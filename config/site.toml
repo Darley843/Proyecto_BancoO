@@ -1,0 +1,57 @@
+# Configuracion del corpus. Un solo lugar para cambiar el alcance del scraping.
+
+[site]
+name = "Banco de Occidente"
+slug = "banco-occidente"
+base_url = "https://www.bancodeoccidente.com.co"
+sitemap_url = "https://www.bancodeoccidente.com.co/sitemap.xml"
+allowed_hosts = ["www.bancodeoccidente.com.co", "bancodeoccidente.com.co"]
+language = "es"
+# Identificarse siempre: es un trabajo academico, no un bot anonimo.
+user_agent = "TAAML-bot/1.0 (curso UAO; uso academico; contacto: darley.idarraga@uao.edu.co)"
+
+[crawl]
+# Cortesia con el servidor: 1.5 s entre peticiones (los slides sugieren 1-2 s).
+delay_seconds = 1.5
+timeout_seconds = 30
+max_retries = 3
+# Tope de seguridad para no martillar el sitio.
+max_urls = 1500
+# El sitemap de Liferay es un indice de indices: se expande recursivamente.
+max_sitemap_depth = 2
+max_sitemaps = 250
+# Sin esto no se captura nada que este en Disallow.
+respect_robots = true
+
+[crawl.politeness]
+# Pausa extra cada N peticiones, por si el sitio responde lento.
+pause_every = 50
+pause_seconds = 10
+
+[discovery]
+# Solo se capturan paginas HTML; los PDF se listan aparte para una fase posterior.
+html_extensions = [".html", ".htm", ".shtml", ""]
+document_extensions = [".pdf", ".doc", ".docx", ".xls", ".xlsx", ".ppt", ".pptx"]
+# Rutas que nunca aportan al corpus (transaccionales, privadas o ruido).
+exclude_patterns = [
+    "/portaltransaccional",
+    "/icbs-web",
+    "/AjaxTx",
+    "/wps/",
+    "/login",
+    "/logout",
+    "/carrito",
+    "/admin",
+    "/error",
+    "/servlet",
+    "/documents/",
+    "/image/",
+]
+
+[gold]
+# Las secciones del checklist del Taller 1.
+sections = ["identidad", "oferta", "presencia", "datos", "atencion", "legal", "otros"]
+# Minimo de documentos para considerar que una linea es boilerplate.
+boilerplate_min_docs = 5
+# Fraccion de documentos en la que debe aparecer una linea para ser boilerplate.
+boilerplate_ratio = 0.35

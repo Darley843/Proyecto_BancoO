@@ -1,0 +1,58 @@
+[project]
+name = "banco-occidente-corpus"
+version = "0.1.0"
+description = "Corpus web de Banco de Occidente: pipeline Medallion (Bronze/Silver/Gold) listo para RAG"
+readme = "README.md"
+authors = [
+    { name = "Darley Idarraga", email = "darley.idarraga@uao.edu.co" }
+]
+requires-python = ">=3.12"
+keywords = ["web-scraping", "rag", "corpus", "medallion", "trafilatura", "uv"]
+classifiers = [
+    "Private :: Do Not Upload",
+    "Programming Language :: Python :: 3.13",
+]
+
+dependencies = [
+    "beautifulsoup4>=4.12.3",
+    "httpx[http2]>=0.27.2",
+    "lxml>=5.3.0",
+    "pyyaml>=6.0.2",
+    "trafilatura>=1.12.2",
+]
+
+[project.optional-dependencies]
+# Conteo exacto de tokens (si no esta instalado se usa un estimador)
+tokens = ["tiktoken>=0.8.0"]
+# Fallback para paginas renderizadas con JavaScript
+browser = ["playwright>=1.48.0"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.3",
+    "pytest-cov>=5.0.0",
+    "ruff>=0.7.0",
+]
+
+[project.scripts]
+corpus = "banco_occidente_corpus.cli:main"
+
+[build-system]
+requires = ["uv_build>=0.13.3,<0.14.0"]
+build-backend = "uv_build"
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "C4", "PTH"]
+ignore = ["E501"]
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["test"]
+addopts = "-q --strict-markers"

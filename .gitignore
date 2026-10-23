@@ -1,0 +1,44 @@
+# Entorno
+.venv/
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Datos
+# Bronze y Silver son reproducibles y pesados; Gold SI se versiona:
+# es el entregable que consume el RAG del Modulo 2.
+data/raw/
+data/processed/
+.data/
+.demo/
+!data/gold/
+!data/gold/**
+
+# Secretos
+.env
+.env.*
+!.env.example
+*.token
+*.pem
+
+# Herramientas
+.playwright/
+node_modules/
+
+# Sistema y editores
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
+*.swp
+
+# Logs
+*.log
