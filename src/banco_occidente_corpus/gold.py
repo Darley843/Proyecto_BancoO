@@ -56,7 +56,8 @@ def build_frontmatter(row: dict, config: Config, *, text_hash: str, tokens: int)
 
 
 def render_document(frontmatter: dict, body: str) -> str:
-    """Une YAML frontmatter + cuerpo Markdown."""
+    """Une YAML frontmatter + cuerpo Markdown (siempre con LF)."""
+    body = body.replace("\r\n", "\n").replace("\r", "\n").strip()
     header = yaml.safe_dump(
         frontmatter,
         allow_unicode=True,
@@ -64,7 +65,7 @@ def render_document(frontmatter: dict, body: str) -> str:
         default_flow_style=False,
         width=100,
     ).strip()
-    return f"---\n{header}\n---\n\n{body.strip()}\n"
+    return f"---\n{header}\n---\n\n{body}\n"
 
 
 def build_gold(config: Config, *, force: bool = False) -> list[dict]:

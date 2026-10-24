@@ -3025,9 +3025,11 @@ por peritos independientes usando técnicas de valoración de nivel dos descrita
 clasifiquen como propiedad de inversión se provisionan de acuerdo con lo establecido en la 
 circular externa 036 de 2014 emitida por la Superintendencia Financiera de Colombia. 
 
-   
+
+   
  
-   
+ 
+  
     
  
 

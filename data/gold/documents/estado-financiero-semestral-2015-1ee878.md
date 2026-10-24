@@ -1068,7 +1068,9 @@ Activo Años
 
 
 
-
+
+
+
  
  
  
@@ -1076,19 +1078,24 @@ Activo Años
   
       
  
-  
+ 
+ 
    
 
-   
+
+   
 
  
  
   
-
+
+
 
 
-  
- 
+
+  
+
+ 
 
 ## Pagina 24
 
@@ -2357,7 +2364,8 @@ Créditos no garantizados $ 7.595.059 3.848.232 1.507 56.032 11.500.830
 Créditos garantizados por otros bancos 301.361 2.569 - 1.351 305.281
  Viviendas 
  823 204.428 - 227.302
- Otros bienes raices   31.708 - 5.130 668.306
+ Otros bienes raices  
+ 31.708 - 5.130 668.306
  Inversiones en instrumentos de patrimonio 375.398 8.632 - - 384.030
  Depositos en efectivo o equivalentes de efectivo 
  4.066 - - 233.123
@@ -3382,13 +3390,15 @@ Obligaciones financieras 6.147.535 6.149.581 4.707.381 4.735.661
 31 de Diciembre de 2015 
 Mediciones a valor razonable para recurrentes
 Activos
- Inversiones a valor razonable de renta fija $ 
+ Inversiones a valor razonable de renta fija $ 
+
 
 30 de Junio de 2015  
 Mediciones a valor razonable para recurrentes
 Activos
  Inversiones a valor razonable de renta fija $ 
- 
+ 
+
 
 
 Instrumentos de 
@@ -3555,7 +3565,8 @@ Emitidos o garantizados por el gobierno colombiano 103.708 57.264
 
 
 
-     855.277 681.094
+ 
+    855.277 681.094
 
 ## Pagina 76
 
