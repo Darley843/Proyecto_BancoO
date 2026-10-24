@@ -15,7 +15,7 @@
   temas: [digital, inteligencia-artificial]
   relevancia: alta
   evento: 2025-08-11-ia-amazon
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2025-08-21-tunel-oriente-larepublica
   fecha: 2025-08-21
@@ -29,7 +29,7 @@
   temas: [financiacion, infraestructura]
   relevancia: alta
   evento: 2025-08-21-tunel-oriente
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2025-09-06-aval-fiduciaria-portafolio
   fecha: 2025-09-06
@@ -43,7 +43,7 @@
   temas: [fusiones, gobierno-corporativo]
   relevancia: alta
   evento: 2025-09-06-aval-fiduciaria
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2025-09-10-apple-pay-portafolio
   fecha: 2025-09-10
@@ -56,7 +56,7 @@
   temas: [digital, productos]
   relevancia: alta
   evento: 2025-09-10-apple-pay
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2025-10-28-petromil-larepublica
   fecha: 2025-10-28
@@ -70,7 +70,7 @@
   temas: [financiacion, empresas]
   relevancia: alta
   evento: 2025-10-28-petromil
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2025-11-11-ia-reconocimiento-eltiempo
   fecha: 2025-11-11
@@ -84,7 +84,7 @@
   temas: [digital, reconocimientos]
   relevancia: media
   evento: 2025-11-11-ia-reconocimiento
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2025-11-19-pagos-inmediatos-valora
   fecha: 2025-11-19
@@ -97,7 +97,7 @@
   temas: [digital, productos, empresas]
   relevancia: alta
   evento: 2025-11-19-pagos-inmediatos
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2025-11-27-invest-bogota-eltiempo
   fecha: 2025-11-27
@@ -111,7 +111,7 @@
   temas: [financiacion, infraestructura, inversion]
   relevancia: media
   evento: 2025-11-27-invest-bogota
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2025-12-01-mejor-lugar-trabajar-eltiempo
   fecha: 2025-12-01
@@ -125,7 +125,7 @@
   temas: [reconocimientos, talento-humano]
   relevancia: media
   evento: 2025-12-01-mejor-lugar-trabajar
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2025-12-22-whatsapp-portafolio
   fecha: 2025-12-22
@@ -138,7 +138,7 @@
   temas: [digital, productos]
   relevancia: alta
   evento: 2025-12-22-whatsapp
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2026-05-14-utilidades-q1-larepublica
   fecha: 2026-05-14
@@ -151,7 +151,7 @@
   temas: [resultados]
   relevancia: alta
   evento: 2026-05-14-resultados-q1
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2026-05-16-kubo-forbes
   fecha: 2026-05-16
@@ -164,7 +164,7 @@
   temas: [productos, digital]
   relevancia: alta
   evento: 2026-05-16-kubo
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2026-08-14-utilidad-semestral-portafolio
   fecha: 2026-08-14
@@ -177,7 +177,7 @@
   temas: [resultados]
   relevancia: alta
   evento: 2026-08-14-resultados-semestre
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2026-08-24-alivio-terremoto-elcolombiano
   fecha: 2026-08-24
@@ -191,7 +191,7 @@
   temas: [productos, responsabilidad-social]
   relevancia: alta
   evento: 2026-08-24-alivio-terremoto
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2026-08-27-caf-reactivacion-caf
   fecha: 2026-08-27
@@ -205,7 +205,7 @@
   temas: [financiacion, sostenibilidad, responsabilidad-social]
   relevancia: alta
   evento: 2026-08-27-caf-reactivacion
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2026-09-03-absorcion-fiduciaria-larepublica
   fecha: 2026-09-03
@@ -218,7 +218,7 @@
   temas: [fusiones, gobierno-corporativo]
   relevancia: alta
   evento: 2026-09-03-absorcion-fiduciaria
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2026-09-22-credito-subordinado-deg-portafolio
   fecha: 2026-09-22
@@ -232,7 +232,7 @@
   temas: [financiacion, sostenibilidad]
   relevancia: alta
   evento: 2026-09-22-credito-subordinado-deg
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2026-10-07-crecimiento-23-valora
   fecha: 2026-10-07
@@ -245,7 +245,7 @@
   temas: [resultados, digital]
   relevancia: alta
   evento: 2026-10-07-crecimiento-23
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2026-10-09-aprobacion-tarjetas-larepublica
   fecha: 2026-10-09
@@ -259,7 +259,7 @@
   temas: [productos, digital, reconocimientos]
   relevancia: alta
   evento: 2026-10-09-aprobacion-tarjetas
-  estado: pendiente
+  estado: verificado
 
 - id: noticia-2026-10-19-parque-solar-portafolio
   fecha: 2026-10-19
@@ -272,4 +272,4 @@
   temas: [financiacion, sostenibilidad, energia]
   relevancia: alta
   evento: 2026-10-19-parque-solar-santander
-  estado: pendiente
+  estado: verificado
