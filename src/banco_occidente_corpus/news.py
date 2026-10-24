@@ -631,10 +631,22 @@ def _fecha_iso_obligatoria(valor: Any) -> str:
     return fecha
 
 
-def _id_derivado(tipo: str, fecha: str, titulo: str, fuente: str) -> str:
-    """Deriva un id estable con prefijo de tipo y hash corto de la fuente."""
+def _id_derivado(
+    tipo: str,
+    fecha: str,
+    titulo: str,
+    fuente: str,
+    *,
+    discriminante: str = "",
+) -> str:
+    """Deriva un id estable con prefijo de tipo y hash corto de la fuente.
+
+    ``discriminante`` separa hechos de la misma fecha y tema que tienen
+    resumen o anexo distintos, para que no colisionen en el mismo archivo.
+    """
     prefijo = "hecho" if tipo == "hecho" else "noticia"
-    return f"{prefijo}-{fecha}-{slugify(titulo, 60)}-{short_hash(fuente, 6)}"
+    base = f"{fuente}|{discriminante}" if discriminante else fuente
+    return f"{prefijo}-{fecha}-{slugify(titulo, 60)}-{short_hash(base, 6)}"
 
 
 def render_ficha(row: Mapping[str, Any], config: Config) -> tuple[dict[str, Any], str]:
@@ -683,7 +695,14 @@ def render_ficha(row: Mapping[str, Any], config: Config) -> tuple[dict[str, Any]
     documento_id = _campo_texto(row, "documento_id")
     documento_archivo = Path(_campo_texto(row, "documento_archivo")).name
     documento_titulo = _campo_texto(row, "documento_titulo")
-    id_ficha = _campo_texto(row, "id") or _id_derivado(tipo, fecha_publicacion, titulo, fuente)
+    anexo = _campo_texto(row, "anexo")
+    id_ficha = _campo_texto(row, "id") or _id_derivado(
+        tipo,
+        fecha_publicacion,
+        titulo,
+        fuente,
+        discriminante=f"{resumen}|{anexo}",
+    )
 
     texto_hash = sha256_text(f"{titulo}\n{resumen}")
 
@@ -750,6 +769,8 @@ def merge_corpus(config: Config, rows: list[dict[str, Any]]) -> list[dict[str, A
             _campo_texto(fila, "fuente"),
             _campo_texto(fila, "fecha_publicacion", "fecha"),
             _campo_texto(fila, "titulo"),
+            _campo_texto(fila, "resumen"),
+            _campo_texto(fila, "anexo"),
         )
         for fila in conservadas
     }
@@ -765,6 +786,8 @@ def merge_corpus(config: Config, rows: list[dict[str, Any]]) -> list[dict[str, A
             _campo_texto(nueva, "fuente"),
             _campo_texto(nueva, "fecha_publicacion", "fecha"),
             _campo_texto(nueva, "titulo"),
+            _campo_texto(nueva, "resumen"),
+            _campo_texto(nueva, "anexo"),
         )
         if clave in claves_vistas:
             continue
@@ -1038,7 +1061,9 @@ def _escribir_fichas(config: Config, rows: list[dict[str, Any]]) -> list[dict[st
         ids.add(identificador)
         ruta = config.paths.gold_markdown / f"{identificador}.md"
         ruta.write_text(render_document(frontmatter, cuerpo), encoding="utf-8", newline="\n")
-        generadas.append(frontmatter)
+        fila = dict(frontmatter)
+        fila["archivo"] = ruta.relative_to(config.paths.root).as_posix()
+        generadas.append(fila)
 
     for ruta in config.paths.gold_markdown.glob("*.md"):
         if ruta.stem.startswith(("noticia-", "hecho-")) and ruta.stem not in ids:
