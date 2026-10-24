@@ -52,6 +52,7 @@ class ExtractedPage:
     method: str
     section: str
     date: str | None = None
+    capture_date: str | None = None
 
 
 def _clean_html(html: str) -> str:
@@ -127,7 +128,9 @@ def _fallback(html: str) -> str:
     return "\n\n".join(blocks)
 
 
-def extract_page(html: str, url: str, *, language: str = "es") -> ExtractedPage:
+def extract_page(
+    html: str, url: str, *, language: str = "es", capture_date: str | None = None
+) -> ExtractedPage:
     """Extrae una pagina; nunca lanza por contenido pobre."""
     body, meta_title, date = _trafilatura(html, url)
     method = "trafilatura"
@@ -145,6 +148,7 @@ def extract_page(html: str, url: str, *, language: str = "es") -> ExtractedPage:
         method=method,
         section=classify(url, title),
         date=date,
+        capture_date=capture_date,
     )
 
 
@@ -154,7 +158,12 @@ def extract_all(config: Config, *, min_chars: int = 120) -> list[dict]:
     captured = 0
     for row in iter_bronze(config):
         captured += 1
-        page = extract_page(row["html"], row["url"], language=config.site.language)
+        page = extract_page(
+            row["html"],
+            row["url"],
+            language=config.site.language,
+            capture_date=row.get("fecha_captura"),
+        )
         if len(page.markdown) < min_chars:
             continue
         pages.append(page)
@@ -191,6 +200,7 @@ def extract_all(config: Config, *, min_chars: int = 120) -> list[dict]:
                 "chars": len(clean),
                 "archivo": path.relative_to(config.paths.root).as_posix(),
                 "texto": clean,
+                "fecha_captura": page.capture_date,
                 "fecha_proceso": utc_now(),
             }
         )

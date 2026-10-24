@@ -28,7 +28,7 @@ def build_frontmatter(row: dict, config: Config, *, text_hash: str, tokens: int)
     """Metadatos del estandar del curso (mismo orden que los slides)."""
     from datetime import date
 
-    raw_date = (row.get("fecha_proceso") or utc_now())[:10]
+    raw_date = (row.get("fecha_captura") or row.get("fecha_proceso") or utc_now())[:10]
     try:
         capture_date: object = date.fromisoformat(raw_date)
     except ValueError:
