@@ -4,6 +4,7 @@ context: |
   Language: es
   All artifacts must be written in es.
   Keep OpenSpec structural headings and SHALL/MUST keywords in English.
+  Every function, method and test helper MUST have a docstring in Spanish and explicit type annotations.
 
 # Per-artifact rules (optional)
 # Add custom rules for specific artifacts.
