@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
+import yaml
 from bs4 import BeautifulSoup, Tag
 
 from .utils import read_jsonl
@@ -69,6 +70,22 @@ _HOSTS_BANCO = {
     "www.bancodeoccidente.com.co",
     "portalpublico.bancodeoccidente.com.co",
 }
+
+_CAMPOS_PRENSA = (
+    "id",
+    "fecha",
+    "medio",
+    "titulo",
+    "url",
+    "resumen",
+    "temas",
+    "relevancia",
+    "estado",
+)
+
+_ESTADOS_PRENSA = frozenset({"pendiente", "verificado"})
+_RELEVANCIAS_PRENSA = frozenset({"alta", "media", "baja"})
+_FECHA_ISO = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 
 
 def _normalizar_espacios(texto: str) -> str:
@@ -367,3 +384,193 @@ def vincular_documento(
         "documento_archivo": archivo,
         "documento_titulo": str(fila.get("titulo") or "").strip(),
     }
+
+
+def _tiene_contenido(valor: Any) -> bool:
+    """Indica si un valor obligatorio tiene contenido util."""
+    if isinstance(valor, str):
+        return bool(valor.strip())
+    if isinstance(valor, (list, tuple, set, dict)):
+        return bool(valor)
+    return valor is not None
+
+
+def _normalizar_fecha(valor: Any) -> str | None:
+    """Convierte una fecha ISO o un ``date`` de YAML a ``YYYY-MM-DD``."""
+    if isinstance(valor, date):
+        return valor.strftime("%Y-%m-%d")
+    if not isinstance(valor, str):
+        return None
+    texto = valor.strip()
+    if not _FECHA_ISO.fullmatch(texto):
+        return None
+    try:
+        return date.fromisoformat(texto).isoformat()
+    except ValueError:
+        return None
+
+
+def validar_ficha(ficha: Mapping[str, Any]) -> list[str]:
+    """Valida los campos minimos de una ficha de prensa externa.
+
+    Devuelve una lista de errores legibles; una lista vacia indica que la ficha
+    cumple el contrato minimo. No consulta la red ni modifica la ficha.
+    """
+    errores: list[str] = []
+    for campo in _CAMPOS_PRENSA:
+        if not _tiene_contenido(ficha.get(campo)):
+            errores.append(f"falta el campo obligatorio '{campo}'")
+
+    for campo in ("id", "medio", "titulo", "resumen"):
+        valor = ficha.get(campo)
+        if _tiene_contenido(valor) and not isinstance(valor, str):
+            errores.append(f"'{campo}' debe ser texto")
+
+    fecha = ficha.get("fecha")
+    if _tiene_contenido(fecha) and _normalizar_fecha(fecha) is None:
+        errores.append("'fecha' debe ser una fecha ISO valida (YYYY-MM-DD)")
+
+    url = ficha.get("url")
+    if _tiene_contenido(url):
+        if not isinstance(url, str):
+            errores.append("'url' debe ser una URL http(s) valida")
+        else:
+            partes = urlsplit(url.strip())
+            if partes.scheme.lower() not in {"http", "https"} or not partes.netloc:
+                errores.append("'url' debe ser una URL http(s) valida")
+
+    estado = ficha.get("estado")
+    if _tiene_contenido(estado) and (
+        not isinstance(estado, str) or estado.strip().casefold() not in _ESTADOS_PRENSA
+    ):
+        errores.append("'estado' debe ser 'pendiente' o 'verificado'")
+
+    temas = ficha.get("temas")
+    if _tiene_contenido(temas):
+        if not isinstance(temas, list):
+            errores.append("'temas' debe ser una lista de textos")
+        elif not all(isinstance(tema, str) and bool(tema.strip()) for tema in temas):
+            errores.append("'temas' no puede contener elementos vacios")
+
+    relevancia = ficha.get("relevancia")
+    if _tiene_contenido(relevancia) and (
+        not isinstance(relevancia, str) or relevancia.strip().casefold() not in _RELEVANCIAS_PRENSA
+    ):
+        errores.append("'relevancia' debe ser 'alta', 'media' o 'baja'")
+
+    return errores
+
+
+def load_prensa(path: Path) -> list[dict[str, Any]]:
+    """Carga y valida la curaduria externa desde un YAML local.
+
+    Normaliza la fecha a ``YYYY-MM-DD``. Lanza ``ValueError`` con el archivo y
+    el campo invalido si el YAML no existe, no es una lista o alguna ficha no
+    cumple el contrato minimo.
+    """
+    try:
+        contenido = yaml.safe_load(path.read_text(encoding="utf-8"))
+    except FileNotFoundError as exc:
+        raise ValueError(f"No existe la curaduria de prensa: {path}") from exc
+    except yaml.YAMLError as exc:
+        raise ValueError(f"YAML invalido en {path}: {exc}") from exc
+    except OSError as exc:
+        raise ValueError(f"No se pudo leer la curaduria de prensa {path}: {exc}") from exc
+
+    if not isinstance(contenido, list):
+        raise ValueError(f"{path} debe contener una lista de fichas de prensa")
+
+    fichas: list[dict[str, Any]] = []
+    for indice, fila in enumerate(contenido, start=1):
+        if not isinstance(fila, dict):
+            raise ValueError(f"{path}: la ficha {indice} no es un objeto")
+        ficha = dict(fila)
+        errores = validar_ficha(ficha)
+        if errores:
+            raise ValueError(f"{path}: ficha {indice} invalida: {'; '.join(errores)}")
+        fecha = _normalizar_fecha(ficha.get("fecha"))
+        if fecha is not None:
+            ficha["fecha"] = fecha
+        fichas.append(ficha)
+    return fichas
+
+
+def _clave_fuente(ficha: Mapping[str, Any]) -> str:
+    """Normaliza la URL de la ficha para detectar la misma fuente.
+
+    Acepta ``fuente`` (contrato Gold) o ``url`` (curaduria YAML). Ignora
+    fragmentos, mayusculas del host y la barra final; conserva la query.
+    """
+    valor = ficha.get("fuente") or ficha.get("url") or ""
+    if not isinstance(valor, str):
+        valor = str(valor)
+    url = valor.strip()
+    if not url:
+        return ""
+    partes = urlsplit(url)
+    if not partes.scheme or not partes.netloc:
+        return url
+    camino = partes.path.rstrip("/") or "/"
+    return urlunsplit((partes.scheme.lower(), partes.netloc.lower(), camino, partes.query, ""))
+
+
+def deduplicar(
+    rows: list[dict[str, Any]],
+    *,
+    max_por_evento: int = 2,
+) -> list[dict[str, Any]]:
+    """Elimina fichas duplicadas y limita las coberturas por evento.
+
+    Conserva la primera aparicion por ``id``, por URL de ``fuente``/``url`` y
+    por la pareja ``evento`` + ``medio``. Ademas, acepta como maximo
+    ``max_por_evento`` coberturas para un mismo evento. No consulta la red.
+    """
+    if max_por_evento < 1:
+        raise ValueError("max_por_evento debe ser al menos 1")
+
+    resultado: list[dict[str, Any]] = []
+    ids: set[str] = set()
+    fuentes: set[str] = set()
+    pares_evento_medio: set[tuple[str, str]] = set()
+    por_evento: dict[str, int] = {}
+
+    for fila in rows:
+        id_ficha = str(fila.get("id") or "").strip()
+        if id_ficha and id_ficha in ids:
+            continue
+
+        fuente = _clave_fuente(fila)
+        if fuente and fuente in fuentes:
+            continue
+
+        evento = _normalizar_espacios(str(fila.get("evento") or "")).casefold()
+        medio = _normalizar_espacios(str(fila.get("medio") or "")).casefold()
+        par = (evento, medio) if evento and medio else None
+        if par is not None and par in pares_evento_medio:
+            continue
+
+        if evento and por_evento.get(evento, 0) >= max_por_evento:
+            log.info("Se omite una cobertura adicional del evento %s", evento)
+            continue
+
+        resultado.append(fila)
+        if id_ficha:
+            ids.add(id_ficha)
+        if fuente:
+            fuentes.add(fuente)
+        if par is not None:
+            pares_evento_medio.add(par)
+        if evento:
+            por_evento[evento] = por_evento.get(evento, 0) + 1
+
+    return resultado
+
+
+def filtrar_verificadas(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Devuelve solo las fichas con estado ``verificado``.
+
+    Las fichas ``pendiente`` requieren revision humana y no se publican en Gold.
+    """
+    return [
+        fila for fila in rows if str(fila.get("estado") or "").strip().casefold() == "verificado"
+    ]

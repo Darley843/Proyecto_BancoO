@@ -12,16 +12,37 @@ from banco_occidente_corpus import documents
 from banco_occidente_corpus.config import load_config
 from banco_occidente_corpus.news import (
     cargar_indice_documentos,
+    deduplicar,
     derivar_resumen,
     derivar_titulo,
     es_aviso_dividendo,
+    filtrar_verificadas,
+    load_prensa,
     parse_fecha_es,
     parse_hechos_relevantes,
+    validar_ficha,
     validar_pii,
     vincular_documento,
 )
 
 FIXTURES = Path(__file__).parent / "fixtures"
+
+
+def _ficha_prensa(**cambios: object) -> dict[str, object]:
+    """Devuelve una ficha de prensa valida para las pruebas locales."""
+    ficha: dict[str, object] = {
+        "id": "noticia-2026-01-01-ejemplo",
+        "fecha": "2026-01-01",
+        "medio": "Medio de prueba",
+        "titulo": "Banco de Occidente anuncia una iniciativa",
+        "url": "https://example.com/noticia",
+        "resumen": "Resumen propio de la noticia para las pruebas locales.",
+        "temas": ["digital"],
+        "relevancia": "alta",
+        "estado": "verificado",
+    }
+    ficha.update(cambios)
+    return ficha
 
 
 def test_config_noticias() -> None:
@@ -67,14 +88,150 @@ def test_prensa_yaml_carga_y_estado_valido() -> None:
         ids.add(row["id"])
 
 
+def test_load_prensa_lee_y_normaliza_fechas() -> None:
+    """El registro real se carga y sus fechas quedan como texto ISO."""
+    config = load_config()
+    fichas = load_prensa(config.paths.news_prensa)
+
+    assert 15 <= len(fichas) <= 20
+    assert all(isinstance(ficha["fecha"], str) for ficha in fichas)
+    assert all(validar_ficha(ficha) == [] for ficha in fichas)
+
+
+def test_validar_ficha_rechaza_campo_faltante() -> None:
+    """Una ficha sin uno de los campos obligatorios no es valida."""
+    ficha = _ficha_prensa()
+    del ficha["titulo"]
+
+    assert any("titulo" in error for error in validar_ficha(ficha))
+
+
+@pytest.mark.parametrize(
+    ("campo", "valor", "mensaje"),
+    [
+        ("fecha", "2025-13-40", "fecha"),
+        ("url", "ftp://example.com/noticia", "url"),
+        ("estado", "revision", "estado"),
+        ("resumen", "   ", "resumen"),
+    ],
+)
+def test_validar_ficha_rechaza_valores_invalidos(campo: str, valor: object, mensaje: str) -> None:
+    """Rechaza fecha, URL, estado y resumen que no cumplen el contrato."""
+    ficha = _ficha_prensa()
+    ficha[campo] = valor
+
+    assert any(mensaje in error for error in validar_ficha(ficha))
+
+
+def test_load_prensa_falla_con_campo_faltante(tmp_path: Path) -> None:
+    """El cargador informa el archivo y el campo invalido."""
+    ficha = _ficha_prensa()
+    del ficha["resumen"]
+    path = tmp_path / "prensa.yaml"
+    path.write_text(yaml.safe_dump([ficha], allow_unicode=True), encoding="utf-8")
+
+    with pytest.raises(ValueError, match="resumen"):
+        load_prensa(path)
+
+
+def test_deduplicar_por_id_fuente_y_evento_medio(tmp_path: Path) -> None:
+    """Descarta ids, URLs y pares evento-medio repetidos y aplica el tope."""
+    fichas = [
+        _ficha_prensa(
+            id="noticia-1",
+            url="https://example.com/a",
+            medio="Medio A",
+            evento="evento-1",
+        ),
+        _ficha_prensa(
+            id="noticia-1",
+            url="https://example.com/id-repetido",
+            medio="Medio B",
+            evento="evento-2",
+        ),
+        _ficha_prensa(
+            id="noticia-2",
+            url="https://example.com/a",
+            medio="Medio C",
+            evento="evento-3",
+        ),
+        _ficha_prensa(
+            id="noticia-3",
+            url="https://example.com/evento-medio",
+            medio="Medio A",
+            evento="evento-1",
+        ),
+        _ficha_prensa(
+            id="noticia-4",
+            url="https://example.com/evento-4-a",
+            medio="Medio A",
+            evento="evento-4",
+        ),
+        _ficha_prensa(
+            id="noticia-5",
+            url="https://example.com/evento-4-b",
+            medio="Medio B",
+            evento="evento-4",
+        ),
+        _ficha_prensa(
+            id="noticia-6",
+            url="https://example.com/evento-4-c",
+            medio="Medio C",
+            evento="evento-4",
+        ),
+    ]
+    path = tmp_path / "prensa.yaml"
+    path.write_text(
+        yaml.safe_dump(fichas, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    resultado = deduplicar(load_prensa(path), max_por_evento=2)
+
+    assert [ficha["id"] for ficha in resultado] == ["noticia-1", "noticia-4", "noticia-5"]
+
+
+def test_filtrar_verificadas_excluye_pendientes(tmp_path: Path) -> None:
+    """Solo las fichas verificadas quedan disponibles para publicar en Gold."""
+    fichas = [
+        _ficha_prensa(
+            id="noticia-pendiente",
+            url="https://example.com/pendiente",
+            estado="pendiente",
+        ),
+        _ficha_prensa(
+            id="noticia-verificada",
+            url="https://example.com/verificada",
+            estado="verificado",
+        ),
+    ]
+    path = tmp_path / "prensa.yaml"
+    path.write_text(
+        yaml.safe_dump(fichas, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+
+    publicables = filtrar_verificadas(deduplicar(load_prensa(path)))
+
+    assert [ficha["id"] for ficha in publicables] == ["noticia-verificada"]
+
+
 def test_readme_documenta_limites_y_verificacion() -> None:
-    """El README explica el rango 15-20 y el paso de pendiente a verificado."""
+    """El README explica el rango 15-20, los campos, los temas y la verificación."""
     config = load_config()
     readme = (config.paths.news_source / "README.md").read_text(encoding="utf-8")
+    compacto = " ".join(readme.split())
+
     assert "15 y 20" in readme
     assert "estado: pendiente" in readme
     assert "estado: verificado" in readme
     assert "Banco de Occidente de Colombia" in readme
+    assert "título, fecha, medio, enlace original y resumen propio" in compacto
+    assert "No se guarda el cuerpo del artículo" in compacto
+    assert "no se copian párrafos del artículo" in compacto
+    assert "## Campos" in readme
+    assert "Vocabulario de `temas`" in readme
+    assert "## Verificación humana" in readme
 
 
 # ---------------------------------------------------------------- fechas
