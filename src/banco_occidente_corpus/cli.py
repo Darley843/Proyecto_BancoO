@@ -16,6 +16,11 @@ log = logging.getLogger("corpus")
 
 
 def _setup_logging(verbose: bool) -> None:
+    # La consola de Windows usa cp1252: un titulo con caracteres combinados
+    # (p. ej. "n" + tilde) rompe logging. Se degrada a 'replace' sin perder el log.
+    reconfigure = getattr(sys.stdout, "reconfigure", None)
+    if callable(reconfigure):
+        reconfigure(errors="replace")
     logging.basicConfig(
         level=logging.DEBUG if verbose else logging.INFO,
         format="%(levelname)-7s %(message)s",
@@ -179,6 +184,62 @@ def cmd_knowledge(config: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_docs(config: Config, args: argparse.Namespace) -> int:
+    from .documents import discover_documents, extract_documents, fetch_documents
+
+    if args.docs_action in {"discover", "all"}:
+        rows = discover_documents(config)
+        by_priority: dict[int, int] = {}
+        for row in rows:
+            by_priority[row["prioridad"]] = by_priority.get(row["prioridad"], 0) + 1
+        print(f"Documentos inventariados: {len(rows)} {by_priority}")
+
+    if args.docs_action in {"fetch", "all"}:
+        stats = fetch_documents(
+            config,
+            limit=args.limit,
+            max_mb=args.max_mb,
+            priority_max=3 if args.all_docs else args.priority_max,
+            force=args.force,
+            delay=args.delay,
+            types=args.doc_types,
+        )
+        print(
+            "Documentos: "
+            f"{stats['ok']} nuevos, {stats['cached']} en cache, "
+            f"{stats['failed']} fallidos, {stats['skipped']} omitidos, "
+            f"{stats['bytes'] / 1_048_576:.1f} MB"
+        )
+
+    if args.docs_action in {"extract", "all"}:
+        rows = extract_documents(config)
+        print(f"Documentos Gold: {len(rows)}")
+
+    return 0
+
+
+def cmd_videos(config: Config, args: argparse.Namespace) -> int:
+    from .videos import discover_videos, extract_videos, fetch_videos
+
+    if args.videos_action in {"discover", "all"}:
+        rows = discover_videos(config, channel_limit=args.channel_limit)
+        print(f"Videos inventariados: {len(rows)}")
+
+    if args.videos_action in {"fetch", "all"}:
+        stats = fetch_videos(config, limit=args.limit, force=args.force)
+        print(
+            "Videos: "
+            f"{stats['ok']} nuevos, {stats['cached']} en cache, "
+            f"{stats['failed']} fallidos, {stats['sin_subtitulos']} sin subtitulos"
+        )
+
+    if args.videos_action in {"extract", "all"}:
+        rows = extract_videos(config)
+        print(f"Videos Gold: {len(rows)}")
+
+    return 0
+
+
 def cmd_status(config: Config, args: argparse.Namespace) -> int:
     from .gold import load_corpus
 
@@ -193,6 +254,8 @@ def cmd_status(config: Config, args: argparse.Namespace) -> int:
     print(f"{'Bronze':<12}{len(raw_files):>10}")
     print(f"{'Silver':<12}{len(silver_files):>10}")
     print(f"{'Gold':<12}{len(corpus):>10}")
+    print(f"{'Docs PDF':<12}{len(list(config.paths.documents_gold.glob('*.md'))):>10}")
+    print(f"{'Videos':<12}{len(list(config.paths.videos_gold.glob('*.md'))):>10}")
     return 0
 
 
@@ -282,6 +345,17 @@ def build_parser() -> argparse.ArgumentParser:
     knowledge = sub.add_parser("knowledge", help="valida entidades, hechos y relaciones")
     knowledge.add_argument("--file", default=None, help="valida un JSONL candidato")
     knowledge.add_argument("--merge", default=None, help="valida y fusiona un JSONL candidato")
+    docs = sub.add_parser("docs", help="documentos PDF: discover | fetch | extract | all")
+    docs.add_argument("docs_action", choices=["discover", "fetch", "extract", "all"])
+    docs.add_argument("--max-mb", type=float, default=400, help="tope de descarga en MB")
+    docs.add_argument("--priority-max", type=int, default=2, help="prioridad maxima (1-3)")
+    docs.add_argument("--all", dest="all_docs", action="store_true", help="sin filtro de prioridad")
+    docs.add_argument(
+        "--tipo", dest="doc_types", default=None, help="filtrar: financiero,gobierno,producto,legal"
+    )
+    videos = sub.add_parser("videos", help="videos de YouTube: discover | fetch | extract | all")
+    videos.add_argument("videos_action", choices=["discover", "fetch", "extract", "all"])
+    videos.add_argument("--channel-limit", type=int, default=30, help="videos del canal a listar")
     sub.add_parser("all", help="discover + fetch + extract + gold + stats")
     sub.add_parser("status", help="cuenta documentos por capa")
     sub.add_parser("doctor", help="diagnostica red y estado del pipeline")
@@ -310,6 +384,8 @@ def main(argv: list[str] | None = None) -> int:
         "gold": cmd_gold,
         "chunks": cmd_chunks,
         "knowledge": cmd_knowledge,
+        "docs": cmd_docs,
+        "videos": cmd_videos,
         "all": cmd_all,
         "stats": cmd_stats,
         "status": cmd_status,

@@ -93,6 +93,21 @@ chunks: ## Segmenta Gold en chunks por encabezado (capa Knowledge)
 knowledge: chunks ## Valida entidades/hechos/relaciones y escribe el indice
 	$(CORPUS) knowledge
 
+.PHONY: docs
+docs: ## Inventaria, descarga y extrae PDFs (balances, informes, gobierno)
+	$(CORPUS) docs all
+
+.PHONY: docs-finanzas
+docs-finanzas: ## Descarga el historico completo de estados financieros
+	$(CORPUS) docs fetch --tipo financiero --priority-max 3 --max-mb 600
+
+.PHONY: videos
+videos: ## Lista el canal, descarga subtitulos y transcribe a Gold
+	$(CORPUS) videos all
+
+.PHONY: media
+media: docs videos ## Documentos PDF + videos de YouTube
+
 .PHONY: all
 all: ## Pipeline completo: discover -> fetch -> extract -> gold -> stats
 	$(CORPUS) all $(if $(LIMIT),--limit $(LIMIT),) $(if $(DELAY),--delay $(DELAY),)

@@ -20,6 +20,7 @@ dependencies = [
     "httpx[http2]>=0.27.2",
     "jsonschema>=4.26.0",
     "lxml>=5.3.0",
+    "pypdfium2>=5.14.0",
     "pyyaml>=6.0.2",
     "trafilatura>=1.12.2",
 ]
@@ -29,6 +30,9 @@ dependencies = [
 tokens = ["tiktoken>=0.8.0"]
 # Fallback para paginas renderizadas con JavaScript
 browser = ["playwright>=1.48.0"]
+media = [
+    "yt-dlp>=2026.10.21",
+]
 
 [dependency-groups]
 dev = [

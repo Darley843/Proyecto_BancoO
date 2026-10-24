@@ -25,6 +25,7 @@ class Response:
     content_type: str
     elapsed: float
     error: str | None = None
+    content: bytes = b""
 
     @property
     def ok(self) -> bool:
@@ -110,6 +111,7 @@ class HttpClient:
                         url=str(response.url),
                         status=response.status_code,
                         text=response.text,
+                        content=response.content,
                         content_type=response.headers.get("content-type", ""),
                         elapsed=elapsed,
                     )

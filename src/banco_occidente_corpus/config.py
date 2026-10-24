@@ -45,6 +45,42 @@ class Paths:
         return self.raw / "documents"
 
     @property
+    def documents_urls(self) -> Path:
+        return self.raw / "documents_urls.jsonl"
+
+    @property
+    def documents_capture(self) -> Path:
+        return self.raw / "documents_capture.jsonl"
+
+    @property
+    def documents_gold(self) -> Path:
+        return self.gold / "documents"
+
+    @property
+    def documents_index(self) -> Path:
+        return self.gold / "documents.jsonl"
+
+    @property
+    def videos_raw(self) -> Path:
+        return self.raw / "videos"
+
+    @property
+    def videos_urls(self) -> Path:
+        return self.raw / "videos_urls.jsonl"
+
+    @property
+    def videos_capture(self) -> Path:
+        return self.raw / "videos_capture.jsonl"
+
+    @property
+    def videos_gold(self) -> Path:
+        return self.gold / "videos"
+
+    @property
+    def videos_index(self) -> Path:
+        return self.gold / "videos.jsonl"
+
+    @property
     def urls_file(self) -> Path:
         return self.raw / "urls.jsonl"
 
@@ -103,6 +139,9 @@ class Paths:
             self.silver_markdown,
             self.gold_markdown,
             self.knowledge,
+            self.documents_gold,
+            self.videos_raw,
+            self.videos_gold,
         ):
             path.mkdir(parents=True, exist_ok=True)
 

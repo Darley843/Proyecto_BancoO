@@ -42,9 +42,9 @@ make chunks     # segmenta Gold por encabezados -> data/knowledge/chunks.jsonl
 
 ## Flujo (por sección, nunca todo de golpe)
 
-1. **Elige el alcance.** Una sección (`identidad`, `oferta`, `datos`…) o un
-   conjunto de 10–20 chunks. El corpus tiene ~1.177 chunks: no caben en un
-   prompt y la calidad cae.
+1. **Elige el alcance.** Una sección (`identidad`, `oferta`, `datos`…), un
+   documento PDF o un conjunto de 10–20 chunks. El corpus tiene ~14.300 chunks
+   (páginas, PDFs y videos): no caben en un prompt y la calidad cae.
 2. **Lee los chunks** con su `chunk_id`, `page_id`, `url`, `section` y `heading`.
    El chunk es la unidad de evidencia: no cites texto de otro chunk.
 3. **Normaliza entidades primero.** Crea o reutiliza la entidad (`ent:...`)

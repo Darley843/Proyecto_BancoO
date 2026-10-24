@@ -84,10 +84,23 @@ def split_page(page_id: str, meta: dict, body: str) -> list[dict]:
     return chunks
 
 
+def _gold_files(config: Config) -> list[Path]:
+    """Paginas + documentos PDF + transcripciones de video."""
+    files: list[Path] = []
+    for directory in (
+        config.paths.gold_markdown,
+        config.paths.documents_gold,
+        config.paths.videos_gold,
+    ):
+        if directory.exists():
+            files.extend(sorted(directory.glob("*.md")))
+    return files
+
+
 def build_chunks(config: Config) -> list[dict]:
     """Gold -> data/knowledge/chunks.jsonl (determinista, sin red)."""
     rows: list[dict] = []
-    for path in sorted(config.paths.gold_markdown.glob("*.md")):
+    for path in _gold_files(config):
         meta, body = load_page(path)
         rows.extend(split_page(path.stem, meta, body))
     config.paths.knowledge.mkdir(parents=True, exist_ok=True)
@@ -98,7 +111,7 @@ def build_chunks(config: Config) -> list[dict]:
 def _all_chunks(config: Config) -> dict[tuple[str, str], dict]:
     """Chunks en memoria: permite validar sin depender de haber corrido 'chunks'."""
     index: dict[tuple[str, str], dict] = {}
-    for path in sorted(config.paths.gold_markdown.glob("*.md")):
+    for path in _gold_files(config):
         meta, body = load_page(path)
         for chunk in split_page(path.stem, meta, body):
             index[(chunk["page_id"], chunk["chunk_id"])] = chunk
@@ -150,7 +163,7 @@ def validate_knowledge(
     chunks = _all_chunks(config)
 
     pages: dict[str, dict] = {}
-    for path in sorted(config.paths.gold_markdown.glob("*.md")):
+    for path in _gold_files(config):
         meta, _ = load_page(path)
         pages[path.stem] = meta
 
