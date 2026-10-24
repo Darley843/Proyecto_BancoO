@@ -1,7 +1,7 @@
 """Demo offline: corre Bronze -> Silver -> Gold con una pagina local.
 
-No toca la red ni el corpus real: escribe en .demo/ y muestra el resultado.
-Sirve para validar el entorno antes de lanzar el scraping.
+No toca la red ni el corpus real: escribe en .demo/offline y muestra el
+resultado. Sirve para validar el entorno antes de lanzar el scraping.
 """
 
 from __future__ import annotations
@@ -17,7 +17,8 @@ from banco_occidente_corpus.gold import build_gold, load_corpus
 
 ROOT = Path(__file__).resolve().parents[1]
 FIXTURE = ROOT / "test" / "fixtures" / "quienes_somos.html"
-WORK = ROOT / ".demo"
+#: Subdirectorio propio: no borra otros archivos de .demo (logs, pruebas).
+WORK = ROOT / ".demo" / "offline"
 
 
 def main() -> int:
@@ -26,8 +27,8 @@ def main() -> int:
         return 1
 
     if WORK.exists():
-        shutil.rmtree(WORK)
-    WORK.mkdir(parents=True)
+        shutil.rmtree(WORK, ignore_errors=True)
+    WORK.mkdir(parents=True, exist_ok=True)
 
     config = Config(
         gold=GoldConfig(boilerplate_min_docs=5, boilerplate_ratio=0.35),
