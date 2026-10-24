@@ -2,14 +2,15 @@
 
 from __future__ import annotations
 
+import json
 import logging
-from collections.abc import Iterable
+from collections.abc import Iterable, Iterator
 from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config import Config
 from .net import BlockedError, HttpClient, fetch_with_browser
-from .utils import human_size, read_jsonl, sha256_text, utc_now, write_jsonl
+from .utils import human_size, read_jsonl, sha256_text, utc_now
 
 log = logging.getLogger(__name__)
 
@@ -59,86 +60,93 @@ def fetch_all(
     delay: float | None = None,
     browser: bool = False,
 ) -> FetchStats:
-    """Recorre las URLs y llena data/raw. Reanudable: no repite lo ya bajado."""
+    """Recorre las URLs y llena data/raw. Reanudable: no repite lo ya bajado.
+
+    Cada captura se anexa a ``capture.jsonl`` en el momento: si el proceso se
+    interrumpe, lo ya descargado queda registrado y la siguiente ejecucion
+    continua donde quedo.
+    """
     stats = FetchStats()
     cached = load_capture(config)
-    records: list[dict] = []
+    config.paths.capture_file.parent.mkdir(parents=True, exist_ok=True)
 
     client: HttpClient | None = None
     if not browser:
         client = HttpClient(config, delay=delay)
 
     try:
-        for index, url in enumerate(urls, start=1):
-            previous = cached.get(url)
-            if previous and previous.get("status") == 200 and not force:
-                stats.cached += 1
-                records.append(previous)
-                continue
+        with config.paths.capture_file.open("a", encoding="utf-8", newline="\n") as log_file:
 
-            try:
-                if browser:
-                    response = fetch_with_browser(url, config)
-                else:
-                    assert client is not None
-                    response = client.get(url)
-            except BlockedError as exc:
-                log.error("%s", exc)
-                stats.failed += 1
-                stats.failures.append({"url": url, "error": str(exc)})
-                records.append(
-                    {
-                        "url": url,
-                        "status": 0,
-                        "fecha_captura": utc_now(),
-                        "bytes": 0,
-                        "sha256": None,
-                        "archivo": None,
-                        "error": str(exc),
-                    }
+            def save(record: dict) -> None:
+                log_file.write(json.dumps(record, ensure_ascii=False) + "\n")
+                log_file.flush()
+
+            for index, url in enumerate(urls, start=1):
+                previous = cached.get(url)
+                if previous and previous.get("status") == 200 and not force:
+                    stats.cached += 1
+                    continue
+
+                try:
+                    if browser:
+                        response = fetch_with_browser(url, config)
+                    else:
+                        assert client is not None
+                        response = client.get(url)
+                except BlockedError as exc:
+                    log.error("%s", exc)
+                    stats.failed += 1
+                    stats.failures.append({"url": url, "error": str(exc)})
+                    save(
+                        {
+                            "url": url,
+                            "status": 0,
+                            "fecha_captura": utc_now(),
+                            "bytes": 0,
+                            "sha256": None,
+                            "archivo": None,
+                            "error": str(exc),
+                        }
+                    )
+                    break  # si bloquean una URL, bloquean todas: no insistir
+
+                if not response.ok:
+                    stats.failed += 1
+                    stats.failures.append({"url": url, "error": response.error or ""})
+                    save(
+                        {
+                            "url": url,
+                            "status": response.status,
+                            "fecha_captura": utc_now(),
+                            "bytes": 0,
+                            "sha256": None,
+                            "archivo": None,
+                            "error": response.error,
+                        }
+                    )
+                    log.warning("[%d] %s -> %s", index, url, response.error)
+                    continue
+
+                record = save_bronze(config, url, response.text)
+                save(record)
+                stats.ok += 1
+                stats.bytes += record["bytes"]
+                log.info(
+                    "[%d] %s (%s, %.2fs)",
+                    index,
+                    url,
+                    human_size(record["bytes"]),
+                    response.elapsed,
                 )
-                break  # si bloquean una URL, bloquean todas: no insistir
-
-            if not response.ok:
-                stats.failed += 1
-                stats.failures.append({"url": url, "error": response.error or ""})
-                records.append(
-                    {
-                        "url": url,
-                        "status": response.status,
-                        "fecha_captura": utc_now(),
-                        "bytes": 0,
-                        "sha256": None,
-                        "archivo": None,
-                        "error": response.error,
-                    }
-                )
-                log.warning("[%d] %s -> %s", index, url, response.error)
-                continue
-
-            record = save_bronze(config, url, response.text)
-            records.append(record)
-            stats.ok += 1
-            stats.bytes += record["bytes"]
-            log.info(
-                "[%d] %s (%s, %.2fs)",
-                index,
-                url,
-                human_size(record["bytes"]),
-                response.elapsed,
-            )
     finally:
         if client is not None:
             client.close()
 
-    if records:
-        write_jsonl(config.paths.capture_file, records)
     return stats
 
 
-def load_bronze(config: Config, *, only_ok: bool = True) -> list[dict]:
-    """Registros de captura utilizables, con su HTML ya leido."""
-    rows: list[dict] = []
+def iter_bronze(config: Config, *, only_ok: bool = True) -> Iterator[dict]:
+    """Itera los registros utilizables leyendo un HTML a la vez (memoria acotada)."""
     for row in load_capture(config).values():
         if only_ok and row.get("status") != 200:
             continue
@@ -150,8 +158,12 @@ def load_bronze(config: Config, *, only_ok: bool = True) -> list[dict]:
             continue
         row = dict(row)
         row["html"] = file_path.read_text(encoding="utf-8", errors="replace")
-        rows.append(row)
-    return sorted(rows, key=lambda r: r["url"])
+        yield row
+
+
+def load_bronze(config: Config, *, only_ok: bool = True) -> list[dict]:
+    """Registros de captura utilizables, con su HTML ya leido."""
+    return sorted(iter_bronze(config, only_ok=only_ok), key=lambda r: r["url"])
 
 
 def pending_urls(config: Config, urls: Iterable[str]) -> list[str]:

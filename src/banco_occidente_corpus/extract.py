@@ -10,7 +10,7 @@ from bs4 import BeautifulSoup
 
 from .config import Config
 from .dedupe import find_boilerplate, strip_boilerplate
-from .fetch import load_bronze
+from .fetch import iter_bronze
 from .section import classify
 from .utils import page_slug, read_jsonl, utc_now, write_jsonl
 
@@ -150,17 +150,18 @@ def extract_page(html: str, url: str, *, language: str = "es") -> ExtractedPage:
 
 def extract_all(config: Config, *, min_chars: int = 120) -> list[dict]:
     """Bronze -> Silver: extrae, deduplica boilerplate y escribe JSONL + .md."""
-    rows = load_bronze(config)
-    if not rows:
-        log.warning("No hay capturas en %s. Ejecuta 'make fetch' primero.", config.paths.raw_html)
-        return []
-
     pages: list[ExtractedPage] = []
-    for row in rows:
+    captured = 0
+    for row in iter_bronze(config):
+        captured += 1
         page = extract_page(row["html"], row["url"], language=config.site.language)
         if len(page.markdown) < min_chars:
             continue
         pages.append(page)
+
+    if not captured:
+        log.warning("No hay capturas en %s. Ejecuta 'make fetch' primero.", config.paths.raw_html)
+        return []
 
     boilerplate = find_boilerplate(
         (page.markdown.splitlines() for page in pages),
@@ -195,7 +196,7 @@ def extract_all(config: Config, *, min_chars: int = 120) -> list[dict]:
         )
 
     write_jsonl(config.paths.silver_file, silver_rows)
-    log.info("Silver: %d paginas utiles de %d capturadas", len(silver_rows), len(rows))
+    log.info("Silver: %d paginas utiles de %d capturadas", len(silver_rows), captured)
     return silver_rows
 
 
