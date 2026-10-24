@@ -41,14 +41,14 @@
 
 ## 6. Integración y verificación
 
-- [ ] 6.1 Ejecutar `make fmt` y `make check`; verificar que lint, tipos y pruebas pasan al 100 %.
-- [ ] 6.2 Ejecutar `make demo`; verificar que el pipeline offline sigue funcionando sin red y sin depender de noticias.
-- [ ] 6.3 Ejecutar `uv run corpus noticias --sin-red` con el fixture; verificar que aparecen `data/gold/pages/noticia-*.md`, `data/gold/pages/hecho-*.md`, `data/gold/_NOTICIAS.md` y las filas correspondientes en `corpus.jsonl`, incluyendo los enlaces a documentos cuando el fixture los tenga.
-- [ ] 6.4 Ejecutar `make health`; verificar que el contrato de Gold, las fichas de noticias y los enlaces a documentos son consistentes.
-- [ ] 6.5 Ejecutar `make noticias` desde red residencial colombiana; si el sitio responde `403`, verificar que el comando se detiene y avisa sin evadir el bloqueo.
-- [ ] 6.6 Revisar `_NOTICIAS.md` y `_INDICE.md`; verificar que hay como máximo 40 hechos oficiales, 15-20 fichas externas verificadas, ninguna tabla de accionistas, ningún cuerpo de artículo copiado y que cada anexo existente tiene su enlace a documento.
-- [ ] 6.7 Comparar el inventario de `data/gold/documents/` y `data/gold/videos/` antes y después de `make noticias`; verificar que el número de archivos y sus hashes no cambian y que no aparecen PDFs nuevos.
-- [ ] 6.8 Revisar el diff final; verificar que no se modificaron `make all`, `make gold`, `make deliver`, `make docs`, `make docs-finanzas`, `make videos`, `make media`, `documents.py`, `videos.py` ni `knowledge.py`, y que no se añadieron dependencias ni secretos.
+- [x] 6.1 Ejecutar `make fmt` y `make check`; verificar que lint, tipos y pruebas pasan al 100 %.
+- [x] 6.2 Ejecutar `make demo`; verificar que el pipeline offline sigue funcionando sin red y sin depender de noticias.
+- [x] 6.3 Ejecutar `uv run corpus noticias --sin-red` con el fixture; verificar que aparecen `data/gold/pages/noticia-*.md`, `data/gold/pages/hecho-*.md`, `data/gold/_NOTICIAS.md` y las filas correspondientes en `corpus.jsonl`, incluyendo los enlaces a documentos cuando el fixture los tenga.
+- [x] 6.4 Ejecutar `make health`; verificar que el contrato de Gold, las fichas de noticias y los enlaces a documentos son consistentes.
+- [x] 6.5 Ejecutar `make noticias` desde red residencial colombiana; si el sitio responde `403`, verificar que el comando se detiene y avisa sin evadir el bloqueo.
+- [x] 6.6 Revisar `_NOTICIAS.md` y `_INDICE.md`; verificar que hay como máximo 40 hechos oficiales, 15-20 fichas externas verificadas, ninguna tabla de accionistas, ningún cuerpo de artículo copiado y que cada anexo existente tiene su enlace a documento.
+- [x] 6.7 Comparar el inventario de `data/gold/documents/` y `data/gold/videos/` antes y después de `make noticias`; verificar que el número de archivos y sus hashes no cambian y que no aparecen PDFs nuevos.
+- [x] 6.8 Revisar el diff final; verificar que no se modificaron `make all`, `make gold`, `make deliver`, `make docs`, `make docs-finanzas`, `make videos`, `make media`, `documents.py`, `videos.py` ni `knowledge.py`, y que no se añadieron dependencias ni secretos.
 
 ## Workflow follow-up
 

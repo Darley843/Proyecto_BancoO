@@ -556,6 +556,22 @@ def test_render_ficha_rechaza_campos_minimos_ausentes(tmp_path: Path) -> None:
         render_ficha(_fila_hecho(fecha_publicacion="2026-13-40"), config)
 
 
+def test_render_ficha_ids_distintos_mismo_dia_y_tema(tmp_path: Path) -> None:
+    """Dos hechos de la misma fecha y tema con anexos distintos no colisionan."""
+    config = _config_temporal(tmp_path)
+    primero, _ = render_ficha(
+        _fila_hecho(id="", resumen="Informe A del mismo dia.", anexo="https://x.co/a.pdf"),
+        config,
+    )
+    segundo, _ = render_ficha(
+        _fila_hecho(id="", resumen="Informe B del mismo dia.", anexo="https://x.co/b.pdf"),
+        config,
+    )
+
+    assert primero["id"] != segundo["id"]
+    assert primero["id"].startswith("hecho-2026-10-19-")
+
+
 def test_merge_corpus_conserva_sitio_y_no_duplica(tmp_path: Path) -> None:
     """La fusion elimina fichas viejas, conserva el sitio y es idempotente."""
     config = _config_temporal(tmp_path)
@@ -830,7 +846,12 @@ def test_build_noticias_sin_red_genera_tres_artefactos(
 
     assert len(list(config.paths.gold_markdown.glob("hecho-*.md"))) == 3
     assert len(list(config.paths.gold_markdown.glob("noticia-*.md"))) == 1
-    assert len(list(read_jsonl(config.paths.corpus_file))) == 4
+    filas_corpus = list(read_jsonl(config.paths.corpus_file))
+    assert len(filas_corpus) == 4
+    assert all(
+        fila.get("archivo") and config.paths.root.joinpath(fila["archivo"]).exists()
+        for fila in filas_corpus
+    )
     assert config.paths.news_index.exists()
     indice = config.paths.news_index.read_text(encoding="utf-8")
     assert "**Fichas publicadas:** 4" in indice
