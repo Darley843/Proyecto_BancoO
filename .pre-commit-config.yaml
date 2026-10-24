@@ -5,7 +5,7 @@ repos:
     hooks:
       - id: gga
         name: Gentleman Guardian Angel (revisión contra AGENTS.md)
-        entry: gga run
+        entry: sh -c "gga run"
         language: system
         pass_filenames: false
         stages: [pre-commit]
