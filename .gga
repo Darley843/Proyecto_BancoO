@@ -1,0 +1,6 @@
+PROVIDER="opencode:deepseek/deepseek-flash"
+FILE_PATTERNS="*.py"
+EXCLUDE_PATTERNS="test/fixtures/*"
+RULES_FILE="AGENTS.md"
+STRICT_MODE="true"
+TIMEOUT="300"

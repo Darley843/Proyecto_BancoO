@@ -1,6 +1,15 @@
 # Hooks de calidad antes de cada commit.
 # Instalación: uv run pre-commit install  (o: make pre-commit)
 repos:
+  - repo: local
+    hooks:
+      - id: gga
+        name: Gentleman Guardian Angel (revisión contra AGENTS.md)
+        entry: gga run
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]
+
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
