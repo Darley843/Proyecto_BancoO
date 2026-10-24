@@ -9,12 +9,12 @@
 
 ## 2. Parser oficial y privacidad
 
-- [ ] 2.1 Implementar `parse_fecha_es` con los meses en español y probar `Octubre 19-2026`, `Septiembre 01-2026`, `Enero 2-2025` y una fecha inválida; verificar con `uv run pytest test/test_news.py -k fecha`.
-- [ ] 2.2 Implementar `parse_hechos_relevantes` seleccionando la tabla por encabezados `Fecha/Tema/Resumen/Anexo Descargable`, con filtro `desde/hasta`, enlace de anexo normalizado y tope de 40; verificar con un fixture que incluya una fila con PDF, una con “No aplica”, una de 2024 y una tabla de accionistas que debe ignorarse.
-- [ ] 2.3 Implementar la derivación de título y resumen oficial, y la exclusión de avisos mensuales de dividendos; verificar que un fixture con dividendos no genera ficha y que un hito material sí la genera.
-- [ ] 2.4 Implementar la validación de PII para título y resumen (cédula, NIT, correo y teléfono); verificar que una ficha con cada dato se rechaza y que la tabla de accionistas nunca llega al render.
-- [ ] 2.5 Actualizar `docs/FUENTES.md` con la tabla de hechos relevantes, el enlace “Ver Anexo” y la exclusión explícita de la tabla de accionistas; verificar que las rutas y encabezados documentados coinciden con el fixture y con `test_news.py`.
-- [ ] 2.6 Implementar `vincular_documento(anexo, indice)` leyendo `data/gold/documents.jsonl` por URL canónica, con variantes `?download=true` y host alterno `www`/`portalpublico`; verificar con pruebas de coincidencia, no coincidencia y que no se invoca ninguna función de descarga o extracción.
+- [x] 2.1 Implementar `parse_fecha_es` con los meses en español y probar `Octubre 19-2026`, `Septiembre 01-2026`, `Enero 2-2025` y una fecha inválida; verificar con `uv run pytest test/test_news.py -k fecha`.
+- [x] 2.2 Implementar `parse_hechos_relevantes` seleccionando la tabla por encabezados `Fecha/Tema/Resumen/Anexo Descargable`, con filtro `desde/hasta`, enlace de anexo normalizado y tope de 40; verificar con un fixture que incluya una fila con PDF, una con “No aplica”, una de 2024 y una tabla de accionistas que debe ignorarse.
+- [x] 2.3 Implementar la derivación de título y resumen oficial, y la exclusión de avisos mensuales de dividendos; verificar que un fixture con dividendos no genera ficha y que un hito material sí la genera.
+- [x] 2.4 Implementar la validación de PII para título y resumen (cédula, NIT, correo y teléfono); verificar que una ficha con cada dato se rechaza y que la tabla de accionistas nunca llega al render.
+- [x] 2.5 Actualizar `docs/FUENTES.md` con la tabla de hechos relevantes, el enlace “Ver Anexo” y la exclusión explícita de la tabla de accionistas; verificar que las rutas y encabezados documentados coinciden con el fixture y con `test_news.py`.
+- [x] 2.6 Implementar `vincular_documento(anexo, indice)` leyendo `data/gold/documents.jsonl` por URL canónica, con variantes `?download=true` y host alterno `www`/`portalpublico`; verificar con pruebas de coincidencia, no coincidencia y que no se invoca ninguna función de descarga o extracción.
 
 ## 3. Prensa externa y validación
 
