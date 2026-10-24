@@ -1,0 +1,275 @@
+# Fuente curada de prensa externa sobre Banco de Occidente.
+# Cada ficha inicia en estado `pendiente`: una persona debe abrir el enlace,
+# confirmar que es el Banco de Occidente de Colombia y validar la fecha antes
+# de cambiarla a `verificado`. No se guarda el cuerpo del articulo.
+
+- id: noticia-2025-08-11-ia-amazon-portafolio
+  fecha: 2025-08-11
+  medio: Portafolio
+  titulo: "Banco de Occidente se apoya en IA de Amazon para mejorar relación con sus clientes"
+  url: "https://www.portafolio.co/negocios/empresas/banco-de-occidente-se-apoya-en-ia-de-amazon-para-mejorar-relacion-con-sus-clientes-637437"
+  resumen: >-
+    El banco incorporó herramientas de inteligencia artificial de Amazon para
+    fortalecer la atención y la relación con sus clientes. La iniciativa forma
+    parte de su estrategia de transformación digital.
+  temas: [digital, inteligencia-artificial]
+  relevancia: alta
+  evento: 2025-08-11-ia-amazon
+  estado: pendiente
+
+- id: noticia-2025-08-21-tunel-oriente-larepublica
+  fecha: 2025-08-21
+  medio: La República
+  titulo: "Banco de Occidente dará $200.000 millones para segunda etapa del Túnel de Oriente"
+  url: "https://www.larepublica.co/finanzas/banco-de-occidente-dara-200-000-millones-para-segunda-etapa-del-tunel-de-oriente-4206915"
+  resumen: >-
+    El Banco de Occidente aportará $200.000 millones para la segunda etapa del
+    Túnel de Oriente. La financiación busca impulsar infraestructura clave en
+    Antioquia.
+  temas: [financiacion, infraestructura]
+  relevancia: alta
+  evento: 2025-08-21-tunel-oriente
+  estado: pendiente
+
+- id: noticia-2025-09-06-aval-fiduciaria-portafolio
+  fecha: 2025-09-06
+  medio: Portafolio
+  titulo: "Grupo Aval inicia la integración del negocio fiduciario a través de Aval Fiduciaria"
+  url: "https://www.portafolio.co/economia/finanzas/grupo-aval-inicia-la-integracion-del-negocio-fiduciario-a-traves-de-aval-fiduciaria-639319"
+  resumen: >-
+    Grupo Aval comenzó a integrar sus negocios fiduciarios en Aval Fiduciaria,
+    con participación de Banco de Occidente. La operación busca consolidar la
+    oferta fiduciaria del holding.
+  temas: [fusiones, gobierno-corporativo]
+  relevancia: alta
+  evento: 2025-09-06-aval-fiduciaria
+  estado: pendiente
+
+- id: noticia-2025-09-10-apple-pay-portafolio
+  fecha: 2025-09-10
+  medio: Portafolio
+  titulo: "Banco de Occidente y Credencial estrenan Apple Pay para sus clientes en Colombia"
+  url: "https://www.portafolio.co/economia/finanzas/banco-de-occidente-y-credencial-estrenan-apple-pay-para-sus-clientes-en-colombia-639641"
+  resumen: >-
+    El Banco de Occidente y Credencial habilitaron Apple Pay para sus clientes
+    en Colombia. La medida amplía las opciones de pago digital del banco.
+  temas: [digital, productos]
+  relevancia: alta
+  evento: 2025-09-10-apple-pay
+  estado: pendiente
+
+- id: noticia-2025-10-28-petromil-larepublica
+  fecha: 2025-10-28
+  medio: La República
+  titulo: "El Banco de Occidente lideró crédito sindicado por $797.500 millones Grupo Petromil"
+  url: "https://www.larepublica.co/finanzas/credito-que-recibio-el-grupo-petromil-4258265"
+  resumen: >-
+    El Banco de Occidente lideró un crédito sindicado por $797.500 millones
+    para el Grupo Petromil. La operación refuerza su financiación al sector
+    empresarial.
+  temas: [financiacion, empresas]
+  relevancia: alta
+  evento: 2025-10-28-petromil
+  estado: pendiente
+
+- id: noticia-2025-11-11-ia-reconocimiento-eltiempo
+  fecha: 2025-11-11
+  medio: El Tiempo
+  titulo: "Los usos con los que el Banco de Occidente lidera la transformación digital con inteligencia artificial y recibe reconocimiento internacional"
+  url: "https://www.eltiempo.com/economia/empresas/los-usos-con-los-que-el-banco-de-occidente-lidera-la-transformacion-digital-con-inteligencia-artificial-y-recibe-reconocimiento-internacional-3506331"
+  resumen: >-
+    El banco presentó usos de inteligencia artificial en su operación y recibió
+    un reconocimiento internacional. La nota destaca su avance en
+    transformación digital.
+  temas: [digital, reconocimientos]
+  relevancia: media
+  evento: 2025-11-11-ia-reconocimiento
+  estado: pendiente
+
+- id: noticia-2025-11-19-pagos-inmediatos-valora
+  fecha: 2025-11-19
+  medio: Valora Analitik
+  titulo: "Banco de Occidente anuncia solución para pagos inmediatos empresariales; ¿de qué se trata?"
+  url: "https://www.valoraanalitik.com/banco-de-occidente-solucion-pagos-empresas/"
+  resumen: >-
+    El banco lanzó una solución de pagos inmediatos para empresas. El servicio
+    busca agilizar las transacciones del segmento corporativo.
+  temas: [digital, productos, empresas]
+  relevancia: alta
+  evento: 2025-11-19-pagos-inmediatos
+  estado: pendiente
+
+- id: noticia-2025-11-27-invest-bogota-eltiempo
+  fecha: 2025-11-27
+  medio: El Tiempo
+  titulo: "Invest in Bogotá y Banco de Occidente impulsan nuevas oportunidades de inversión en infraestructura desde Cartagena"
+  url: "https://www.eltiempo.com/bogota/invest-in-bogota-y-banco-de-occidente-impulsan-nuevas-oportunidades-de-inversion-en-infraestructura-desde-cartagena-3512459"
+  resumen: >-
+    Invest in Bogotá y el Banco de Occidente promovieron oportunidades de
+    inversión en infraestructura desde Cartagena. La alianza busca atraer
+    proyectos e inversionistas.
+  temas: [financiacion, infraestructura, inversion]
+  relevancia: media
+  evento: 2025-11-27-invest-bogota
+  estado: pendiente
+
+- id: noticia-2025-12-01-mejor-lugar-trabajar-eltiempo
+  fecha: 2025-12-01
+  medio: El Tiempo
+  titulo: "Banco de Occidente es reconocido como el mejor lugar para trabajar en Colombia por tercer año consecutivo"
+  url: "https://www.eltiempo.com/economia/empresas/banco-de-occidente-es-reconocido-como-el-mejor-lugar-para-trabajar-en-colombia-por-tercer-ano-consecutivo-3513407"
+  resumen: >-
+    El Banco de Occidente fue reconocido como el mejor lugar para trabajar en
+    Colombia por tercer año consecutivo. El reconocimiento destaca sus
+    prácticas de talento humano.
+  temas: [reconocimientos, talento-humano]
+  relevancia: media
+  evento: 2025-12-01-mejor-lugar-trabajar
+  estado: pendiente
+
+- id: noticia-2025-12-22-whatsapp-portafolio
+  fecha: 2025-12-22
+  medio: Portafolio
+  titulo: "Así puede hacer transferencias de dinero por WhatsApp si es cliente del Banco de Occidente"
+  url: "https://www.portafolio.co/tecnologia/asi-puede-hacer-transferencias-de-dinero-por-whatsapp-si-es-cliente-del-banco-de-occidente-485133"
+  resumen: >-
+    Los clientes del Banco de Occidente pueden realizar transferencias por
+    WhatsApp. La funcionalidad se suma a los canales digitales del banco.
+  temas: [digital, productos]
+  relevancia: alta
+  evento: 2025-12-22-whatsapp
+  estado: pendiente
+
+- id: noticia-2026-05-14-utilidades-q1-larepublica
+  fecha: 2026-05-14
+  medio: La República
+  titulo: "Banco de Occidente reportó utilidades por $66.095 millones en el primer trimestre"
+  url: "https://www.larepublica.co/finanzas/banco-de-occidente-reporto-utilidades-por-66-095-millones-en-el-primer-trimestre-4393295"
+  resumen: >-
+    El banco reportó utilidades por $66.095 millones en el primer trimestre de
+    2026. La cifra corresponde al desempeño del periodo.
+  temas: [resultados]
+  relevancia: alta
+  evento: 2026-05-14-resultados-q1
+  estado: pendiente
+
+- id: noticia-2026-05-16-kubo-forbes
+  fecha: 2026-05-16
+  medio: Forbes Colombia
+  titulo: "Banco de Occidente lanza KUBO en una apuesta por competir con los neobancos"
+  url: "https://forbes.co/2026/05/16/economia-y-finanzas/banco-de-occidente-lanza-kubo-en-una-apuesta-por-competir-con-los-neobancos/"
+  resumen: >-
+    El Banco de Occidente lanzó KUBO para competir con los neobancos. La
+    propuesta busca atraer clientes digitales con una oferta diferenciada.
+  temas: [productos, digital]
+  relevancia: alta
+  evento: 2026-05-16-kubo
+  estado: pendiente
+
+- id: noticia-2026-08-14-utilidad-semestral-portafolio
+  fecha: 2026-08-14
+  medio: Portafolio
+  titulo: "Banco de Occidente eleva su utilidad semestral y gana $254.651 millones solo en segundo trimestre"
+  url: "https://www.portafolio.co/negocios/empresas/banco-de-occidente-eleva-su-utilidad-semestral-y-gana-254-651-millones-solo-en-segundo-trimestre-500377"
+  resumen: >-
+    El banco elevó su utilidad semestral y registró $254.651 millones en el
+    segundo trimestre. El resultado refleja el desempeño del periodo.
+  temas: [resultados]
+  relevancia: alta
+  evento: 2026-08-14-resultados-semestre
+  estado: pendiente
+
+- id: noticia-2026-08-24-alivio-terremoto-elcolombiano
+  fecha: 2026-08-24
+  medio: El Colombiano
+  titulo: "Banco de Occidente reduce 50% los intereses en compras con tarjetas de crédito para afectados por terremoto"
+  url: "https://www.elcolombiano.com/negocios/banco-de-occidente-baja-tasa-interes-terremoto-AH40219786"
+  resumen: >-
+    El banco redujo 50% los intereses en compras con tarjetas de crédito para
+    afectados por el terremoto. La medida busca aliviar la carga financiera de
+    los damnificados.
+  temas: [productos, responsabilidad-social]
+  relevancia: alta
+  evento: 2026-08-24-alivio-terremoto
+  estado: pendiente
+
+- id: noticia-2026-08-27-caf-reactivacion-caf
+  fecha: 2026-08-27
+  medio: CAF
+  titulo: "CAF y Banco de Occidente destinan USD 50 millones a la reactivación"
+  url: "https://www.caf.com/es/actualidad/noticias/caf-y-banco-de-occidente-destinaran-hasta-usd-50-millones-para-la-reactivacion-economica-tras-el-terremoto/"
+  resumen: >-
+    CAF y el Banco de Occidente destinarán USD 50 millones a la reactivación
+    económica tras el terremoto. Los recursos se orientan a empresas
+    afectadas.
+  temas: [financiacion, sostenibilidad, responsabilidad-social]
+  relevancia: alta
+  evento: 2026-08-27-caf-reactivacion
+  estado: pendiente
+
+- id: noticia-2026-09-03-absorcion-fiduciaria-larepublica
+  fecha: 2026-09-03
+  medio: La República
+  titulo: "Banco de Occidente completó la absorción por adquisición de Fiduciaria de Occidente"
+  url: "https://www.larepublica.co/finanzas/banco-de-occidente-completo-la-absorcion-por-adquisicion-de-fiduciaria-de-occidente-4472688"
+  resumen: >-
+    El Banco de Occidente completó la absorción de Fiduciaria de Occidente. La
+    operación integra los activos y obligaciones de la fiduciaria al banco.
+  temas: [fusiones, gobierno-corporativo]
+  relevancia: alta
+  evento: 2026-09-03-absorcion-fiduciaria
+  estado: pendiente
+
+- id: noticia-2026-09-22-credito-subordinado-deg-portafolio
+  fecha: 2026-09-22
+  medio: Portafolio
+  titulo: "Banco alemán presta US$150 millones a Banco de Occidente en crédito subordinado: qué es este tipo de préstamo"
+  url: "https://www.portafolio.co/mis-finanzas/creditos/banco-aleman-presta-us-150-millones-a-banco-de-occidente-en-credito-subordinado-que-es-este-tipo-de-prestamo-503016"
+  resumen: >-
+    Un banco alemán otorgó US$150 millones al Banco de Occidente mediante un
+    crédito subordinado. La nota explica las características de este tipo de
+    préstamo.
+  temas: [financiacion, sostenibilidad]
+  relevancia: alta
+  evento: 2026-09-22-credito-subordinado-deg
+  estado: pendiente
+
+- id: noticia-2026-10-07-crecimiento-23-valora
+  fecha: 2026-10-07
+  medio: Valora Analitik
+  titulo: "Entrevista | Banco de Occidente creció 23 % en el primer semestre de 2026 y apuesta por la digitalización"
+  url: "https://www.valoraanalitik.com/entrevista-banco-de-occidente-crecio-23-en-el-primer-semestre-de-2026-y-apuesta-por-la-digitalizacion/"
+  resumen: >-
+    El banco creció 23% en el primer semestre de 2026 y apuesta por la
+    digitalización. La entrevista repasa su desempeño y prioridades.
+  temas: [resultados, digital]
+  relevancia: alta
+  evento: 2026-10-07-crecimiento-23
+  estado: pendiente
+
+- id: noticia-2026-10-09-aprobacion-tarjetas-larepublica
+  fecha: 2026-10-09
+  medio: La República
+  titulo: "Banco de Occidente logró una tasa de aprobación superior a 90% en compras con tarjeta"
+  url: "https://www.larepublica.co/finanzas/banco-de-occidente-logro-una-tasa-de-aprobacion-superior-a-90-en-compras-con-tarjeta-4500599"
+  resumen: >-
+    El Banco de Occidente logró una tasa de aprobación superior a 90% en
+    compras con tarjeta. El resultado destaca su gestión de riesgo y
+    experiencia de cliente.
+  temas: [productos, digital, reconocimientos]
+  relevancia: alta
+  evento: 2026-10-09-aprobacion-tarjetas
+  estado: pendiente
+
+- id: noticia-2026-10-19-parque-solar-portafolio
+  fecha: 2026-10-19
+  medio: Portafolio
+  titulo: "Banco de Occidente financiará con $200.000 millones parque solar en Santander que generará 500 GWh al año"
+  url: "https://www.portafolio.co/energia/banco-de-occidente-financiara-con-200-000-millones-parque-solar-en-santander-que-generara-500-gwh-al-ano-504747"
+  resumen: >-
+    El Banco de Occidente financiará con $200.000 millones un parque solar en
+    Santander. El proyecto generará 500 GWh al año.
+  temas: [financiacion, sostenibilidad, energia]
+  relevancia: alta
+  evento: 2026-10-19-parque-solar-santander
+  estado: pendiente
