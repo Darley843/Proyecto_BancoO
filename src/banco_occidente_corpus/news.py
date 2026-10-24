@@ -16,7 +16,9 @@ import yaml
 from bs4 import BeautifulSoup, Tag
 
 from .config import Config
+from .net import BlockedError, HttpClient
 from .utils import (
+    append_jsonl,
     count_words,
     estimate_tokens,
     read_jsonl,
@@ -31,6 +33,9 @@ log = logging.getLogger(__name__)
 
 #: Base publica usada para convertir los enlaces relativos de la tabla oficial.
 BASE_URL = "https://www.bancodeoccidente.com.co"
+
+#: Pagina oficial que contiene la tabla "Informacion Relevante".
+OFFICIAL_PAGE_URL = f"{BASE_URL}/quienes-somos/informacion-inversionistas"
 
 #: Tope de hechos oficiales que se conservan despues de ordenar por fecha.
 MAX_HECHOS_OFICIALES = 40
@@ -879,3 +884,217 @@ def write_noticias_index(config: Config, rows: list[dict[str, Any]]) -> str:
     config.paths.news_index.write_text(contenido, encoding="utf-8", newline="\n")
     log.info("Indice de noticias escrito en %s", config.paths.news_index)
     return contenido
+
+
+def _html_oficial_desde_bronze(config: Config) -> str | None:
+    """Busca en Bronze el HTML de la pagina oficial de inversionistas."""
+    from .fetch import load_capture
+
+    objetivo = _url_canonica(OFFICIAL_PAGE_URL)
+    for url, row in load_capture(config).items():
+        if _url_canonica(url) != objetivo or row.get("status") != 200:
+            continue
+        archivo = str(row.get("archivo") or "").strip()
+        if not archivo:
+            continue
+        ruta = config.paths.root / archivo
+        if ruta.exists():
+            return ruta.read_text(encoding="utf-8", errors="replace")
+    return None
+
+
+def _descargar_html_oficial(config: Config) -> str:
+    """Hace una unica peticion de la pagina oficial y la guarda en Bronze.
+
+    Lanza ``BlockedError`` ante un ``403`` o un bloqueo persistente. No altera
+    el User-Agent, los proxies ni la velocidad configurada.
+    """
+    from .fetch import save_bronze
+
+    with HttpClient(config) as client:
+        response = client.get(OFFICIAL_PAGE_URL)
+
+    if response.status == 403:
+        raise BlockedError(
+            f"{OFFICIAL_PAGE_URL} respondio 403. El sitio bloqueo la peticion: "
+            "la ingesta se detiene sin evadir el bloqueo. Puedes intentarlo "
+            "mas tarde."
+        )
+    if not response.ok:
+        raise BlockedError(
+            f"No se pudo leer {OFFICIAL_PAGE_URL}: {response.error or response.status}. "
+            "La ingesta se detiene sin modificar la identificacion ni el ritmo."
+        )
+
+    config.paths.capture_file.parent.mkdir(parents=True, exist_ok=True)
+    record = save_bronze(config, OFFICIAL_PAGE_URL, response.text)
+    append_jsonl(config.paths.capture_file, record)
+    log.info("Pagina oficial capturada en Bronze: %s", record["archivo"])
+    return response.text
+
+
+def _html_oficial(config: Config, *, sin_red: bool, force: bool) -> str | None:
+    """Devuelve el HTML oficial desde Bronze o con una peticion puntual.
+
+    En ``sin_red`` nunca se toca la red: si falta Bronze devuelve ``None`` y
+    deja un aviso. ``force`` obliga a refrescar Bronze salvo en ``sin_red``.
+    """
+    if not force:
+        html = _html_oficial_desde_bronze(config)
+        if html is not None:
+            return html
+    if sin_red:
+        log.warning(
+            "No hay Bronze de %s y se ejecuto --sin-red: se omiten los hechos oficiales",
+            OFFICIAL_PAGE_URL,
+        )
+        return None
+    return _descargar_html_oficial(config)
+
+
+def _fila_oficial(
+    hecho: Mapping[str, Any],
+    indice: Mapping[str, dict[str, Any]],
+) -> dict[str, Any]:
+    """Convierte un hecho oficial parseado en una fila publicable de Gold.
+
+    Vincula el anexo con ``documents.jsonl`` en modo solo lectura; si no hay
+    coincidencia conserva la URL del anexo y no descarga nada.
+    """
+    fecha = hecho.get("fecha")
+    if not isinstance(fecha, date):
+        raise ValueError(f"El hecho oficial no trae una fecha valida: {fecha!r}")
+
+    fecha_iso = fecha.isoformat()
+    titulo = _normalizar_espacios(str(hecho.get("titulo") or "Hecho relevante"))
+    resumen = _normalizar_espacios(str(hecho.get("resumen") or ""))
+    tema = _normalizar_espacios(str(hecho.get("tema") or ""))
+
+    fila: dict[str, Any] = {
+        "tipo": "hecho",
+        "origen": "oficial",
+        "seccion": "presencia",
+        "titulo": titulo,
+        "fecha_publicacion": fecha_iso,
+        "fuente": OFFICIAL_PAGE_URL,
+        "medio": "Banco de Occidente",
+        "resumen": resumen,
+        "temas": [slugify(tema, 40)] if tema else [],
+        "relevancia": "alta",
+        "estado": "verificado",
+        "metodo": "news-parser",
+        "evento": f"{fecha_iso}-{slugify(titulo, 40)}",
+    }
+    if tema:
+        fila["categoria"] = tema
+
+    anexo = hecho.get("anexo")
+    if isinstance(anexo, str) and anexo.strip():
+        fila["anexo"] = anexo.strip()
+        vinculado = vincular_documento(anexo, indice)
+        if vinculado is not None:
+            fila.update(vinculado)
+    return fila
+
+
+def _fila_prensa(ficha: Mapping[str, Any]) -> dict[str, Any]:
+    """Convierte una ficha verificada de prensa en una fila publicable de Gold."""
+    fila: dict[str, Any] = {
+        "id": str(ficha.get("id") or "").strip(),
+        "tipo": "noticia",
+        "origen": "prensa",
+        "seccion": "presencia",
+        "titulo": _normalizar_espacios(str(ficha.get("titulo") or "")),
+        "fecha_publicacion": _fecha_iso_obligatoria(ficha.get("fecha")),
+        "fuente": _normalizar_espacios(str(ficha.get("url") or "")),
+        "medio": _normalizar_espacios(str(ficha.get("medio") or "")),
+        "resumen": _normalizar_espacios(str(ficha.get("resumen") or "")),
+        "temas": _lista_textos(ficha.get("temas")),
+        "relevancia": _normalizar_espacios(str(ficha.get("relevancia") or "media")).casefold(),
+        "estado": "verificado",
+        "metodo": "curaduria",
+    }
+    evento = _normalizar_espacios(str(ficha.get("evento") or ""))
+    if evento:
+        fila["evento"] = evento
+    return fila
+
+
+def _escribir_fichas(config: Config, rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Renderiza y escribe las fichas en ``data/gold/pages``.
+
+    Retira las fichas ``noticia-*`` y ``hecho-*`` que ya no se generan para que
+    el indice y el healthcheck no vean publicaciones obsoletas.
+    """
+    from .gold import render_document
+
+    config.paths.gold_markdown.mkdir(parents=True, exist_ok=True)
+    generadas: list[dict[str, Any]] = []
+    ids: set[str] = set()
+
+    for row in rows:
+        frontmatter, cuerpo = render_ficha(row, config)
+        identificador = str(frontmatter["id"])
+        ids.add(identificador)
+        ruta = config.paths.gold_markdown / f"{identificador}.md"
+        ruta.write_text(render_document(frontmatter, cuerpo), encoding="utf-8", newline="\n")
+        generadas.append(frontmatter)
+
+    for ruta in config.paths.gold_markdown.glob("*.md"):
+        if ruta.stem.startswith(("noticia-", "hecho-")) and ruta.stem not in ids:
+            ruta.unlink()
+            log.info("Se retira una ficha de noticias obsoleta: %s", ruta.name)
+
+    return generadas
+
+
+def build_noticias(
+    config: Config,
+    *,
+    desde: date,
+    hasta: date,
+    sin_red: bool = False,
+    force: bool = False,
+) -> list[dict[str, Any]]:
+    """Construye las fichas Gold de noticias y hechos sin tocar PDFs.
+
+    Lee el HTML oficial desde Bronze, hace una unica peticion si falta (salvo
+    en ``sin_red``), consulta ``documents.jsonl`` en modo solo lectura, publica
+    las fichas verificadas de ``prensa.yaml`` y escribe las paginas Gold,
+    ``corpus.jsonl`` y ``_NOTICIAS.md``. Ante ``403`` o bloqueo persistente
+    lanza ``BlockedError`` antes de escribir cualquier ficha oficial.
+    """
+    if hasta < desde:
+        raise ValueError("La fecha 'hasta' no puede ser anterior a 'desde'")
+
+    html = _html_oficial(config, sin_red=sin_red, force=force)
+    indice = (
+        cargar_indice_documentos(config.paths.documents_index)
+        if config.paths.documents_index.exists()
+        else {}
+    )
+    hechos = (
+        parse_hechos_relevantes(html, desde, hasta, max_oficiales=config.news.max_oficiales)
+        if html is not None
+        else []
+    )
+
+    filas: list[dict[str, Any]] = [_fila_oficial(hecho, indice) for hecho in hechos]
+    prensa = filtrar_verificadas(
+        deduplicar(
+            load_prensa(config.paths.news_prensa),
+            max_por_evento=config.news.max_por_evento,
+        )
+    )
+    filas.extend(_fila_prensa(ficha) for ficha in prensa)
+
+    generadas = _escribir_fichas(config, filas)
+    corpus = merge_corpus(config, generadas)
+    write_noticias_index(config, corpus)
+    log.info(
+        "Noticias: %d hechos oficiales, %d fichas de prensa, %d filas en corpus",
+        len(hechos),
+        len(prensa),
+        len(corpus),
+    )
+    return generadas
