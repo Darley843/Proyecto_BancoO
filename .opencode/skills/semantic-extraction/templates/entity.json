@@ -1,0 +1,10 @@
+{
+  "record_type": "entity",
+  "id": "ent:banco-de-occidente",
+  "type": "organizacion",
+  "name": "Banco de Occidente",
+  "aliases": ["Banco de Occidente S.A."],
+  "attributes": {},
+  "sources": ["https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"],
+  "confidence": 0.98
+}

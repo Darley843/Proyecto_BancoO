@@ -13,6 +13,9 @@ from pathlib import Path
 
 import yaml
 
+from banco_occidente_corpus.config import load_config
+from banco_occidente_corpus.knowledge import load_knowledge, validate_knowledge
+
 ROOT = Path(__file__).resolve().parents[4]
 RAW = ROOT / "data" / "raw"
 PROCESSED = ROOT / "data" / "processed"
@@ -110,6 +113,18 @@ def main() -> int:
     if len(pages) > len(corpus):
         warnings.append("hay mas paginas Gold que registros en corpus.jsonl")
 
+    config = load_config()
+    knowledge = load_knowledge(config)
+    knowledge_errors, knowledge_warnings = validate_knowledge(config, knowledge)
+    print(
+        "Knowledge   : "
+        f"{len(knowledge['entities'])} entidades, "
+        f"{len(knowledge['facts'])} hechos, "
+        f"{len(knowledge['relations'])} relaciones"
+    )
+    errors.extend(knowledge_errors)
+    warnings.extend(knowledge_warnings)
+
     print()
     for warning in warnings:
         print(f"AVISO  {warning}")
@@ -121,7 +136,7 @@ def main() -> int:
         print(f"\nRESULTADO: FALLA ({len(errors)} errores)")
         return 1
 
-    print("RESULTADO: OK (capas y contrato de Gold consistentes)")
+    print("RESULTADO: OK (capas, contrato de Gold y conocimiento consistentes)")
     return 0
 
 

@@ -1,0 +1,138 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/Darley843/Proyecto_BancoO/config/knowledge.schema.json",
+  "title": "Registro de conocimiento semantico",
+  "description": "Entidades, hechos y relaciones extraidos del corpus Gold con evidencia textual verificable.",
+  "oneOf": [
+    { "$ref": "#/$defs/entity" },
+    { "$ref": "#/$defs/fact" },
+    { "$ref": "#/$defs/relation" }
+  ],
+  "$defs": {
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["url", "page_id", "chunk_id", "section", "quote"],
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "pattern": "^https://www\\.bancodeoccidente\\.com\\.co/"
+        },
+        "page_id": { "type": "string", "minLength": 3 },
+        "chunk_id": { "type": "string", "pattern": "^chk:[0-9a-f]{12}$" },
+        "section": {
+          "type": "string",
+          "enum": ["identidad", "oferta", "presencia", "datos", "atencion", "legal", "otros"]
+        },
+        "heading": { "type": "string" },
+        "quote": { "type": "string", "minLength": 20, "maxLength": 600 }
+      }
+    },
+    "entity": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["record_type", "id", "type", "name", "aliases", "sources", "confidence"],
+      "properties": {
+        "record_type": { "const": "entity" },
+        "id": { "type": "string", "pattern": "^ent:[a-z0-9]+(-[a-z0-9]+)*$" },
+        "type": {
+          "type": "string",
+          "enum": [
+            "organizacion",
+            "producto",
+            "canal",
+            "sede",
+            "directivo",
+            "segmento",
+            "normativa",
+            "indicador",
+            "certificacion",
+            "aliado",
+            "evento"
+          ]
+        },
+        "name": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "aliases": {
+          "type": "array",
+          "items": { "type": "string", "minLength": 2 },
+          "uniqueItems": true
+        },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": { "type": ["string", "number", "boolean"] }
+        },
+        "sources": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "format": "uri" },
+          "uniqueItems": true
+        },
+        "confidence": { "$ref": "#/$defs/confidence" }
+      }
+    },
+    "fact": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type",
+        "id",
+        "entity_id",
+        "predicate",
+        "value",
+        "value_type",
+        "evidence",
+        "confidence",
+        "review",
+        "extracted_at",
+        "extractor"
+      ],
+      "properties": {
+        "record_type": { "const": "fact" },
+        "id": { "type": "string", "pattern": "^fact:[a-z0-9]+(-[a-z0-9]+)*(:[a-z0-9]+(-[a-z0-9]+)*){1,2}$" },
+        "entity_id": { "type": "string", "pattern": "^ent:[a-z0-9]+(-[a-z0-9]+)*$" },
+        "predicate": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "value": { "type": ["string", "number", "boolean"] },
+        "value_type": {
+          "type": "string",
+          "enum": ["text", "number", "date", "boolean", "currency", "percentage"]
+        },
+        "qualifiers": { "type": "object" },
+        "evidence": { "$ref": "#/$defs/evidence" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "review": { "type": "string", "enum": ["pending", "approved", "rejected"] },
+        "extracted_at": { "type": "string", "format": "date" },
+        "extractor": { "type": "string", "minLength": 3 }
+      }
+    },
+    "relation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "record_type",
+        "id",
+        "subject_id",
+        "predicate",
+        "object_id",
+        "evidence",
+        "confidence",
+        "review"
+      ],
+      "properties": {
+        "record_type": { "const": "relation" },
+        "id": { "type": "string", "pattern": "^rel:[a-z0-9]+(-[a-z0-9]+)*(:[a-z0-9]+(-[a-z0-9]+)*){2}$" },
+        "subject_id": { "type": "string", "pattern": "^ent:[a-z0-9]+(-[a-z0-9]+)*$" },
+        "predicate": { "type": "string", "pattern": "^[a-z][a-z0-9_]*$" },
+        "object_id": { "type": "string", "pattern": "^ent:[a-z0-9]+(-[a-z0-9]+)*$" },
+        "evidence": { "$ref": "#/$defs/evidence" },
+        "confidence": { "$ref": "#/$defs/confidence" },
+        "review": { "type": "string", "enum": ["pending", "approved", "rejected"] }
+      }
+    }
+  }
+}

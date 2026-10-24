@@ -6,6 +6,7 @@ import argparse
 import logging
 import shutil
 import sys
+from pathlib import Path
 
 from . import __version__
 from .config import Config, load_config
@@ -114,6 +115,70 @@ def cmd_stats(config: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_chunks(config: Config, args: argparse.Namespace) -> int:
+    from .knowledge import build_chunks
+
+    rows = build_chunks(config)
+    pages = len({row["page_id"] for row in rows})
+    tokens = sum(int(row["tokens"]) for row in rows)
+    print(f"Chunks: {len(rows)} de {pages} paginas, {tokens:,} tokens")
+    print(f"Archivo: {config.paths.knowledge_chunks}")
+    return 0
+
+
+def cmd_knowledge(config: Config, args: argparse.Namespace) -> int:
+    from .knowledge import (
+        build_knowledge_index,
+        load_knowledge,
+        merge_draft,
+        validate_knowledge,
+        write_knowledge,
+    )
+
+    if args.merge or args.file:
+        path = Path(args.merge or args.file)
+        records, errors, warnings = merge_draft(config, path)
+        target = path
+    else:
+        records = load_knowledge(config)
+        errors, warnings = validate_knowledge(config, records)
+        target = config.paths.knowledge
+
+    for warning in warnings[:10]:
+        print(f"AVISO  {warning}")
+    for error in errors[:30]:
+        print(f"ERROR  {error}")
+    if len(errors) > 30:
+        print(f"... y {len(errors) - 30} errores mas")
+
+    if errors:
+        print(f"\nKnowledge: FALLA ({len(errors)} errores) en {target}")
+        return 1
+
+    if args.merge:
+        write_knowledge(config, records)
+        build_knowledge_index(config)
+        print(
+            "Knowledge fusionado: "
+            f"{len(records['entities'])} entidades, "
+            f"{len(records['facts'])} hechos, "
+            f"{len(records['relations'])} relaciones"
+        )
+        print(f"Indice: {config.paths.knowledge_index}")
+    elif args.file:
+        print(f"Knowledge OK: borrador valido (no se escribio) {target}")
+    else:
+        build_knowledge_index(config)
+        print(
+            "Knowledge OK: "
+            f"{len(records['entities'])} entidades, "
+            f"{len(records['facts'])} hechos, "
+            f"{len(records['relations'])} relaciones"
+        )
+        print(f"Indice: {config.paths.knowledge_index}")
+    return 0
+
+
 def cmd_status(config: Config, args: argparse.Namespace) -> int:
     from .gold import load_corpus
 
@@ -186,6 +251,10 @@ def cmd_clean(config: Config, args: argparse.Namespace) -> int:
         if path.exists():
             shutil.rmtree(path)
             print(f"borrado {path}")
+    chunks = config.paths.knowledge_chunks
+    if chunks.exists():
+        chunks.unlink()
+        print(f"borrado {chunks} (se regenera con 'make chunks')")
     config.paths.ensure()
     return 0
 
@@ -209,6 +278,10 @@ def build_parser() -> argparse.ArgumentParser:
     sub.add_parser("fetch", help="descarga el HTML crudo (Bronze)")
     sub.add_parser("extract", help="limpia el HTML y genera Markdown (Silver)")
     sub.add_parser("gold", help="anade metadatos y consolida corpus.jsonl (Gold)")
+    sub.add_parser("chunks", help="segmenta Gold en chunks por encabezado")
+    knowledge = sub.add_parser("knowledge", help="valida entidades, hechos y relaciones")
+    knowledge.add_argument("--file", default=None, help="valida un JSONL candidato")
+    knowledge.add_argument("--merge", default=None, help="valida y fusiona un JSONL candidato")
     sub.add_parser("all", help="discover + fetch + extract + gold + stats")
     sub.add_parser("status", help="cuenta documentos por capa")
     sub.add_parser("doctor", help="diagnostica red y estado del pipeline")
@@ -235,6 +308,8 @@ def main(argv: list[str] | None = None) -> int:
         "fetch": cmd_fetch,
         "extract": cmd_extract,
         "gold": cmd_gold,
+        "chunks": cmd_chunks,
+        "knowledge": cmd_knowledge,
         "all": cmd_all,
         "stats": cmd_stats,
         "status": cmd_status,

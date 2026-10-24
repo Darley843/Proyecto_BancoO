@@ -1,7 +1,7 @@
 # Pipeline del corpus — referencia técnica
 
 Documento de apoyo de la skill `corpus-extraction`. La fuente de verdad sigue
-siendo [`CONSTITUTION.md`](../../../CONSTITUTION.md).
+siendo `CONSTITUTION.md` (raíz del repositorio).
 
 ## Capas
 

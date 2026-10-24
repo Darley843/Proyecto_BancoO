@@ -37,13 +37,17 @@ make identity    # fija user.name / user.email del repo
 
 El CLI también funciona directo: `uv run corpus <comando>`.
 
-## Skill del proyecto
+## Skills del proyecto
 
-La skill operativa vive en `.opencode/skills/corpus-extraction/` y se carga
-bajo demanda con el id `corpus-extraction` (o mencionándola como
-`@corpus-extraction`). Contiene el flujo, las reglas duras, el diagnóstico y un
-`healthcheck.py`. Úsala antes de tocar el pipeline; no dupliques sus reglas
-aquí.
+Viven en `.opencode/skills/` y se cargan bajo demanda:
+
+| Skill | Para qué |
+|---|---|
+| `corpus-extraction` | Captura, regeneración y diagnóstico del pipeline (Bronze/Silver/Gold) |
+| `semantic-extraction` | Convertir Gold en entidades/hechos/relaciones con cita y validación |
+
+Úsalas antes de tocar el pipeline o la capa Knowledge; no dupliques sus reglas
+aquí. Se pueden mencionar como `@corpus-extraction` y `@semantic-extraction`.
 
 ## Mapa del código
 

@@ -32,6 +32,9 @@ class Paths:
     gold: Path = field(
         default_factory=lambda: _env_path("CORPUS_GOLD_DIR", PROJECT_ROOT / "data/gold")
     )
+    knowledge: Path = field(
+        default_factory=lambda: _env_path("CORPUS_KNOWLEDGE_DIR", PROJECT_ROOT / "data/knowledge")
+    )
 
     @property
     def raw_html(self) -> Path:
@@ -66,6 +69,26 @@ class Paths:
         return self.gold / "pages"
 
     @property
+    def knowledge_chunks(self) -> Path:
+        return self.knowledge / "chunks.jsonl"
+
+    @property
+    def knowledge_entities(self) -> Path:
+        return self.knowledge / "entities.jsonl"
+
+    @property
+    def knowledge_facts(self) -> Path:
+        return self.knowledge / "facts.jsonl"
+
+    @property
+    def knowledge_relations(self) -> Path:
+        return self.knowledge / "relations.jsonl"
+
+    @property
+    def knowledge_index(self) -> Path:
+        return self.knowledge / "_INDICE.md"
+
+    @property
     def corpus_file(self) -> Path:
         return self.gold / "corpus.jsonl"
 
@@ -79,6 +102,7 @@ class Paths:
             self.raw_documents,
             self.silver_markdown,
             self.gold_markdown,
+            self.knowledge,
         ):
             path.mkdir(parents=True, exist_ok=True)
 

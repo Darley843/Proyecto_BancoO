@@ -81,6 +81,7 @@ Encabezados `#`/`##` como fronteras de chunk. Tablas y listas se conservan.
 - Un `.md` por página en `data/gold/pages/`
 - `data/gold/corpus.jsonl` con todos los metadatos
 - `data/gold/_INDICE.md` con el resumen y la cobertura
+- `data/knowledge/` con entidades, hechos y relaciones validados
 - Pipeline reproducible: `make all`
 - Paquete para entregar: `make deliver` → `dist/corpus-gold-YYYY-MM-DD.zip`
 
@@ -102,3 +103,29 @@ Encabezados `#`/`##` como fronteras de chunk. Tablas y listas se conservan.
 `data/raw/capture.jsonl` guarda por URL: `status`, `fecha_captura`, `bytes`,
 `sha256`, `archivo` y `error`. Con `sha256` se detecta si el contenido cambió y
 con `_INDICE.md` se ve la cobertura. `make status` resume las cuatro etapas.
+
+## 10. Extracción semántica (capa Knowledge)
+
+| Regla | Implementación |
+|---|---|
+| Un chunk = una frontera de encabezado | `knowledge.split_page()`; `chk:<hash>` determinista |
+| Todo hecho tiene cita textual | `evidence.quote` + `validate_knowledge()` |
+| La cita debe estar en el chunk | normalización sin markdown + comparación |
+| Esquema explícito | `config/knowledge.schema.json` (JSON Schema 2020-12) |
+| Sin datos personales | `PII_PATTERNS` (email, celular, documento) |
+| Sin duplicados | firma `(entidad, predicado, valor)` y `(sujeto, predicado, objeto)` |
+| Revisión humana | `review: pending → approved` |
+| Extracción incremental | borradores por sección + `--file` / `--merge` |
+| Skill del agente | `.opencode/skills/semantic-extraction/` |
+
+Comandos:
+
+```bash
+make chunks
+uv run corpus knowledge --file data/knowledge/draft-identidad.jsonl
+uv run corpus knowledge --merge data/knowledge/draft-identidad.jsonl
+make knowledge
+```
+
+El detalle del contrato está en la skill (`references/schema.md` y
+`references/taxonomy.md`).

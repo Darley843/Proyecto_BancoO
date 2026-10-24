@@ -85,6 +85,14 @@ extract: ## Limpia el HTML a Markdown (Silver)
 gold: ## Anade metadatos y genera corpus.jsonl (Gold)
 	$(CORPUS) gold
 
+.PHONY: chunks
+chunks: ## Segmenta Gold en chunks por encabezado (capa Knowledge)
+	$(CORPUS) chunks
+
+.PHONY: knowledge
+knowledge: chunks ## Valida entidades/hechos/relaciones y escribe el indice
+	$(CORPUS) knowledge
+
 .PHONY: all
 all: ## Pipeline completo: discover -> fetch -> extract -> gold -> stats
 	$(CORPUS) all $(if $(LIMIT),--limit $(LIMIT),) $(if $(DELAY),--delay $(DELAY),)

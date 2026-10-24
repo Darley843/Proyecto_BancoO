@@ -18,6 +18,7 @@ del Taller 1.
 | [`docs/IDENTIDAD.md`](./docs/IDENTIDAD.md) | Identidad de Git y GitHub del autor |
 | [`AGENTS.md`](./AGENTS.md) | Contexto y reglas para agentes LLM |
 | [`.opencode/skills/corpus-extraction/`](./.opencode/skills/corpus-extraction/SKILL.md) | Skill operativa del pipeline (flujo, diagnóstico, healthcheck) |
+| [`.opencode/skills/semantic-extraction/`](./.opencode/skills/semantic-extraction/SKILL.md) | Skill de extracción semántica (entidades, hechos y relaciones) |
 | [`docs/CONSTITUTION-curso-TAAML.md`](./docs/CONSTITUTION-curso-TAAML.md) | Estándar del curso (documento original) |
 
 ## Resultado de la captura (2026-10-23)
@@ -38,6 +39,30 @@ El entregable se regenera con `make all` y se empaqueta con `make deliver`.
 porque es el entregable que consume el RAG; Bronze y Silver son reproducibles y
 se regeneran sin volver a la web (`make clean && make extract && make gold`).
 No hay un repositorio aparte para el corpus.
+
+## Capa Knowledge (conocimiento verificable)
+
+Sobre Gold se construye una capa semántica: entidades, hechos y relaciones, cada
+uno con su cita textual. Es lo que permite que el agente responda **con fuente**
+y no con paráfrasis.
+
+```bash
+make chunks      # 1.177 chunks de 184 páginas (por encabezado)
+make knowledge   # valida esquema + evidencia y actualiza el índice
+```
+
+| Archivo | Contenido |
+|---|---|
+| `data/knowledge/entities.jsonl` | Entidades canónicas (`ent:...`) |
+| `data/knowledge/facts.jsonl` | Hechos atómicos (`fact:...`) |
+| `data/knowledge/relations.jsonl` | Relaciones (`rel:...`) |
+| `data/knowledge/_INDICE.md` | Conteos y pendientes de revisión |
+| `config/knowledge.schema.json` | Contrato JSON Schema |
+
+El estado actual es una **semilla validada** (2 entidades, 5 hechos, 1 relación)
+extraída de las páginas de identidad. El resto se puebla con la skill
+`semantic-extraction`, sección por sección. Regla dura: si la cita no está en el
+chunk, el validador rechaza el registro.
 
 ---
 
@@ -74,6 +99,8 @@ documentos por sección y la cobertura del checklist del Taller 1.
 | `make fetch` | Descarga el HTML crudo → `data/raw/` (Bronze) |
 | `make extract` | Limpia y convierte a Markdown → `data/processed/` (Silver) |
 | `make gold` | Añade metadatos y consolida `corpus.jsonl` (Gold) |
+| `make chunks` | Segmenta Gold en chunks por encabezado |
+| `make knowledge` | Valida entidades/hechos/relaciones y escribe el índice |
 | `make all` | Pipeline completo |
 | `make stats` | Resumen y checklist → `data/gold/_INDICE.md` |
 | `make status` | Cuenta URLs/Bronze/Silver/Gold |

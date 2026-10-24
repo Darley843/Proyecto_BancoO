@@ -1,0 +1,20 @@
+{
+  "record_type": "fact",
+  "id": "fact:banco-de-occidente:tiene-proposito",
+  "entity_id": "ent:banco-de-occidente",
+  "predicate": "tiene_proposito",
+  "value": "Hacer realidad el desarrollo de las personas, el crecimiento de los negocios y la transformación del país.",
+  "value_type": "text",
+  "evidence": {
+    "url": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco",
+    "page_id": "nuestro-banco-banco-de-occidente-4f58e4",
+    "chunk_id": "chk:128cb3d27d99",
+    "section": "identidad",
+    "heading": "Banco de Occidente",
+    "quote": "Hacer realidad el desarrollo de las personas, el crecimiento de los negocios y la transformación del país."
+  },
+  "confidence": 0.98,
+  "review": "pending",
+  "extracted_at": "2026-10-23",
+  "extractor": "agent:semantic-extraction@1"
+}

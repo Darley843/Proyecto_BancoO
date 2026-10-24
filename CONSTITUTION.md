@@ -119,13 +119,15 @@ ProyectoAvance1/
 ├── data/
 │   ├── raw/              # Bronze (ignorado por Git)
 │   ├── processed/        # Silver (ignorado por Git)
-│   └── gold/             # Gold (VERSIONADO) → entregable
+│   ├── gold/             # Gold (VERSIONADO) → entregable
+│   └── knowledge/        # Knowledge (VERSIONADO) → entidades, hechos, relaciones
 ├── scripts/
 │   ├── tasks.py          # tareas del Makefile portables (Windows/Unix)
 │   ├── demo_offline.py   # pipeline completo con un fixture, sin red
 │   └── scrape_empresa.py # scraper autocontenido PEP 723
 ├── docs/ESTANDAR.md      # trazabilidad regla de la clase → implementación
-├── .opencode/skills/corpus-extraction/   # skill operativa del pipeline
+├── .opencode/skills/corpus-extraction/    # skill operativa del pipeline
+├── .opencode/skills/semantic-extraction/  # skill de conocimiento semántico
 ├── .github/workflows/ci.yml
 ├── .pre-commit-config.yaml
 ├── CONSTITUTION.md       # este archivo
@@ -209,6 +211,33 @@ keywords: [historia, misión, visión]
 `make clean && make extract && make gold` reconstruye Silver y Gold desde Bronze
 sin volver a la web. Bronze nunca se edita a mano.
 
+### Capa Knowledge (conocimiento semántico)
+
+Sobre Gold se deriva una capa de conocimiento **verificable**:
+
+```text
+data/knowledge/entities.jsonl    entidades canónicas (ent:...)
+data/knowledge/facts.jsonl       hechos atómicos (fact:...)
+data/knowledge/relations.jsonl   relaciones (rel:...)
+data/knowledge/chunks.jsonl      segmentos por encabezado (derivado, no se versiona)
+data/knowledge/_INDICE.md        conteos y revisión
+config/knowledge.schema.json     contrato JSON Schema 2020-12
+```
+
+**Reglas:**
+
+1. Todo hecho o relación lleva `evidence` con `url`, `page_id`, `chunk_id`,
+   `section` y `quote`.
+2. La cita debe aparecer **dentro del chunk**; el validador lo comprueba.
+3. Sin cita no hay registro; no se infiere conocimiento entre páginas.
+4. Sin datos personales (correos, celulares, documentos).
+5. Todo entra con `review: "pending"`; solo una persona lo pasa a `approved`.
+6. Knowledge se regenera desde Gold + extractor; Gold sigue siendo la verdad.
+
+Comandos: `make chunks` (segmenta) y `make knowledge` (valida + índice).
+Borradores: `uv run corpus knowledge --file <jsonl>` y `--merge <jsonl>`.
+La skill responsable es `.opencode/skills/semantic-extraction/`.
+
 ## 8. Repositorio y Git
 
 - **El corpus vive en este mismo repositorio.** No hay un repo aparte: Gold se
@@ -283,6 +312,9 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 | 2026-10-23 | Tareas del Makefile en `scripts/tasks.py` | El mismo comando funciona en Windows y Unix (sin grep/awk/rm) |
 | 2026-10-23 | Bronze y Silver ignorados por Git; Gold versionado | Tamaño y reproducibilidad frente al entregable |
 | 2026-10-23 | `demo` offline con fixture | Validar el pipeline completo sin red ni riesgo para el sitio |
+| 2026-10-23 | Capa **Knowledge** con entidades, hechos y relaciones, cada uno con cita textual | El agente debe responder con fuente verificable, no con paráfrasis |
+| 2026-10-23 | Validación con JSON Schema + comprobación de la cita contra el chunk | Un esquema solo no detecta citas inventadas; la evidencia se valida en el texto |
+| 2026-10-23 | Chunks deterministas por encabezado (`chk:<hash>`) | Evidencia atómica y estable para el RAG y para el validador |
 
 ## 12. Configuración local (no trackear)
 
@@ -305,6 +337,8 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 - [x] Pipeline Bronze → Silver → Gold con `uv`.
 - [x] Checklist de 24 casillas y reporte `_INDICE.md`.
 - [x] Makefile portable y diagnóstico de red.
+- [x] Skill `semantic-extraction`, esquema JSON y validador de evidencia.
+- [ ] Poblar Knowledge para todas las secciones (semilla actual: identidad).
 - [ ] Descargar y procesar los PDF del sitio (Fase 3).
 - [ ] Transcripciones de YouTube (Fase 3).
 - [ ] Chunking + embeddings para el Módulo 2 (Fase 4).

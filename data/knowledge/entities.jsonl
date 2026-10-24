@@ -1,0 +1,2 @@
+{"record_type": "entity", "id": "ent:banco-de-occidente", "type": "organizacion", "name": "Banco de Occidente", "aliases": ["Banco de Occidente S.A."], "attributes": {}, "sources": ["https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"], "confidence": 0.98}
+{"record_type": "entity", "id": "ent:grupo-aval", "type": "organizacion", "name": "Grupo Aval", "aliases": [], "attributes": {}, "sources": ["https://www.bancodeoccidente.com.co/quienes-somos/trabaja-nosotros"], "confidence": 0.95}

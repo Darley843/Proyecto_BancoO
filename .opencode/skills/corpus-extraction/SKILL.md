@@ -74,6 +74,6 @@ uv run python .opencode/skills/corpus-extraction/scripts/healthcheck.py
 ## Referencias
 
 - `references/pipeline.md` — arquitectura, contrato de Gold y límites.
-- `../../docs/FUENTES.md` — inventario de fuentes y hallazgos del sitio.
-- `../../CONSTITUTION.md` — verdad central del proyecto.
-- `../../docs/ESTANDAR.md` — trazabilidad regla de la clase → código.
+- `docs/FUENTES.md` — inventario de fuentes y hallazgos del sitio.
+- `CONSTITUTION.md` — verdad central del proyecto.
+- `docs/ESTANDAR.md` — trazabilidad regla de la clase → código.
