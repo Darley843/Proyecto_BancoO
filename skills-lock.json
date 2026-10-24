@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "skills": {
+    "corpus-medallion-financiero": {
+      "source": "AnnyValencia89/taaml-skills",
+      "sourceType": "github",
+      "skillPath": "skills/corpus-medallion-financiero/SKILL.md",
+      "computedHash": "27f3769431c25d2c494fbd1529d54f3977349c961c8ea7eaf7ccc9f6cad6983f"
+    }
+  }
+}
