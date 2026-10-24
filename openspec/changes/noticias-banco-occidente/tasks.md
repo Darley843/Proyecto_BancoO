@@ -14,6 +14,7 @@
 - [ ] 2.3 Implementar la derivación de título y resumen oficial, y la exclusión de avisos mensuales de dividendos; verificar que un fixture con dividendos no genera ficha y que un hito material sí la genera.
 - [ ] 2.4 Implementar la validación de PII para título y resumen (cédula, NIT, correo y teléfono); verificar que una ficha con cada dato se rechaza y que la tabla de accionistas nunca llega al render.
 - [ ] 2.5 Actualizar `docs/FUENTES.md` con la tabla de hechos relevantes, el enlace “Ver Anexo” y la exclusión explícita de la tabla de accionistas; verificar que las rutas y encabezados documentados coinciden con el fixture y con `test_news.py`.
+- [ ] 2.6 Implementar `vincular_documento(anexo, indice)` leyendo `data/gold/documents.jsonl` por URL canónica, con variantes `?download=true` y host alterno `www`/`portalpublico`; verificar con pruebas de coincidencia, no coincidencia y que no se invoca ninguna función de descarga o extracción.
 
 ## 3. Prensa externa y validación
 
@@ -24,29 +25,30 @@
 
 ## 4. Renderizado Gold, corpus e índice
 
-- [ ] 4.1 Implementar `render_ficha` con frontmatter completo y cuerpo limitado a título, medio, fecha, enlace y resumen; verificar con una prueba que el cuerpo no contiene párrafos del artículo ni imágenes.
+- [ ] 4.1 Implementar `render_ficha` con frontmatter completo y cuerpo limitado a título, medio, fecha, enlace y resumen; si existe documento Gold, incluir `documento_id`, `documento_archivo`, `documento_titulo` y enlace relativo `../documents/<archivo>.md`; verificar con una prueba que el cuerpo no contiene párrafos del artículo ni imágenes.
 - [ ] 4.2 Implementar `merge_corpus` eliminando filas antiguas `noticia-*`/`hecho-*`, conservando las filas del sitio y evitando duplicados; verificar ejecutando la fusión dos veces y comparando el número de filas.
-- [ ] 4.3 Implementar `write_noticias_index` con ventana, conteos por tipo/origen/año/medio y tabla de fichas; verificar con un conjunto de dos fichas que el índice refleja exactamente sus fechas y enlaces.
-- [ ] 4.4 Extender `healthcheck.py` para exigir `fecha_publicacion`, `tipo`, `origen`, `medio` y `resumen` en páginas `noticia-*`/`hecho-*`, y detectar ids duplicados; verificar con un fixture válido y uno inválido.
-- [ ] 4.5 Actualizar `CONSTITUTION.md` §2, §7 y §11 y `docs/ESTANDAR.md` §4 y §7 con los campos nuevos, las fichas Gold y `_NOTICIAS.md`; verificar que los ejemplos de frontmatter y el contrato coinciden con `render_ficha`.
+- [ ] 4.3 Implementar `write_noticias_index` con ventana, conteos por tipo/origen/año/medio y tabla de fichas; verificar con un conjunto de dos fichas que el índice refleja exactamente sus fechas, enlaces y documentos vinculados.
+- [ ] 4.4 Extender `healthcheck.py` para exigir `fecha_publicacion`, `tipo`, `origen`, `medio` y `resumen` en páginas `noticia-*`/`hecho-*`, detectar ids duplicados y validar que `documento_archivo` exista cuando haya `documento_id`; verificar con fixtures válido e inválido.
+- [ ] 4.5 Actualizar `CONSTITUTION.md` §2, §7 y §11 y `docs/ESTANDAR.md` §4 y §7 con los campos nuevos, las fichas Gold, `_NOTICIAS.md` y el enlace a documentos; verificar que los ejemplos de frontmatter y el contrato coinciden con `render_ficha` y sin reescribir las secciones de PDF y videos.
 
 ## 5. CLI, target y bloqueo
 
-- [ ] 5.1 Implementar `build_noticias` con `desde`, `hasta`, `sin_red`, lectura de Bronze, petición puntual si falta Bronze y escritura de fichas/corpus/índice; verificar con un fixture y un `tmp_path` que no se toca la red y que se generan los tres artefactos.
+- [ ] 5.1 Implementar `build_noticias` con `desde`, `hasta`, `sin_red`, lectura de Bronze, petición puntual si falta Bronze, lectura de solo lectura de `documents.jsonl` y escritura de fichas/corpus/índice; verificar con un fixture y un `tmp_path` que no se toca la red, que se generan los tres artefactos y que no se descargan PDFs.
 - [ ] 5.2 Añadir el subcomando `noticias` en `cli.py` con `--desde`, `--hasta`, `--sin-red` y `--force`; verificar que `uv run corpus noticias --help` lista las opciones.
-- [ ] 5.3 Añadir solo el target `make noticias` en `makefile`; verificar que `make noticias` ejecuta el subcomando y que `make all`, `make gold` y `make deliver` no cambian en el diff.
+- [ ] 5.3 Añadir solo el target `make noticias` en `makefile`; verificar que `make noticias` ejecuta el subcomando y que `make all`, `make gold`, `make deliver`, `make docs`, `make docs-finanzas`, `make videos` y `make media` no cambian en el diff.
 - [ ] 5.4 Implementar la detención ante `403` o bloqueo persistente sin cambiar UA, proxies ni velocidad; verificar con un mock que el comando falla, muestra el motivo y no escribe nuevas fichas oficiales.
-- [ ] 5.5 Documentar el comando y el target en `README.md` y `AGENTS.md`; verificar que la documentación indica que `make all`, `make gold` y `make deliver` no incluyen noticias.
+- [ ] 5.5 Documentar el comando y el target en `README.md` y `AGENTS.md`; verificar que la documentación indica que `make noticias` es independiente de `all`, `gold`, `deliver`, `docs`, `docs-finanzas`, `videos` y `media`.
 
 ## 6. Integración y verificación
 
 - [ ] 6.1 Ejecutar `make fmt` y `make check`; verificar que lint, tipos y pruebas pasan al 100 %.
 - [ ] 6.2 Ejecutar `make demo`; verificar que el pipeline offline sigue funcionando sin red y sin depender de noticias.
-- [ ] 6.3 Ejecutar `uv run corpus noticias --sin-red` con el fixture; verificar que aparecen `data/gold/pages/noticia-*.md`, `data/gold/pages/hecho-*.md`, `data/gold/_NOTICIAS.md` y las filas correspondientes en `corpus.jsonl`.
-- [ ] 6.4 Ejecutar `make health`; verificar que el contrato de Gold y las fichas de noticias son consistentes.
+- [ ] 6.3 Ejecutar `uv run corpus noticias --sin-red` con el fixture; verificar que aparecen `data/gold/pages/noticia-*.md`, `data/gold/pages/hecho-*.md`, `data/gold/_NOTICIAS.md` y las filas correspondientes en `corpus.jsonl`, incluyendo los enlaces a documentos cuando el fixture los tenga.
+- [ ] 6.4 Ejecutar `make health`; verificar que el contrato de Gold, las fichas de noticias y los enlaces a documentos son consistentes.
 - [ ] 6.5 Ejecutar `make noticias` desde red residencial colombiana; si el sitio responde `403`, verificar que el comando se detiene y avisa sin evadir el bloqueo.
-- [ ] 6.6 Revisar `_NOTICIAS.md` y `_INDICE.md`; verificar que hay como máximo 40 hechos oficiales, 15-20 fichas externas verificadas, ninguna tabla de accionistas y ningún cuerpo de artículo copiado.
-- [ ] 6.7 Revisar el diff final; verificar que no se modificaron `make all`, `make gold` ni `make deliver` y que no se añadieron dependencias ni secretos.
+- [ ] 6.6 Revisar `_NOTICIAS.md` y `_INDICE.md`; verificar que hay como máximo 40 hechos oficiales, 15-20 fichas externas verificadas, ninguna tabla de accionistas, ningún cuerpo de artículo copiado y que cada anexo existente tiene su enlace a documento.
+- [ ] 6.7 Comparar el inventario de `data/gold/documents/` y `data/gold/videos/` antes y después de `make noticias`; verificar que el número de archivos y sus hashes no cambian y que no aparecen PDFs nuevos.
+- [ ] 6.8 Revisar el diff final; verificar que no se modificaron `make all`, `make gold`, `make deliver`, `make docs`, `make docs-finanzas`, `make videos`, `make media`, `documents.py`, `videos.py` ni `knowledge.py`, y que no se añadieron dependencias ni secretos.
 
 ## Workflow follow-up
 

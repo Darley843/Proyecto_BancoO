@@ -67,6 +67,25 @@ El sistema SHALL escribir cada ficha como Markdown con frontmatter en `data/gold
 - **WHEN** se ejecuta la ingesta dos veces sin cambios en la fuente
 - **THEN** no se duplican fichas ni filas de `corpus.jsonl`
 
+### Requirement: Enlace con documentos Gold existentes
+
+El sistema SHALL buscar cada anexo oficial en `data/gold/documents.jsonl` por URL canónica y, si existe, SHALL añadir `documento_id`, `documento_archivo` y `documento_titulo` a la ficha y un enlace relativo al documento Gold. MUST NOT descargar, copiar ni re-extraer el PDF.
+
+#### Scenario: Anexo ya extraído
+
+- **WHEN** el anexo oficial coincide con un registro de `documents.jsonl`
+- **THEN** la ficha incluye los campos del documento y un enlace relativo a `../documents/`, sin descargar el PDF
+
+#### Scenario: Anexo no extraído
+
+- **WHEN** el anexo oficial no aparece en `documents.jsonl`
+- **THEN** la ficha conserva la URL `anexo`, no añade campos de documento y la ingesta continúa sin error
+
+#### Scenario: Variantes de URL del mismo anexo
+
+- **WHEN** el anexo usa `?download=true` o el host alterno `www`/`portalpublico`
+- **THEN** el sistema lo reconoce como el mismo documento y evita duplicarlo
+
 ### Requirement: Fuente curada fuera de Gold
 
 El sistema SHALL leer la curaduría de prensa externa desde `data/noticias/prensa.yaml` y MUST NOT depender de archivos dentro de `data/gold/` como fuente editable.
