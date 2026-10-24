@@ -63,6 +63,8 @@ def main() -> int:
     silver = sorted((PROCESSED / "markdown").glob("*.md"))
     corpus = read_jsonl(GOLD / "corpus.jsonl")
     pages = sorted((GOLD / "pages").glob("*.md"))
+    documents = read_jsonl(GOLD / "documents.jsonl")
+    videos = read_jsonl(GOLD / "videos.jsonl")
 
     ok_capture = [row for row in capture if row.get("status") == 200]
     failed_capture = [row for row in capture if row.get("status") != 200]
@@ -74,6 +76,8 @@ def main() -> int:
     )
     print(f"Silver      : {len(silver)} documentos")
     print(f"Gold        : {len(pages)} paginas, {len(corpus)} registros en corpus.jsonl")
+    print(f"Docs PDF    : {len(documents)} documentos")
+    print(f"Videos      : {len(videos)} transcripciones")
 
     if not urls:
         errors.append("data/raw/urls.jsonl vacio: ejecuta 'make discover'")
@@ -85,6 +89,13 @@ def main() -> int:
         errors.append("data/gold/pages sin archivos: ejecuta 'make gold'")
     if not corpus:
         errors.append("data/gold/corpus.jsonl vacio: ejecuta 'make gold'")
+
+    for row in documents:
+        if not (ROOT / str(row.get("archivo", ""))).exists():
+            errors.append(f"documento sin archivo: {row.get('id')}")
+    for row in videos:
+        if not (ROOT / str(row.get("archivo", ""))).exists():
+            errors.append(f"video sin archivo: {row.get('id')}")
 
     ids = [row.get("id") for row in corpus]
     if len(ids) != len(set(ids)):

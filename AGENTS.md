@@ -30,6 +30,9 @@ make init        # uv python install + uv sync --all-extras
 make doctor      # diagnóstico de red y estado
 make demo        # pipeline completo sin red (fixture)
 make all         # captura real: discover -> fetch -> extract -> gold -> stats
+make docs        # PDFs: inventario -> descarga -> Gold (balances, informes)
+make videos      # YouTube: canal -> subtítulos -> transcripción Gold
+make media       # documentos + videos
 make check       # lint + typecheck + pruebas
 make health      # integridad de las capas y del contrato de Gold
 make identity    # fija user.name / user.email del repo
@@ -62,6 +65,8 @@ aquí. Se pueden mencionar como `@corpus-extraction` y `@semantic-extraction`.
 | `.../gold.py` | Gold: Markdown + frontmatter + `corpus.jsonl` |
 | `.../checklist.py` | 24 casillas del Taller 1 |
 | `.../stats.py` | Genera `data/gold/_INDICE.md` |
+| `.../documents.py` | PDFs: inventario, descarga y extracción a Gold |
+| `.../videos.py` | YouTube: canal, subtítulos y transcripción a Gold |
 | `scripts/tasks.py` | Tareas portables del Makefile |
 
 ## Verificación antes de dar algo por terminado

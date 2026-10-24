@@ -22,7 +22,7 @@
         "url": {
           "type": "string",
           "format": "uri",
-          "pattern": "^https://www\\.bancodeoccidente\\.com\\.co/"
+          "pattern": "^(https://(www|portalpublico)\\.bancodeoccidente\\.com\\.co/|https://(www\\.)?youtube\\.com/|https://youtu\\.be/)"
         },
         "page_id": { "type": "string", "minLength": 3 },
         "chunk_id": { "type": "string", "pattern": "^chk:[0-9a-f]{12}$" },

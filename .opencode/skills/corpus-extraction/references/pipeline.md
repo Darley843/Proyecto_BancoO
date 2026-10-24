@@ -30,6 +30,8 @@ siendo `CONSTITUTION.md` (raíz del repositorio).
 | `gold.py` | Frontmatter, slug, `corpus.jsonl`, duplicados por hash |
 | `checklist.py` | 24 casillas con evidencia citada |
 | `stats.py` | `_INDICE.md` |
+| `documents.py` | PDFs: inventario, descarga priorizada y texto con `pypdf` |
+| `videos.py` | YouTube: canal, subtítulos `.vtt` y transcripción |
 | `utils.py` | Hash, JSONL, tokens, slugs |
 
 ## Contrato de Gold

@@ -8,6 +8,7 @@ from .checklist import CHECKLIST, coverage, evaluate
 from .config import Config
 from .gold import corpus_stats, gold_files, load_corpus
 from .section import section_label
+from .utils import read_jsonl
 
 log = logging.getLogger(__name__)
 
@@ -28,6 +29,10 @@ def build_index(config: Config) -> str:
     texts = _read_gold_texts(config)
     items = evaluate(corpus, texts)
     found, total, percent = coverage(items)
+    documents = list(read_jsonl(config.paths.documents_index))
+    videos = list(read_jsonl(config.paths.videos_index))
+    document_tokens = sum(int(row.get("tokens", 0)) for row in documents)
+    video_tokens = sum(int(row.get("tokens", 0)) for row in videos)
 
     lines: list[str] = []
     lines.append("# Indice del corpus")
@@ -38,7 +43,12 @@ def build_index(config: Config) -> str:
     lines.append(
         f"**Tokens totales:** {stats['tokens']:,} (promedio {stats['promedio_tokens']:,})  "
     )
-    lines.append(f"**Cobertura del checklist:** {found}/{total} ({percent:.0f}%) — heuristica")
+    lines.append(f"**Documentos PDF:** {len(documents)} ({document_tokens:,} tokens)  ")
+    lines.append(f"**Videos transcritos:** {len(videos)} ({video_tokens:,} tokens)  ")
+    lines.append(
+        f"**Tokens del corpus completo:** {stats['tokens'] + document_tokens + video_tokens:,}  "
+    )
+    lines.append(f"**Cobertura del checklist:** {found}/{total} ({percent:.0f}%) - heuristica")
     lines.append("")
 
     lines.append("## Documentos por seccion")
@@ -75,6 +85,36 @@ def build_index(config: Config) -> str:
             lines.append(f"- [{mark}] {item.item}{evidence}")
         lines.append("")
 
+    if documents:
+        lines.append("## Documentos PDF")
+        lines.append("")
+        lines.append("| Año | Categoría | Título | Págs | Tokens |")
+        lines.append("|---:|---|---|---:|---:|")
+        for row in sorted(
+            documents,
+            key=lambda item: int(item.get("tokens", 0)),
+            reverse=True,
+        )[:15]:
+            title = (row.get("titulo") or "Sin titulo").replace("|", "/")[:70]
+            lines.append(
+                f"| {row.get('anio') or ''} | {row.get('categoria_documento')} | {title} "
+                f"| {row.get('paginas')} | {int(row.get('tokens', 0)):,} |"
+            )
+        lines.append("")
+
+    if videos:
+        lines.append("## Videos transcritos")
+        lines.append("")
+        lines.append("| Fecha | Título | Duración (s) | Tokens |")
+        lines.append("|---|---|---:|---:|")
+        for row in videos[:10]:
+            title = (row.get("titulo") or "Sin titulo").replace("|", "/")[:70]
+            lines.append(
+                f"| {row.get('fecha_documento') or ''} | {title} "
+                f"| {row.get('duracion_seg') or ''} | {int(row.get('tokens', 0)):,} |"
+            )
+        lines.append("")
+
     lines.append("## Como se genero")
     lines.append("")
     lines.append("```")
@@ -107,6 +147,8 @@ def print_summary(config: Config) -> str:
         f"Documentos Gold  : {stats['documentos']} ({len(files)} archivos .md)",
         f"Tokens totales   : {stats['tokens']:,}",
         f"Palabras totales : {stats['palabras']:,}",
+        f"Documentos PDF   : {len(list(read_jsonl(config.paths.documents_index)))}",
+        f"Videos           : {len(list(read_jsonl(config.paths.videos_index)))}",
         f"Checklist        : {found}/{total} ({percent:.0f}%)",
         "Secciones        : " + ", ".join(f"{k}={v}" for k, v in stats["secciones"].items()),
     ]

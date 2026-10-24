@@ -69,22 +69,28 @@ académico en **cada** petición.
 
 | Campo | Valor |
 |-------|-------|
-| Detección | `discover.py` → `data/raw/documents.jsonl` |
-| Extensiones | `.pdf`, `.doc`, `.docx`, `.xls`, `.xlsx`, `.ppt`, `.pptx` |
-| Estado | **Registrados, no descargados** (Fase 3) |
-| Uso previsto | Informes, memorias anuales, catálogos, tarifarios |
+| Detección | `documents.discover_documents()` sobre el HTML Bronze |
+| Inventario | **622 PDFs** únicos (balances, informes, gobierno, productos) |
+| Prioridad | 1: financiero/gobierno ≥2024 · 2: ≥2022 o categoría · 3: histórico |
+| Descarga | `make docs`; tope `--max-mb` (400 por defecto) y 80 MB por archivo |
+| Extracción | `pypdf` → `data/gold/documents/*.md` (texto por página) |
+| Índice | `data/gold/documents.jsonl` |
+| Escaneados | se omiten si el texto extraído es < 500 caracteres |
+| Origen | `www.` y `portalpublico.bancodeoccidente.com.co` (mismo banco) |
 
-No se descargan todavía para no duplicar esfuerzo ni peso: primero se estabiliza
-el corpus HTML y se decide qué documentos aportan al checklist.
+El host `www.` devuelve `403` en algunos adjuntos; el pipeline reintenta en
+`portalpublico.` antes de marcar el fallo.
 
 ## 3. Fuente terciaria — YouTube
 
 | Campo | Valor |
 |-------|-------|
-| Herramienta | `yt-dlp` / `youtube-transcript-api` |
-| Contenido | Entrevistas del presidente, videos institucionales |
-| Estado | **Fase 3** |
-| Regla | Solo si existe transcripción (no transcribir a mano) |
+| Herramienta | `yt-dlp` (metadatos + subtítulos automáticos/manuales) |
+| Inventario | videos enlazados en el sitio + canal `@BancodeOccidenteCol` |
+| Descarga | `make videos` (solo subtítulos, no el video) |
+| Extracción | VTT → párrafos → `data/gold/videos/*.md` |
+| Regla | sin subtítulo no entra al corpus (no se transcribe a mano) |
+| Índice | `data/gold/videos.jsonl` |
 
 ## 4. Fuera de alcance
 
@@ -115,7 +121,12 @@ el corpus HTML y se decide qué documentos aportan al checklist.
 | Peso del HTML crudo | 102.3 MB |
 | Páginas con texto útil (Silver) | 193 |
 | Documentos Gold (únicos) | 184 (9 duplicados descartados) |
-| Tokens totales | 151.972 |
+| Tokens de páginas | 151.972 |
+| Documentos PDF | 190 (138 financieros) |
+| Tokens de PDFs | 10.954.933 |
+| Videos transcritos | 32 |
+| Tokens de videos | 119.845 |
+| Tokens del corpus completo | 11.226.750 |
 | Cobertura del checklist | 24/24 (heurística, con evidencia citada) |
 
 > El sitemap no publica PDFs ni vídeos: esos quedan para la Fase 3 con

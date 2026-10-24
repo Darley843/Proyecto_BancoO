@@ -28,8 +28,10 @@ del Taller 1.
 | Sitemaps leídos | 210 |
 | URLs públicas | 196 |
 | Páginas Bronze | 193 (102.3 MB) |
-| Documentos Gold | 184 |
-| Tokens | 151.972 |
+| Páginas Gold | 184 |
+| Documentos PDF | 190 (11.0 M tokens) |
+| Videos transcritos | 32 (119.8 k tokens) |
+| Tokens del corpus completo | 11.2 M |
 | Cobertura del checklist | 24/24 (con evidencia) |
 
 El detalle y las decisiones están en [`docs/FUENTES.md`](./docs/FUENTES.md).
@@ -47,7 +49,7 @@ uno con su cita textual. Es lo que permite que el agente responda **con fuente**
 y no con paráfrasis.
 
 ```bash
-make chunks      # 1.177 chunks de 184 páginas (por encabezado)
+make chunks      # ~14.300 chunks de 406 documentos (páginas + PDFs + videos)
 make knowledge   # valida esquema + evidencia y actualiza el índice
 ```
 
@@ -63,6 +65,27 @@ El estado actual es una **semilla validada** (2 entidades, 5 hechos, 1 relación
 extraída de las páginas de identidad. El resto se puebla con la skill
 `semantic-extraction`, sección por sección. Regla dura: si la cita no está en el
 chunk, el validador rechaza el registro.
+
+## Documentos y videos
+
+Los balances, informes de gestión y documentos de gobierno corporativo no están
+en HTML: viven en PDF. Los videos aportan la parte cualitativa (entrevistas,
+vocería) que no aparece escrita.
+
+```bash
+make docs      # 622 PDFs inventariados -> descarga priorizada -> Gold
+make videos    # canal @BancodeOccidenteCol + videos enlazados -> Gold
+make media     # ambos
+```
+
+| Regla | Implementación |
+|---|---|
+| Solo documentos públicos enlazados desde el sitio | `documents.discover_documents()` + `robots.txt` |
+| Prioridad por año y categoría | financiero/gobierno 2024+ primero; tope `--max-mb 400` |
+| Texto por página | `pypdf` y encabezados `## Pagina N` |
+| PDF escaneado sin texto | se omite y se registra |
+| Video sin subtítulos | no entra al corpus |
+| Trazabilidad | `documents_capture.jsonl` y `videos_capture.jsonl` con URL y hash |
 
 ---
 
@@ -101,6 +124,9 @@ documentos por sección y la cobertura del checklist del Taller 1.
 | `make gold` | Añade metadatos y consolida `corpus.jsonl` (Gold) |
 | `make chunks` | Segmenta Gold en chunks por encabezado |
 | `make knowledge` | Valida entidades/hechos/relaciones y escribe el índice |
+| `make docs` | Inventaría, descarga y extrae PDFs (balances, informes) |
+| `make videos` | Lista el canal, baja subtítulos y transcribe a Gold |
+| `make media` | Documentos PDF + videos |
 | `make all` | Pipeline completo |
 | `make stats` | Resumen y checklist → `data/gold/_INDICE.md` |
 | `make status` | Cuenta URLs/Bronze/Silver/Gold |
@@ -134,13 +160,20 @@ data/
 │   ├── html/               #   un .html por URL (nombre = hash de la URL)
 │   ├── urls.jsonl          #   plan de captura: url, fuente, fecha
 │   ├── capture.jsonl       #   url, status, fecha, bytes, sha256, archivo
-│   └── documents.jsonl     #   PDFs detectados (fase posterior)
+│   ├── documents/          #   PDFs descargados
+│   ├── videos/             #   metadatos y subtítulos .vtt
+│   ├── documents_urls.jsonl / documents_capture.jsonl
+│   └── videos_urls.jsonl / videos_capture.jsonl
 ├── processed/              # SILVER — solo el texto útil, en Markdown
 │   ├── markdown/           #   un .md por página
 │   └── silver.jsonl        #   + título, sección, método, chars
 └── gold/                   # GOLD — lo único que entra al RAG
-    ├── pages/              #   un .md por página con frontmatter YAML
-    ├── corpus.jsonl        #   metadatos consolidados
+    ├── pages/              #   un .md por página HTML
+    ├── documents/          #   un .md por PDF (balances, informes)
+    ├── videos/             #   un .md por video transcrito
+    ├── corpus.jsonl        #   metadatos de páginas
+    ├── documents.jsonl     #   metadatos de PDFs
+    ├── videos.jsonl        #   metadatos de videos
     └── _INDICE.md          #   reporte y checklist
 ```
 

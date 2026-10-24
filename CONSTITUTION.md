@@ -119,7 +119,7 @@ ProyectoAvance1/
 ├── data/
 │   ├── raw/              # Bronze (ignorado por Git)
 │   ├── processed/        # Silver (ignorado por Git)
-│   ├── gold/             # Gold (VERSIONADO) → entregable
+│   ├── gold/             # Gold (VERSIONADO) → páginas, documentos y videos
 │   └── knowledge/        # Knowledge (VERSIONADO) → entidades, hechos, relaciones
 ├── scripts/
 │   ├── tasks.py          # tareas del Makefile portables (Windows/Unix)
@@ -238,6 +238,32 @@ Comandos: `make chunks` (segmenta) y `make knowledge` (valida + índice).
 Borradores: `uv run corpus knowledge --file <jsonl>` y `--merge <jsonl>`.
 La skill responsable es `.opencode/skills/semantic-extraction/`.
 
+### Documentos PDF y videos
+
+| Capa | Ruta | Contenido |
+|---|---|---|
+| Bronze | `data/raw/documents/*.pdf` | PDF tal como se descargó |
+| Bronze | `data/raw/documents_capture.jsonl` | url, sha256, bytes, título, categoría, año |
+| Gold | `data/gold/documents/*.md` | texto por página + frontmatter (`tipo: pdf`) |
+| Gold | `data/gold/documents.jsonl` | índice de documentos |
+| Bronze | `data/raw/videos/` | metadatos y subtítulos `.vtt` |
+| Gold | `data/gold/videos/*.md` | transcripción + frontmatter (`tipo: video`) |
+| Gold | `data/gold/videos.jsonl` | índice de videos |
+
+Reglas:
+
+1. Solo se descargan documentos **públicos** enlazados desde el sitio; `robots.txt`
+   se respeta host por host.
+2. Selección por prioridad: estados financieros, informes de gestión y gobierno
+   corporativo recientes primero; tope configurable (`--max-mb`, por defecto 400).
+3. PDFs escaneados sin texto se omiten y se registran (no se inventa contenido).
+4. Videos: solo se transcriben si existe subtítulo (manual o automático). Sin
+   subtítulo, el video no entra al corpus.
+5. El texto de un PDF se parte por página (`## Pagina N`) para conservar la
+   trazabilidad.
+
+Comandos: `make docs`, `make videos`, `make media`.
+
 ## 8. Repositorio y Git
 
 - **El corpus vive en este mismo repositorio.** No hay un repo aparte: Gold se
@@ -315,6 +341,9 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 | 2026-10-23 | Capa **Knowledge** con entidades, hechos y relaciones, cada uno con cita textual | El agente debe responder con fuente verificable, no con paráfrasis |
 | 2026-10-23 | Validación con JSON Schema + comprobación de la cita contra el chunk | Un esquema solo no detecta citas inventadas; la evidencia se valida en el texto |
 | 2026-10-23 | Chunks deterministas por encabezado (`chk:<hash>`) | Evidencia atómica y estable para el RAG y para el validador |
+| 2026-10-24 | Documentos PDF en Gold con `pypdf` y una sección por página | Los balances e informes no están en HTML; el PDF conserva tablas y cifras |
+| 2026-10-24 | Videos solo si hay subtítulos (`yt-dlp`) | Transcribir a mano no es reproducible; sin subtítulo no hay fuente |
+| 2026-10-24 | Descarga de documentos priorizada y con tope de MB | Hay 622 PDFs históricos; se captura lo reciente y relevante sin saturar el sitio |
 
 ## 12. Configuración local (no trackear)
 
@@ -338,8 +367,9 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 - [x] Checklist de 24 casillas y reporte `_INDICE.md`.
 - [x] Makefile portable y diagnóstico de red.
 - [x] Skill `semantic-extraction`, esquema JSON y validador de evidencia.
+- [x] Documentos PDF (balances e informes) y videos con subtítulos.
 - [ ] Poblar Knowledge para todas las secciones (semilla actual: identidad).
-- [ ] Descargar y procesar los PDF del sitio (Fase 3).
-- [ ] Transcripciones de YouTube (Fase 3).
+- [ ] Procesar los 622 PDFs históricos restantes (hoy se captura 2022–2026).
+- [ ] Transcripciones de YouTube de todo el canal (hoy, las más recientes).
 - [ ] Chunking + embeddings para el Módulo 2 (Fase 4).
 - [ ] Configurar protección de `main` (PR + CI verde).

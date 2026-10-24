@@ -4,7 +4,10 @@
 **Fuente:** https://www.bancodeoccidente.com.co  
 **Documentos Gold:** 184  
 **Tokens totales:** 151,972 (promedio 825.9)  
-**Cobertura del checklist:** 24/24 (100%) — heuristica
+**Documentos PDF:** 190 (10,954,933 tokens)  
+**Videos transcritos:** 32 (119,845 tokens)  
+**Tokens del corpus completo:** 11,226,750  
+**Cobertura del checklist:** 24/24 (100%) - heuristica
 
 ## Documentos por seccion
 
@@ -69,6 +72,41 @@
 - [x] Precios publicos y tarifas - _Abre tu Cuenta de Nómina Online en el Banco de Occidente — «...limitados al mes en Cajeros Automáticos de la red Aval #### Tarifas preferenciales Disfruta de tarifas preferenciales_
 - [x] Datos abiertos (Superfinanciera, SECOP) - _Defensor del Consumidor Financiero | Banco de Occidente — «...ponde a temas de interés general, estos serán enviados a la Superintendencia Financiera de Colombia para su conocimien_
 - [x] Rankings sectoriales - _Icesi — «...ipa por una MacBook Neo Tu plata en modo pro, participa por premios semanales y un gran premio final. #### Abre tu Cuenta de Ahorros Kubo, úsala y...»_
+
+## Documentos PDF
+
+| Año | Categoría | Título | Págs | Tokens |
+|---:|---|---|---:|---:|
+| 2025 | financiero | Informe periódico de fin de ejercicio 2025 Ver informe | 361 | 330,097 |
+| 2024 | financiero | Informe Periódico de Fin de Ejercicio 2024 | 268 | 237,482 |
+| 2025 | financiero | Periodic Year End Report 2025 Ver informe | 361 | 234,046 |
+| 2021 | financiero | Estados financieros separados al 31 de diciembre de 2021 1 | 206 | 169,727 |
+| 2024 | otro | PERIODIC YEAR END REPORT 2024 | 268 | 169,221 |
+| 2024 | otro | aquí | 189 | 169,183 |
+| 2021 | financiero | Informe Periódico de Fin de Ejercicio 2021 | 206 | 169,080 |
+| 2021 | financiero | Estado Financiero Separado a Diciembre 31 de 2021 | 206 | 169,030 |
+| 2024 | financiero | Estado Financiero Consolidado a diciembre 31 de 2024 | 165 | 163,967 |
+|  | financiero | Dic 24 con eeff bocc | 165 | 163,967 |
+| 2024 | financiero | Estado Financiero Separado a Diciembre 31 de 2024 | 167 | 160,853 |
+|  | financiero | Dic 24 sep eeff bocc | 167 | 160,853 |
+| 2023 | financiero | Estado Financiero Consolidado a diciembre 31 de 2023 | 159 | 159,007 |
+| 2023 | financiero | Estado Financiero Separado a Diciembre 31 de 2023 | 163 | 154,400 |
+| 2020 | financiero | Estado Financiero Separado a Diciembre 31 de 2020 | 203 | 152,826 |
+
+## Videos transcritos
+
+| Fecha | Título | Duración (s) | Tokens |
+|---|---|---:|---:|
+| 2026-10-08 | Reputación empresarial | 395 | 1,333 |
+| 2025-06-06 | Whiteboard TAG AVAL v2 | 130 | 493 |
+| 2025-02-20 | ¡Haz que tu #TagAval tenga tu estilo! 😎 | 45 | 129 |
+| 2026-10-13 | Conoce Bre - B y optimiza tus transacciones empresariales | 3046 | 12,173 |
+| 2026-09-10 | Conoce el panorama económico de este segundo semestre 2026 / Retos y o | 271 | 936 |
+| 2026-09-10 | Conoce como la AI potencia el crecimiento empresarial / Eficiencia ope | 262 | 827 |
+| 2026-09-10 | Hablemos del Flujo de Caja: Tips para una planeación financiera efecti | 447 | 1,590 |
+| 2026-10-23 | Gestiona tus quejas y solicitudes con la app Banca Móvil de Banco de O | 48 | 201 |
+| 2026-05-19 | Formarse para liderar | 139 | 510 |
+| 2026-09-10 | Sostenibilidad Rentable: La Estrategia que impulsa el crecimiento de l | 618 | 2,223 |
 
 ## Como se genero
 

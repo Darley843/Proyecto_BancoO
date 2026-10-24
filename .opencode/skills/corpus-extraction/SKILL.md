@@ -41,6 +41,8 @@ make extract    # Silver (trafilatura + fallback)
 make gold       # Gold (frontmatter + corpus.jsonl)
 make stats      # _INDICE.md con la cobertura
 make status     # 196 URLs / Bronze / Silver / Gold
+make docs       # PDFs: balances, informes, gobierno -> Gold
+make videos     # YouTube: subtítulos -> transcripción Gold
 ```
 
 Para una corrida completa: `make all`. Para empaquetar el entregable:
