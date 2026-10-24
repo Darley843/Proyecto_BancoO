@@ -17,6 +17,7 @@ del Taller 1.
 | [`docs/FUENTES.md`](./docs/FUENTES.md) | Inventario de fuentes, `robots.txt` y hallazgos del sitio |
 | [`docs/IDENTIDAD.md`](./docs/IDENTIDAD.md) | Identidad de Git y GitHub del autor |
 | [`AGENTS.md`](./AGENTS.md) | Contexto y reglas para agentes LLM |
+| [`.opencode/skills/corpus-extraction/`](./.opencode/skills/corpus-extraction/SKILL.md) | Skill operativa del pipeline (flujo, diagnóstico, healthcheck) |
 | [`docs/CONSTITUTION-curso-TAAML.md`](./docs/CONSTITUTION-curso-TAAML.md) | Estándar del curso (documento original) |
 
 ## Resultado de la captura (2026-10-23)
@@ -32,6 +33,11 @@ del Taller 1.
 
 El detalle y las decisiones están en [`docs/FUENTES.md`](./docs/FUENTES.md).
 El entregable se regenera con `make all` y se empaqueta con `make deliver`.
+
+**El corpus vive en este mismo repositorio.** Gold (`data/gold/`) se versiona
+porque es el entregable que consume el RAG; Bronze y Silver son reproducibles y
+se regeneran sin volver a la web (`make clean && make extract && make gold`).
+No hay un repositorio aparte para el corpus.
 
 ---
 
@@ -72,6 +78,7 @@ documentos por sección y la cobertura del checklist del Taller 1.
 | `make stats` | Resumen y checklist → `data/gold/_INDICE.md` |
 | `make status` | Cuenta URLs/Bronze/Silver/Gold |
 | `make test` / `make check` | Pruebas / lint + tipos + pruebas |
+| `make health` | Integridad de Bronze/Silver/Gold y del contrato de Gold |
 | `make ci` | Lo mismo que corre GitHub Actions (check + demo) |
 | `make deliver` | Gold + índice + ZIP del entregable en `dist/` |
 | `make clean` | Borra Silver y Gold (conserva el crudo) |

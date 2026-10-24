@@ -31,10 +31,19 @@ make doctor      # diagnóstico de red y estado
 make demo        # pipeline completo sin red (fixture)
 make all         # captura real: discover -> fetch -> extract -> gold -> stats
 make check       # lint + typecheck + pruebas
+make health      # integridad de las capas y del contrato de Gold
 make identity    # fija user.name / user.email del repo
 ```
 
 El CLI también funciona directo: `uv run corpus <comando>`.
+
+## Skill del proyecto
+
+La skill operativa vive en `.opencode/skills/corpus-extraction/` y se carga
+bajo demanda con el id `corpus-extraction` (o mencionándola como
+`@corpus-extraction`). Contiene el flujo, las reglas duras, el diagnóstico y un
+`healthcheck.py`. Úsala antes de tocar el pipeline; no dupliques sus reglas
+aquí.
 
 ## Mapa del código
 

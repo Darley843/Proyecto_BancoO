@@ -144,6 +144,10 @@ ci: check demo ## Lo mismo que corre GitHub Actions
 pre-commit: ## Corre los hooks sobre todos los archivos
 	$(UV) run pre-commit run --all-files
 
+.PHONY: health
+health: ## Verifica integridad de Bronze/Silver/Gold y el contrato de Gold
+	$(UV) run python .opencode/skills/corpus-extraction/scripts/healthcheck.py
+
 .PHONY: pack
 pack: ## Empaqueta Gold en dist/ para entregar
 	$(TASKS) pack

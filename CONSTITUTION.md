@@ -125,6 +125,7 @@ ProyectoAvance1/
 │   ├── demo_offline.py   # pipeline completo con un fixture, sin red
 │   └── scrape_empresa.py # scraper autocontenido PEP 723
 ├── docs/ESTANDAR.md      # trazabilidad regla de la clase → implementación
+├── .opencode/skills/corpus-extraction/   # skill operativa del pipeline
 ├── .github/workflows/ci.yml
 ├── .pre-commit-config.yaml
 ├── CONSTITUTION.md       # este archivo
@@ -210,6 +211,8 @@ sin volver a la web. Bronze nunca se edita a mano.
 
 ## 8. Repositorio y Git
 
+- **El corpus vive en este mismo repositorio.** No hay un repo aparte: Gold se
+  versiona en `data/gold/` y se publica junto con el código.
 - **Remoto:** `https://github.com/Darley843/Proyecto_BancoO.git` (privado).
 - **Rama principal:** `main`.
 - **Ramas:** `feat/...`, `fix/...`, `docs/...`, `refactor/...`, `test/...`,
