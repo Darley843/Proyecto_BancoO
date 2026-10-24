@@ -82,3 +82,24 @@ make status      # URLs / Bronze / Silver / Gold
 
 Si tocaste el corpus, revisa `data/gold/_INDICE.md` y confirma que la cobertura
 del checklist no bajó.
+
+## Reglas de revisión (GGA)
+
+REJECT if:
+- Se usa `pip`, se crea `requirements.txt` o se edita `uv.lock` a mano.
+- Una petición HTTP no pasa por `net.py`, no tiene `timeout`, no envía el User-Agent y el header `From` del proyecto, o usa `verify=False`.
+- Se descarga una URL sin consultar antes `robots.txt` o se baja el `Crawl-delay` de 1.5 s.
+- Se captura una página con login, formulario, simulador o datos personales (Ley 1581 de 2012).
+- Se usa cualquier técnica para evadir protecciones anti-bot o captchas.
+- `extract.py` hace peticiones de red: debe recibir HTML ya descargado.
+- Hay secretos, tokens o claves en el código, o se lee un archivo `.env`.
+- Cambia el formato de Gold sin actualizar `CONSTITUTION.md` §7 en el mismo commit.
+- Hay código nuevo en `src/` sin su prueba en `test/`.
+- Una función pública no tiene anotaciones de tipo o docstring.
+
+REQUIRE:
+- Pruebas sin red: el HTML de ejemplo vive dentro de `test/`.
+
+## Recordatorio final
+
+Siguen vigentes las reglas del inicio: solo `uv`; Bronze no se toca a mano; Gold es el contrato; `robots.txt`, 1.5 s y header `From`; sin datos personales.
