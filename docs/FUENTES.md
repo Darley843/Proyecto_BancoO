@@ -65,6 +65,39 @@ CloudFront responde `403` a cualquier UA que se declare bot, aunque
 `CONSTITUTION.md` §10): UA de navegador + header `From` con el correo
 académico en **cada** petición.
 
+### Tabla de hechos relevantes (información oficial)
+
+La actualidad corporativa oficial se captura de la tabla **“Información
+Relevante”** de la página de inversionistas, no de una sala de prensa.
+
+| Campo | Valor |
+|-------|-------|
+| Página | `https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas` |
+| Tabla | encabezados `Fecha`, `Tema`, `Resumen`, `Anexo Descargable` |
+| Enlace | la celda del anexo contiene el texto `Ver Anexo`; se guarda como URL absoluta |
+| Parser | `news.py` → `parse_hechos_relevantes()` |
+| Fixture | `test/fixtures/inversionistas.html` |
+| Pruebas | `test/test_news.py` |
+
+Reglas de selección y privacidad:
+
+- Solo se procesan las tablas cuyos cuatro encabezados coinciden exactamente
+  con `Fecha`, `Tema`, `Resumen` y `Anexo Descargable`. Cualquier otra tabla se
+  ignora.
+- La **tabla de accionistas** (nombre, cédula, NIT y participación) se excluye
+  siempre y nunca llega al render ni a Gold.
+- Se incluyen únicamente hechos entre `2025-01-01` y la fecha de ejecución; se
+  conservan como máximo **40**, del más reciente al más antiguo.
+- Los avisos mensuales rutinarios de pago de dividendos se excluyen. Las
+  decisiones de asamblea sobre distribución de utilidades sí son hitos.
+- Una celda con `No aplica` deja el campo `anexo` vacío.
+- Antes de publicar se validan cédula, NIT, correo y teléfono en título y
+  resumen; si aparece cualquiera de esos datos, la fila se descarta.
+- El enlace `Ver Anexo` se compara con `data/gold/documents.jsonl` por URL
+  canónica (sin query ni fragmento y con los hosts `www` y `portalpublico`
+  equivalentes). Si el PDF ya está en Gold, la ficha lo enlaza; nunca se
+  descarga ni se reextrae.
+
 ## 2. Fuente secundaria — documentos (PDF, DOCX, XLSX)
 
 | Campo | Valor |
