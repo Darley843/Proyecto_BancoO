@@ -7,6 +7,10 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Minimo privilegio: la CI solo lee el repositorio.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -15,16 +19,17 @@ jobs:
   quality:
     name: lint + test (Python ${{ matrix.python }})
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     strategy:
       fail-fast: false
       matrix:
         python: ["3.13"]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Instalar uv
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
           cache-dependency-glob: uv.lock
@@ -37,6 +42,11 @@ jobs:
 
       - name: Formato (ruff)
         run: uv run ruff format --check .
+
+      - name: Tipos (ty)
+        # --all-extras: 'uv run' re-sincroniza sin extras y ty no resolveria
+        # playwright, tiktoken ni yt-dlp (imports opcionales).
+        run: uv run --all-extras ty check src
 
       - name: Pruebas (pytest)
         run: uv run pytest
