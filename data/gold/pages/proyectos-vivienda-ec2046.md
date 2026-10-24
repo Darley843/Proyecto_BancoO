@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/proyectos-vivienda-form
 titulo: Proyectos Vivienda
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 393
 hash: d0903ab3

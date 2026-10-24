@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/inversion/fondos-inversion
 titulo: 'Occirenta: Fondos de Inversión Colectiva en Renta Fija'
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 852
 hash: '43715356'

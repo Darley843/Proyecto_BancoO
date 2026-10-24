@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/canales-digitales/visacion-credito-l
 titulo: Visación y Exigibilidades de Libranza Banco de Occidente
 seccion: atencion
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 447
 hash: 7aa101a5

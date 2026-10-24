@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/seguros/cuenta-ahorros
 titulo: Seguro Cuenta Protegida Plus Banco de Occidente
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 541
 hash: 894aae97

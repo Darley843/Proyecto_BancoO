@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/click-to-pay
 titulo: Click to Pay
 seccion: otros
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 215
 hash: 06c041b9

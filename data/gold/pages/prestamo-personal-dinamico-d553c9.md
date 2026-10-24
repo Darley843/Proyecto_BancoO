@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/prestamo-personal-dinamico
 titulo: Prestamo Personal Dinámico
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 387
 hash: a9fb9867

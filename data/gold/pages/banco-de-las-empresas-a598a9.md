@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/bancodelasempresas
 titulo: Banco de las Empresas
 seccion: otros
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 221
 hash: 342ccc53

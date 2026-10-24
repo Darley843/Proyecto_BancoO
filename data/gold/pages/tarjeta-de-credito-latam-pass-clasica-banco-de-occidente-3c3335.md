@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/clasica-latam
 titulo: Tarjeta de Crédito LATAM Pass Clásica Banco de Occidente
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 552
 hash: d0f6f477

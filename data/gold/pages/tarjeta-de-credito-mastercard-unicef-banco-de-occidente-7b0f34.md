@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/tarjetas-credito/proposito
 titulo: Tarjeta de Crédito MasterCard Unicef | Banco de Occidente
 seccion: identidad
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 83
 hash: 45cdb459

@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/ayuda/reversion-pagos
 titulo: Reversión de Pagos Banco de Occidente
 seccion: atencion
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 146
 hash: bb0bf266

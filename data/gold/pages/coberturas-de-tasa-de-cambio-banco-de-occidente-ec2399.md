@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/mesa-dinero/cobertura-tasas-cambio
 titulo: Coberturas de Tasa de Cambio Banco de Occidente
 seccion: otros
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 237
 hash: 2d924f6e

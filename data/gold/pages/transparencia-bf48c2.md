@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/transparencia
 titulo: Transparencia
 seccion: legal
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 8796
 hash: 8a784d84

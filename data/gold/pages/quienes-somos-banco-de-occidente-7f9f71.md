@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/quienes-somos
 titulo: Quiénes Somos | Banco de Occidente
 seccion: identidad
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 601
 hash: a689f3ac

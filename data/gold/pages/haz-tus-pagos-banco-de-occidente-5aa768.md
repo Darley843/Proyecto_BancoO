@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/haz-tus-pagos
 titulo: Haz tus pagos | Banco de Occidente
 seccion: otros
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 1072
 hash: 8fd5f83a

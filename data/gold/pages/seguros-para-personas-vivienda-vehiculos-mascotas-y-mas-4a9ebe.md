@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/seguros
 titulo: 'Seguros para Personas: Vivienda, Vehículos, Mascotas y más'
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 235
 hash: c401aff2

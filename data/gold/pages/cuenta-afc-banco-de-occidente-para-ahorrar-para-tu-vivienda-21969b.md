@@ -3,9 +3,9 @@ fuente: https://www.bancodeoccidente.com.co/cuenta-afc
 titulo: Cuenta AFC Banco de Occidente para Ahorrar para tu Vivienda
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
-tokens: 554
+tokens: 578
 hash: '12992803'
 palabras: 350
 metodo: trafilatura

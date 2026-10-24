@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/colombianos-en-el-exterior
 titulo: Crédito de Vivienda para Colombianos en el Exterior | Banco de Occidente
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 277
 hash: 4a111413

@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/creditos/rotativo
 titulo: 'Crédito Rotativo Banco de Occidente: Soluciones a tu Medida'
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 432
 hash: 7fbc263c

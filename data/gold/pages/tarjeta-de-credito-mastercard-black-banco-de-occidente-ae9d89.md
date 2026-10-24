@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/master-card-black
 titulo: Tarjeta de Crédito Mastercard Black Banco de Occidente
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 483
 hash: 975e3f6a

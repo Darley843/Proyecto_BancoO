@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/inversion/cdt
 titulo: 'CDT Banco de Occidente: Inversión Segura y Rentable'
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 604
 hash: 48e4d3e5

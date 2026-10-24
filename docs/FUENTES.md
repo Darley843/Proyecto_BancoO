@@ -115,7 +115,7 @@ el corpus HTML y se decide qué documentos aportan al checklist.
 | Peso del HTML crudo | 102.3 MB |
 | Páginas con texto útil (Silver) | 193 |
 | Documentos Gold (únicos) | 184 (9 duplicados descartados) |
-| Tokens totales | 151.712 |
+| Tokens totales | 151.972 |
 | Cobertura del checklist | 24/24 (heurística, con evidencia citada) |
 
 > El sitemap no publica PDFs ni vídeos: esos quedan para la Fase 3 con

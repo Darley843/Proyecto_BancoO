@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/ayuda
 titulo: Ayuda y Asesoría en Productos y Servicios Banco de Occidente
 seccion: atencion
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 360
 hash: 58ae00a5

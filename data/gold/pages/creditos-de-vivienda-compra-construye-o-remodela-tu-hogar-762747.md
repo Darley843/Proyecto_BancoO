@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/creditos/vivienda
 titulo: 'Créditos de Vivienda: Compra, Construye o Remodela tu Hogar'
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 92
 hash: 20ec91a7

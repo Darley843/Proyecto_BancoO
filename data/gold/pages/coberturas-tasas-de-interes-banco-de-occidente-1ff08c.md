@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/coberturas-tasas-interes
 titulo: Coberturas Tasas de Interés Banco de Occidente
 seccion: otros
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 495
 hash: 33685e58

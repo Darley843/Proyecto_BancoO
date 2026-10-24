@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/creditos/cesion-leasing-habitacional
 titulo: Cesión de Derechos en Leasing Habitacional Banco de Occidente
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 118
 hash: 8ef65919

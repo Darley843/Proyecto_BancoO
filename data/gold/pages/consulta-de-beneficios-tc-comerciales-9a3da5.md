@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/consulta-de-beneficios-tc-comerciale
 titulo: Consulta de beneficios TC comerciales
 seccion: otros
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 1340
 hash: 44e99f99

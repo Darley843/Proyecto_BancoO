@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/inversion/offshore
 titulo: Cuenta Offshore en Dólares | Banco de Occidente
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 379
 hash: c1e103a6

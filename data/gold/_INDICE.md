@@ -3,7 +3,7 @@
 **Empresa:** Banco de Occidente  
 **Fuente:** https://www.bancodeoccidente.com.co  
 **Documentos Gold:** 184  
-**Tokens totales:** 151,712 (promedio 824.5)  
+**Tokens totales:** 151,972 (promedio 825.9)  
 **Cobertura del checklist:** 24/24 (100%) — heuristica
 
 ## Documentos por seccion

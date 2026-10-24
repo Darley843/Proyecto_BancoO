@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import contextlib
 import logging
 from collections import Counter
+from datetime import date, datetime
 from pathlib import Path
 
 import yaml
@@ -26,9 +28,13 @@ log = logging.getLogger(__name__)
 
 def build_frontmatter(row: dict, config: Config, *, text_hash: str, tokens: int) -> dict:
     """Metadatos del estandar del curso (mismo orden que los slides)."""
-    from datetime import date
-
     raw_date = (row.get("fecha_captura") or row.get("fecha_proceso") or utc_now())[:10]
+    # La captura se registra en UTC; el frontmatter usa la fecha local del
+    # autor (America/Bogota) para que coincida con lo que se ve en el sitio.
+    stamp = row.get("fecha_captura") or row.get("fecha_proceso")
+    if stamp:
+        with contextlib.suppress(ValueError):
+            raw_date = datetime.fromisoformat(stamp).astimezone().date().isoformat()
     try:
         capture_date: object = date.fromisoformat(raw_date)
     except ValueError:

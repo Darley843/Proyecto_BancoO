@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/seguros/libranza/pensionados-protegi
 titulo: Pensionados Protegidos
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 1304
 hash: 3f919264

@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/legal-politicas/ley-borron-cuenta-nu
 titulo: Ley Borrón y Cuenta Nueva | Banco de Occidente
 seccion: legal
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 494
 hash: 220ee7fc

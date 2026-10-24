@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/tarjetas-credito/santa-fe
 titulo: Tarjeta de Crédito Santafé Banco de Occidente
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 669
 hash: ddf3f5b6

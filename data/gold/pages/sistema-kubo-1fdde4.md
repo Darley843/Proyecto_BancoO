@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/sistema-kubo
 titulo: Sistema Kubo
 seccion: otros
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 255
 hash: ba7e6749

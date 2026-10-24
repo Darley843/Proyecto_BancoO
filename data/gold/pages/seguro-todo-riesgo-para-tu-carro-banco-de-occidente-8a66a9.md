@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/seguros/carros
 titulo: Seguro todo riesgo para tu carro Banco de Occidente
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 629
 hash: b82ed8fe

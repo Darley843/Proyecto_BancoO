@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/tarjetas-credito/mastercard-visa-gol
 titulo: Tarjetas de Crédito Visa y Mastercard Gold Banco de Occidente
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 476
 hash: 1cd130fa

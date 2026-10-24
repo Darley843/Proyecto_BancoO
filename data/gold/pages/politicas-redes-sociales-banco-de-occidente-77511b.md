@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/legal-politicas/redes-sociales
 titulo: Políticas Redes Sociales | Banco de Occidente
 seccion: legal
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 192
 hash: 5c9200b9

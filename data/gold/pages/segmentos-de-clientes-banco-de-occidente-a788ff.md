@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/segmentos
 titulo: Segmentos de Clientes Banco de Occidente
 seccion: otros
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 311
 hash: 80a4ae68

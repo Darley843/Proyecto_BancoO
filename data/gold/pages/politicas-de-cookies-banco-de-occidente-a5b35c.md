@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/legal-politicas/cookies
 titulo: Políticas de Cookies | Banco de Occidente
 seccion: legal
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 704
 hash: 564bcfb5

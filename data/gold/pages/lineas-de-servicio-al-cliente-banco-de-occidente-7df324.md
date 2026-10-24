@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/ayuda/linea-servicio-cliente
 titulo: Líneas de Servicio al Cliente Banco de Occidente
 seccion: atencion
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 467
 hash: 502dc725

@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/seguros/vehiculos-cuota-protegida
 titulo: Seguro Cuota Protegida para Vehículos Banco de Occidente
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 423
 hash: 3bbbb4b3

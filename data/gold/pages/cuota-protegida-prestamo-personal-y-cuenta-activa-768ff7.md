@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/seguros/prestamo-personal
 titulo: Cuota Protegida Préstamo Personal y Cuenta Activa
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 491
 hash: b8e8cee5

@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/sostenibilidad
 titulo: Sostenibilidad Banco de Occidente
 seccion: datos
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 739
 hash: 9734543c

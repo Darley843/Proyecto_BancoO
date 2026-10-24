@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/seguros/contenidos
 titulo: Protege los Contenidos de tu Hogar |Vivienda Protegida
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 675
 hash: 626eb705

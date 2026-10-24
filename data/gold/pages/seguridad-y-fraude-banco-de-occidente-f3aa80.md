@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/ayuda/seguridad-fraude
 titulo: Seguridad y Fraude Banco de Occidente
 seccion: atencion
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 380
 hash: 511a8505

@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/tarjetas-credito/latam-pass-signatur
 titulo: Tarjeta de Crédito LATAM Pass Signature Banco de Occidente
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 174
 hash: 57a779f3

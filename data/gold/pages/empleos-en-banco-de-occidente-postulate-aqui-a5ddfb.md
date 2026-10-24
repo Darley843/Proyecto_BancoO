@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/quienes-somos/trabaja-nosotros
 titulo: Empleos en Banco de Occidente | ¡Postúlate Aquí!
 seccion: identidad
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 616
 hash: aff467c1

@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/seguro-de-accidentes-integral
 titulo: Seguro de Accidentes integral
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 133
 hash: ecbf9c91

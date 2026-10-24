@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/winback
 titulo: Winback
 seccion: otros
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 159
 hash: 839fa255

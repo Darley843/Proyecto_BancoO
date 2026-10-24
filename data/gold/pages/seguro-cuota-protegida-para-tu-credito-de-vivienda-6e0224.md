@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/seguro-de-vida-vivienda
 titulo: Seguro Cuota Protegida para tu Crédito de Vivienda
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 669
 hash: d396e152

@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/google-wallet
 titulo: Google Wallet
 seccion: otros
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 392
 hash: 484edca8

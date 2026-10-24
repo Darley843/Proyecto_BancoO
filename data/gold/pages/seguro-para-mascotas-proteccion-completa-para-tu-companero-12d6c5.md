@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/seguros/mascotas
 titulo: Seguro para Mascotas - Protección Completa para tu Compañero
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 251
 hash: 5a72d212

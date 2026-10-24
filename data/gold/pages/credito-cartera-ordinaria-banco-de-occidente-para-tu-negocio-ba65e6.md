@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/creditos/cartera-ordinaria
 titulo: Crédito Cartera Ordinaria Banco de Occidente para tu Negocio
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 393
 hash: '52418588'

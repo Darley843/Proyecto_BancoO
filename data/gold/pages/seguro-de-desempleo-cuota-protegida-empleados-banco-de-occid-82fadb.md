@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/seguros/desempleo-empleados
 titulo: Seguro de Desempleo Cuota Protegida Empleados Banco de Occidente
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 391
 hash: 1843c3ff

@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/seguros/asistencia-salud
 titulo: Servicios de Asistencia en Salud Banco de Occidente
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 276
 hash: 829162e3

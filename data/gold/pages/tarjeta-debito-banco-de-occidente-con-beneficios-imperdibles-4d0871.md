@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/cuentas/tarjeta-debito
 titulo: Tarjeta Débito Banco de Occidente con Beneficios Imperdibles
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 558
 hash: fb9d327c

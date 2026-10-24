@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/duplica-tu-saldo
 titulo: Duplica tu saldo
 seccion: otros
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 442
 hash: 525376e9

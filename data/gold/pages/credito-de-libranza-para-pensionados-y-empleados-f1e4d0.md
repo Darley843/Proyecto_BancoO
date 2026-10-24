@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/creditos/libranza
 titulo: Crédito de Libranza para Pensionados y Empleados
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 90
 hash: 4a1ed403

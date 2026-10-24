@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/legal-politicas/terminos-condiciones
 titulo: Términos y Condiciones | Banco de Occidente
 seccion: legal
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 167
 hash: 6e552848

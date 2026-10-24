@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/ayuda/whatsapp
 titulo: Solicita Productos del Banco por WhatsApp Fácil y Rápido
 seccion: atencion
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 380
 hash: 209ab5e9

@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/creditos
 titulo: 'Créditos Banco de Occidente: Financia Tus Proyectos Hoy'
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 254
 hash: 883c5705

@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/asamblea-de-accionistas-2026
 titulo: Asamblea de Accionistas
 seccion: datos
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 143
 hash: ad4cffd1

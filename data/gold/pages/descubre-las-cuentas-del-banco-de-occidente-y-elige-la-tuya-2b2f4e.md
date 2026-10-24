@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/cuentas
 titulo: Descubre las cuentas del Banco de Occidente y elige la tuya
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 148
 hash: 7e2a65ba

@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/seguros/libranza
 titulo: Seguro Cuota Protegida Libranza Banco de Occidente
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 444
 hash: 38d1559b

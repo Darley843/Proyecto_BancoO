@@ -3,9 +3,9 @@ fuente: https://www.bancodeoccidente.com.co/cuenta-de-ahorros
 titulo: Cuenta de Ahorros Digital | Banco de Occidente
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
-tokens: 142
+tokens: 178
 hash: 67e7b3bb
 palabras: 78
 metodo: trafilatura

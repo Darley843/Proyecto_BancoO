@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/segmentos/preferente
 titulo: Clientes Segmento Preferente Banco de Occidente
 seccion: otros
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 392
 hash: 376d65bd

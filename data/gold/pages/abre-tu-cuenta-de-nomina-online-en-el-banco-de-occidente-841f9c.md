@@ -3,9 +3,9 @@ fuente: https://www.bancodeoccidente.com.co/cuenta-de-nomina
 titulo: Abre tu Cuenta de Nómina Online en el Banco de Occidente
 seccion: oferta
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
-tokens: 941
+tokens: 1068
 hash: 9265ecc1
 palabras: 591
 metodo: fallback

@@ -3,7 +3,7 @@ fuente: https://www.bancodeoccidente.com.co/quienes-somos/subsidio-empleo-joven
 titulo: Incentivo a la generación de empleo | Banco de Occidente
 seccion: identidad
 empresa: Banco de Occidente
-fecha_captura: 2026-10-24
+fecha_captura: 2026-10-23
 idioma: es
 tokens: 190
 hash: 0c91e1ec
