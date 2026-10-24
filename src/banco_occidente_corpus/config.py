@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import tomllib
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields
 from pathlib import Path
 from typing import Any
 
@@ -92,6 +92,8 @@ class SiteConfig:
     allowed_hosts: list[str] = field(default_factory=list)
     language: str = "es"
     user_agent: str = "TAAML-bot/1.0 (uso academico)"
+    #: Contacto academico; se envia en el header `From` de cada peticion.
+    contact: str = ""
 
 
 @dataclass(slots=True)
@@ -130,9 +132,9 @@ class Config:
     paths: Paths = field(default_factory=Paths)
 
 
-def _build(cls: type, data: dict[str, Any]) -> Any:
+def _build(cls: Any, data: dict[str, Any]) -> Any:
     """Construye un dataclass ignorando claves desconocidas."""
-    known = set(cls.__dataclass_fields__)
+    known = {field.name for field in fields(cls)}
     return cls(**{k: v for k, v in data.items() if k in known})
 
 

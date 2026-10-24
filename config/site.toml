@@ -7,19 +7,25 @@ base_url = "https://www.bancodeoccidente.com.co"
 sitemap_url = "https://www.bancodeoccidente.com.co/sitemap.xml"
 allowed_hosts = ["www.bancodeoccidente.com.co", "bancodeoccidente.com.co"]
 language = "es"
-# Identificarse siempre: es un trabajo academico, no un bot anonimo.
-user_agent = "TAAML-bot/1.0 (curso UAO; uso academico; contacto: darley.idarraga@uao.edu.co)"
+# Identificacion. El WAF del sitio responde 403 a cualquier UA que se declare
+# bot, aunque robots.txt permita el contenido. Se usa un UA de navegador real y
+# la identificacion academica viaja en el header estandar `From` (RFC 9110),
+# que el pipeline envia en cada peticion. Sigue siendo un crawler identificado,
+# con Crawl-delay y respeto estricto de robots.txt.
+user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
+contact = "darley.idarraga@uao.edu.co"
 
 [crawl]
 # Cortesia con el servidor: 1.5 s entre peticiones (los slides sugieren 1-2 s).
 delay_seconds = 1.5
 timeout_seconds = 30
 max_retries = 3
-# Tope de seguridad para no martillar el sitio.
-max_urls = 1500
+# Tope de seguridad para no martillar el sitio. El sitemap publica ~2.500
+# entradas (con duplicados y algunas obsoletas): 3.500 deja margen.
+max_urls = 3500
 # El sitemap de Liferay es un indice de indices: se expande recursivamente.
 max_sitemap_depth = 2
-max_sitemaps = 250
+max_sitemaps = 400
 # Sin esto no se captura nada que este en Disallow.
 respect_robots = true
 

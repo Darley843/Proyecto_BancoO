@@ -1,0 +1,45 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: lint + test (Python ${{ matrix.python }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.13"]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Instalar uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+
+      - name: Sincronizar entorno (desde uv.lock)
+        run: uv sync --frozen --all-extras --python ${{ matrix.python }}
+
+      - name: Lint (ruff)
+        run: uv run ruff check .
+
+      - name: Formato (ruff)
+        run: uv run ruff format --check .
+
+      - name: Pruebas (pytest)
+        run: uv run pytest
+
+      - name: Demo offline del pipeline
+        run: uv run python scripts/demo_offline.py

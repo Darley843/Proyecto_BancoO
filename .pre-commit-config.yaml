@@ -1,0 +1,38 @@
+# Hooks de calidad antes de cada commit.
+# Instalación: uv run pre-commit install  (o: make pre-commit)
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+        exclude: ^data/
+      - id: end-of-file-fixer
+        exclude: ^data/
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+      - id: mixed-line-ending
+        args: ["--fix=lf"]
+        exclude: \.(html|pdf)$
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.13.0
+    hooks:
+      - id: ruff
+        args: [--fix]
+      - id: ruff-format
+
+  - repo: local
+    hooks:
+      - id: no-pip-requirements
+        name: prohibido requirements.txt / pip install
+        entry: El estandar del curso exige uv; usa uv add / uv sync.
+        language: fail
+        files: (^|/)requirements\.txt$
+      - id: no-bronze-silver
+        name: Bronze y Silver no se versionan
+        entry: data/raw y data/processed son reproducibles; solo Gold se versiona.
+        language: fail
+        files: ^data/(raw|processed)/

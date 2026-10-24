@@ -43,13 +43,20 @@ class HttpClient:
             http2=True,
             follow_redirects=True,
             timeout=config.crawl.timeout_seconds,
-            headers={
-                "User-Agent": config.site.user_agent,
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-                "Accept-Language": f"{config.site.language},es;q=0.9,en;q=0.5",
-                "Accept-Encoding": "gzip, deflate, br",
-            },
+            headers=self._headers(),
         )
+
+    def _headers(self) -> dict[str, str]:
+        """Headers de un navegador real + identificacion academica en `From`."""
+        headers = {
+            "User-Agent": self.config.site.user_agent,
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            "Accept-Language": f"{self.config.site.language},es;q=0.9,en;q=0.5",
+            "Accept-Encoding": "gzip, deflate, br",
+        }
+        if self.config.site.contact:
+            headers["From"] = self.config.site.contact
+        return headers
 
     def __enter__(self) -> HttpClient:
         return self

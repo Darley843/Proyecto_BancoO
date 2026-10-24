@@ -111,6 +111,53 @@ def cmd_identity(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_whoami(_: argparse.Namespace) -> int:
+    """Muestra la identidad de Git y el remoto configurado."""
+    for key in ("user.name", "user.email"):
+        value = subprocess.run(
+            ["git", "config", key], cwd=ROOT, capture_output=True, text=True, check=False
+        ).stdout.strip()
+        print(f"{key:<12} = {value or '(sin configurar)'}")
+    remotes = subprocess.run(
+        ["git", "remote", "-v"], cwd=ROOT, capture_output=True, text=True, check=False
+    ).stdout.strip()
+    print(remotes or "(sin remoto)")
+    return 0
+
+
+def cmd_remote(args: argparse.Namespace) -> int:
+    """Configura origin de forma portable (ignora que no exista antes)."""
+    subprocess.run(["git", "remote", "remove", "origin"], cwd=ROOT, check=False)
+    code = _git("remote", "add", "origin", args.url)
+    if code == 0:
+        print(f"origin = {args.url}")
+    return code
+
+
+def cmd_pack(_: argparse.Namespace) -> int:
+    """Empaqueta data/gold en dist/corpus-gold-YYYY-MM-DD.zip."""
+    import zipfile
+    from datetime import date
+
+    gold = ROOT / "data" / "gold"
+    if not gold.exists():
+        print("No existe data/gold. Ejecuta 'make all' primero.", file=sys.stderr)
+        return 1
+
+    dist = ROOT / "dist"
+    dist.mkdir(exist_ok=True)
+    target = dist / f"corpus-gold-{date.today().isoformat()}.zip"
+
+    with zipfile.ZipFile(target, "w", compression=zipfile.ZIP_DEFLATED) as zf:
+        for path in sorted(gold.rglob("*")):
+            if path.is_file():
+                zf.write(path, path.relative_to(gold.parent).as_posix())
+
+    size_mb = target.stat().st_size / 1_048_576
+    print(f"Empaquetado: {target.relative_to(ROOT)} ({size_mb:.2f} MB)")
+    return 0
+
+
 def cmd_repo(args: argparse.Namespace) -> int:
     token = _token()
     if not token:
@@ -191,6 +238,16 @@ def main() -> int:
     identity.add_argument("--user", default="Darley843")
     identity.add_argument("--email", default="darley.idarraga@uao.edu.co")
     identity.set_defaults(func=cmd_identity)
+
+    sub.add_parser("whoami", help="muestra identidad y remoto").set_defaults(func=cmd_whoami)
+
+    remote = sub.add_parser("remote", help="configura origin")
+    remote.add_argument(
+        "--url", default="https://github.com/Darley843/Proyecto_BancoO.git"
+    )
+    remote.set_defaults(func=cmd_remote)
+
+    sub.add_parser("pack", help="empaqueta Gold en dist/").set_defaults(func=cmd_pack)
 
     repo = sub.add_parser("repo", help="crea el repositorio en GitHub")
     repo.add_argument("--repo", default="Proyecto_BancoO")

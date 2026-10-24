@@ -6,7 +6,7 @@
 #  Uso: make help
 #
 #  Las tareas con logica viven en scripts/tasks.py para que funcione igual
-#  en Windows (cmd.exe) y en macOS/Linux, sin grep, awk ni rm.
+#  en Windows (PowerShell/cmd) y en macOS/Linux, sin grep, awk ni rm.
 # ============================================================================
 
 .DEFAULT_GOAL := help
@@ -22,6 +22,7 @@ REPO ?= Proyecto_BancoO
 OWNER ?= Darley843
 GIT_USER ?= Darley843
 GIT_EMAIL ?= darley.idarraga@uao.edu.co
+GIT_REMOTE ?= https://github.com/$(OWNER)/$(REPO).git
 
 # ---------------------------------------------------------------------------
 #  Ayuda
@@ -36,15 +37,16 @@ help: ## Muestra esta ayuda
 # ---------------------------------------------------------------------------
 
 .PHONY: init
-init: ## Crea el entorno: Python, dependencias y navegador opcional
+init: ## Crea el entorno: Python, dependencias y hooks
 	$(UV) python install
 	$(UV) sync --all-extras
+	$(UV) run pre-commit install
 	@echo.
 	@echo Listo. Siguiente paso: make doctor
 
 .PHONY: sync
 sync: ## Sincroniza el entorno con uv.lock
-	$(UV) sync
+	$(UV) sync --all-extras
 
 .PHONY: lock
 lock: ## Regenera uv.lock
@@ -53,6 +55,10 @@ lock: ## Regenera uv.lock
 .PHONY: add
 add: ## Anade una dependencia (make add PKG=httpx)
 	$(UV) add $(PKG)
+
+.PHONY: add-dev
+add-dev: ## Anade una dependencia de desarrollo (make add-dev PKG=pytest)
+	$(UV) add --dev $(PKG)
 
 .PHONY: browser
 browser: ## Instala Chromium para paginas con JavaScript
@@ -87,6 +93,10 @@ all: ## Pipeline completo: discover -> fetch -> extract -> gold -> stats
 demo: ## Prueba el pipeline con una pagina local (sin red)
 	$(UV) run python scripts/demo_offline.py
 
+.PHONY: deliver
+deliver: gold stats pack ## Genera Gold, el indice y el ZIP del entregable
+	@echo Paquete listo en dist/
+
 # ---------------------------------------------------------------------------
 #  Calidad y diagnostico
 # ---------------------------------------------------------------------------
@@ -120,8 +130,23 @@ fmt: ## Formatea el codigo con ruff
 	$(UV) run ruff format .
 	$(UV) run ruff check --fix .
 
+.PHONY: typecheck
+typecheck: ## Verifica tipos con ty
+	$(UV) run ty check src
+
 .PHONY: check
-check: lint test ## Lint + pruebas
+check: lint typecheck test ## Lint + tipos + pruebas
+
+.PHONY: ci
+ci: check demo ## Lo mismo que corre GitHub Actions
+
+.PHONY: pre-commit
+pre-commit: ## Corre los hooks sobre todos los archivos
+	$(UV) run pre-commit run --all-files
+
+.PHONY: pack
+pack: ## Empaqueta Gold en dist/ para entregar
+	$(TASKS) pack
 
 .PHONY: clean
 clean: ## Borra Silver y Gold (conserva el crudo)
@@ -140,8 +165,16 @@ clean-env: ## Borra .venv y las caches
 # ---------------------------------------------------------------------------
 
 .PHONY: identity
-identity: ## Captura la identidad de Git en este repositorio
+identity: ## Fija user.name y user.email del repositorio
 	$(TASKS) identity --user $(GIT_USER) --email $(GIT_EMAIL)
+
+.PHONY: whoami
+whoami: ## Muestra la identidad de Git y el remoto
+	$(TASKS) whoami
+
+.PHONY: remote
+remote: ## Configura origin (make remote OWNER=... REPO=...)
+	$(TASKS) remote --url $(GIT_REMOTE)
 
 .PHONY: git-init
 git-init: identity ## Inicializa el repositorio local y hace el primer commit
@@ -159,9 +192,16 @@ push: ## Sube a origin/main
 	git push -u origin main
 
 .PHONY: repo
-repo: ## Crea el repositorio en GitHub (requiere GITHUB_TOKEN)
+repo: ## Crea el repositorio en GitHub (requiere GITHUB_TOKEN con scope repo)
 	$(TASKS) repo --repo $(REPO) --owner $(OWNER)
 
 .PHONY: constitution
 constitution: ## Descarga la CONSTITUTION del repo (requiere GITHUB_TOKEN)
 	$(TASKS) constitution --repo $(REPO) --owner $(OWNER)
+
+# ---------------------------------------------------------------------------
+#  Atajos
+# ---------------------------------------------------------------------------
+
+.PHONY: setup
+setup: init doctor ## init + doctor

@@ -61,6 +61,16 @@ def test_normalize_url_quita_fragmento():
     )
 
 
+def test_normalize_url_quita_prefijo_friendly_url():
+    # Liferay publica /w/<slug> en el sitemap pero sirve /<slug>.
+    assert normalize_url("https://www.bancodeoccidente.com.co/w/cuenta-de-ahorros") == (
+        "https://www.bancodeoccidente.com.co/cuenta-de-ahorros"
+    )
+    assert normalize_url("https://www.bancodeoccidente.com.co/w/") == (
+        "https://www.bancodeoccidente.com.co/"
+    )
+
+
 def test_filtros_de_alcance(config: Config):
     assert is_capture_target("https://www.bancodeoccidente.com.co/quienes-somos", config)
     assert not is_capture_target(
@@ -230,6 +240,44 @@ def test_checklist_marca_evidencia(config: Config):
     assert total == 24
     assert 0 < found < total
     assert 0 < percent < 100
+
+
+# ---------------------------------------------------------------- red
+
+
+def test_headers_incluyen_identificacion():
+    from banco_occidente_corpus.config import SiteConfig
+    from banco_occidente_corpus.net import HttpClient
+
+    cfg = Config(site=SiteConfig(user_agent="UA-test", contact="a@b.co"))
+    client = HttpClient(cfg, delay=0)
+    try:
+        headers = client._headers()
+        assert headers["User-Agent"] == "UA-test"
+        assert headers["From"] == "a@b.co"
+    finally:
+        client.close()
+
+
+def test_headers_sin_contacto_no_envia_from():
+    from banco_occidente_corpus.config import SiteConfig
+    from banco_occidente_corpus.net import HttpClient
+
+    cfg = Config(site=SiteConfig(user_agent="UA-test", contact=""))
+    client = HttpClient(cfg, delay=0)
+    try:
+        assert "From" not in client._headers()
+    finally:
+        client.close()
+
+
+def test_config_real_identifica_al_autor():
+    from banco_occidente_corpus.config import load_config
+
+    cfg = load_config()
+    assert cfg.site.contact
+    assert "@" in cfg.site.contact
+    assert "Mozilla" in cfg.site.user_agent
 
 
 # ---------------------------------------------------------------- helpers

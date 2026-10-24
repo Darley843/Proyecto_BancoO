@@ -73,14 +73,21 @@ def parse_robots(text: str) -> tuple[RobotFileParser, float | None, list[str]]:
 
 
 def normalize_url(url: str) -> str:
-    """Quita el fragmento y normaliza el esquema/host, conservando la query."""
+    """Quita el fragmento y normaliza el esquema/host, conservando la query.
+
+    Liferay publica el sitemap con el prefijo ``/w/`` (friendly URL) pero sirve
+    el contenido sin el: ``/w/cuenta-de-ahorros`` responde 404 y
+    ``/cuenta-de-ahorros`` responde 200. Se normaliza para no capturar 404 en
+    masa.
+    """
     parts = urlsplit(url.strip())
     if not parts.scheme:
         return url.strip()
     host = parts.netloc.lower()
-    if host.startswith("www."):
-        pass
-    return urlunsplit((parts.scheme.lower(), host, parts.path or "/", parts.query, ""))
+    path = parts.path or "/"
+    if path.startswith("/w/"):
+        path = path[2:]
+    return urlunsplit((parts.scheme.lower(), host, path, parts.query, ""))
 
 
 def _suffix(url: str) -> str:
@@ -158,7 +165,10 @@ def discover(config: Config, client: HttpClient, *, save: bool = True) -> Discov
             from bs4 import BeautifulSoup
 
             soup = BeautifulSoup(home.text, "lxml")
-            found.extend(urljoin(base + "/", a["href"]) for a in soup.select("a[href]"))
+            for anchor in soup.select("a[href]"):
+                href = anchor.get("href")
+                if isinstance(href, str) and href:
+                    found.append(urljoin(base + "/", href))
 
     urls: list[str] = []
     seen: set[str] = set()

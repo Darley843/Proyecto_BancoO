@@ -46,10 +46,14 @@ documentos por sección y la cobertura del checklist del Taller 1.
 | `make all` | Pipeline completo |
 | `make stats` | Resumen y checklist → `data/gold/_INDICE.md` |
 | `make status` | Cuenta URLs/Bronze/Silver/Gold |
-| `make test` / `make check` | Pruebas / lint + pruebas |
+| `make test` / `make check` | Pruebas / lint + tipos + pruebas |
+| `make ci` | Lo mismo que corre GitHub Actions (check + demo) |
+| `make deliver` | Gold + índice + ZIP del entregable en `dist/` |
 | `make clean` | Borra Silver y Gold (conserva el crudo) |
 | `make clean-all` | Borra todas las capas |
 | `make identity` | Fija `user.name` y `user.email` del repo |
+| `make whoami` | Muestra la identidad de Git y el remoto |
+| `make remote` | Configura `origin` (`OWNER=`, `REPO=`) |
 | `make repo` | Crea el repositorio en GitHub (requiere `GITHUB_TOKEN`) |
 
 El CLI también se usa directo:
@@ -135,7 +139,10 @@ cuáles ya tienen evidencia en el corpus.
 - Se respeta `robots.txt`: lo que está en `Disallow` no se toca
   (`/portaltransaccional/`, `/icbs-web/`, `/AjaxTx`, `/wps/`).
 - `Crawl-delay` y pausa de 1.5 s entre peticiones (configurable).
-- `User-Agent` identificable con contacto académico.
+- Identificación en cada petición: UA de navegador + header HTTP `From` con el
+  contacto académico. El WAF del sitio responde `403` a cualquier UA que se
+  declare bot, aunque `robots.txt` permita el contenido (ver `CONSTITUTION.md`
+  §10).
 - Solo información **pública**. Nada de zonas privadas, datos tras login ni
   datos personales (Ley 1581 de 2012 — Habeas Data).
 - El HTML crudo se conserva para poder reprocesar sin volver a molestar al
@@ -155,11 +162,17 @@ CloudFront rechaza la petición antes de llegar al origen. Causas:
 
 1. **VPN activa** con salida fuera de Colombia (es la causa más común).
 2. Red de datacenter, contenedor o CI.
-3. Fingerprint TLS de bot (curl, httpx, requests).
+3. Un `User-Agent` que se declara bot: el WAF responde `403` aunque
+   `robots.txt` permita la página.
 
-Diagnóstico: `make doctor`. Solución: **desconecta la VPN** y ejecuta desde una
-conexión residencial colombiana. Si el HTML carga pero el texto sale vacío,
-la página necesita JavaScript:
+Diagnóstico: `make doctor`. Solución:
+
+- Desconecta la VPN y ejecuta desde una conexión residencial colombiana.
+- No cambies el UA a uno de bot: el proyecto ya usa un UA de navegador y envía
+  la identificación académica en el header `From` (configurable en
+  `config/site.toml`).
+
+Si el HTML carga pero el texto sale vacío, la página necesita JavaScript:
 
 ```bash
 make browser
@@ -204,6 +217,10 @@ Variables en el Makefile: `GIT_USER`, `GIT_EMAIL`, `REPO`.
 ├── pyproject.toml            # proyecto uv (PEP 621)
 ├── uv.lock                   # versiones exactas (se versiona)
 ├── .python-version           # 3.13
+├── CONSTITUTION.md           # verdad central del proyecto
+├── AGENTS.md                 # contexto para agentes LLM
+├── .github/workflows/ci.yml  # lint + formato + pruebas
+├── .pre-commit-config.yaml   # hooks de calidad
 ├── src/banco_occidente_corpus/
 │   ├── cli.py                # discover | fetch | extract | gold | stats
 │   ├── config.py             # carga de site.toml y rutas

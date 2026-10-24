@@ -29,9 +29,11 @@ browser = ["playwright>=1.48.0"]
 
 [dependency-groups]
 dev = [
+    "pre-commit>=4.7.0",
     "pytest>=8.3.3",
     "pytest-cov>=5.0.0",
     "ruff>=0.7.0",
+    "ty>=0.0.91",
 ]
 
 [project.scripts]

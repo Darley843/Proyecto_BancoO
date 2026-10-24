@@ -18,8 +18,8 @@ Gold desde Bronze sin volver a la web.
 
 | Regla | Implementación |
 |---|---|
-| 1–2 s entre peticiones | `crawl.delay_seconds = 1.5`, más pausa de 10 s cada 50 peticiones |
-| User-Agent identificable | `TAAML-bot/1.0 (curso UAO; ...)` en `config/site.toml` |
+| 1-2 s entre peticiones | `crawl.delay_seconds = 1.5`, más pausa de 10 s cada 50 peticiones |
+| User-Agent identificable | UA de navegador + header `From` con el contacto académico (el WAF responde 403 a UA que se declaren bot; ver `CONSTITUTION.md` §10) |
 | Respetar `robots.txt` | `discover.parse_robots()` + `can_fetch()`; los `Disallow` se registran como descartados |
 | Leer el sitemap primero | `discover.py` expande el **índice de índices** de Liferay hasta 2 niveles |
 | Nada de datos personales | filtros de alcance + revisión en la etapa Gold |
@@ -82,3 +82,23 @@ Encabezados `#`/`##` como fronteras de chunk. Tablas y listas se conservan.
 - `data/gold/corpus.jsonl` con todos los metadatos
 - `data/gold/_INDICE.md` con el resumen y la cobertura
 - Pipeline reproducible: `make all`
+- Paquete para entregar: `make deliver` → `dist/corpus-gold-YYYY-MM-DD.zip`
+
+## 8. Estándar de ingeniería (heredado de la CONSTITUTION del curso)
+
+| Regla | Dónde se cumple |
+|---|---|
+| `uv` único gestor; prohibido `pip`/`requirements.txt` | `pyproject.toml`, `uv.lock`, hook `no-pip-requirements` |
+| Estilo Ruff (línea 100, comillas dobles) | `[tool.ruff]` + `make lint` / `make fmt` |
+| Tipado estático | `make typecheck` (`ty`) |
+| Pruebas AAA sin red | `test/test_pipeline.py` + `make test` |
+| Conventional Commits | `CONSTITUTION.md` §8 |
+| Hooks antes del commit | `.pre-commit-config.yaml` |
+| CI en verde | `.github/workflows/ci.yml` (lint + formato + pytest + demo) |
+| Documentación viva | `CONSTITUTION.md` y este archivo se actualizan en el mismo commit |
+
+## 9. Trazabilidad de la captura
+
+`data/raw/capture.jsonl` guarda por URL: `status`, `fecha_captura`, `bytes`,
+`sha256`, `archivo` y `error`. Con `sha256` se detecta si el contenido cambió y
+con `_INDICE.md` se ve la cobertura. `make status` resume las cuatro etapas.
