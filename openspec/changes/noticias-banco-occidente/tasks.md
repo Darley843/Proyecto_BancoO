@@ -18,10 +18,10 @@
 
 ## 3. Prensa externa y validación
 
-- [ ] 3.1 Implementar `load_prensa` y `validar_ficha` con campos obligatorios, fecha ISO, URL `http(s)`, `estado` permitido y resumen no vacío; verificar con pruebas de campo faltante, fecha inválida, URL inválida y estado desconocido.
-- [ ] 3.2 Implementar `deduplicar` por `id`, por `fuente` y por `evento`+`medio`, con máximo dos coberturas externas por evento; verificar con un YAML que repita URL y evento y comprobar que no se duplican fichas.
-- [ ] 3.3 Aplicar la regla de verificación: una ficha `pendiente` no se publica en Gold y una `verificado` sí; verificar con dos entradas de prueba y comprobar que solo aparece la verificada.
-- [ ] 3.4 Documentar en `data/noticias/README.md` el diccionario de campos, el vocabulario de `temas` y el procedimiento de verificación humana; verificar que el README menciona los cinco datos mínimos y que prohíbe copiar el artículo.
+- [x] 3.1 Implementar `load_prensa` y `validar_ficha` con campos obligatorios, fecha ISO, URL `http(s)`, `estado` permitido y resumen no vacío; verificar con pruebas de campo faltante, fecha inválida, URL inválida y estado desconocido.
+- [x] 3.2 Implementar `deduplicar` por `id`, por `fuente` y por `evento`+`medio`, con máximo dos coberturas externas por evento; verificar con un YAML que repita URL y evento y comprobar que no se duplican fichas.
+- [x] 3.3 Aplicar la regla de verificación: una ficha `pendiente` no se publica en Gold y una `verificado` sí; verificar con dos entradas de prueba y comprobar que solo aparece la verificada.
+- [x] 3.4 Documentar en `data/noticias/README.md` el diccionario de campos, el vocabulario de `temas` y el procedimiento de verificación humana; verificar que el README menciona los cinco datos mínimos y que prohíbe copiar el artículo.
 
 ## 4. Renderizado Gold, corpus e índice
 
