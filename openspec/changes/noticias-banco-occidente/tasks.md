@@ -4,7 +4,7 @@
 
 - [x] 1.1 Añadir las rutas de noticias en `config.py` y la sección `[noticias]` en `config/site.toml`; verificar que `uv run python -c "from banco_occidente_corpus.config import load_config; c=load_config(); print(c.paths.news_source)"` carga sin error y muestra `data/noticias`.
 - [x] 1.2 Crear `data/noticias/prensa.yaml` con la plantilla de campos y `data/noticias/README.md` con criterios de selección y verificación; verificar que el YAML de ejemplo se carga con `yaml.safe_load` y que el README documenta los 15-20 límites.
-- [x] 1.3 Registrar 15-20 fichas de prensa externa con estado `pendiente`, cada una con título, fecha, medio, enlace original y resumen propio; verificar que el YAML carga, que no contiene cuerpo del artículo y presentar al usuario la lista para su verificación manual.
+- [x] 1.3 Registrar 15-20 fichas de prensa externa, primero en `pendiente` y luego en `verificado` tras la verificación manual del usuario, cada una con título, fecha, medio, enlace original y resumen propio; verificar que el YAML carga y que no contiene cuerpo del artículo.
 - [x] 1.4 Añadir una prueba de configuración que compruebe las rutas nuevas y que `[noticias]` tiene `desde`, `hasta`, `prensa` y `max_por_evento`; verificar con `uv run pytest test/test_news.py -k config`.
 
 ## 2. Parser oficial y privacidad

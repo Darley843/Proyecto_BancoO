@@ -22,8 +22,8 @@ def test_config_noticias() -> None:
     assert config.news.max_oficiales == 40
 
 
-def test_prensa_yaml_carga_y_esta_pendiente() -> None:
-    """El registro tiene 15-20 fichas, campos minimos y estado pendiente."""
+def test_prensa_yaml_carga_y_estado_valido() -> None:
+    """El registro tiene 15-20 fichas, campos minimos y estado valido."""
     config = load_config()
     rows = yaml.safe_load(config.paths.news_prensa.read_text(encoding="utf-8"))
     assert isinstance(rows, list)
@@ -43,7 +43,7 @@ def test_prensa_yaml_carga_y_esta_pendiente() -> None:
     ids: set[str] = set()
     for row in rows:
         assert required <= set(row)
-        assert row["estado"] == "pendiente"
+        assert row["estado"] in {"pendiente", "verificado"}
         assert row["url"].startswith("https://")
         assert row["id"] not in ids
         assert len(row["resumen"].split()) >= 10
