@@ -25,11 +25,11 @@
 
 ## 4. Renderizado Gold, corpus e índice
 
-- [ ] 4.1 Implementar `render_ficha` con frontmatter completo y cuerpo limitado a título, medio, fecha, enlace y resumen; si existe documento Gold, incluir `documento_id`, `documento_archivo`, `documento_titulo` y enlace relativo `../documents/<archivo>.md`; verificar con una prueba que el cuerpo no contiene párrafos del artículo ni imágenes.
-- [ ] 4.2 Implementar `merge_corpus` eliminando filas antiguas `noticia-*`/`hecho-*`, conservando las filas del sitio y evitando duplicados; verificar ejecutando la fusión dos veces y comparando el número de filas.
-- [ ] 4.3 Implementar `write_noticias_index` con ventana, conteos por tipo/origen/año/medio y tabla de fichas; verificar con un conjunto de dos fichas que el índice refleja exactamente sus fechas, enlaces y documentos vinculados.
-- [ ] 4.4 Extender `healthcheck.py` para exigir `fecha_publicacion`, `tipo`, `origen`, `medio` y `resumen` en páginas `noticia-*`/`hecho-*`, detectar ids duplicados y validar que `documento_archivo` exista cuando haya `documento_id`; verificar con fixtures válido e inválido.
-- [ ] 4.5 Actualizar `CONSTITUTION.md` §2, §7 y §11 y `docs/ESTANDAR.md` §4 y §7 con los campos nuevos, las fichas Gold, `_NOTICIAS.md` y el enlace a documentos; verificar que los ejemplos de frontmatter y el contrato coinciden con `render_ficha` y sin reescribir las secciones de PDF y videos.
+- [x] 4.1 Implementar `render_ficha` con frontmatter completo y cuerpo limitado a título, medio, fecha, enlace y resumen; si existe documento Gold, incluir `documento_id`, `documento_archivo`, `documento_titulo` y enlace relativo `../documents/<archivo>.md`; verificar con una prueba que el cuerpo no contiene párrafos del artículo ni imágenes.
+- [x] 4.2 Implementar `merge_corpus` eliminando filas antiguas `noticia-*`/`hecho-*`, conservando las filas del sitio y evitando duplicados; verificar ejecutando la fusión dos veces y comparando el número de filas.
+- [x] 4.3 Implementar `write_noticias_index` con ventana, conteos por tipo/origen/año/medio y tabla de fichas; verificar con un conjunto de dos fichas que el índice refleja exactamente sus fechas, enlaces y documentos vinculados.
+- [x] 4.4 Extender `healthcheck.py` para exigir `fecha_publicacion`, `tipo`, `origen`, `medio` y `resumen` en páginas `noticia-*`/`hecho-*`, detectar ids duplicados y validar que `documento_archivo` exista cuando haya `documento_id`; verificar con fixtures válido e inválido.
+- [x] 4.5 Actualizar `CONSTITUTION.md` §2, §7 y §11 y `docs/ESTANDAR.md` §4 y §7 con los campos nuevos, las fichas Gold, `_NOTICIAS.md` y el enlace a documentos; verificar que los ejemplos de frontmatter y el contrato coinciden con `render_ficha` y sin reescribir las secciones de PDF y videos.
 
 ## 5. CLI, target y bloqueo
 

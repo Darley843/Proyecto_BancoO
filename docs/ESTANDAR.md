@@ -57,6 +57,50 @@ keywords: [...]          # extra
 
 Encabezados `#`/`##` como fronteras de chunk. Tablas y listas se conservan.
 
+### Fichas de noticias y hechos relevantes
+
+Las fichas se escriben como `data/gold/pages/noticia-*.md` (prensa externa
+verificada) y `hecho-*.md` (hechos oficiales). Su frontmatter extiende el
+contrato anterior con los campos de noticias:
+
+```yaml
+---
+id: hecho-2026-10-19-emision-de-valores
+tipo: hecho
+origen: oficial
+seccion: presencia
+empresa: Banco de Occidente
+titulo: Emisión de valores
+fecha_publicacion: 2026-10-19
+fecha_captura: 2026-10-24
+idioma: es
+fuente: https://www.bancodeoccidente.com.co/inversionistas
+medio: Banco de Occidente
+resumen: Colocación de bonos ordinarios por $500.000 millones.
+temas: [financiacion]
+relevancia: alta
+estado: verificado
+tokens: 42
+hash: 3f9c1a7d
+palabras: 10
+metodo: noticias
+evento: 2026-10-19-emision
+anexo: https://www.bancodeoccidente.com.co/documents/d/guest/ir-final-oct-2026
+documento_id: ir-final-oct-2026
+documento_archivo: ir-final-oct-2026.md
+documento_titulo: Informe Final Octubre 2026
+---
+```
+
+- El cuerpo solo lleva título, medio, fecha, enlace al origen y resumen propio;
+  no se copia el artículo, ni imágenes, ni PDFs de prensa.
+- Si el anexo ya está en `documents.jsonl`, se agrega el enlace relativo
+  `../documents/<archivo>.md`; si no, se conserva `anexo` sin descargar.
+- `_NOTICIAS.md` resume la ventana, los conteos y la tabla de fichas. Las filas
+  `noticia-*` y `hecho-*` también se consolidan en `corpus.jsonl`.
+- `healthcheck.py` exige `fecha_publicacion`, `tipo`, `origen`, `medio` y
+  `resumen`, detecta ids duplicados y valida el documento enlazado.
+
 ## 5. Entorno con uv
 
 | Regla de la clase | Implementación |
@@ -79,10 +123,14 @@ Encabezados `#`/`##` como fronteras de chunk. Tablas y listas se conservan.
 ## 7. Entregable
 
 - Un `.md` por página en `data/gold/pages/`
-- `data/gold/corpus.jsonl` con todos los metadatos
+- Fichas `data/gold/pages/noticia-*.md` y `hecho-*.md` con el frontmatter de
+  noticias y su enlace a `../documents/<archivo>.md` cuando el anexo ya existe
+- `data/gold/corpus.jsonl` con todos los metadatos, incluidas las fichas
 - `data/gold/_INDICE.md` con el resumen y la cobertura
+- `data/gold/_NOTICIAS.md` con la ventana, los conteos y la tabla de fichas
 - `data/knowledge/` con entidades, hechos y relaciones validados
 - Pipeline reproducible: `make all`
+- Noticias reproducibles por separado: `make noticias`
 - Paquete para entregar: `make deliver` → `dist/corpus-gold-YYYY-MM-DD.zip`
 
 ## 8. Estándar de ingeniería (heredado de la CONSTITUTION del curso)

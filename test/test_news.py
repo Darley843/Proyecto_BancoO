@@ -2,14 +2,22 @@
 
 from __future__ import annotations
 
+import importlib.util
 from datetime import date
 from pathlib import Path
+from typing import Any
 
 import pytest
 import yaml
 
 from banco_occidente_corpus import documents
-from banco_occidente_corpus.config import load_config
+from banco_occidente_corpus.config import (
+    Config,
+    NewsConfig,
+    Paths,
+    SiteConfig,
+    load_config,
+)
 from banco_occidente_corpus.news import (
     cargar_indice_documentos,
     deduplicar,
@@ -18,12 +26,16 @@ from banco_occidente_corpus.news import (
     es_aviso_dividendo,
     filtrar_verificadas,
     load_prensa,
+    merge_corpus,
     parse_fecha_es,
     parse_hechos_relevantes,
+    render_ficha,
     validar_ficha,
     validar_pii,
     vincular_documento,
+    write_noticias_index,
 )
+from banco_occidente_corpus.utils import read_jsonl, write_jsonl
 
 FIXTURES = Path(__file__).parent / "fixtures"
 
@@ -428,3 +440,293 @@ def test_fuentes_documenta_tabla_y_privacidad() -> None:
     assert "tabla de accionistas" in fuentes
     assert "inversionistas.html" in fuentes
     assert "test/test_news.py" in fuentes
+
+
+# ---------------------------------------------------------------- Gold local
+
+
+def _config_temporal(tmp_path: Path) -> Config:
+    """Construye una configuracion aislada en ``tmp_path`` para probar Gold."""
+    return Config(
+        site=SiteConfig(
+            name="Banco de Occidente",
+            language="es",
+            base_url="https://www.bancodeoccidente.com.co",
+        ),
+        news=NewsConfig(desde="2025-01-01", hasta="2026-12-31"),
+        paths=Paths(
+            root=tmp_path,
+            raw=tmp_path / "data/raw",
+            processed=tmp_path / "data/processed",
+            gold=tmp_path / "data/gold",
+        ),
+    )
+
+
+def _fila_hecho(**cambios: object) -> dict[str, object]:
+    """Devuelve una fila publicable de hecho oficial para las pruebas Gold."""
+    fila: dict[str, object] = {
+        "id": "hecho-2026-10-19-emision-de-valores",
+        "tipo": "hecho",
+        "origen": "oficial",
+        "titulo": "Emisión de valores",
+        "fecha_publicacion": "2026-10-19",
+        "fecha_captura": "2026-10-24",
+        "fuente": "https://www.bancodeoccidente.com.co/inversionistas",
+        "medio": "Banco de Occidente",
+        "resumen": "Colocación de bonos ordinarios por $500.000 millones.",
+        "temas": ["financiacion"],
+        "relevancia": "alta",
+        "estado": "verificado",
+        "anexo": "https://www.bancodeoccidente.com.co/documents/d/guest/ir-final-oct-2026",
+    }
+    fila.update(cambios)
+    return fila
+
+
+def test_render_ficha_contrato_y_cuerpo_minimo(tmp_path: Path) -> None:
+    """La ficha tiene frontmatter completo y un cuerpo sin el articulo original."""
+    config = _config_temporal(tmp_path)
+    fila = _fila_hecho(
+        cuerpo="Parrafo completo del articulo que no debe copiarse.",
+        imagen="https://example.com/foto.jpg",
+        documento_id="ir-final-oct-2026",
+        documento_archivo="data/gold/documents/ir-final-oct-2026.md",
+        documento_titulo="Informe Final Octubre 2026",
+    )
+
+    frontmatter, cuerpo = render_ficha(fila, config)
+
+    obligatorios = {
+        "id",
+        "tipo",
+        "origen",
+        "seccion",
+        "empresa",
+        "titulo",
+        "fecha_publicacion",
+        "fecha_captura",
+        "idioma",
+        "fuente",
+        "medio",
+        "resumen",
+        "temas",
+        "relevancia",
+        "estado",
+        "tokens",
+        "hash",
+        "palabras",
+        "metodo",
+        "documento_id",
+        "documento_archivo",
+        "documento_titulo",
+    }
+    assert obligatorios <= set(frontmatter)
+    assert frontmatter["id"] == "hecho-2026-10-19-emision-de-valores"
+    assert frontmatter["tipo"] == "hecho"
+    assert frontmatter["origen"] == "oficial"
+    assert frontmatter["documento_archivo"] == "ir-final-oct-2026.md"
+    assert frontmatter["estado"] == "verificado"
+    assert len(str(frontmatter["hash"])) == 8
+
+    assert "Emisión de valores" in cuerpo
+    assert "Banco de Occidente" in cuerpo
+    assert "2026-10-19" in cuerpo
+    assert str(fila["fuente"]) in cuerpo
+    assert str(fila["resumen"]) in cuerpo
+    assert "../documents/ir-final-oct-2026.md" in cuerpo
+    assert "Parrafo completo" not in cuerpo
+    assert "![" not in cuerpo
+    assert "<img" not in cuerpo
+    assert "\n## " not in cuerpo
+
+
+def test_render_ficha_rechaza_campos_minimos_ausentes(tmp_path: Path) -> None:
+    """Sin titulo, resumen o fecha valida la ficha no se puede renderizar."""
+    config = _config_temporal(tmp_path)
+
+    with pytest.raises(ValueError, match="titulo"):
+        render_ficha(_fila_hecho(titulo=""), config)
+    with pytest.raises(ValueError, match="resumen"):
+        render_ficha(_fila_hecho(resumen=""), config)
+    with pytest.raises(ValueError, match="Fecha"):
+        render_ficha(_fila_hecho(fecha_publicacion="2026-13-40"), config)
+
+
+def test_merge_corpus_conserva_sitio_y_no_duplica(tmp_path: Path) -> None:
+    """La fusion elimina fichas viejas, conserva el sitio y es idempotente."""
+    config = _config_temporal(tmp_path)
+    sitio = {
+        "id": "quienes-somos-abc",
+        "fuente": "https://x.co/quienes-somos",
+        "titulo": "Quienes somos",
+    }
+    antigua = {
+        "id": "noticia-2024-01-01-vieja",
+        "fuente": "https://x.co/vieja",
+        "titulo": "Vieja",
+    }
+    write_jsonl(config.paths.corpus_file, [sitio, antigua])
+
+    nuevas: list[dict[str, Any]] = [
+        _fila_hecho(),
+        {
+            "id": "noticia-2026-01-01-ejemplo",
+            "fuente": "https://example.com/noticia",
+            "fecha_publicacion": "2026-01-01",
+            "titulo": "Nota externa",
+            "medio": "Medio",
+        },
+    ]
+
+    primera = merge_corpus(config, nuevas)
+    segunda = merge_corpus(config, nuevas)
+
+    assert len(primera) == len(segunda) == 3
+    ids = [fila["id"] for fila in read_jsonl(config.paths.corpus_file)]
+    assert ids.count("quienes-somos-abc") == 1
+    assert ids.count("hecho-2026-10-19-emision-de-valores") == 1
+    assert ids.count("noticia-2026-01-01-ejemplo") == 1
+    assert "noticia-2024-01-01-vieja" not in ids
+
+
+def test_write_noticias_index_refleja_fichas(tmp_path: Path) -> None:
+    """El indice muestra ventana, conteos, fechas, enlaces y documentos."""
+    config = _config_temporal(tmp_path)
+    hecho, _ = render_ficha(
+        _fila_hecho(
+            documento_id="ir-final-oct-2026",
+            documento_archivo="ir-final-oct-2026.md",
+            documento_titulo="Informe Final Octubre 2026",
+            evento="2026-10-19-emision",
+        ),
+        config,
+    )
+    prensa, _ = render_ficha(
+        _ficha_prensa(
+            id="noticia-2026-01-01-ejemplo",
+            fecha="2026-01-01",
+            url="https://example.com/noticia",
+        ),
+        config,
+    )
+
+    contenido = write_noticias_index(config, [hecho, prensa])
+
+    assert config.paths.news_index.exists()
+    assert config.paths.news_index.read_text(encoding="utf-8") == contenido
+    assert "**Ventana:** 2025-01-01 a 2026-12-31" in contenido
+    assert "**Fichas publicadas:** 2" in contenido
+    assert "2026-10-19" in contenido
+    assert "2026-01-01" in contenido
+    assert "https://example.com/noticia" in contenido
+    assert "documents/ir-final-oct-2026.md" in contenido
+    assert "| hecho | 1 |" in contenido
+    assert "| oficial | 1 |" in contenido
+    assert "| prensa | 1 |" in contenido
+
+
+def test_write_noticias_index_sin_fichas(tmp_path: Path) -> None:
+    """Sin fichas publicadas el indice deja conteos en cero y una nota."""
+    config = _config_temporal(tmp_path)
+
+    contenido = write_noticias_index(config, [])
+
+    assert "**Fichas publicadas:** 0" in contenido
+    assert "_No hubo publicaciones en la ventana._" in contenido
+    assert "| - | 0 |" in contenido
+
+
+def _cargar_healthcheck() -> Any:
+    """Carga el script healthcheck de la skill sin instalarlo como paquete."""
+    ruta = (
+        Path(__file__).resolve().parents[1]
+        / ".opencode"
+        / "skills"
+        / "corpus-extraction"
+        / "scripts"
+        / "healthcheck.py"
+    )
+    spec = importlib.util.spec_from_file_location("healthcheck_noticias", ruta)
+    assert spec is not None
+    assert spec.loader is not None
+    modulo = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(modulo)
+    return modulo
+
+
+def _escribir_pagina_noticia(
+    directorio: Path,
+    nombre: str,
+    meta: dict[str, object],
+) -> Path:
+    """Escribe una pagina Gold de noticias con frontmatter YAML en ``directorio``."""
+    directorio.mkdir(parents=True, exist_ok=True)
+    ruta = directorio / nombre
+    cabecera = yaml.safe_dump(meta, allow_unicode=True, sort_keys=False).strip()
+    ruta.write_text(f"---\n{cabecera}\n---\n\n# Ficha\n", encoding="utf-8")
+    return ruta
+
+
+def test_healthcheck_noticias_validas(tmp_path: Path) -> None:
+    """Una ficha con sus campos y su documento vinculado pasa el healthcheck."""
+    modulo = _cargar_healthcheck()
+    paginas = tmp_path / "pages"
+    documentos_dir = tmp_path / "documents"
+    documentos_dir.mkdir()
+    (documentos_dir / "informe.md").write_text("# Informe\n", encoding="utf-8")
+    pagina = _escribir_pagina_noticia(
+        paginas,
+        "hecho-2026-10-19-emision.md",
+        {
+            "id": "hecho-2026-10-19-emision",
+            "fecha_publicacion": "2026-10-19",
+            "tipo": "hecho",
+            "origen": "oficial",
+            "medio": "Banco de Occidente",
+            "resumen": "Colocacion de bonos.",
+            "documento_id": "doc-1",
+            "documento_archivo": "informe.md",
+        },
+    )
+    documentos = [{"id": "doc-1", "archivo": "data/gold/documents/informe.md"}]
+
+    assert modulo.validate_noticias([pagina], documentos_dir, documentos) == []
+
+
+def test_healthcheck_noticias_invalidas(tmp_path: Path) -> None:
+    """El healthcheck detecta campos faltantes, ids repetidos y enlaces rotos."""
+    modulo = _cargar_healthcheck()
+    paginas = tmp_path / "pages"
+    documentos_dir = tmp_path / "documents"
+    documentos_dir.mkdir()
+    base: dict[str, object] = {
+        "fecha_publicacion": "2026-10-19",
+        "tipo": "hecho",
+        "origen": "oficial",
+        "medio": "Banco de Occidente",
+        "resumen": "Colocacion de bonos.",
+    }
+    primera = _escribir_pagina_noticia(paginas, "hecho-a.md", {**base, "id": "hecho-duplicado"})
+    segunda = _escribir_pagina_noticia(paginas, "hecho-b.md", {**base, "id": "hecho-duplicado"})
+    sin_medio = _escribir_pagina_noticia(
+        paginas, "hecho-c.md", {**base, "id": "hecho-c", "medio": ""}
+    )
+    roto = _escribir_pagina_noticia(
+        paginas,
+        "hecho-d.md",
+        {
+            **base,
+            "id": "hecho-d",
+            "documento_id": "doc-x",
+            "documento_archivo": "no-existe.md",
+        },
+    )
+
+    errores = modulo.validate_noticias([primera, segunda, sin_medio, roto], documentos_dir, [])
+    texto = " ".join(errores)
+
+    assert "id duplicado" in texto
+    assert "medio" in texto
+    assert "documento_archivo no existe" in texto
+    assert "documento_id ausente de documents.jsonl" in texto
