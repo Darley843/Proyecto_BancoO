@@ -108,6 +108,10 @@ videos: ## Lista el canal, descarga subtitulos y transcribe a Gold
 .PHONY: media
 media: docs videos ## Documentos PDF + videos de YouTube
 
+.PHONY: noticias
+noticias: ## Hechos oficiales y prensa curada a Gold (independiente del pipeline)
+	$(CORPUS) noticias
+
 .PHONY: all
 all: ## Pipeline completo: discover -> fetch -> extract -> gold -> stats
 	$(CORPUS) all $(if $(LIMIT),--limit $(LIMIT),) $(if $(DELAY),--delay $(DELAY),)

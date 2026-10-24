@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import importlib.util
+import logging
 from datetime import date
 from pathlib import Path
 from typing import Any
@@ -10,7 +11,7 @@ from typing import Any
 import pytest
 import yaml
 
-from banco_occidente_corpus import documents
+from banco_occidente_corpus import cli, documents, news
 from banco_occidente_corpus.config import (
     Config,
     NewsConfig,
@@ -18,7 +19,9 @@ from banco_occidente_corpus.config import (
     SiteConfig,
     load_config,
 )
+from banco_occidente_corpus.net import Response
 from banco_occidente_corpus.news import (
+    build_noticias,
     cargar_indice_documentos,
     deduplicar,
     derivar_resumen,
@@ -730,3 +733,222 @@ def test_healthcheck_noticias_invalidas(tmp_path: Path) -> None:
     assert "medio" in texto
     assert "documento_archivo no existe" in texto
     assert "documento_id ausente de documents.jsonl" in texto
+
+
+# ---------------------------------------------------------------- integracion CLI
+
+
+def _preparar_bronce(config: Config, html: str) -> None:
+    """Guarda el HTML oficial como Bronze y su registro en ``capture.jsonl``."""
+    ruta = config.paths.raw_html / "inversionistas.html"
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text(html, encoding="utf-8")
+    write_jsonl(
+        config.paths.capture_file,
+        [
+            {
+                "url": news.OFFICIAL_PAGE_URL,
+                "status": 200,
+                "archivo": ruta.relative_to(config.paths.root).as_posix(),
+            }
+        ],
+    )
+
+
+def _preparar_prensa(config: Config) -> None:
+    """Escribe una ficha verificada y una pendiente en la curaduria temporal."""
+    config.paths.news_source.mkdir(parents=True, exist_ok=True)
+    fichas = [
+        _ficha_prensa(),
+        _ficha_prensa(
+            id="noticia-pendiente",
+            url="https://example.com/pendiente",
+            estado="pendiente",
+        ),
+    ]
+    config.paths.news_prensa.write_text(
+        yaml.safe_dump(fichas, allow_unicode=True, sort_keys=False),
+        encoding="utf-8",
+    )
+
+
+def _preparar_indice_documentos(config: Config) -> None:
+    """Crea un ``documents.jsonl`` de solo lectura con el anexo de octubre."""
+    write_jsonl(
+        config.paths.documents_index,
+        [
+            {
+                "id": "ir-final-oct-2026",
+                "titulo": "Informe Final Octubre 2026",
+                "fuente": (
+                    "https://portalpublico.bancodeoccidente.com.co/documents/d/guest/"
+                    "ir-final-oct-2026"
+                ),
+                "archivo": "data/gold/documents/ir-final-oct-2026.md",
+            }
+        ],
+    )
+
+
+def _prohibir_red(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Hace fallar cualquier peticion o descarga real durante la prueba."""
+
+    def no_permitido(*args: object, **kwargs: object) -> None:
+        """Falla si una rutina intenta tocar la red o descargar PDFs."""
+        raise AssertionError("la prueba no debe tocar la red ni descargar PDFs")
+
+    monkeypatch.setattr(news.HttpClient, "get", no_permitido)
+    monkeypatch.setattr(documents, "discover_documents", no_permitido)
+    monkeypatch.setattr(documents, "fetch_documents", no_permitido)
+    monkeypatch.setattr(documents, "extract_documents", no_permitido)
+
+
+def test_build_noticias_sin_red_genera_tres_artefactos(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con Bronze y ``--sin-red`` publica fichas, corpus e indice sin red."""
+    config = _config_temporal(tmp_path)
+    html = (FIXTURES / "inversionistas.html").read_text(encoding="utf-8")
+    _preparar_bronce(config, html)
+    _preparar_prensa(config)
+    _preparar_indice_documentos(config)
+    _prohibir_red(monkeypatch)
+
+    filas = build_noticias(
+        config,
+        desde=date(2025, 1, 1),
+        hasta=date(2026, 10, 24),
+        sin_red=True,
+    )
+
+    oficiales = [fila for fila in filas if fila["origen"] == "oficial"]
+    prensa = [fila for fila in filas if fila["origen"] == "prensa"]
+    assert len(oficiales) == 3
+    assert [fila["id"] for fila in prensa] == ["noticia-2026-01-01-ejemplo"]
+    assert "noticia-pendiente" not in {fila["id"] for fila in filas}
+
+    assert len(list(config.paths.gold_markdown.glob("hecho-*.md"))) == 3
+    assert len(list(config.paths.gold_markdown.glob("noticia-*.md"))) == 1
+    assert len(list(read_jsonl(config.paths.corpus_file))) == 4
+    assert config.paths.news_index.exists()
+    indice = config.paths.news_index.read_text(encoding="utf-8")
+    assert "**Fichas publicadas:** 4" in indice
+    assert "2025-03-26" in indice
+
+    octubre = next(fila for fila in oficiales if fila["fecha_publicacion"] == "2026-10-19")
+    assert octubre["documento_id"] == "ir-final-oct-2026"
+    pagina = config.paths.gold_markdown / f"{octubre['id']}.md"
+    assert "../documents/ir-final-oct-2026.md" in pagina.read_text(encoding="utf-8")
+    assert not list((tmp_path / "data/gold/documents").glob("*.pdf"))
+
+
+def test_build_noticias_sin_red_sin_bronce_no_toca_red(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sin Bronze y con ``--sin-red`` omite oficiales y publica la curaduria."""
+    config = _config_temporal(tmp_path)
+    _preparar_prensa(config)
+    _prohibir_red(monkeypatch)
+
+    filas = build_noticias(
+        config,
+        desde=date(2025, 1, 1),
+        hasta=date(2026, 10, 24),
+        sin_red=True,
+    )
+
+    assert len(filas) == 1
+    assert filas[0]["origen"] == "prensa"
+    assert config.paths.news_index.exists()
+    assert not list(config.paths.gold_markdown.glob("hecho-*.md"))
+
+
+def test_cli_noticias_403_avisa_y_no_escribe(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Ante 403 el comando falla, muestra el motivo y no escribe fichas."""
+    config = _config_temporal(tmp_path)
+
+    def get_403(self: object, url: str, *, accept: str | None = None) -> Response:
+        """Simula un 403 del WAF sin salir a la red."""
+        return Response(
+            url=url,
+            status=403,
+            text="",
+            content_type="text/html",
+            elapsed=0.0,
+            error="HTTP 403",
+        )
+
+    monkeypatch.setattr(news.HttpClient, "get", get_403)
+    monkeypatch.setattr(cli, "load_config", lambda path=None: config)
+
+    with caplog.at_level(logging.ERROR, logger="corpus"):
+        codigo = cli.main(["noticias"])
+
+    assert codigo == 2
+    assert "403" in caplog.text
+    assert "bloqueo" in caplog.text
+    assert "intentarlo mas tarde" in caplog.text
+    assert not list(config.paths.gold_markdown.glob("*.md"))
+    assert not config.paths.corpus_file.exists()
+    assert not config.paths.news_index.exists()
+
+
+def test_cli_noticias_help(capsys: pytest.CaptureFixture[str]) -> None:
+    """El subcomando noticias expone las cuatro opciones del contrato."""
+    with pytest.raises(SystemExit):
+        cli.main(["noticias", "--help"])
+
+    salida = capsys.readouterr().out
+    for opcion in ("--desde", "--hasta", "--sin-red", "--force"):
+        assert opcion in salida
+
+
+def test_makefile_target_noticias_independiente() -> None:
+    """El makefile añade noticias sin encadenarlo a los targets existentes."""
+    config = load_config()
+    texto = (config.paths.root / "makefile").read_text(encoding="utf-8")
+
+    assert "noticias:" in texto
+    assert "$(CORPUS) noticias" in texto
+    for objetivo in (
+        "all",
+        "gold",
+        "deliver",
+        "docs",
+        "docs-finanzas",
+        "videos",
+        "media",
+    ):
+        for linea in texto.splitlines():
+            if linea.startswith(f"{objetivo}:"):
+                assert "noticias" not in linea
+
+
+def test_documentacion_noticias_independiente() -> None:
+    """README y AGENTS documentan el comando y su independencia del pipeline."""
+    config = load_config()
+    readme = (config.paths.root / "README.md").read_text(encoding="utf-8")
+    agents = (config.paths.root / "AGENTS.md").read_text(encoding="utf-8")
+    compacto = " ".join(readme.split())
+
+    assert "make noticias" in readme
+    assert "## Noticias y hechos relevantes" in readme
+    assert "no forma parte de" in compacto
+    for objetivo in (
+        "all",
+        "gold",
+        "deliver",
+        "docs",
+        "docs-finanzas",
+        "videos",
+        "media",
+    ):
+        assert f"`make {objetivo}`" in compacto
+    assert "make noticias" in agents
+    assert "independiente" in agents

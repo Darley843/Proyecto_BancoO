@@ -33,11 +33,11 @@
 
 ## 5. CLI, target y bloqueo
 
-- [ ] 5.1 Implementar `build_noticias` con `desde`, `hasta`, `sin_red`, lectura de Bronze, petición puntual si falta Bronze, lectura de solo lectura de `documents.jsonl` y escritura de fichas/corpus/índice; verificar con un fixture y un `tmp_path` que no se toca la red, que se generan los tres artefactos y que no se descargan PDFs.
-- [ ] 5.2 Añadir el subcomando `noticias` en `cli.py` con `--desde`, `--hasta`, `--sin-red` y `--force`; verificar que `uv run corpus noticias --help` lista las opciones.
-- [ ] 5.3 Añadir solo el target `make noticias` en `makefile`; verificar que `make noticias` ejecuta el subcomando y que `make all`, `make gold`, `make deliver`, `make docs`, `make docs-finanzas`, `make videos` y `make media` no cambian en el diff.
-- [ ] 5.4 Implementar la detención ante `403` o bloqueo persistente sin cambiar UA, proxies ni velocidad; verificar con un mock que el comando falla, muestra el motivo y no escribe nuevas fichas oficiales.
-- [ ] 5.5 Documentar el comando y el target en `README.md` y `AGENTS.md`; verificar que la documentación indica que `make noticias` es independiente de `all`, `gold`, `deliver`, `docs`, `docs-finanzas`, `videos` y `media`.
+- [x] 5.1 Implementar `build_noticias` con `desde`, `hasta`, `sin_red`, lectura de Bronze, petición puntual si falta Bronze, lectura de solo lectura de `documents.jsonl` y escritura de fichas/corpus/índice; verificar con un fixture y un `tmp_path` que no se toca la red, que se generan los tres artefactos y que no se descargan PDFs.
+- [x] 5.2 Añadir el subcomando `noticias` en `cli.py` con `--desde`, `--hasta`, `--sin-red` y `--force`; verificar que `uv run corpus noticias --help` lista las opciones.
+- [x] 5.3 Añadir solo el target `make noticias` en `makefile`; verificar que `make noticias` ejecuta el subcomando y que `make all`, `make gold`, `make deliver`, `make docs`, `make docs-finanzas`, `make videos` y `make media` no cambian en el diff.
+- [x] 5.4 Implementar la detención ante `403` o bloqueo persistente sin cambiar UA, proxies ni velocidad; verificar con un mock que el comando falla, muestra el motivo y no escribe nuevas fichas oficiales.
+- [x] 5.5 Documentar el comando y el target en `README.md` y `AGENTS.md`; verificar que la documentación indica que `make noticias` es independiente de `all`, `gold`, `deliver`, `docs`, `docs-finanzas`, `videos` y `media`.
 
 ## 6. Integración y verificación
 

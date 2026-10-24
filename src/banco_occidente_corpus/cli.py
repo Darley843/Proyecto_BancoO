@@ -6,6 +6,7 @@ import argparse
 import logging
 import shutil
 import sys
+from datetime import date
 from pathlib import Path
 
 from . import __version__
@@ -240,6 +241,48 @@ def cmd_videos(config: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_noticias(config: Config, args: argparse.Namespace) -> int:
+    """Regenera hechos oficiales y fichas de prensa en Gold.
+
+    Usa Bronze si existe; solo hace una peticion puntual cuando falta y no se
+    ejecuto ``--sin-red``. Ante ``403`` o bloqueo persistente se detiene con
+    codigo 2 y no escribe fichas oficiales nuevas.
+    """
+    from .news import build_noticias, parse_fecha_es
+
+    desde_texto = args.desde or config.news.desde or "2025-01-01"
+    hasta_texto = args.hasta or config.news.hasta or date.today().isoformat()
+    try:
+        desde = parse_fecha_es(str(desde_texto))
+        hasta = parse_fecha_es(str(hasta_texto))
+    except ValueError as exc:
+        log.error("Ventana de noticias invalida: %s", exc)
+        return 1
+
+    try:
+        rows = build_noticias(
+            config,
+            desde=desde,
+            hasta=hasta,
+            sin_red=bool(args.sin_red),
+            force=bool(args.force),
+        )
+    except BlockedError as exc:
+        log.error("Noticias detenidas: %s", exc)
+        log.error("No se escribieron fichas oficiales nuevas.")
+        return 2
+    except ValueError as exc:
+        log.error("Noticias: %s", exc)
+        return 1
+
+    oficiales = sum(1 for row in rows if row.get("origen") == "oficial")
+    print(f"Hechos oficiales    : {oficiales}")
+    print(f"Fichas de prensa    : {len(rows) - oficiales}")
+    print(f"Paginas Gold        : {config.paths.gold_markdown}")
+    print(f"Indice              : {config.paths.news_index}")
+    return 0
+
+
 def cmd_status(config: Config, args: argparse.Namespace) -> int:
     from .gold import load_corpus
 
@@ -356,6 +399,19 @@ def build_parser() -> argparse.ArgumentParser:
     videos = sub.add_parser("videos", help="videos de YouTube: discover | fetch | extract | all")
     videos.add_argument("videos_action", choices=["discover", "fetch", "extract", "all"])
     videos.add_argument("--channel-limit", type=int, default=30, help="videos del canal a listar")
+    noticias = sub.add_parser("noticias", help="hechos oficiales y prensa curada a Gold")
+    noticias.add_argument("--desde", default=None, help="fecha inicial (ISO o espanol)")
+    noticias.add_argument("--hasta", default=None, help="fecha final (ISO o espanol)")
+    noticias.add_argument(
+        "--sin-red",
+        action="store_true",
+        help="no toca la red: usa solo Bronze y la curaduria",
+    )
+    noticias.add_argument(
+        "--force",
+        action="store_true",
+        help="refresca Bronze y regenera las fichas",
+    )
     sub.add_parser("all", help="discover + fetch + extract + gold + stats")
     sub.add_parser("status", help="cuenta documentos por capa")
     sub.add_parser("doctor", help="diagnostica red y estado del pipeline")
@@ -386,6 +442,7 @@ def main(argv: list[str] | None = None) -> int:
         "knowledge": cmd_knowledge,
         "docs": cmd_docs,
         "videos": cmd_videos,
+        "noticias": cmd_noticias,
         "all": cmd_all,
         "stats": cmd_stats,
         "status": cmd_status,

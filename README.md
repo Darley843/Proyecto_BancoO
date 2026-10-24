@@ -87,6 +87,25 @@ make media     # ambos
 | Video sin subtítulos | no entra al corpus |
 | Trazabilidad | `documents_capture.jsonl` y `videos_capture.jsonl` con URL y hash |
 
+## Noticias y hechos relevantes
+
+La actualidad corporativa se publica como fichas Gold: hechos oficiales de la
+tabla **“Información Relevante”** y prensa externa curada. `make noticias` es
+independiente: no forma parte de `make all`, `make gold`, `make deliver`,
+`make docs`, `make docs-finanzas`, `make videos` ni `make media`.
+
+```bash
+make noticias                              # usa Bronze; si falta, una petición puntual
+uv run corpus noticias --sin-red           # solo Bronze y curaduría, sin red
+uv run corpus noticias --desde 2025-01-01 --hasta 2026-10-24
+```
+
+Las fichas quedan en `data/gold/pages/noticia-*.md` y `hecho-*.md`, con su fila
+en `corpus.jsonl` y el índice `data/gold/_NOTICIAS.md`. La curaduría externa
+vive en `data/noticias/prensa.yaml`; `make clean` no la borra. Si el sitio
+responde `403`, el comando se detiene y avisa: no cambia User-Agent, proxies ni
+velocidad de las peticiones.
+
 ---
 
 ## Requisitos
@@ -127,6 +146,7 @@ documentos por sección y la cobertura del checklist del Taller 1.
 | `make docs` | Inventaría, descarga y extrae PDFs (balances, informes) |
 | `make videos` | Lista el canal, baja subtítulos y transcribe a Gold |
 | `make media` | Documentos PDF + videos |
+| `make noticias` | Hechos oficiales y prensa curada a Gold (independiente del pipeline) |
 | `make all` | Pipeline completo |
 | `make stats` | Resumen y checklist → `data/gold/_INDICE.md` |
 | `make status` | Cuenta URLs/Bronze/Silver/Gold |

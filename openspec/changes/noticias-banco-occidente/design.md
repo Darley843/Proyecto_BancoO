@@ -112,7 +112,7 @@ Alternativas descartadas: re-descargar el anexo desde la ficha (duplica PDFs y g
 
 ## Risks / Trade-offs
 
-- **WAF `403`** → el comando se detiene y explica que se necesita red residencial colombiana; no se reintenta con identidades distintas.
+- **WAF `403`** → el comando se detiene, explica que el sitio bloqueó la petición, que la ingesta no evade el bloqueo y que se puede intentar más tarde; no se reintenta con identidades distintas.
 - **Derechos de autor** → solo ficha mínima y resumen propio; nunca cuerpo, imágenes o PDFs de prensa.
 - **Datos personales** → tabla de accionistas excluida y validación de PII antes de escribir.
 - **Curaduría sesgada o incompleta** → criterios documentados, campo `evento` y revisión humana; el índice muestra conteos y fechas.
@@ -130,7 +130,7 @@ Alternativas descartadas: re-descargar el anexo desde la ficha (duplica PDFs y g
 4. Añadir fixtures de tabla y de índice de documentos, pruebas y extensión de `healthcheck.py`.
 5. Actualizar `CONSTITUTION.md`, `docs/ESTANDAR.md`, `docs/FUENTES.md`, `README.md` y `AGENTS.md` sin reescribir las secciones de PDF y videos.
 6. Ejecutar `make fmt`, `make check`, `make demo` y pruebas de noticias con `--sin-red`.
-7. Ejecutar la ingesta real desde red residencial colombiana y revisar `_NOTICIAS.md` y los enlaces a documentos.
+7. Ejecutar la ingesta real y revisar `_NOTICIAS.md` y los enlaces a documentos.
 
 Rollback: al ser un target y archivos nuevos, basta con retirar el target, el subcomando y las fichas generadas; `make all`, `make gold`, `make deliver`, `make docs`, `make docs-finanzas`, `make videos` y `make media` no cambian. `data/gold/documents/` y `data/gold/videos/` quedan intactos.
 
