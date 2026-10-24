@@ -30,8 +30,19 @@ REQUIRED_FRONTMATTER = {
     "hash",
 }
 
+NEWS_PREFIXES = ("noticia-", "hecho-")
+
+REQUIRED_NEWS_FRONTMATTER = {
+    "fecha_publicacion",
+    "tipo",
+    "origen",
+    "medio",
+    "resumen",
+}
+
 
 def read_jsonl(path: Path) -> list[dict]:
+    """Lee un JSONL y devuelve sus registros, ignorando lineas vacias."""
     if not path.exists():
         return []
     rows: list[dict] = []
@@ -43,6 +54,7 @@ def read_jsonl(path: Path) -> list[dict]:
 
 
 def frontmatter(path: Path) -> dict:
+    """Extrae el frontmatter YAML de una pagina Gold."""
     text = path.read_text(encoding="utf-8")
     if not text.startswith("---"):
         return {}
@@ -53,7 +65,63 @@ def frontmatter(path: Path) -> dict:
     return data if isinstance(data, dict) else {}
 
 
+def is_news_page(path: Path) -> bool:
+    """Indica si un archivo Gold es una ficha de noticias o de hechos."""
+    return path.stem.startswith(NEWS_PREFIXES)
+
+
+def validate_noticias(
+    pages: list[Path],
+    documents_dir: Path,
+    documents: list[dict],
+) -> list[str]:
+    """Valida el contrato de las fichas de noticias y sus enlaces a documentos.
+
+    Exige fecha de publicacion, tipo, origen, medio y resumen; detecta ids
+    repetidos y comprueba que ``documento_archivo`` exista cuando la ficha
+    declara ``documento_id`` y que ese id figure en ``documents.jsonl``.
+    Devuelve una lista de errores legibles; vacia significa contrato valido.
+    """
+    errors: list[str] = []
+    ids: dict[str, str] = {}
+    documentos_por_id = {str(row.get("id") or ""): row for row in documents}
+
+    for page in pages:
+        if not is_news_page(page):
+            continue
+        meta = frontmatter(page)
+        faltantes = [
+            campo
+            for campo in sorted(REQUIRED_NEWS_FRONTMATTER)
+            if not str(meta.get(campo) or "").strip()
+        ]
+        if faltantes:
+            errors.append(f"{page.name}: ficha sin {faltantes}")
+            continue
+
+        identificador = str(meta.get("id") or page.stem).strip()
+        if identificador in ids:
+            errors.append(
+                f"{page.name}: id duplicado '{identificador}' (ya en {ids[identificador]})"
+            )
+        else:
+            ids[identificador] = page.name
+
+        documento_id = str(meta.get("documento_id") or "").strip()
+        archivo = str(meta.get("documento_archivo") or "").strip()
+        if documento_id:
+            if not archivo:
+                errors.append(f"{page.name}: documento_id sin documento_archivo")
+            elif not (documents_dir / Path(archivo).name).exists():
+                errors.append(f"{page.name}: documento_archivo no existe ({archivo})")
+            if documento_id not in documentos_por_id:
+                errors.append(f"{page.name}: documento_id ausente de documents.jsonl")
+
+    return errors
+
+
 def main() -> int:
+    """Ejecuta el diagnostico y devuelve 0 si el corpus es consistente."""
     errors: list[str] = []
     warnings: list[str] = []
 
@@ -120,6 +188,8 @@ def main() -> int:
             errors.append(f"{page.name}: tokens invalido ({meta.get('tokens')!r})")
         if not str(meta.get("fuente", "")).startswith("http"):
             errors.append(f"{page.name}: fuente no es URL")
+
+    errors.extend(validate_noticias(pages, GOLD / "documents", documents))
 
     if len(pages) > len(corpus):
         warnings.append("hay mas paginas Gold que registros en corpus.jsonl")

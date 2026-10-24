@@ -64,12 +64,14 @@ oferta, presencia digital y datos duros.
 |------|-------------|:------:|
 | **Fase 1** | Captura del sitio (Bronze), limpieza (Silver) y corpus Gold con metadatos | ✅ |
 | **Fase 2** | Cobertura del checklist y reporte `_INDICE.md` | ✅ |
-| **Fase 3** | Documentos (PDF) y YouTube (subtítulos) como fuentes complementarias | 🚧 |
+| **Fase 3** | Documentos (PDF), YouTube (subtítulos) y noticias (hechos oficiales + prensa curada) como fuentes complementarias | 🚧 |
 | **Fase 4** | Chunking + embeddings y consumo desde el RAG del Módulo 2 | ⏳ |
 
 **Dentro del alcance:** páginas HTML públicas del dominio, `robots.txt`,
 `sitemap.xml` (índice de índices de Liferay), noticias, blog, información
-corporativa, tarifas, documentos enlazados (registrados, no descargados aún).
+corporativa, tarifas, documentos enlazados (registrados, no descargados aún),
+hechos relevantes oficiales de la página de inversionistas y prensa externa
+curada (solo ficha mínima y resumen propio).
 
 **Fuera del alcance (por ahora):** redes sociales, contenido tras login,
 descarga masiva de PDF, transcripción de vídeo.
@@ -176,8 +178,11 @@ data/raw/capture.jsonl                url, status, fecha, bytes, sha256
 data/raw/urls.jsonl                   plan de captura (sitemap)
 data/processed/markdown/*.md  SILVER  solo el texto útil
 data/gold/pages/*.md          GOLD    Markdown + frontmatter YAML
+data/gold/pages/noticia-*.md  GOLD    fichas de prensa externa verificada
+data/gold/pages/hecho-*.md    GOLD    hechos relevantes oficiales
 data/gold/corpus.jsonl                metadatos consolidados
-data/gold/_INDICE.md                  reporte y checklist
+data/gold/_NOTICIAS.md                índice de noticias y hechos
+data/noticias/prensa.yaml     FUENTE  curaduría externa (fuera de Gold)
 ```
 
 ### Contrato de la capa Gold
@@ -205,6 +210,60 @@ keywords: [historia, misión, visión]
 3. `corpus.jsonl` es la fuente para el índice y para el RAG.
 4. El hash del cuerpo detecta duplicados y permite re-scrapear solo lo cambiado.
 5. Gold **nunca** se edita a mano: se regenera con `make gold`.
+
+### Fichas de noticias y hechos relevantes
+
+Las fichas de noticias viven en `data/gold/pages/noticia-*.md` (prensa externa
+verificada) y `data/gold/pages/hecho-*.md` (hechos oficiales). Su frontmatter
+sigue el contrato:
+
+```yaml
+---
+id: hecho-2026-10-19-emision-de-valores
+tipo: hecho              # hecho | noticia
+origen: oficial          # oficial | prensa
+seccion: presencia
+empresa: Banco de Occidente
+titulo: Emisión de valores
+fecha_publicacion: 2026-10-19
+fecha_captura: 2026-10-24
+idioma: es
+fuente: https://www.bancodeoccidente.com.co/inversionistas
+medio: Banco de Occidente
+resumen: Colocación de bonos ordinarios por $500.000 millones.
+temas: [financiacion]
+relevancia: alta
+estado: verificado
+tokens: 42
+hash: 3f9c1a7d
+palabras: 10
+metodo: noticias
+evento: 2026-10-19-emision
+anexo: https://www.bancodeoccidente.com.co/documents/d/guest/ir-final-oct-2026
+documento_id: ir-final-oct-2026
+documento_archivo: ir-final-oct-2026.md
+documento_titulo: Informe Final Octubre 2026
+---
+```
+
+Reglas de las fichas:
+
+1. `noticia-*` es prensa externa con `estado: verificado`; `hecho-*` es
+   comunicación oficial. Una ficha `pendiente` no se publica.
+2. El cuerpo solo contiene título, medio, fecha, enlace al origen y resumen
+   propio. Nunca se copia el cuerpo del artículo, imágenes, audio ni PDFs.
+3. Si el anexo oficial ya existe en `documents.jsonl`, se añaden
+   `documento_id`, `documento_archivo` y `documento_titulo` y el enlace relativo
+   `../documents/<archivo>.md`; si no existe, se conserva `anexo` sin descargar.
+4. `_NOTICIAS.md` resume la ventana, los conteos por tipo/origen/año/medio y la
+   tabla de fichas publicadas. `corpus.jsonl` recibe las filas `noticia-*` y
+   `hecho-*` junto con las filas del sitio.
+5. La curaduría externa vive en `data/noticias/prensa.yaml`, fuera de Gold, para
+   que `make clean` no la destruya.
+6. La tabla de accionistas se ignora y el título/resumen pasan validación de PII
+   antes de escribir.
+7. La regeneración es `make noticias`, independiente de `make all`, `make gold`,
+   `make deliver`, `make docs`, `make docs-finanzas`, `make videos` y `make media`.
 
 ### Reprocesabilidad
 
@@ -344,6 +403,8 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 | 2026-10-24 | Documentos PDF en Gold con `pypdf` y una sección por página | Los balances e informes no están en HTML; el PDF conserva tablas y cifras |
 | 2026-10-24 | Videos solo si hay subtítulos (`yt-dlp`) | Transcribir a mano no es reproducible; sin subtítulo no hay fuente |
 | 2026-10-24 | Descarga de documentos priorizada y con tope de MB | Hay 622 PDFs históricos; se captura lo reciente y relevante sin saturar el sitio |
+| 2026-10-24 | Noticias en Gold: hechos oficiales y prensa externa curada, con enlace de solo lectura a documentos | El sitio no tiene sala de prensa; la actualidad vive en la tabla de inversionistas y en medios externos |
+| 2026-10-24 | Fichas de prensa con resumen propio y verificación humana antes de publicar | Respeta derechos de autor y evita publicar enlaces o fechas sin confirmar |
 
 ## 12. Configuración local (no trackear)
 
