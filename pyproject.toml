@@ -3,10 +3,12 @@ name = "banco-occidente-corpus"
 version = "0.1.0"
 description = "Corpus web de Banco de Occidente: pipeline Medallion (Bronze/Silver/Gold) listo para RAG"
 readme = "README.md"
+license = "MIT"
+license-files = ["LICENSE"]
 authors = [
     { name = "Darley Idarraga", email = "darley.idarraga@uao.edu.co" }
 ]
-requires-python = ">=3.12"
+requires-python = ">=3.13"
 keywords = ["web-scraping", "rag", "corpus", "medallion", "trafilatura", "uv"]
 classifiers = [
     "Private :: Do Not Upload",
@@ -48,7 +50,7 @@ package = true
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py313"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4", "PTH"]

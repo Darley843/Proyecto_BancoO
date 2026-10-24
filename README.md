@@ -8,11 +8,22 @@ arquitectura **Medallion** (Bronze → Silver → Gold), `trafilatura`,
 El resultado es el corpus que alimenta el RAG y el agente de los Módulos 2 y 3
 del Taller 1.
 
+**Documentación**
+
+| Documento | Contenido |
+|---|---|
+| [`CONSTITUTION.md`](./CONSTITUTION.md) | Verdad central: alcance, stack, convenciones y decisiones |
+| [`docs/ESTANDAR.md`](./docs/ESTANDAR.md) | Trazabilidad regla de la clase → implementación |
+| [`docs/FUENTES.md`](./docs/FUENTES.md) | Inventario de fuentes, `robots.txt` y hallazgos del sitio |
+| [`docs/IDENTIDAD.md`](./docs/IDENTIDAD.md) | Identidad de Git y GitHub del autor |
+| [`AGENTS.md`](./AGENTS.md) | Contexto y reglas para agentes LLM |
+| [`docs/CONSTITUTION-curso-TAAML.md`](./docs/CONSTITUTION-curso-TAAML.md) | Estándar del curso (documento original) |
+
 ---
 
 ## Requisitos
 
-- Python 3.12 o 3.13 (uv lo instala si falta)
+- Python 3.13 (uv lo instala si falta)
 - [uv](https://docs.astral.sh/uv/) — único gestor permitido
 - `make` (GNU Make 4.x)
 - Red con salida **colombiana**. El sitio está detrás de CloudFront y rechaza
