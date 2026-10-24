@@ -132,6 +132,21 @@ class Paths:
     def index_file(self) -> Path:
         return self.gold / "_INDICE.md"
 
+    @property
+    def news_source(self) -> Path:
+        """Directorio versionado con la curaduria de noticias."""
+        return _env_path("CORPUS_NEWS_DIR", self.root / "data/noticias")
+
+    @property
+    def news_prensa(self) -> Path:
+        """Archivo YAML con las fichas de prensa externa."""
+        return self.news_source / "prensa.yaml"
+
+    @property
+    def news_index(self) -> Path:
+        """Indice Markdown de noticias dentro de Gold."""
+        return self.gold / "_NOTICIAS.md"
+
     def ensure(self) -> None:
         for path in (
             self.raw_html,
@@ -142,6 +157,7 @@ class Paths:
             self.documents_gold,
             self.videos_raw,
             self.videos_gold,
+            self.news_source,
         ):
             path.mkdir(parents=True, exist_ok=True)
 
@@ -187,11 +203,25 @@ class GoldConfig:
 
 
 @dataclass(slots=True)
+class NewsConfig:
+    """Parametros de la ingesta de noticias y prensa externa."""
+
+    desde: str = "2025-01-01"
+    hasta: str = ""
+    prensa: str = "data/noticias/prensa.yaml"
+    max_por_evento: int = 2
+    max_oficiales: int = 40
+    relevancia_minima: str = "media"
+    incluir_dividendos: bool = False
+
+
+@dataclass(slots=True)
 class Config:
     site: SiteConfig = field(default_factory=SiteConfig)
     crawl: CrawlConfig = field(default_factory=CrawlConfig)
     discovery: DiscoveryConfig = field(default_factory=DiscoveryConfig)
     gold: GoldConfig = field(default_factory=GoldConfig)
+    news: NewsConfig = field(default_factory=NewsConfig)
     paths: Paths = field(default_factory=Paths)
 
 
@@ -224,5 +254,6 @@ def load_config(path: str | Path | None = None) -> Config:
         crawl=_build(CrawlConfig, crawl_raw),
         discovery=_build(DiscoveryConfig, data.get("discovery", {})),
         gold=_build(GoldConfig, data.get("gold", {})),
+        news=_build(NewsConfig, data.get("noticias", {})),
         paths=Paths(),
     )

@@ -61,3 +61,15 @@ sections = ["identidad", "oferta", "presencia", "datos", "atencion", "legal", "o
 boilerplate_min_docs = 5
 # Fraccion de documentos en la que debe aparecer una linea para ser boilerplate.
 boilerplate_ratio = 0.35
+
+[noticias]
+# Ventana de la curaduria. `hasta` vacio significa la fecha de ejecucion.
+desde = "2025-01-01"
+hasta = ""
+prensa = "data/noticias/prensa.yaml"
+# Maximo de coberturas externas por hecho.
+max_por_evento = 2
+# Tope de hitos oficiales materiales.
+max_oficiales = 40
+relevancia_minima = "media"
+incluir_dividendos = false
