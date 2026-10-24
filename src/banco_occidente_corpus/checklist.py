@@ -8,41 +8,91 @@ from dataclasses import dataclass
 from .section import _normalize  # reutiliza la normalizacion de acentos
 
 #: 4 categorias x 6 items = 24 casillas (igual que la slide "Que capturar").
+#: Los patrones usan limites de palabra: sin ellos "mision" tambien coincide con
+#: "comision" y "vision" con "supervision" (falsos positivos).
 CHECKLIST: dict[str, list[tuple[str, str]]] = {
     "identidad": [
-        ("Mision y vision", r"mision|vision"),
-        ("Valores y proposito", r"valores|proposito"),
-        ("Historia (fundacion, hitos)", r"historia|fundad|hitos|trayectoria|aniversario"),
-        ("Fundador / dueno y junta", r"fundador|junta directiva|accionistas|controlante"),
-        ("Gerente y equipo directivo", r"presidente|gerente|directivo|vicepresidente"),
-        ("Sedes y ubicaciones", r"sede|sucursal|oficina|direccion|agencia"),
+        ("Mision y vision", r"\bmision(es)?\b|\bvision(es)?\b"),
+        ("Valores y proposito", r"\bvalores\b|\bproposito\b"),
+        (
+            "Historia (fundacion, hitos)",
+            r"\bhistoria\b|\bfundad\w*|\bhitos?\b|\btrayectoria\b|\baniversario\b",
+        ),
+        (
+            "Fundador / dueno y junta",
+            r"\bfundador\w*|\bjunta directiva\b|\baccionistas?\b|\bcontrolante\b",
+        ),
+        (
+            "Gerente y equipo directivo",
+            r"\bpresidente\b|\bgerente\b|\bdirectiv\w+|\bvicepresidente\b",
+        ),
+        (
+            "Sedes y ubicaciones",
+            r"\bsede\b|\bsucursal\w*|\boficina\w*|\bdireccion\b|\bagencia\w*",
+        ),
     ],
     "oferta": [
-        ("Productos y servicios", r"producto|servicio|portafolio"),
-        ("Fichas tecnicas y especificaciones", r"ficha tecnica|especificacion|caracteristicas"),
-        ("Precios y planes", r"tarifa|tasa|precio|plan|cuota"),
-        ("Catalogos en PDF", r"catalogo|brochure|pdf"),
-        ("Casos de exito y clientes", r"caso de exito|cliente|testimonio"),
-        ("Certificaciones", r"iso\s?\d|basc|invima|certificacion|sello"),
+        ("Productos y servicios", r"\bproductos?\b|\bservicios?\b|\bportafolio\b"),
+        (
+            "Fichas tecnicas y especificaciones",
+            r"\bficha tecnica\b|\bespecificacion\w*|\bcaracteristicas?\b",
+        ),
+        (
+            "Precios y planes",
+            r"\btarifas?\b|\btasas?\b|\bprecios?\b|\bplanes?\b|\bcuotas?\b",
+        ),
+        ("Catalogos en PDF", r"\bcatalogos?\b|\bbrochure\b|\bpdf\b"),
+        ("Casos de exito y clientes", r"\bcaso de exito\b|\bclientes?\b|\btestimonio\w*"),
+        (
+            "Certificaciones",
+            r"\biso\s?\d|\bbasc\b|\binvima\b|\bcertificacion\w*|\bsello\b",
+        ),
     ],
     "presencia": [
-        ("Noticias y sala de prensa", r"noticia|prensa|comunicado|boletin"),
-        ("Blog y articulos", r"blog|articulo|aprende|educacion financiera"),
-        ("Videos de YouTube", r"youtube|video"),
-        ("Entrevistas del gerente", r"entrevista|declaracion"),
-        ("Redes sociales", r"facebook|instagram|linkedin|x\.com|twitter|tiktok"),
-        ("Vacantes de empleo", r"vacante|empleo|trabaja con nosotros|convocatoria"),
+        (
+            "Noticias y sala de prensa",
+            r"\bnoticias?\b|\bprensa\b|\bcomunicado\w*|\bboletin\w*",
+        ),
+        (
+            "Blog y articulos",
+            r"\bblog\b|\barticulos?\b|\baprende\b|\beducacion financiera\b",
+        ),
+        ("Videos de YouTube", r"\byoutube\b|\bvideos?\b"),
+        ("Entrevistas del gerente", r"\bentrevista\w*|\bdeclaracion\w*"),
+        (
+            "Redes sociales",
+            r"\bfacebook\b|\binstagram\b|\blinkedin\b|\bx\.com\b|\btwitter\b|\btiktok\b",
+        ),
+        (
+            "Vacantes de empleo",
+            r"\bvacante\w*|\bempleo\w*|\btrabaja con nosotros\b|\bconvocatoria\w*",
+        ),
     ],
     "datos": [
-        ("Informes financieros / memoria anual", r"informe|memoria anual|estados financieros"),
-        ("NIT y Camara de Comercio", r"\bnit\b|camara de comercio|matricula mercantil"),
-        ("Indicadores de sostenibilidad", r"sostenibilidad|huella|indicador|esg"),
-        ("Precios publicos y tarifas", r"tarifario|tarifas|comisiones"),
+        (
+            "Informes financieros / memoria anual",
+            r"\binformes?\b|\bmemoria anual\b|\bestados financieros\b",
+        ),
+        (
+            "NIT y Camara de Comercio",
+            r"\bnit\b|\bcamara de comercio\b|\bmatricula mercantil\b",
+        ),
+        (
+            "Indicadores de sostenibilidad",
+            r"\bsostenibilidad\b|\bhuella\b|\bindicador\w*|\besg\b",
+        ),
+        (
+            "Precios publicos y tarifas",
+            r"\btarifario\b|\btarifas?\b|\bcomisiones?\b",
+        ),
         (
             "Datos abiertos (Superfinanciera, SECOP)",
-            r"superfinanciera|superintendencia|secop|datos abiertos",
+            r"\bsuperfinanciera\b|\bsuperintendencia\b|\bsecop\b|\bdatos abiertos\b",
         ),
-        ("Rankings sectoriales", r"ranking|premio|reconocimiento|calificacion"),
+        (
+            "Rankings sectoriales",
+            r"\branking\b|\bpremios?\b|\breconocimiento\w*|\bcalificacion\w*",
+        ),
     ],
 }
 
@@ -59,6 +109,9 @@ def evaluate(corpus: list[dict], texts: dict[str, str] | None = None) -> list[Ch
     """Marca cada casilla buscando evidencia en el texto de los documentos.
 
     texts: id -> texto. Si no se pasa, solo se evalua sobre titulo y URL.
+
+    La evidencia incluye el fragmento real donde coincidio el patron, para que
+    la cobertura sea verificable en la sustentacion (no solo el titulo).
     """
     texts = texts or {}
     results: list[ChecklistItem] = []
@@ -67,19 +120,24 @@ def evaluate(corpus: list[dict], texts: dict[str, str] | None = None) -> list[Ch
             regex = re.compile(pattern, re.IGNORECASE)
             evidence = ""
             for row in corpus:
-                haystack = _normalize(
-                    " ".join(
-                        [
-                            row.get("titulo", ""),
-                            row.get("fuente", ""),
-                            texts.get(row.get("id", ""), ""),
-                        ]
-                    )
+                original = " ".join(
+                    [
+                        row.get("titulo", ""),
+                        row.get("fuente", ""),
+                        texts.get(row.get("id", ""), ""),
+                    ]
                 )
-                match = regex.search(haystack)
-                if match:
-                    evidence = f"{row.get('titulo') or row.get('fuente')}"
-                    break
+                # translate() conserva la longitud: los indices del texto
+                # normalizado sirven para cortar el texto original.
+                match = regex.search(_normalize(original))
+                if not match:
+                    continue
+                start = max(0, match.start() - 60)
+                end = min(len(original), match.end() + 80)
+                snippet = " ".join(original[start:end].split())
+                title = row.get("titulo") or row.get("fuente")
+                evidence = f"{title} — «...{snippet}...»"
+                break
             results.append(
                 ChecklistItem(
                     categoria=categoria,

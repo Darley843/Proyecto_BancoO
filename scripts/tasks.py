@@ -1,9 +1,9 @@
 """Tareas auxiliares del Makefile, en Python puro (funciona en Windows y Unix).
 
-    uv run python scripts/tasks.py help
-    uv run python scripts/tasks.py clean-env
-    uv run python scripts/tasks.py repo
-    uv run python scripts/tasks.py constitution
+uv run python scripts/tasks.py help
+uv run python scripts/tasks.py clean-env
+uv run python scripts/tasks.py repo
+uv run python scripts/tasks.py constitution
 """
 
 from __future__ import annotations
@@ -88,7 +88,9 @@ def _api(method: str, path: str, token: str, payload: dict | None = None, *, raw
     data = json.dumps(payload).encode() if payload is not None else None
     request = urllib.request.Request(f"{API}{path}", data=data, method=method)
     request.add_header("Authorization", f"Bearer {token}")
-    request.add_header("Accept", "application/vnd.github.raw" if raw else "application/vnd.github+json")
+    request.add_header(
+        "Accept", "application/vnd.github.raw" if raw else "application/vnd.github+json"
+    )
     request.add_header("X-GitHub-Api-Version", "2022-11-28")
     if data:
         request.add_header("Content-Type", "application/json")
@@ -242,9 +244,7 @@ def main() -> int:
     sub.add_parser("whoami", help="muestra identidad y remoto").set_defaults(func=cmd_whoami)
 
     remote = sub.add_parser("remote", help="configura origin")
-    remote.add_argument(
-        "--url", default="https://github.com/Darley843/Proyecto_BancoO.git"
-    )
+    remote.add_argument("--url", default="https://github.com/Darley843/Proyecto_BancoO.git")
     remote.set_defaults(func=cmd_remote)
 
     sub.add_parser("pack", help="empaqueta Gold en dist/").set_defaults(func=cmd_pack)

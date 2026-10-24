@@ -77,6 +77,8 @@ def cmd_fetch(config: Config, args: argparse.Namespace) -> int:
     )
     if stats.failures:
         print(f"Primer error: {stats.failures[0]['error']}")
+    # Un 404 suelto no invalida la captura: solo es error si no se guardo nada.
+    if stats.ok == 0 and stats.cached == 0 and stats.failed:
         return 2
     return 0
 

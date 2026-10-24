@@ -104,7 +104,24 @@ el corpus HTML y se decide qué documentos aportan al checklist.
 | Evidencia por URL | `data/raw/capture.jsonl` (status, fecha, bytes, sha256) |
 | Reprocesable | Bronze intacto; Silver y Gold se regeneran sin red |
 
-## 6. Cómo verificar el inventario
+## 6. Resultado de la primera captura (2026-10-23)
+
+| Métrica | Valor |
+|---|---:|
+| Sitemaps leídos | 210 (11 con `404`, layouts obsoletos) |
+| URLs públicas descubiertas | 196 |
+| Páginas capturadas (Bronze) | 193 |
+| URLs no capturadas | 3 (`404` reales) |
+| Peso del HTML crudo | 102.3 MB |
+| Páginas con texto útil (Silver) | 193 |
+| Documentos Gold (únicos) | 184 (9 duplicados descartados) |
+| Tokens totales | 151.712 |
+| Cobertura del checklist | 24/24 (heurística, con evidencia citada) |
+
+> El sitemap no publica PDFs ni vídeos: esos quedan para la Fase 3 con
+> `yt-dlp` y `pdfplumber`.
+
+## 7. Cómo verificar el inventario
 
 ```bash
 make doctor      # red + robots.txt + estado

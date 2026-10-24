@@ -38,7 +38,7 @@ def build_index(config: Config) -> str:
     lines.append(
         f"**Tokens totales:** {stats['tokens']:,} (promedio {stats['promedio_tokens']:,})  "
     )
-    lines.append(f"**Cobertura del checklist:** {found}/{total} ({percent:.0f}%)")
+    lines.append(f"**Cobertura del checklist:** {found}/{total} ({percent:.0f}%) — heuristica")
     lines.append("")
 
     lines.append("## Documentos por seccion")
@@ -71,7 +71,7 @@ def build_index(config: Config) -> str:
         lines.append("")
         for item in category_items:
             mark = "x" if item.encontrado else " "
-            evidence = f" — _{item.evidencia[:60]}_" if item.evidencia else ""
+            evidence = f" - _{item.evidencia[:180]}_" if item.evidencia else ""
             lines.append(f"- [{mark}] {item.item}{evidence}")
         lines.append("")
 
