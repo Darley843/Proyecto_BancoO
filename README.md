@@ -19,6 +19,20 @@ del Taller 1.
 | [`AGENTS.md`](./AGENTS.md) | Contexto y reglas para agentes LLM |
 | [`docs/CONSTITUTION-curso-TAAML.md`](./docs/CONSTITUTION-curso-TAAML.md) | Estándar del curso (documento original) |
 
+## Resultado de la captura (2026-10-23)
+
+| Métrica | Valor |
+|---|---:|
+| Sitemaps leídos | 210 |
+| URLs públicas | 196 |
+| Páginas Bronze | 193 (102.3 MB) |
+| Documentos Gold | 184 |
+| Tokens | 151.972 |
+| Cobertura del checklist | 24/24 (con evidencia) |
+
+El detalle y las decisiones están en [`docs/FUENTES.md`](./docs/FUENTES.md).
+El entregable se regenera con `make all` y se empaqueta con `make deliver`.
+
 ---
 
 ## Requisitos
