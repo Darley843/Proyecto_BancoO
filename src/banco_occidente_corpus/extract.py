@@ -128,6 +128,49 @@ def _fallback(html: str) -> str:
     return "\n\n".join(blocks)
 
 
+# El sitio (Liferay) guarda la cronologia, las fichas de la junta directiva y las
+# preguntas frecuentes en acordeones: el titulo va en un <h2> y la respuesta en
+# un <h3> hermano marcado aria-hidden="true". _clean_html elimina ese panel y
+# trafilatura tampoco lo reconstruye, asi que se lee del HTML crudo y se anexa
+# lo que falte.
+_ACCORDION_GROUP = "div.o-c-accordeon"
+_ACCORDION_PLACEHOLDER = re.compile(
+    r"texto de pruebas|lorem ipsum|m[aá]ximo \d+ caracteres|aqu[ií] va la descripci[oó]n",
+    re.IGNORECASE,
+)
+
+
+def _accordion_items(html: str) -> list[tuple[str, str]]:
+    """Devuelve (boton, respuesta) de cada acordeon con contenido real."""
+    if "o-t-accordeon__heading" not in html:  # atajo: la mayoria de paginas no tiene
+        return []
+    soup = BeautifulSoup(html, "lxml")
+    items: list[tuple[str, str]] = []
+    for group in soup.select(_ACCORDION_GROUP):
+        heads = group.select("h2.o-t-accordeon__heading")
+        answers = group.select("h3.o-t-accordeon__answer")
+        for head, answer in zip(heads, answers, strict=False):
+            button = head.select_one(".o-t-accordeon__button-text")
+            title = button.get_text(" ", strip=True) if button else ""
+            text = answer.get_text(" ", strip=True)
+            if not title or not text:
+                continue
+            if _ACCORDION_PLACEHOLDER.search(f"{title} {text}"):
+                continue  # fragmento de ejemplo de la plantilla
+            items.append((title, text))
+    return items
+
+
+def _append_accordions(body: str, items: list[tuple[str, str]]) -> str:
+    """Anexa solo los acordeones cuyo contenido no trajo la extraccion semantica."""
+    out = body.rstrip()
+    for title, text in items:
+        if title in out or text[:80] in out:
+            continue
+        out += f"\n\n### {title}\n\n{text}"
+    return out
+
+
 def extract_page(
     html: str, url: str, *, language: str = "es", capture_date: str | None = None
 ) -> ExtractedPage:
@@ -138,6 +181,7 @@ def extract_page(
         fallback = _fallback(html)
         if len(fallback.strip()) > len(body.strip()):
             body, method = fallback, "fallback"
+    body = _append_accordions(body, _accordion_items(html))
     title = meta_title or _title_from_html(html)
     body = body.replace("\r\n", "\n").replace("\r", "\n")
     body = re.sub(r"\n{3,}", "\n\n", body).strip()

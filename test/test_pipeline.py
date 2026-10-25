@@ -134,6 +134,38 @@ def test_pagina_corta_no_rompe():
     assert page.markdown.strip() == "hola" or page.markdown == ""
 
 
+def test_nuestro_banco_conserva_la_cronologia():
+    # Arrange: recorte del Bronze real; la cronologia vive en acordeones
+    html = (FIXTURES / "nuestro_banco.html").read_text(encoding="utf-8")
+    url = "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+
+    # Act
+    page = extract_page(html, url)
+
+    # Assert
+    assert page.method == "trafilatura"
+    assert "Década de los 60s" in page.markdown
+    assert "1965" in page.markdown
+    assert "3 de mayo" in page.markdown
+    assert "Década de los 70s" in page.markdown
+
+
+def test_inversionistas_conserva_la_junta_directiva():
+    # Arrange: recorte del Bronze real; las fichas viven en acordeones
+    html = (FIXTURES / "informacion_inversionistas.html").read_text(encoding="utf-8")
+    url = "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas"
+
+    # Act
+    page = extract_page(html, url)
+
+    # Assert
+    assert page.method == "trafilatura"
+    assert "Gerardo Silva Castro" in page.markdown
+    assert "Junta Directiva" in page.markdown  # "Presidente de la Junta Directiva"
+    assert "Universidad Javeriana" in page.markdown  # la ficha, no solo el nombre
+    assert "Texto de pruebas" not in page.markdown  # no se cuela el acordeon de ejemplo
+
+
 # ---------------------------------------------------------------- gold
 
 
