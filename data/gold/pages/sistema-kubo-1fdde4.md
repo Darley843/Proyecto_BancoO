@@ -5,19 +5,19 @@ seccion: otros
 empresa: Banco de Occidente
 fecha_captura: 2026-10-23
 idioma: es
-tokens: 255
-hash: ba7e6749
-palabras: 152
+tokens: 518
+hash: 1483a3fa
+palabras: 315
 metodo: trafilatura
 keywords:
-- kubo
-- aval
-- condiciones
 - cuenta
-- terminos
-- abre
 - ahorros
-- crezca
+- digital
+- kubo
+- solicitar
+- asignada
+- aval
+- ciudad
 ---
 
 Abre tu KUBO para que tu dinero crezca 9,25% E.A.
@@ -33,3 +33,13 @@ Con Tag Aval puedes recibir transferencias de forma rápida, segura y sin tener 
 Términos y Condiciones "Mi Primer Aporte"
 Términos y Condiciones Impulsa tu Kubo
 Términos y condiciones Campaña “Tu prima en manos BdeO"
+### Soy pensionado, ¿puedo solicitar una cuenta de ahorros por aquí?
+No, si un cliente pensionado desea una cuenta de ahorros, puede solicitarla aquí o a través de las oficinas o línea telefónica.
+### ¿Puedo solicitar varias cuentas de ahorros de manera digital?
+Sí, se pueden solicitar máximo dos cuentas del mismo tipo de cuenta.
+### Ya tengo mi cuenta lista ¿Cuándo recibiré mi Tarjeta Débito en mi domicilio?
+El proceso de envío de tu tarjeta débito puede tardar entre 5 y 7 días, también dependerá de tu ciudad de residencia, el banco te estará contactando para coordinar la cita de entrega
+### ¿A qué oficina queda asignada la cuenta de ahorros digital?
+Queda asignada aleatoriamente en una de las oficinas de tu ciudad de residencia. Si en la ciudad no hay oficina del Banco de Occidente, la oficina será asignada de manera predeterminada.
+### ¿Puedo solicitar una cuenta de ahorros digital por fuera del horario laboral?
+Sí, puedes crear tu cuenta de ahorros digital en cualquier momento.

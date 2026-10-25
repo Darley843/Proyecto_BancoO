@@ -5,19 +5,19 @@ seccion: identidad
 empresa: Banco de Occidente
 fecha_captura: 2026-10-23
 idioma: es
-tokens: 190
-hash: 0c91e1ec
-palabras: 113
+tokens: 2074
+hash: a9f4dba8
+palabras: 1241
 metodo: trafilatura
 keywords:
-- accede
-- auto
-- descubre
-- empleo
-- oportunidades
-- tasas
-- acceder
-- apoyos
+- incentivo
+- meses
+- personas
+- trabajadores
+- legal
+- minimo
+- hayan
+- postulacion
 ---
 
 Impulsa el empleo en tu empresa
@@ -31,3 +31,10 @@ Obtén tu crédito y haz realidad tus planes con plazos flexible.
 Protege tu dinero, hazlo crecer y úsalo cuando lo necesites.
 Compra lo que necesitas y accede a promociones exclusivas.
 Financia tu próximo vehículo con cuotas cómodas y excelentes tasas.
+### ¿Quiénes pueden ser los beneficiarios?
+Personas Jurídicas, Personas Naturales, Consorcios, Uniones Temporales, Patrimonios Autónomos y Cooperativas que demuestren su calidad de empleador mediante la Planilla Integrada de Liquidación de Aportes -PILA. Cooperativas de Trabajo Asociado que hubiesen vinculado trabajadores asociados bajo la vigencia del Decreto 1736 del 20 de octubre de 2023, y hayan recibido al menos un pago del Incentivo Por la vinculación de jóvenes entre 18 y 28 años será un aporte del treinta por ciento (30%) de un (1) salario mínimo mensual legal vigente -SMMLV, por cada uno de estos trabajadores/as adicionales que hayan sido vinculados formalmente, y por los que se hubiere cotizado en los respectivos subsistemas mínimo durante los seis (6) meses previos a la fecha de la postulación, dentro de la temporalidad establecida en el artículo 2.2.6.1.10.7 del Decreto 0533 de 2024. Por la vinculación de mujeres mayores de 28 años que devenguen hasta tres (3) salarios mínimos legales mensuales vigentes -SMLMV, será un aporte del veinte por ciento (20%) de un (1) salario mínimo legal mensual vigente -SMLMV, por cada una de estas trabajadoras adicionales que hayan sido vinculadas formalmente, y por las que se hubiere cotizado en los respectivos subsistemas mínimo durante los seis (6) meses previos a la fecha de la postulación, dentro de la temporalidad establecida en el artículo 2.2.6.1.10.7 del Decreto 0533 de 2024. Por la vinculación de hombres mayores de 28 años que devenguen hasta tres (3) salarios mínimos legales mensuales vigentes -SMLMV, será un aporte del quince por ciento (15%) de un (1) salario mínimo legal mensual vigente -SMLMV, por cada uno de estos trabajadores adicionales que hayan sido vinculados formalmente, y por los que se hubiere cotizado en los respectivos subsistemas mínimo durante los seis (6) meses previos a la fecha de la postulación, dentro de la temporalidad establecida en el artículo 2.2.6.1.10.7 del Decreto 0533 de 2024. Por la vinculación de personas con discapacidad (PcD), el aporte estatal será del treinta y cinco por ciento (35%) de un (1) salario mínimo legal mensual vigente -SMLMV, por cada uno de estos trabajadores adicionales que hayan sido vinculados formalmente y por los que se hubiere cotizado en los respectivos subsistemas mínimo durante los seis (6) meses previos a la fecha de la postulación, dentro de la temporalidad establecida en el artículo 2.2.6.1.10.7 Decreto 0533 de 2024. El incentivo se reconocerá a las y los empleadores que mantengan vinculados formalmente a los trabajadores adicionales mínimo durante seis (6) meses anteriores a la fecha de postulación, de acuerdo con el procedimiento que se describe en el presenta Manual Operativo. Los y las empleadoras que vinculen trabajadores/as que, por ser beneficiarios del Mecanismo de Protección al Cesante, la caja de subsidio les haya cotizado aportes en los cuatro (4) meses anteriores al cumplimiento de la vinculación laboral mínima de seis (6) meses, también podrán ser beneficiarios del incentivo adicional. No podrán acceder: Entidades o Sociedades cuya participación de la Nación y/o sus Entidades descentralizadas sea mayor al 50% de su capital. Los Patrimonios Autónomos NO declarantes del impuesto de renta y complementarios. Personas naturales que sean Personas Expuestas Políticamente (PEP) o sean cónyuges, compañeros permanentes o parientes en el segundo grado de consanguinidad, primero de afinidad o único civil de Personas Expuestas Políticamente (PEP). Quienes no cumplan con la totalidad de los requisitos del decreto 0533 de 2024. Las Cooperativas de Trabajo Asociado respecto de las vinculaciones de nuevos trabajadores asociados. Exceptuando aquellas Cooperativas de Trabajo Asociado que hayan recibido al menos un pago del Incentivo.
+### ¿Cuál es el beneficio?
+Conforme con la Resolución 0608 del 25 de febrero de 2025, las postulaciones sobre las nóminas del año 2025 tendrán como referencia los siguientes valores del Incentivo: Para jóvenes entre 18 y 28 años, corresponderá a $427.050.oo Para los trabajadores adicionales mayores de 28 años que devenguen hasta 3 SMLMV, corresponderá a $213.525 Para las trabajadoras mujeres mayores de 28 años que devenguen hasta 3 SMLMV, corresponderá a $284.700 Para trabajadores/as con discapacidad, el incentivo corresponderá a $498.225.oo. Nota: Se reconocerá un porcentaje adicional del diez por ciento (10%) sobre los porcentajes antes indicados cuando personas por las que se solicita el incentivo no hayan sido cotizantes en los últimos cuatro (4) meses o más, anteriores al cumplimiento de la vinculación laboral mínima de seis (6) meses exigida como requisito para acceder al incentivo. ¿Qué debes tener en cuenta? Los recursos que sean entregados a los beneficiarios como parte del incentivo, deberán ser reconocidos como ingresos gravables por el beneficiario de los mismos para efectos del impuesto sobre la renta y complementarios, sobre los cuales se deberá aplicar la retención en la fuente al momento del pago o abono en cuenta.
+### ¿Qué documentos necesitas para postularte?
+Formulario Banco debidamente diligenciado, firmado por el Representante Legal o el que haga de sus veces, o por la Persona Natural empleadora o por el Representante Legal de la Fiduciaria que actúa como vocera o administradora del Patrimonio Autónomo No se acepta formulario diferente al originado por nuestra página.
+Para acceder al Formulario, haz clic en el botón “Diligencia el Formulario Web de Postulación Aquí” que se encuentra en la parte inferior de esta página. Certificación de Cumplimiento de Requisitos firmada por el Representante Legal, la Persona Natural Empleadora o Representante Legal de la Fiduciaria que actúa como vocera o administradora del Patrimonio Autónomo y el Revisor Fiscal o Contador Público en los casos en los que la empresa no esté obligada a tener Revisor Fiscal. Descarga aquí la Certificación de Cumplimiento de Requisitos. Recuerda diligenciar todos los campos, imprimir y firmar. Es parte de los documentos que debes anexar al momento de la postulación Certificado de Existencia y Representación Legal no superior a 90 días de expedición. Fotocopia del Registro Único Tributario (RUT) expedido dentro de los seis (6) meses previos a la postulación. Importante: el RUT debe estar con todas sus hojas y el archivo debe venir sin clave de acceso. No podrán acceder: Los Entidades o Sociedades cuya participación de la Nación y/o sus Entidades descentralizadas sea mayor al 50% de su capital. Los Patrimonios Autónomos NO declarantes del impuesto de renta y complementarios. Personas naturales que sean Personas Expuestas Políticamente (PEP) o sean cónyuges, compañeros permanentes o parientes en el segundo grado de consanguinidad, primero de afinidad o único civil de Personas Expuestas Políticamente (PEP). Quienes no cumplan con la totalidad de los requisitos del decreto 0533 de 2024 Las Cooperativas de Trabajo Asociado respecto de las vinculaciones de nuevos trabajadores asociados. Exceptuando aquellas Cooperativas de Trabajo Asociado que hayan recibido al menos un pago del Incentivo.
