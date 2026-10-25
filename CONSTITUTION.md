@@ -425,6 +425,8 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 | 2026-10-24 | Descarga de documentos priorizada y con tope de MB | Hay 622 PDFs históricos; se captura lo reciente y relevante sin saturar el sitio |
 | 2026-10-24 | Noticias en Gold: hechos oficiales y prensa externa curada, con enlace de solo lectura a documentos | El sitio no tiene sala de prensa; la actualidad vive en la tabla de inversionistas y en medios externos |
 | 2026-10-24 | Fichas de prensa con resumen propio y verificación humana antes de publicar | Respeta derechos de autor y evita publicar enlaces o fechas sin confirmar |
+| 2026-10-24 | Descarga con `httpx` (`HttpClient` de `net.py`) en vez del `Fetcher` de Scrapling que propone la guía del curso; Scrapling queda solo como servidor MCP del agente (grupo `mcp`) | El pipeline ya descarga con `HttpClient`, que aplica User-Agent, header `From`, `Crawl-delay`, reintentos y caché en Bronze; el motivo por el que no se adoptó Scrapling en el pipeline está pendiente de confirmar |
+| 2026-10-25 | Limitación conocida: `urllib.robotparser` no interpreta comodines (`/*!ut/p*`) del `robots.txt` del banco | `RobotFileParser` solo compara prefijos literales; se verificó que ninguna URL de `corpus.jsonl`, `documents.jsonl` ni `videos.jsonl` coincide con las rutas prohibidas |
 
 ## 12. Configuración local (no trackear)
 
