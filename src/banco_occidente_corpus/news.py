@@ -9,7 +9,7 @@ from collections import Counter
 from collections.abc import Mapping
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, TypedDict
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import yaml
@@ -412,13 +412,26 @@ def _etiqueta_relevancia(puntaje: int) -> str:
     return "baja"
 
 
+class _GrupoHecho(TypedDict):
+    """Agrupacion temporal de hechos oficiales con la misma fecha y tema.
+
+    Conserva la fecha original, el tema tal como lo publica el banco, los
+    resumenes unicos acumulados y los anexos disponibles en orden de aparicion.
+    """
+
+    fecha: date
+    tema: str
+    resumenes: list[str]
+    anexos: list[str]
+
+
 def _consolidar_hechos(hechos: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Agrupa por fecha y tema los hechos que describen el mismo acontecimiento.
 
     Une los resumenes sin repetirlos, conserva el primer anexo disponible y
     deriva un solo titulo y una sola relevancia para el grupo.
     """
-    grupos: dict[tuple[str, str], dict[str, Any]] = {}
+    grupos: dict[tuple[str, str], _GrupoHecho] = {}
     orden: list[tuple[str, str]] = []
 
     for hecho in hechos:
@@ -426,12 +439,12 @@ def _consolidar_hechos(hechos: list[dict[str, Any]]) -> list[dict[str, Any]]:
         clave = (fecha.isoformat(), _tema_plano(str(hecho.get("tema") or "")))
         grupo = grupos.get(clave)
         if grupo is None:
-            grupo = {
-                "fecha": fecha,
-                "tema": str(hecho.get("tema") or ""),
-                "resumenes": [],
-                "anexos": [],
-            }
+            grupo = _GrupoHecho(
+                fecha=fecha,
+                tema=str(hecho.get("tema") or ""),
+                resumenes=[],
+                anexos=[],
+            )
             grupos[clave] = grupo
             orden.append(clave)
 
