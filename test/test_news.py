@@ -43,6 +43,26 @@ from banco_occidente_corpus.utils import read_jsonl, write_jsonl
 FIXTURES = Path(__file__).parent / "fixtures"
 
 
+def _html_tabla_hechos(filas: list[tuple[str, str, str, str]]) -> str:
+    """Construye una tabla oficial minima con fecha, tema, resumen y anexo."""
+    cuerpo = "".join(
+        (
+            "<tr>"
+            f"<td>{fecha}</td>"
+            f"<td>{tema}</td>"
+            f"<td>{resumen}</td>"
+            f'<td><a href="{anexo}">Ver Anexo</a></td>'
+            "</tr>"
+        )
+        for fecha, tema, resumen, anexo in filas
+    )
+    return (
+        "<html><body><table><thead><tr>"
+        "<th>Fecha</th><th>Tema</th><th>Resumen</th><th>Anexo Descargable</th>"
+        f"</tr></thead><tbody>{cuerpo}</tbody></table></body></html>"
+    )
+
+
 def _ficha_prensa(**cambios: object) -> dict[str, object]:
     """Devuelve una ficha de prensa valida para las pruebas locales."""
     ficha: dict[str, object] = {
@@ -341,7 +361,7 @@ def test_parse_hechos_relevantes_ignora_accionistas_y_pii() -> None:
 
 
 def test_parse_hechos_relevantes_aplica_tope() -> None:
-    """Conserva como maximo el numero de hechos indicado, del mas nuevo al mas viejo."""
+    """El tope conserva hitos y reserva cobertura para los dos anios de la ventana."""
     html = (FIXTURES / "inversionistas.html").read_text(encoding="utf-8")
     hechos = parse_hechos_relevantes(
         html,
@@ -350,7 +370,119 @@ def test_parse_hechos_relevantes_aplica_tope() -> None:
         max_oficiales=2,
     )
 
-    assert [hecho["fecha"] for hecho in hechos] == [date(2026, 10, 19), date(2026, 9, 1)]
+    assert [hecho["fecha"] for hecho in hechos] == [date(2026, 10, 19), date(2025, 3, 26)]
+
+
+def test_derivar_titulo_de_temas_genericos_usa_el_resumen() -> None:
+    """Un tema generico se reemplaza por la accion concreta del resumen."""
+    assert (
+        derivar_titulo(
+            "Otros eventos",
+            "Banco de Occidente informa que la SFC autorizó a clasificar el crédito subordinado.",
+        )
+        == "SFC autorizó a clasificar el crédito subordinado"
+    )
+    assert (
+        derivar_titulo(
+            "Otros Eventos",
+            "Banco de Occidente S.A. informa que, el día de hoy, se perfeccionó la absorción "
+            "de Fiduciaria de Occidente.",
+        )
+        == "Se perfeccionó la absorción de Fiduciaria de Occidente"
+    )
+    assert (
+        derivar_titulo(
+            "Informes de fin de ejercicio",
+            "Banco de Occidente publica los Estados Financieros Consolidados del segundo "
+            "trimestre de 2026.",
+        )
+        == "Estados Financieros Consolidados del segundo trimestre de 2026"
+    )
+    assert derivar_titulo("Emisión de valores", "Texto del resumen.") == "Emisión de valores"
+
+
+def test_parse_hechos_relevantes_consolida_mismo_tema_y_fecha() -> None:
+    """Varias filas del mismo tema y fecha producen una sola ficha consolidada."""
+    html = _html_tabla_hechos(
+        [
+            (
+                "Agosto 13-2026",
+                "Informes de fin de Ejercicio",
+                "Banco de Occidente publica los Estados Financieros Consolidados del segundo "
+                "trimestre de 2026.",
+                "/consolidados",
+            ),
+            (
+                "Agosto 13-2026",
+                "Informes de fin de Ejercicio.",
+                "Banco de Occidente publica los Estados Financieros Separados del segundo "
+                "trimestre de 2026.",
+                "/separados",
+            ),
+            (
+                "Agosto 13-2026",
+                "Informes de fin de ejercicio",
+                "En cumplimiento de la Circular Básica Jurídica, Banco de Occidente remite el "
+                "Informe Periódico Trimestral del segundo trimestre de 2026.",
+                "/trimestral",
+            ),
+        ]
+    )
+
+    hechos = parse_hechos_relevantes(html, date(2025, 1, 1), date(2026, 12, 31))
+
+    assert len(hechos) == 1
+    hecho = hechos[0]
+    assert hecho["fecha"] == date(2026, 8, 13)
+    assert hecho["titulo"] == "Estados Financieros Consolidados del segundo trimestre de 2026"
+    assert "Consolidados" in hecho["resumen"]
+    assert "Separados" in hecho["resumen"]
+    assert "Informe Periódico Trimestral" in hecho["resumen"]
+    assert hecho["anexo"] is not None
+    assert hecho["anexo"].endswith("/consolidados")
+    assert hecho["relevancia"] == "alta"
+
+
+def test_parse_hechos_relevantes_tope_prioriza_materialidad_y_ventana() -> None:
+    """El tope descarta convocatorias nuevas antes que hitos materiales antiguos."""
+    html = _html_tabla_hechos(
+        [
+            (
+                "Septiembre 01-2026",
+                "Convocatorias de Asambleas de Inversionistas",
+                "Banco de Occidente informa la convocatoria a la Asamblea Ordinaria de "
+                "Accionistas.",
+                "/convocatoria",
+            ),
+            (
+                "Marzo 26-2025",
+                "Decisiones adoptadas por la Asamblea de Inversionistas",
+                "Banco de Occidente informa la distribución de utilidades aprobada por la "
+                "asamblea.",
+                "/decisiones",
+            ),
+            (
+                "Enero 15-2025",
+                "Otros eventos",
+                "Banco de Occidente informa que se perfeccionó la absorción de Fiduciaria de "
+                "Occidente.",
+                "/absorcion",
+            ),
+        ]
+    )
+
+    hechos = parse_hechos_relevantes(
+        html,
+        date(2025, 1, 1),
+        date(2026, 12, 31),
+        max_oficiales=2,
+    )
+
+    assert [hecho["fecha"] for hecho in hechos] == [date(2025, 3, 26), date(2025, 1, 15)]
+    assert all(hecho["fecha"].year == 2025 for hecho in hechos)
+    assert hechos[0]["relevancia"] == "alta"
+    assert hechos[1]["relevancia"] == "alta"
+    assert hechos[1]["titulo"] == "Se perfeccionó la absorción de Fiduciaria de Occidente"
 
 
 # ---------------------------------------------------------------- privacidad

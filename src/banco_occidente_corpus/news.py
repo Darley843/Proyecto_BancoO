@@ -70,6 +70,53 @@ _TEMAS_DIVIDENDO = {
     "aviso de pago de dividendo",
 }
 
+#: Temas oficiales demasiado genericos: el titular se deriva del resumen.
+_TEMAS_GENERICOS = {
+    "otro evento",
+    "otros eventos",
+    "informe de fin de ejercicio",
+    "informes de fin de ejercicio",
+}
+
+#: Temas de tramite que no deben desplazar a un hito material en el tope.
+_TEMAS_RUTINARIOS = {
+    "convocatoria de asamblea de inversionistas",
+    "convocatorias de asamblea de inversionistas",
+    "convocatoria de asambleas de inversionistas",
+    "convocatorias de asambleas de inversionistas",
+}
+
+_CLAVES_RELEVANCIA_ALTA = (
+    "absorcion",
+    "adquisicion",
+    "aporte en especie",
+    "acuerdo material",
+    "credito subordinado",
+    "emision de valores",
+    "escision",
+    "esision",
+    "fusion",
+    "reestructuracion",
+)
+
+_CLAVES_RELEVANCIA_MEDIA = (
+    "acciones ordinarias",
+    "bonos subordinados",
+    "calificacion",
+    "decisiones adoptadas",
+    "distribucion de utilidades",
+    "estados financieros",
+    "informe de fin de ejercicio",
+    "informe periodico",
+    "junta directiva",
+    "mejores practicas corporativas",
+    "nombramiento",
+    "novedades de los directores",
+    "patrimonio adicional",
+    "renuncia",
+    "resultados",
+)
+
 _PII_CORREO = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 _PII_NIT = re.compile(r"\bnit\b[^\d]{0,12}\d{3}[.\s]?\d{3}[.\s]?\d{3}-?\d?")
 _PII_CEDULA = re.compile(
@@ -144,13 +191,91 @@ def parse_fecha_es(texto: str) -> date:
         raise ValueError(f"Fecha invalida: {original!r}") from exc
 
 
+def _tema_plano(tema: str) -> str:
+    """Normaliza un tema oficial para compararlo sin tildes ni puntuacion."""
+    return _sin_acentos(_normalizar_espacios(tema)).strip(" .;:")
+
+
+def es_tema_generico(tema: str) -> bool:
+    """Indica si el tema es un cajon de sastre y el titulo debe salir del resumen."""
+    return _tema_plano(tema) in _TEMAS_GENERICOS
+
+
+def _titulo_desde_resumen(resumen: str) -> str:
+    """Extrae del resumen una frase corta que explique que ocurrio.
+
+    Quita el encabezado de alcance, el sujeto ``Banco de Occidente``, los
+    verbos de comunicacion y las clausulas legales o temporales iniciales. Si
+    aun queda texto, devuelve la primera frase como titular.
+    """
+    texto = _normalizar_espacios(resumen)
+    if not texto:
+        return ""
+
+    texto = re.sub(r"^alcance\s*[-–—:]\s*", "", texto, flags=re.IGNORECASE)
+
+    if texto.casefold().startswith(("en cumplimiento", "conforme", "de acuerdo")):
+        banco = re.search(r"\b(?:el\s+)?banco de occidente\b", texto, flags=re.IGNORECASE)
+        if banco is not None and 0 < banco.start() <= 300:
+            texto = texto[banco.start() :]
+        else:
+            texto = re.sub(
+                r"^(?:en cumplimiento|conforme|de acuerdo)\b[^,]{0,240},\s*",
+                "",
+                texto,
+                flags=re.IGNORECASE,
+            )
+
+    texto = re.sub(
+        r"^(?:el\s+)?banco de occidente(?:\s+s\.a\.)?\s*[,;:]?\s*",
+        "",
+        texto,
+        flags=re.IGNORECASE,
+    )
+
+    for _ in range(2):
+        texto = re.sub(
+            r"^(?:se permite\s+)?informa(?:r)?(?: al mercado)?\s*,?\s*(?:que\s*,?\s*)?",
+            "",
+            texto,
+            flags=re.IGNORECASE,
+        )
+        texto = re.sub(
+            r"^(?:adjunta|remite|publica|transmite|transmitimos)\s+",
+            "",
+            texto,
+            flags=re.IGNORECASE,
+        )
+        texto = re.sub(r"^sobre\s+", "", texto, flags=re.IGNORECASE)
+        texto = re.sub(
+            r"^(?:el|en el)\s+d[ií]a de hoy\s*,\s*",
+            "",
+            texto,
+            flags=re.IGNORECASE,
+        )
+        texto = re.sub(
+            r"^(?:contando|conforme|de acuerdo|en cumplimiento|mediante)\b[^,]{0,180},\s*",
+            "",
+            texto,
+            flags=re.IGNORECASE,
+        )
+
+    texto = _primera_frase(texto).strip(" .;:,")
+    texto = re.sub(r"^(?:el|la|los|las|un|una)\s+", "", texto, flags=re.IGNORECASE)
+    return texto.strip(" .;:,")
+
+
 def derivar_titulo(tema: str, resumen: str) -> str:
-    """Deriva un titular legible a partir del tema oficial o del resumen."""
-    base = _normalizar_espacios(tema).rstrip(" .;:")
+    """Deriva un titular legible a partir del tema oficial o del resumen.
+
+    Los temas genericos como ``Otros eventos`` o ``Informes de fin de
+    ejercicio`` no identifican el hecho: en esos casos el titular se toma de la
+    primera frase util del resumen.
+    """
+    tema_limpio = _normalizar_espacios(tema).rstrip(" .;:")
+    base = _titulo_desde_resumen(resumen) if es_tema_generico(tema) else tema_limpio
     if not base:
-        base = _primera_frase(_normalizar_espacios(resumen)).rstrip(" .;:")
-    if not base:
-        return "Hecho relevante"
+        base = tema_limpio or "Hecho relevante"
     if len(base) > 120:
         base = base[:120].rsplit(" ", 1)[0].rstrip(" ,;:") + "..."
     return base[0].upper() + base[1:]
@@ -201,9 +326,8 @@ def validar_pii(titulo: str, resumen: str) -> list[str]:
 
 
 def _primera_frase(texto: str) -> str:
-    """Devuelve la primera frase de un texto ya normalizado."""
-    coincidencia = re.match(r"(.+?[.!?])(?:\s|$)", texto)
-    return coincidencia.group(1) if coincidencia else texto
+    """Devuelve la primera frase sin cortar abreviaturas como ``S.A.``."""
+    return re.split(r"(?<=[.!?])\s+(?=[A-ZÁÉÍÓÚÜÑ¿¡])", texto, maxsplit=1)[0]
 
 
 def _columnas_de_encabezado(fila: Tag) -> dict[str, int]:
@@ -256,6 +380,137 @@ def _texto_celda(celdas: list[Tag], columnas: dict[str, int], nombre: str) -> st
     return _normalizar_espacios(celdas[indice].get_text(" ", strip=True))
 
 
+def _puntaje_relevancia(tema: str, resumen: str) -> int:
+    """Asigna una prioridad numerica a un hecho segun su materialidad.
+
+    Cero corresponde a una convocatoria rutinaria; los valores mas altos a
+    hitos corporativos. El resumen tambien pesa porque ``Otros eventos`` puede
+    esconder una absorcion o un credito subordinado.
+    """
+    tema_plano = _tema_plano(tema)
+    if tema_plano in _TEMAS_RUTINARIOS or (
+        "convocatoria" in tema_plano and "asamblea" in tema_plano
+    ):
+        return 0
+
+    texto = _sin_acentos(f"{tema} {resumen}")
+    if any(clave in texto for clave in _CLAVES_RELEVANCIA_ALTA):
+        return 5
+    if any(clave in texto for clave in _CLAVES_RELEVANCIA_MEDIA):
+        return 4
+    if tema_plano in _TEMAS_GENERICOS:
+        return 2
+    return 3
+
+
+def _etiqueta_relevancia(puntaje: int) -> str:
+    """Traduce el puntaje interno a la etiqueta del contrato Gold."""
+    if puntaje >= 4:
+        return "alta"
+    if puntaje == 3:
+        return "media"
+    return "baja"
+
+
+def _consolidar_hechos(hechos: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Agrupa por fecha y tema los hechos que describen el mismo acontecimiento.
+
+    Une los resumenes sin repetirlos, conserva el primer anexo disponible y
+    deriva un solo titulo y una sola relevancia para el grupo.
+    """
+    grupos: dict[tuple[str, str], dict[str, Any]] = {}
+    orden: list[tuple[str, str]] = []
+
+    for hecho in hechos:
+        fecha = hecho["fecha"]
+        clave = (fecha.isoformat(), _tema_plano(str(hecho.get("tema") or "")))
+        grupo = grupos.get(clave)
+        if grupo is None:
+            grupo = {
+                "fecha": fecha,
+                "tema": str(hecho.get("tema") or ""),
+                "resumenes": [],
+                "anexos": [],
+            }
+            grupos[clave] = grupo
+            orden.append(clave)
+
+        resumen = _normalizar_espacios(str(hecho.get("resumen") or ""))
+        if resumen and resumen not in grupo["resumenes"]:
+            grupo["resumenes"].append(resumen)
+
+        anexo = hecho.get("anexo")
+        if isinstance(anexo, str) and anexo.strip() and anexo not in grupo["anexos"]:
+            grupo["anexos"].append(anexo.strip())
+
+    consolidados: list[dict[str, Any]] = []
+    for clave in orden:
+        grupo = grupos[clave]
+        resumen = " ".join(grupo["resumenes"])
+        tema = grupo["tema"]
+        puntaje = _puntaje_relevancia(tema, resumen)
+        consolidados.append(
+            {
+                "fecha": grupo["fecha"],
+                "tema": tema,
+                "titulo": derivar_titulo(tema, resumen),
+                "resumen": derivar_resumen(resumen),
+                "anexo": grupo["anexos"][0] if grupo["anexos"] else None,
+                "relevancia": _etiqueta_relevancia(puntaje),
+                "_puntaje": puntaje,
+            }
+        )
+    return consolidados
+
+
+def _seleccionar_hechos(
+    hechos: list[dict[str, Any]],
+    max_oficiales: int,
+) -> list[dict[str, Any]]:
+    """Aplica el tope priorizando materialidad y cobertura de la ventana.
+
+    Ordena por relevancia y, en empate, por fecha descendente. Antes de llenar
+    los cupos restantes reserva el mejor hecho material de cada anio presente
+    para no perder la parte antigua de la ventana. Las convocatorias rutinarias
+    solo ocupan cupos sobrantes.
+    """
+    if max_oficiales < 1:
+        raise ValueError("max_oficiales debe ser al menos 1")
+
+    ordenados = sorted(
+        hechos,
+        key=lambda hecho: (
+            -int(hecho["_puntaje"]),
+            -hecho["fecha"].toordinal(),
+            _tema_plano(str(hecho.get("tema") or "")),
+            str(hecho.get("titulo") or ""),
+        ),
+    )
+    if len(ordenados) <= max_oficiales:
+        seleccionados = list(ordenados)
+    else:
+        seleccionados = []
+        elegidos: set[int] = set()
+        anios = sorted({hecho["fecha"].year for hecho in ordenados})
+        if len(anios) <= max_oficiales:
+            for anio in anios:
+                for hecho in ordenados:
+                    if hecho["fecha"].year == anio:
+                        if int(hecho["_puntaje"]) >= 3:
+                            seleccionados.append(hecho)
+                            elegidos.add(id(hecho))
+                        break
+        for hecho in ordenados:
+            if len(seleccionados) >= max_oficiales:
+                break
+            if id(hecho) not in elegidos:
+                seleccionados.append(hecho)
+                elegidos.add(id(hecho))
+
+    seleccionados.sort(key=lambda hecho: hecho["fecha"], reverse=True)
+    return seleccionados
+
+
 def parse_hechos_relevantes(
     html: str,
     desde: date,
@@ -268,7 +523,9 @@ def parse_hechos_relevantes(
     Solo procesa las tablas cuyos encabezados sean ``Fecha``, ``Tema``,
     ``Resumen`` y ``Anexo Descargable``. Ignora la tabla de accionistas, los
     avisos mensuales de dividendos y cualquier fila con datos personales.
-    Ordena de mas reciente a mas antiguo y aplica el tope indicado.
+    Consolida los hechos del mismo tema y fecha, aplica el tope priorizando
+    hitos materiales sobre convocatorias rutinarias y devuelve el resultado de
+    mas reciente a mas antiguo.
     """
     if hasta < desde:
         raise ValueError("La fecha 'hasta' no puede ser anterior a 'desde'")
@@ -331,15 +588,24 @@ def parse_hechos_relevantes(
                 }
             )
 
-    hechos.sort(key=lambda hecho: hecho["fecha"], reverse=True)
-    if len(hechos) > max_oficiales:
+    consolidados = _consolidar_hechos(hechos)
+    if len(consolidados) < len(hechos):
+        log.info(
+            "Se consolidaron %d filas en %d hechos por fecha y tema",
+            len(hechos),
+            len(consolidados),
+        )
+
+    seleccionados = _seleccionar_hechos(consolidados, max_oficiales)
+    if len(consolidados) > max_oficiales:
         log.warning(
-            "Se descartaron %d hechos por el tope de %d",
-            len(hechos) - max_oficiales,
+            "Se descartaron %d hechos por el tope de %d, priorizando materialidad",
+            len(consolidados) - max_oficiales,
             max_oficiales,
         )
-        hechos = hechos[:max_oficiales]
-    return hechos
+    for hecho in seleccionados:
+        hecho.pop("_puntaje", None)
+    return seleccionados
 
 
 def _url_canonica(url: str) -> str:
@@ -992,6 +1258,7 @@ def _fila_oficial(
     titulo = _normalizar_espacios(str(hecho.get("titulo") or "Hecho relevante"))
     resumen = _normalizar_espacios(str(hecho.get("resumen") or ""))
     tema = _normalizar_espacios(str(hecho.get("tema") or ""))
+    relevancia = _normalizar_espacios(str(hecho.get("relevancia") or "alta")).casefold()
 
     fila: dict[str, Any] = {
         "tipo": "hecho",
@@ -1003,7 +1270,7 @@ def _fila_oficial(
         "medio": "Banco de Occidente",
         "resumen": resumen,
         "temas": [slugify(tema, 40)] if tema else [],
-        "relevancia": "alta",
+        "relevancia": relevancia,
         "estado": "verificado",
         "metodo": "news-parser",
         "evento": f"{fecha_iso}-{slugify(titulo, 40)}",
