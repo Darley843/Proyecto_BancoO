@@ -89,6 +89,7 @@ descarga masiva de PDF, transcripción de vídeo.
 | **Frontmatter** | `PyYAML` |
 | **Tokens** | `tiktoken` (extra `tokens`; si falta, estimador) |
 | **Navegador (fallback JS)** | `playwright` (extra `browser`) |
+| **Herramienta del agente** | `scrapling` (grupo `mcp`) — navegación ad hoc vía MCP, **fuera del pipeline** |
 | **Testing** | `pytest` (patrón AAA) |
 | **Lint / formato** | `ruff` (línea 100, comillas dobles) |
 | **Tipado** | `ty` (target `make typecheck`) |
@@ -98,6 +99,25 @@ descarga masiva de PDF, transcripción de vídeo.
 > ⚠️ **Regla dura heredada:** prohibido `pip` y `requirements.txt`. Toda
 > dependencia entra con `uv add` (o `uv add --dev`) y se fija en `uv.lock`.
 > Las pruebas de una tarde van con `uv run --with` o PEP 723, no al proyecto.
+
+### Herramientas del agente (MCP)
+
+`opencode.json` declara los servidores MCP del agente: `docs-langchain`,
+`reference-langchain` (remotos, solo consulta) y `scrapling` (local). Scrapling
+vive en el grupo `mcp` de `pyproject.toml` y se lanza con
+`uv run --group mcp scrapling mcp`; **no** forma parte de las dependencias del
+pipeline ni de la CI.
+
+Reglas:
+
+1. Un MCP es herramienta del agente, no una etapa del corpus: no escribe en
+   Bronze, Silver ni Gold.
+2. Si se usa contra el sitio del banco, siguen mandando `robots.txt`, el
+   `Crawl-delay` (1.5 s) y el header `From` de `net.py`.
+3. Los fetchers de navegador requieren `uv run --group mcp scrapling install`
+   una sola vez; el modo HTTP funciona sin ese paso.
+4. Toda herramienta nueva entra con su grupo propio y se documenta aquí en el
+   mismo commit.
 
 ## 4. Estructura del repositorio
 

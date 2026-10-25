@@ -8,6 +8,17 @@
       "reference-langchain": {
         "type": "remote",
         "url": "https://reference.langchain.com/mcp"
+      },
+      "scrapling": {
+        "type": "local",
+        "command": [
+          "uv",
+          "run",
+          "--group",
+          "mcp",
+          "scrapling",
+          "mcp"
+        ]
       }
     }
   }

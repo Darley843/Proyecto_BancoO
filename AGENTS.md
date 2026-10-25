@@ -53,6 +53,15 @@ Viven en `.opencode/skills/` y se cargan bajo demanda:
 Úsalas antes de tocar el pipeline o la capa Knowledge; no dupliques sus reglas
 aquí. Se pueden mencionar como `@corpus-extraction` y `@semantic-extraction`.
 
+## Herramientas del agente (MCP)
+
+`opencode.json` declara los servidores MCP: `docs-langchain` y
+`reference-langchain` (remotos, solo consulta) y `scrapling` (local, navegación
+ad hoc). Scrapling se instala con el grupo `mcp` y **no** es dependencia del
+pipeline: no escribe en Bronze/Silver/Gold. Si lo usas contra el sitio del banco,
+aplican igual `robots.txt`, el `Crawl-delay` de 1.5 s y el header `From`
+(ver `CONSTITUTION.md` §3).
+
 ## Mapa del código
 
 | Archivo | Responsabilidad |
