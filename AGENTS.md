@@ -94,6 +94,8 @@ del checklist no bajó.
 
 ## Reglas de revisión (GGA)
 
+Instrucciones para quien revisa (GGA): el código a revisar ya viene completo en este mensaje. No ejecutes comandos ni leas otros archivos; revisa solo el contenido recibido. Escribe la línea `STATUS: PASSED` o `STATUS: FAILED` al comienzo de tu respuesta y después la lista de violaciones.
+
 REJECT if:
 - Se usa `pip`, se crea `requirements.txt` o se edita `uv.lock` a mano.
 - Una petición HTTP no pasa por `net.py`, no tiene `timeout`, no envía el User-Agent y el header `From` del proyecto, o usa `verify=False`.
