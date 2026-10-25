@@ -139,6 +139,7 @@ def extract_page(
         if len(fallback.strip()) > len(body.strip()):
             body, method = fallback, "fallback"
     title = meta_title or _title_from_html(html)
+    body = body.replace("\r\n", "\n").replace("\r", "\n")
     body = re.sub(r"\n{3,}", "\n\n", body).strip()
     return ExtractedPage(
         url=url,

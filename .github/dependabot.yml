@@ -14,13 +14,25 @@ updates:
       include: scope
     labels:
       - dependencies
+    # Un solo PR por semana con parches y menores; los mayores van aparte
+    # para revisarlos a mano (pueden romper el pipeline).
+    groups:
+      python-minor-patch:
+        patterns: ["*"]
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
       interval: monthly
+    open-pull-requests-limit: 3
     commit-message:
       prefix: chore
       include: scope
     labels:
       - dependencies
+    # Todas las actions en un unico PR mensual: si una rompe la CI, se
+    # revierte sola y no quedan PRs encadenados esperando rebase.
+    groups:
+      github-actions:
+        patterns: ["*"]

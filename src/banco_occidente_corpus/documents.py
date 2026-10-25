@@ -381,7 +381,8 @@ def extract_documents(config: Config) -> list[dict]:
                 total_pages = len(pdf)
                 parts: list[str] = []
                 for number in range(total_pages):
-                    text = (pdf[number].get_textpage().get_text_range() or "").replace("\x00", " ")
+                    text = pdf[number].get_textpage().get_text_range() or ""
+                    text = text.replace("\r\n", "\n").replace("\r", "\n").replace("\x00", " ")
                     text = re.sub(r"[ \t]+", " ", text)
                     text = re.sub(r"\n{3,}", "\n\n", text).strip()
                     if text:

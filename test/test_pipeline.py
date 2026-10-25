@@ -280,6 +280,12 @@ def test_config_real_identifica_al_autor():
     assert "Mozilla" in cfg.site.user_agent
 
 
+def test_render_document_normaliza_cr():
+    doc = render_document({"titulo": "x"}, "linea1\r\nlinea2\rlinea3")
+    assert "\r" not in doc
+    assert "linea1\nlinea2\nlinea3" in doc
+
+
 # ---------------------------------------------------------------- helpers
 
 
