@@ -8,9 +8,9 @@
 
 ## 2. Reporte `_REPETIDOS.md`
 
-- [ ] 2.1 Añadir `Paths.repetitions_file` en `config.py` para resolver `data/gold/_REPETIDOS.md` y verificar con una prueba que la ruta apunta al archivo correcto sin crear artefactos adicionales.
-- [ ] 2.2 Implementar el renderizado Markdown con total de páginas, tabla de umbrales, top 20 con tamaño/páginas/ejemplos y sección de `unique_ratio`, con orden determinista y escape de `|`. Verificar con una prueba que el reporte contiene esas secciones, no supera 20 bloques y conserva tildes en el texto mostrado.
-- [ ] 2.3 Implementar la escritura del reporte con `utf-8`, saltos `\n` y sin fecha, de modo que dos ejecuciones produzcan el mismo contenido. Verificar con una prueba que solo se crea `_REPETIDOS.md` y que los hashes de todas las páginas, `corpus.jsonl`, `documents.jsonl` y `videos.jsonl` no cambian.
+- [x] 2.1 Añadir `Paths.repetitions_file` en `config.py` para resolver `data/gold/_REPETIDOS.md` y verificar con una prueba que la ruta apunta al archivo correcto sin crear artefactos adicionales.
+- [x] 2.2 Implementar el renderizado Markdown con total de páginas, tabla de umbrales, top 20 con tamaño/páginas/ejemplos y sección de `unique_ratio`, con orden determinista y escape de `|`. Verificar con una prueba que el reporte contiene esas secciones, no supera 20 bloques y conserva tildes en el texto mostrado.
+- [x] 2.3 Implementar la escritura del reporte con `utf-8`, saltos `\n` y sin fecha, de modo que dos ejecuciones produzcan el mismo contenido. Verificar con una prueba que solo se crea `_REPETIDOS.md` y que los hashes de todas las páginas, `corpus.jsonl`, `documents.jsonl` y `videos.jsonl` no cambian.
 
 ## 3. CLI y Makefile
 

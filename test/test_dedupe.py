@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 import pytest
 
+from banco_occidente_corpus.config import Config, Paths
 from banco_occidente_corpus.dedupe import (
     RepeatedBlock,
     analyze_gold_repetitions,
     compute_unique_ratio_metrics,
     find_repeated_blocks,
     load_gold_pages,
+    render_repetitions_report,
+    write_repetitions_report,
 )
 
 
@@ -214,3 +218,84 @@ def test_unique_ratio_global_promedio_y_paginas_repetitivas(tmp_path: Path) -> N
     assert metrics.average == pytest.approx((1 / 3 + 1) / 2)
     assert metrics.lowest[0].page_id == "a-repetitiva"
     assert metrics.lowest[0].ratio == pytest.approx(1 / 3)
+
+
+def test_ruta_reporte_repetidos_sin_crear_artefactos(tmp_path: Path) -> None:
+    """Resuelve el reporte dentro de Gold sin crear el archivo ni el directorio."""
+    paths = Paths(gold=tmp_path / "gold")
+
+    target = paths.repetitions_file
+
+    assert target == tmp_path / "gold" / "_REPETIDOS.md"
+    assert not target.exists()
+    assert not (tmp_path / "gold").exists()
+
+
+def test_render_reporte_con_secciones_y_limite(tmp_path: Path) -> None:
+    """Renderiza las secciones pedidas, limita el top a veinte y conserva tildes."""
+    pages: dict[str, list[str]] = {}
+    for index in range(22):
+        card = [
+            "Cuenta de Nómina",
+            f"Tarjeta | Premium {index}",
+            f"Cupo inmediato {index}",
+        ]
+        pages[f"pagina-{index:02d}-a"] = card
+        pages[f"pagina-{index:02d}-b"] = card
+    root = write_corpus(tmp_path, pages)
+
+    report = analyze_gold_repetitions(root)
+    text = render_repetitions_report(report)
+
+    assert "**Páginas analizadas:** 44" in text
+    assert "## Cobertura por umbral" in text
+    assert "## Top 20 de bloques" in text
+    assert "## Contenido único (`unique_ratio`)" in text
+    assert "| 5 |" in text
+    assert "| 10 |" in text
+    assert "| 20 |" in text
+    assert "Cuenta de Nómina" in text
+    assert "\\|" in text
+    assert len(report.top_blocks) == 20
+    top_section = text.split("## Top 20 de bloques", 1)[1].split("\n## ", 1)[0]
+    rows = [
+        line
+        for line in top_section.splitlines()
+        if line.startswith("| ") and not line.startswith("| #")
+    ]
+    assert len(rows) == 20
+
+
+def test_escritura_solo_crea_reporte_y_no_altera_gold(tmp_path: Path) -> None:
+    """Escribe solo ``_REPETIDOS.md`` en UTF-8, sin CRLF y sin tocar los demás artefactos."""
+    shared = ["Cuenta de Nómina", "Sin cuota de manejo"]
+    write_corpus(
+        tmp_path,
+        {
+            "pagina-a": shared,
+            "pagina-b": shared,
+            "hecho-2026-01-01-demo": shared,
+        },
+    )
+    for name in ("corpus.jsonl", "documents.jsonl", "videos.jsonl"):
+        (tmp_path / name).write_text(f'{{"archivo": "{name}"}}\n', encoding="utf-8")
+    config = Config(paths=Paths(gold=tmp_path))
+    before = {
+        path: hashlib.sha256(path.read_bytes()).hexdigest()
+        for path in tmp_path.rglob("*")
+        if path.is_file()
+    }
+
+    target = write_repetitions_report(config)
+    first = target.read_bytes()
+    write_repetitions_report(config)
+    second = target.read_bytes()
+
+    assert target == tmp_path / "_REPETIDOS.md"
+    assert first == second
+    assert b"\r\n" not in first
+    assert "**Páginas analizadas:** 2" in first.decode("utf-8")
+    after = {path for path in tmp_path.rglob("*") if path.is_file()}
+    assert after - set(before) == {target}
+    for path, digest in before.items():
+        assert hashlib.sha256(path.read_bytes()).hexdigest() == digest
