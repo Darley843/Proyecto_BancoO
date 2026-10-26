@@ -1,28 +1,28 @@
 {
   "version": 1,
   "max_tokens": 175000,
-  "tokens": 166930,
+  "tokens": 167057,
   "tokens_metodo": "stable_tokens (chars/4, sin red)",
-  "tokens_bloques": 166497,
-  "tokens_informacion_comun": 307,
-  "tokens_cabeceras": 126,
+  "tokens_bloques": 166633,
+  "tokens_informacion_comun": 296,
+  "tokens_cabeceras": 128,
   "paginas": {
-    "leidas": 244,
-    "incluidas": 194,
+    "leidas": 243,
+    "incluidas": 193,
     "excluidas": 50
   },
   "tokens_por_seccion": {
-    "identidad": 50924,
-    "atencion": 12315,
-    "oferta": 59247,
+    "identidad": 50935,
+    "atencion": 12273,
+    "oferta": 59370,
     "legal": 18992,
-    "datos": 1892,
+    "datos": 1914,
     "presencia": 2479,
-    "otros": 20648
+    "otros": 20670
   },
   "informacion_comun": {
-    "lineas": 26,
-    "tokens": 307,
+    "lineas": 23,
+    "tokens": 296,
     "texto": [
       "##### Dinero para lo que quieras, sin explicaciones",
       "Obtén tu crédito y haz realidad tus planes con plazos flexibles.",
@@ -33,9 +33,6 @@
       "##### Tu carro nuevo te espera, ¡maneja tu futuro!",
       "Financia tu próximo vehículo con cuotas cómodas y excelentes tasas.",
       "- Canales digitales",
-      "- Segmentos",
-      "- Mesa de dinero",
-      "- Haz tus pagos",
       "Usa tu tarjeta en compras diarias y acumula beneficios exclusivos.",
       "Una alternativa para administrar mejor tus deudas y pagar menos con una tasa preferente.",
       "Tarjeta de Crédito especialmente diseñada para viajeros.",
@@ -100,7 +97,7 @@
       "seccion": "identidad",
       "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-proveedor",
       "prioridad": 1,
-      "tokens": 1321
+      "tokens": 1332
     },
     {
       "id": "informacion-para-accionistas-banco-de-occidente-d95b2d",
@@ -159,14 +156,6 @@
       "tokens": 796
     },
     {
-      "id": "agenda-tu-cita-con-un-asesor-0ce9cf",
-      "titulo": "Agenda tu cita con un asesor",
-      "seccion": "atencion",
-      "fuente": "https://www.bancodeoccidente.com.co/ayuda/agendar-cita-asesor",
-      "prioridad": 2,
-      "tokens": 64
-    },
-    {
       "id": "app-movil-banco-de-occidente-ae3601",
       "titulo": "App Móvil Banco de Occidente",
       "seccion": "atencion",
@@ -196,7 +185,7 @@
       "seccion": "atencion",
       "fuente": "https://www.bancodeoccidente.com.co/ayuda/linea-conciliacion-negociacion",
       "prioridad": 2,
-      "tokens": 696
+      "tokens": 707
     },
     {
       "id": "lineas-de-servicio-al-cliente-banco-de-occidente-7df324",
@@ -204,7 +193,7 @@
       "seccion": "atencion",
       "fuente": "https://www.bancodeoccidente.com.co/ayuda/linea-servicio-cliente",
       "prioridad": 2,
-      "tokens": 414
+      "tokens": 425
     },
     {
       "id": "portal-transaccional-banco-de-occidente-8b4df0",
@@ -260,7 +249,7 @@
       "seccion": "oferta",
       "fuente": "https://www.bancodeoccidente.com.co/cuenta-de-nomina",
       "prioridad": 3,
-      "tokens": 838
+      "tokens": 849
     },
     {
       "id": "ahorros-e-inversion-con-banco-de-occidente-cbeeba",
@@ -308,7 +297,7 @@
       "seccion": "oferta",
       "fuente": "https://www.bancodeoccidente.com.co/asistencia-de-viajes-internacionales",
       "prioridad": 3,
-      "tokens": 3815
+      "tokens": 3826
     },
     {
       "id": "asistencias-tarjetas-de-credito-banco-de-occidente-43cf51",
@@ -340,7 +329,7 @@
       "seccion": "oferta",
       "fuente": "https://www.bancodeoccidente.com.co/asistencia-al-hogar",
       "prioridad": 3,
-      "tokens": 3068
+      "tokens": 3079
     },
     {
       "id": "cdt-banco-de-occidente-inversion-segura-y-rentable-ef9226",
@@ -524,7 +513,7 @@
       "seccion": "oferta",
       "fuente": "https://www.bancodeoccidente.com.co/cuenta-activa-basica",
       "prioridad": 3,
-      "tokens": 453
+      "tokens": 464
     },
     {
       "id": "cuenta-afc-banco-de-occidente-para-ahorrar-para-tu-vivienda-21969b",
@@ -540,7 +529,7 @@
       "seccion": "oferta",
       "fuente": "https://www.bancodeoccidente.com.co/cuenta-corriente",
       "prioridad": 3,
-      "tokens": 652
+      "tokens": 664
     },
     {
       "id": "cuenta-de-ahorros-digital-banco-de-occidente-524d0d",
@@ -596,7 +585,7 @@
       "seccion": "oferta",
       "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/visa-gold-mascotas",
       "prioridad": 3,
-      "tokens": 446
+      "tokens": 457
     },
     {
       "id": "google-pay-tarjeta-debito-16d726",
@@ -924,7 +913,7 @@
       "seccion": "oferta",
       "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/credencial-free",
       "prioridad": 3,
-      "tokens": 451
+      "tokens": 462
     },
     {
       "id": "tarjeta-de-credito-credencial-platinum-banco-de-occidente-c59b56",
@@ -964,7 +953,7 @@
       "seccion": "oferta",
       "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/latam-pass-gold-visa",
       "prioridad": 3,
-      "tokens": 572
+      "tokens": 583
     },
     {
       "id": "tarjeta-de-credito-latam-pass-platinum-banco-de-occidente-1eee11",
@@ -980,7 +969,7 @@
       "seccion": "oferta",
       "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/latam-pass-platinum-visa",
       "prioridad": 3,
-      "tokens": 646
+      "tokens": 657
     },
     {
       "id": "tarjeta-de-credito-latam-pass-signature-banco-de-occidente-28ed65",
@@ -1012,7 +1001,7 @@
       "seccion": "oferta",
       "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/santa-fe",
       "prioridad": 3,
-      "tokens": 439
+      "tokens": 450
     },
     {
       "id": "tarjeta-debito-banco-de-occidente-con-beneficios-imperdibles-4d0871",
@@ -1052,7 +1041,7 @@
       "seccion": "oferta",
       "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/mastercard-visa-clasica",
       "prioridad": 3,
-      "tokens": 456
+      "tokens": 468
     },
     {
       "id": "tarjetas-de-credito-visa-y-mastercard-gold-banco-de-occident-ab8ef8",
@@ -1156,7 +1145,7 @@
       "seccion": "datos",
       "fuente": "https://www.bancodeoccidente.com.co/asamblea-de-accionistas-2026",
       "prioridad": 5,
-      "tokens": 122
+      "tokens": 133
     },
     {
       "id": "informacion-para-accionistas-banco-de-occidente-1cce2d",
@@ -1180,7 +1169,7 @@
       "seccion": "datos",
       "fuente": "https://www.bancodeoccidente.com.co/sostenibilidad",
       "prioridad": 5,
-      "tokens": 756
+      "tokens": 767
     },
     {
       "id": "tarjeta-de-credito-visa-infinite-banco-de-occidente-4fa0ad",
@@ -1388,7 +1377,7 @@
       "seccion": "otros",
       "fuente": "https://www.bancodeoccidente.com.co/coberturas-tasas-interes",
       "prioridad": 7,
-      "tokens": 412
+      "tokens": 423
     },
     {
       "id": "consulta-de-beneficios-tc-comerciales-9a3da5",
@@ -1524,7 +1513,7 @@
       "seccion": "otros",
       "fuente": "https://www.bancodeoccidente.com.co/mesa-dinero/operaciones-cambiarias",
       "prioridad": 7,
-      "tokens": 694
+      "tokens": 705
     },
     {
       "id": "paso-a-paso-tc-6b8d2d",
