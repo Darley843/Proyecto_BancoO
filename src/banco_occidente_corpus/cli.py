@@ -11,12 +11,26 @@ from pathlib import Path
 
 from . import __version__
 from .config import Config, load_config
-from .net import BlockedError, HttpClient
+from .net import MIN_DELAY_SECONDS, BlockedError, HttpClient
 
 log = logging.getLogger("corpus")
 
 
+def _delay_seconds(value: str) -> float:
+    """Valida ``--delay`` contra el minimo de cortesia del proyecto."""
+    try:
+        delay = float(value)
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError(f"'{value}' no es un numero de segundos") from exc
+    if delay < MIN_DELAY_SECONDS:
+        raise argparse.ArgumentTypeError(
+            f"el minimo es {MIN_DELAY_SECONDS} s entre peticiones (cortesia con el sitio)"
+        )
+    return delay
+
+
 def _setup_logging(verbose: bool) -> None:
+    """Configura el logging a stdout, tolerante a la consola cp1252 de Windows."""
     # La consola de Windows usa cp1252: un titulo con caracteres combinados
     # (p. ej. "n" + tilde) rompe logging. Se degrada a 'replace' sin perder el log.
     reconfigure = getattr(sys.stdout, "reconfigure", None)
@@ -30,12 +44,14 @@ def _setup_logging(verbose: bool) -> None:
 
 
 def _urls_from_file(config: Config) -> list[str]:
+    """Lee las URLs descubiertas en ``data/raw/urls.jsonl``."""
     from .utils import read_jsonl
 
     return [row["url"] for row in read_jsonl(config.paths.urls_file) if row.get("url")]
 
 
 def cmd_discover(config: Config, args: argparse.Namespace) -> int:
+    """Lee robots.txt y el sitemap y deja la lista de URLs a capturar."""
     from .discover import discover
 
     with HttpClient(config, delay=args.delay) as client:
@@ -62,6 +78,7 @@ def cmd_discover(config: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_fetch(config: Config, args: argparse.Namespace) -> int:
+    """Descarga el HTML crudo de la lista de URLs y llena Bronze."""
     from .fetch import fetch_all
 
     urls = _urls_from_file(config)
@@ -76,7 +93,6 @@ def cmd_fetch(config: Config, args: argparse.Namespace) -> int:
         urls,
         force=args.force,
         delay=args.delay,
-        browser=args.browser,
     )
     print(
         f"Bronze: {stats.ok} nuevas, {stats.cached} en cache, "
@@ -91,6 +107,7 @@ def cmd_fetch(config: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_extract(config: Config, args: argparse.Namespace) -> int:
+    """Limpia el HTML de Bronze y genera Markdown en Silver (sin red)."""
     from .extract import extract_all
 
     rows = extract_all(config)
@@ -102,6 +119,7 @@ def cmd_extract(config: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_gold(config: Config, args: argparse.Namespace) -> int:
+    """Convierte Silver en Gold: Markdown con frontmatter y ``corpus.jsonl``."""
     from .gold import build_gold
 
     rows = build_gold(config, force=args.force)
@@ -113,6 +131,7 @@ def cmd_gold(config: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_stats(config: Config, args: argparse.Namespace) -> int:
+    """Imprime el resumen del corpus y, con ``--write``, reescribe el indice."""
     from .stats import build_index, print_summary
 
     print_summary(config)
@@ -122,6 +141,7 @@ def cmd_stats(config: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_chunks(config: Config, args: argparse.Namespace) -> int:
+    """Segmenta Gold en chunks por encabezado para la capa Knowledge."""
     from .knowledge import build_chunks
 
     rows = build_chunks(config)
@@ -133,6 +153,7 @@ def cmd_chunks(config: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_knowledge(config: Config, args: argparse.Namespace) -> int:
+    """Valida la capa Knowledge y fusiona un borrador cuando se pide."""
     from .knowledge import (
         build_knowledge_index,
         load_knowledge,
@@ -186,6 +207,7 @@ def cmd_knowledge(config: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_docs(config: Config, args: argparse.Namespace) -> int:
+    """Inventaria, descarga y extrae los PDF a Gold."""
     from .documents import discover_documents, extract_documents, fetch_documents
 
     if args.docs_action in {"discover", "all"}:
@@ -220,6 +242,7 @@ def cmd_docs(config: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_videos(config: Config, args: argparse.Namespace) -> int:
+    """Inventaria videos, descarga subtitulos y los transcribe a Gold."""
     from .videos import discover_videos, extract_videos, fetch_videos
 
     if args.videos_action in {"discover", "all"}:
@@ -284,6 +307,7 @@ def cmd_noticias(config: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_status(config: Config, args: argparse.Namespace) -> int:
+    """Cuenta archivos por capa (URLs, Bronze, Silver, Gold, PDF y videos)."""
     from .gold import load_corpus
 
     urls = _urls_from_file(config)
@@ -303,6 +327,7 @@ def cmd_status(config: Config, args: argparse.Namespace) -> int:
 
 
 def cmd_all(config: Config, args: argparse.Namespace) -> int:
+    """Encadena discover, fetch, extract, gold y stats en una sola corrida."""
     for step, func in (
         ("discover", cmd_discover),
         ("fetch", cmd_fetch),
@@ -324,7 +349,7 @@ def cmd_doctor(config: Config, args: argparse.Namespace) -> int:
     print(f"UA               : {config.site.user_agent}")
 
     ok = True
-    with HttpClient(config, delay=0.0) as client:
+    with HttpClient(config) as client:
         try:
             response = client.get(config.site.base_url + "/robots.txt")
         except BlockedError as exc:
@@ -339,6 +364,9 @@ def cmd_doctor(config: Config, args: argparse.Namespace) -> int:
                 print("  2. WAF de CloudFront filtrando datacenter/bot.")
                 print("Solucion: desconecta la VPN o usa una red residencial colombiana.")
                 ok = False
+            elif not response.ok:
+                print(f"El sitio no responde sano (HTTP {response.status}).")
+                ok = False
 
     print(f"URLs en cola     : {len(_urls_from_file(config))}")
     print(f"Capturas Bronze  : {len(list(config.paths.raw_html.glob('*.html')))}")
@@ -346,10 +374,12 @@ def cmd_doctor(config: Config, args: argparse.Namespace) -> int:
     print("Diagnostico      : " + ("LISTO para capturar" if ok else "BLOQUEADO, revisa la red"))
     if not ok:
         print("Siguiente paso   : desconecta la VPN y repite 'make doctor'")
+        return 2
     return 0
 
 
 def cmd_clean(config: Config, args: argparse.Namespace) -> int:
+    """Borra Silver y Gold; con ``--hard`` borra tambien Bronze (manual)."""
     targets = [config.paths.processed, config.paths.gold]
     if args.hard:
         targets.append(config.paths.raw)
@@ -366,6 +396,7 @@ def cmd_clean(config: Config, args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Construye el parser de argumentos del CLI ``corpus``."""
     parser = argparse.ArgumentParser(
         prog="corpus",
         description="Corpus web de Banco de Occidente (Bronze -> Silver -> Gold).",
@@ -373,22 +404,32 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--version", action="version", version=f"%(prog)s {__version__}")
     parser.add_argument("--config", default=None, help="ruta alternativa a site.toml")
     parser.add_argument("-v", "--verbose", action="store_true")
-    parser.add_argument("--delay", type=float, default=None, help="segundos entre peticiones")
-    parser.add_argument("--limit", type=int, default=None, help="maximo de URLs a procesar")
-    parser.add_argument("--force", action="store_true", help="ignora la cache y regenera")
-    parser.add_argument("--browser", action="store_true", help="usa Chromium (Playwright)")
+
+    # Opciones de captura: viven en cada subcomando (``corpus fetch --delay 2``),
+    # no en la raiz, porque argparse no acepta opciones globales tras el verbo.
+    common = argparse.ArgumentParser(add_help=False)
+    common.add_argument(
+        "--delay",
+        type=_delay_seconds,
+        default=None,
+        help=f"segundos entre peticiones (minimo {MIN_DELAY_SECONDS})",
+    )
+    common.add_argument("--limit", type=int, default=None, help="maximo de URLs a procesar")
+    common.add_argument("--force", action="store_true", help="ignora la cache y regenera")
 
     sub = parser.add_subparsers(dest="command", required=True)
 
-    sub.add_parser("discover", help="lee robots.txt y sitemap.xml")
-    sub.add_parser("fetch", help="descarga el HTML crudo (Bronze)")
+    sub.add_parser("discover", help="lee robots.txt y sitemap.xml", parents=[common])
+    sub.add_parser("fetch", help="descarga el HTML crudo (Bronze)", parents=[common])
     sub.add_parser("extract", help="limpia el HTML y genera Markdown (Silver)")
-    sub.add_parser("gold", help="anade metadatos y consolida corpus.jsonl (Gold)")
+    sub.add_parser("gold", help="anade metadatos y consolida corpus.jsonl (Gold)", parents=[common])
     sub.add_parser("chunks", help="segmenta Gold en chunks por encabezado")
     knowledge = sub.add_parser("knowledge", help="valida entidades, hechos y relaciones")
     knowledge.add_argument("--file", default=None, help="valida un JSONL candidato")
     knowledge.add_argument("--merge", default=None, help="valida y fusiona un JSONL candidato")
-    docs = sub.add_parser("docs", help="documentos PDF: discover | fetch | extract | all")
+    docs = sub.add_parser(
+        "docs", help="documentos PDF: discover | fetch | extract | all", parents=[common]
+    )
     docs.add_argument("docs_action", choices=["discover", "fetch", "extract", "all"])
     docs.add_argument("--max-mb", type=float, default=400, help="tope de descarga en MB")
     docs.add_argument("--priority-max", type=int, default=2, help="prioridad maxima (1-3)")
@@ -396,7 +437,9 @@ def build_parser() -> argparse.ArgumentParser:
     docs.add_argument(
         "--tipo", dest="doc_types", default=None, help="filtrar: financiero,gobierno,producto,legal"
     )
-    videos = sub.add_parser("videos", help="videos de YouTube: discover | fetch | extract | all")
+    videos = sub.add_parser(
+        "videos", help="videos de YouTube: discover | fetch | extract | all", parents=[common]
+    )
     videos.add_argument("videos_action", choices=["discover", "fetch", "extract", "all"])
     videos.add_argument("--channel-limit", type=int, default=30, help="videos del canal a listar")
     noticias = sub.add_parser("noticias", help="hechos oficiales y prensa curada a Gold")
@@ -412,7 +455,7 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="refresca Bronze y regenera las fichas",
     )
-    sub.add_parser("all", help="discover + fetch + extract + gold + stats")
+    sub.add_parser("all", help="discover + fetch + extract + gold + stats", parents=[common])
     sub.add_parser("status", help="cuenta documentos por capa")
     sub.add_parser("doctor", help="diagnostica red y estado del pipeline")
 
@@ -426,6 +469,7 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Punto de entrada: despacha el subcomando y devuelve el codigo de salida."""
     parser = build_parser()
     args = parser.parse_args(argv)
     _setup_logging(args.verbose)

@@ -60,11 +60,6 @@ add: ## Anade una dependencia (make add PKG=httpx)
 add-dev: ## Anade una dependencia de desarrollo (make add-dev PKG=pytest)
 	$(UV) add --dev $(PKG)
 
-.PHONY: browser
-browser: ## Instala Chromium para paginas con JavaScript
-	$(UV) sync --extra browser
-	$(UV) run playwright install chromium
-
 # ---------------------------------------------------------------------------
 #  Pipeline
 # ---------------------------------------------------------------------------

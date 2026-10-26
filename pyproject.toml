@@ -28,8 +28,6 @@ dependencies = [
 [project.optional-dependencies]
 # Conteo exacto de tokens (si no esta instalado se usa un estimador)
 tokens = ["tiktoken>=0.8.0"]
-# Fallback para paginas renderizadas con JavaScript
-browser = ["playwright>=1.48.0"]
 media = [
     "yt-dlp>=2026.10.21",
 ]
