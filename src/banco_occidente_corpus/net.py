@@ -12,6 +12,10 @@ from .config import Config
 
 RETRY_STATUS = {408, 425, 429, 500, 502, 503, 504}
 
+#: Minimo de cortesia entre peticiones. robots.txt del banco no declara
+#: Crawl-delay: el valor es una decision del proyecto y no se puede bajar.
+MIN_DELAY_SECONDS = 1.5
+
 
 class BlockedError(RuntimeError):
     """El sitio rechaza la peticion (403/429) de forma persistente."""
@@ -29,6 +33,7 @@ class Response:
 
     @property
     def ok(self) -> bool:
+        """True si la respuesta trae contenido util (2xx y sin error)."""
         return 200 <= self.status < 300 and self.error is None
 
 
@@ -36,8 +41,12 @@ class HttpClient:
     """Envoltorio de httpx que aplica UA, timeout, reintentos y pausas."""
 
     def __init__(self, config: Config, *, delay: float | None = None) -> None:
+        """Crea el cliente aplicando UA, `From`, timeout y el minimo de cortesia."""
         self.config = config
-        self.delay = config.crawl.delay_seconds if delay is None else delay
+        requested = config.crawl.delay_seconds if delay is None else delay
+        # El minimo se impone aqui, en el unico punto por el que pasa toda
+        # peticion HTTP: ni el CLI ni una config relajada pueden bajarlo.
+        self.delay = max(MIN_DELAY_SECONDS, float(requested))
         self._requests = 0
         self._last_request = 0.0
         self.client = httpx.Client(
@@ -123,7 +132,8 @@ class HttpClient:
             f"{url} respondio {last_error} tras {attempts} intentos. "
             "Si es 403 persistente, el sitio esta bloqueando la red actual "
             "(VPN, datacenter o WAF de CloudFront): prueba desde una conexion "
-            "residencial colombiana o usa --browser."
+            "residencial colombiana. El proyecto no usa navegadores para "
+            "sortear el WAF."
         )
 
     def get_optional(self, url: str) -> Response | None:
@@ -135,55 +145,12 @@ class HttpClient:
 
 
 def build_client(config: Config, *, delay: float | None = None) -> HttpClient:
+    """Crea un ``HttpClient`` para el pipeline (atajo de ``HttpClient(config)``)."""
     return HttpClient(config, delay=delay)
 
 
-def fetch_with_browser(url: str, config: Config) -> Response:
-    """Fallback con Chromium real para paginas que exigen JavaScript."""
-    try:
-        from playwright.sync_api import sync_playwright
-    except ImportError as exc:  # pragma: no cover - extra opcional
-        raise RuntimeError(
-            "Playwright no esta instalado. Ejecuta: uv sync --extra browser && "
-            "uv run playwright install chromium"
-        ) from exc
-
-    started = time.monotonic()
-    with sync_playwright() as p:  # pragma: no cover - requiere navegador
-        browser = p.chromium.launch(headless=True)
-        context = browser.new_context(
-            locale="es-CO",
-            user_agent=config.site.user_agent,
-            viewport={"width": 1366, "height": 900},
-        )
-        page = context.new_page()
-        try:
-            response = page.goto(url, wait_until="networkidle", timeout=45_000)
-            status = response.status if response else 0
-            html = page.content()
-            return Response(
-                url=page.url,
-                status=status,
-                text=html,
-                content_type="text/html",
-                elapsed=time.monotonic() - started,
-                error=None if status < 400 else f"HTTP {status}",
-            )
-        except Exception as exc:  # noqa: BLE001 - se reporta al llamador
-            return Response(
-                url=url,
-                status=0,
-                text="",
-                content_type="",
-                elapsed=time.monotonic() - started,
-                error=f"{type(exc).__name__}: {exc}",
-            )
-        finally:
-            context.close()
-            browser.close()
-
-
 def describe_status(status: int) -> str:
+    """Traduce un codigo HTTP a una etiqueta legible para los reportes."""
     return {
         200: "ok",
         301: "redirigido",

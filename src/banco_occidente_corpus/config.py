@@ -153,6 +153,7 @@ class Paths:
         return self.gold / "_NOTICIAS.md"
 
     def ensure(self) -> None:
+        """Crea los directorios de trabajo de las capas si no existen."""
         for path in (
             self.raw_html,
             self.raw_documents,
@@ -169,6 +170,8 @@ class Paths:
 
 @dataclass(slots=True)
 class SiteConfig:
+    """Identidad del sitio y contacto academico para el header `From`."""
+
     name: str = "Banco de Occidente"
     slug: str = "banco-occidente"
     base_url: str = "https://www.bancodeoccidente.com.co"
@@ -182,6 +185,8 @@ class SiteConfig:
 
 @dataclass(slots=True)
 class CrawlConfig:
+    """Ritmo, timeouts y topes de la captura."""
+
     delay_seconds: float = 1.5
     timeout_seconds: float = 30.0
     max_retries: int = 3
@@ -195,6 +200,8 @@ class CrawlConfig:
 
 @dataclass(slots=True)
 class DiscoveryConfig:
+    """Extensiones aceptadas y patrones de exclusion del descubrimiento."""
+
     html_extensions: list[str] = field(default_factory=lambda: ["", ".html"])
     document_extensions: list[str] = field(default_factory=list)
     exclude_patterns: list[str] = field(default_factory=list)
@@ -202,6 +209,8 @@ class DiscoveryConfig:
 
 @dataclass(slots=True)
 class GoldConfig:
+    """Secciones del checklist y umbrales para detectar boilerplate."""
+
     sections: list[str] = field(default_factory=list)
     boilerplate_min_docs: int = 5
     boilerplate_ratio: float = 0.35
@@ -222,6 +231,8 @@ class NewsConfig:
 
 @dataclass(slots=True)
 class Config:
+    """Configuracion completa del pipeline (sitio, crawl, Gold y rutas)."""
+
     site: SiteConfig = field(default_factory=SiteConfig)
     crawl: CrawlConfig = field(default_factory=CrawlConfig)
     discovery: DiscoveryConfig = field(default_factory=DiscoveryConfig)

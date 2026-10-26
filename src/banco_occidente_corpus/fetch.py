@@ -9,7 +9,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 from .config import Config
-from .net import BlockedError, HttpClient, fetch_with_browser
+from .net import BlockedError, HttpClient
 from .utils import human_size, read_jsonl, sha256_text, utc_now
 
 log = logging.getLogger(__name__)
@@ -17,6 +17,8 @@ log = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class FetchStats:
+    """Contadores de una corrida de captura (Bronze)."""
+
     ok: int = 0
     cached: int = 0
     failed: int = 0
@@ -58,7 +60,6 @@ def fetch_all(
     *,
     force: bool = False,
     delay: float | None = None,
-    browser: bool = False,
 ) -> FetchStats:
     """Recorre las URLs y llena data/raw. Reanudable: no repite lo ya bajado.
 
@@ -70,9 +71,7 @@ def fetch_all(
     cached = load_capture(config)
     config.paths.capture_file.parent.mkdir(parents=True, exist_ok=True)
 
-    client: HttpClient | None = None
-    if not browser:
-        client = HttpClient(config, delay=delay)
+    client = HttpClient(config, delay=delay)
 
     try:
         with config.paths.capture_file.open("a", encoding="utf-8", newline="\n") as log_file:
@@ -88,11 +87,7 @@ def fetch_all(
                     continue
 
                 try:
-                    if browser:
-                        response = fetch_with_browser(url, config)
-                    else:
-                        assert client is not None
-                        response = client.get(url)
+                    response = client.get(url)
                 except BlockedError as exc:
                     log.error("%s", exc)
                     stats.failed += 1
@@ -139,8 +134,7 @@ def fetch_all(
                     response.elapsed,
                 )
     finally:
-        if client is not None:
-            client.close()
+        client.close()
 
     return stats
 
