@@ -13,6 +13,9 @@ from typing import Any
 
 _SLUG_STRIP = re.compile(r"[^a-z0-9]+")
 
+#: Relacion caracteres/token del estimador estable (texto en espanol).
+CHARS_PER_TOKEN = 4
+
 
 def utc_now() -> str:
     """Fecha ISO-8601 en UTC, sin microsegundos."""
@@ -89,6 +92,17 @@ def estimate_tokens(text: str) -> int:
         return len(encoding.encode(text, disallowed_special=()))
     except Exception:
         return max(1, round(len(text) / 4))
+
+
+def stable_tokens(text: str) -> int:
+    """Estimador determinista (chars/4): sin red, sin dependencias, igual en todo clon.
+
+    Es el unico contador que decide el presupuesto de la capa Contexto: no intenta
+    usar tiktoken, de modo que el resultado no depende del entorno ni de la red.
+    """
+    if not text:
+        return 0
+    return max(1, round(len(text) / CHARS_PER_TOKEN))
 
 
 def count_words(text: str) -> int:
