@@ -14,6 +14,8 @@ from collections.abc import Iterable, Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from .config import Config
+
 _WS = re.compile(r"\s+")
 _MD_NOISE = re.compile(r"^[\s|>*#\-_=~`]{3,}$")
 _LINK_ONLY = re.compile(r"^\[[^\]]*\]\([^)]*\)$")
@@ -337,3 +339,99 @@ def analyze_gold_repetitions(
         top_blocks=tuple(blocks[:top]),
         unique_ratio=compute_unique_ratio_metrics(pages),
     )
+
+
+def _escape_cell(text: str, *, limit: int = 160) -> str:
+    """Escapa barras verticales y recorta el texto para que quepa en una celda Markdown."""
+    collapsed = " ".join(text.split())
+    escaped = collapsed.replace("|", "\\|")
+    if len(escaped) <= limit:
+        return escaped
+    return escaped[: limit - 3].rstrip() + "..."
+
+
+def _format_block(block: RepeatedBlock) -> str:
+    """Une las líneas de un bloque en una sola celda legible."""
+    return _escape_cell(" / ".join(block.text))
+
+
+def render_repetitions_report(report: RepetitionReport) -> str:
+    """Renderiza el reporte Markdown de repeticiones de forma determinista y sin fecha."""
+    lines: list[str] = [
+        "# Repeticiones en Gold",
+        "",
+        "Diagnóstico de solo lectura sobre las páginas web de Gold. No modifica "
+        "páginas, índices ni `corpus.jsonl`.",
+        "",
+        f"**Páginas analizadas:** {report.pages_analyzed}  ",
+        f"**Líneas de contenido:** {report.content_lines}  ",
+        "",
+        "## Cobertura por umbral",
+        "",
+        "Porcentaje de líneas de contenido que pertenecen a algún bloque presente "
+        "en al menos el umbral de páginas indicado.",
+        "",
+        "| Umbral (páginas) | Líneas cubiertas | Total | Porcentaje |",
+        "|---:|---:|---:|---:|",
+    ]
+    for row in report.thresholds:
+        lines.append(
+            f"| {row.threshold} | {row.covered_lines} | {row.total_lines} "
+            f"| {row.percentage:.1f} % |"
+        )
+    lines.extend(
+        [
+            "",
+            "## Top 20 de bloques",
+            "",
+            "Bloques de 1 a 3 líneas consecutivas ordenados por páginas, tamaño y "
+            "texto. Cada página cuenta una sola vez por bloque.",
+            "",
+            "| # | Tamaño | Páginas | Bloque | Ejemplos |",
+            "|---:|---:|---:|---|---|",
+        ]
+    )
+    if report.top_blocks:
+        for index, block in enumerate(report.top_blocks, start=1):
+            examples = _escape_cell(", ".join(block.examples))
+            lines.append(
+                f"| {index} | {block.size} | {block.pages} | {_format_block(block)} "
+                f"| {examples} |"
+            )
+    else:
+        lines.append("| - | - | 0 | Sin bloques repetidos | - |")
+
+    unique = report.unique_ratio
+    lines.extend(
+        [
+            "",
+            "## Contenido único (`unique_ratio`)",
+            "",
+            "Métrica existente que compara líneas normalizadas por página; es sensible "
+            "a mayúsculas y tildes y no equivale al porcentaje de texto repetido.",
+            "",
+            f"- **Global:** {unique.global_ratio * 100:.1f} %",
+            f"- **Promedio por página:** {unique.average * 100:.1f} %",
+            "",
+            "### Páginas con menor proporción de contenido único",
+            "",
+            "| Página | Contenido único |",
+            "|---|---:|",
+        ]
+    )
+    if unique.lowest:
+        for item in unique.lowest:
+            lines.append(f"| {_escape_cell(item.page_id)} | {item.ratio * 100:.1f} % |")
+    else:
+        lines.append("| - | - |")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def write_repetitions_report(config: Config) -> Path:
+    """Analiza Gold y escribe solo ``data/gold/_REPETIDOS.md`` en UTF-8 con saltos ``\\n``."""
+    report = analyze_gold_repetitions(config.paths.gold_markdown)
+    target = config.paths.repetitions_file
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_text(render_repetitions_report(report), encoding="utf-8", newline="\n")
+    return target

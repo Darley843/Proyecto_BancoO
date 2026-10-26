@@ -133,6 +133,11 @@ class Paths:
         return self.gold / "_INDICE.md"
 
     @property
+    def repetitions_file(self) -> Path:
+        """Ruta del reporte de repeticiones dentro de Gold."""
+        return self.gold / "_REPETIDOS.md"
+
+    @property
     def news_source(self) -> Path:
         """Directorio versionado con la curaduria de noticias."""
         return _env_path("CORPUS_NEWS_DIR", self.root / "data/noticias")
