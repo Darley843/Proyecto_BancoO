@@ -61,7 +61,7 @@ uv run python .opencode/skills/corpus-extraction/scripts/healthcheck.py
 |---|---|---|
 | `doctor` da 403 | UA de bot o VPN | Revisar `config/site.toml`; usar red colombiana |
 | Muchos 404 en `fetch` | Rutas `/w/` sin normalizar | Verificar `discover.normalize_url()` |
-| Silver con texto vacío | Página que exige JavaScript | `make browser` y `fetch --browser` |
+| Silver con texto vacío | Página que exige JavaScript | Documentar la limitación; el proyecto no usa navegador para sortear el WAF |
 | Gold con duplicados | Redirecciones al mismo contenido | Es esperado: se descartan por hash |
 | `_INDICE.md` con 0 % | Gold vacío o rutas rotas | `make status` y revisar `data/gold/corpus.jsonl` |
 

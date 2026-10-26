@@ -284,13 +284,8 @@ Diagnóstico: `make doctor`. Solución:
 - No cambies el UA a uno de bot: el proyecto ya usa un UA de navegador y envía
   la identificación académica en el header `From` (configurable en
   `config/site.toml`).
-
-Si el HTML carga pero el texto sale vacío, la página necesita JavaScript:
-
-```bash
-make browser
-uv run corpus fetch --browser --limit 20
-```
+- El proyecto **no** usa un navegador headless para sortear el WAF: si el sitio
+  responde `403`, se detiene y se documenta la limitación.
 
 ### `make` no existe en Windows
 
@@ -302,11 +297,10 @@ choco install make
 
 En PowerShell también puedes usar `uv run corpus <comando>` sin `make`.
 
-### Playwright no encuentra Chromium
+### Ya no se usa Playwright
 
-```bash
-uv run playwright install chromium
-```
+El pipeline descarga solo con `httpx` (`net.py`). Si un `.venv` viejo conserva
+el extra `browser`, se corrige con `uv sync --all-extras`.
 
 ---
 

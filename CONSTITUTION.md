@@ -88,7 +88,6 @@ descarga masiva de PDF, transcripción de vídeo.
 | **Extracción semántica** | `trafilatura` (HTML → Markdown) |
 | **Frontmatter** | `PyYAML` |
 | **Tokens** | `tiktoken` (extra `tokens`; si falta, estimador) |
-| **Navegador (fallback JS)** | `playwright` (extra `browser`) |
 | **Herramienta del agente** | `scrapling` (grupo `mcp`) — navegación ad hoc vía MCP, **fuera del pipeline** |
 | **Testing** | `pytest` (patrón AAA) |
 | **Lint / formato** | `ruff` (línea 100, comillas dobles) |
@@ -420,6 +419,10 @@ Decisión:
   decisión propia, no una directiva del sitio.
 - `robots.txt` se parsea y sus `Disallow` se excluyen por código.
 - El HTML crudo se conserva para no repetir peticiones.
+- **No hay fallback con navegador.** Ante un `403` persistente el pipeline se
+  detiene con código 2: usar Chromium para saltar el WAF sería evasión y la
+  regla del curso lo prohíbe. Se documentó la limitación y se eliminó el extra
+  `browser` (Playwright).
 
 Esto no es evasión: es la única forma de acceder a contenido público que el
 propio `robots.txt` permite, manteniendo identificación y cortesía.
@@ -449,6 +452,7 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 | 2026-10-25 | Limitación conocida: `urllib.robotparser` no interpreta comodines (`/*!ut/p*`) del `robots.txt` del banco | `RobotFileParser` solo compara prefijos literales; se verificó que ninguna URL de `corpus.jsonl`, `documents.jsonl` ni `videos.jsonl` coincide con las rutas prohibidas |
 | 2026-10-25 | `/ayuda/agendar-cita-asesor` fuera de Gold: es un formulario | `AGENTS.md` prohíbe capturar formularios; el filtro de `exclude_patterns` se aplica también al construir Gold para que una página ya capturada no vuelva al entregable |
 | 2026-10-25 | Los 1,5 s entre peticiones son decisión del proyecto, no un `Crawl-delay` del sitio | `robots.txt` del banco no declara `Crawl-delay`; la documentación lo aclara para no atribuirle al sitio una directiva que no existe |
+| 2026-10-25 | Se elimina el fallback con Playwright (`--browser`) y el mínimo de 1,5 s se impone en `net.py` | Un navegador headless eludiría el WAF (evasión prohibida); el ritmo no puede bajarse desde el CLI ni desde una config relajada |
 
 ## 12. Configuración local (no trackear)
 
