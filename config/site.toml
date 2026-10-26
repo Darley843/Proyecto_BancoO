@@ -11,12 +11,13 @@ language = "es"
 # bot, aunque robots.txt permita el contenido. Se usa un UA de navegador real y
 # la identificacion academica viaja en el header estandar `From` (RFC 9110),
 # que el pipeline envia en cada peticion. Sigue siendo un crawler identificado,
-# con Crawl-delay y respeto estricto de robots.txt.
+# con pausa de cortesia entre peticiones y respeto estricto de robots.txt.
 user_agent = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/141.0.0.0 Safari/537.36"
 contact = "darley.idarraga@uao.edu.co"
 
 [crawl]
 # Cortesia con el servidor: 1.5 s entre peticiones (los slides sugieren 1-2 s).
+# robots.txt del banco no declara Crawl-delay: el valor es decision del proyecto.
 delay_seconds = 1.5
 timeout_seconds = 30
 max_retries = 3
@@ -52,6 +53,9 @@ exclude_patterns = [
     "/servlet",
     "/documents/",
     "/image/",
+    # Formulario de contacto, no contenido: AGENTS.md prohibe capturar
+    # formularios. Se descubrio ya en Bronze, por eso tambien se filtra en Gold.
+    "/ayuda/agendar-cita-asesor",
 ]
 
 [gold]

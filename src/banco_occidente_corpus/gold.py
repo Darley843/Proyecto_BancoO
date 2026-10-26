@@ -16,6 +16,7 @@ from .section import classify, extract_keywords
 from .utils import (
     count_words,
     estimate_tokens,
+    is_excluded_url,
     page_slug,
     read_jsonl,
     sha256_text,
@@ -89,6 +90,10 @@ def build_gold(config: Config, *, force: bool = False) -> list[dict]:
         if not text:
             continue
 
+        if is_excluded_url(row["url"], config.discovery.exclude_patterns):
+            log.info("Gold excluye por configuracion: %s", row["url"])
+            continue
+
         text_hash = sha256_text(text)
         if text_hash in seen_hashes:
             duplicates += 1
@@ -128,6 +133,7 @@ def build_gold(config: Config, *, force: bool = False) -> list[dict]:
 
 
 def load_corpus(config: Config) -> list[dict]:
+    """Lee el consolidado ``corpus.jsonl`` (una fila por documento Gold)."""
     return list(read_jsonl(config.paths.corpus_file))
 
 
@@ -146,4 +152,5 @@ def corpus_stats(corpus: list[dict]) -> dict:
 
 
 def gold_files(config: Config) -> list[Path]:
+    """Lista ordenada de las paginas Markdown de Gold."""
     return sorted(config.paths.gold_markdown.glob("*.md"))

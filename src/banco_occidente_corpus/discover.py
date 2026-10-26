@@ -10,7 +10,7 @@ from urllib.robotparser import RobotFileParser
 
 from .config import Config
 from .net import HttpClient
-from .utils import utc_now, write_jsonl
+from .utils import is_excluded_url, utc_now, write_jsonl
 
 
 @dataclass(slots=True)
@@ -97,6 +97,7 @@ def _suffix(url: str) -> str:
 
 
 def is_document(url: str, config: Config) -> bool:
+    """True si la URL apunta a un documento descargable (PDF, Office, etc.)."""
     return _suffix(url) in {ext.lower() for ext in config.discovery.document_extensions}
 
 
@@ -112,8 +113,7 @@ def is_capture_target(url: str, config: Config) -> bool:
     suffix = _suffix(url)
     if suffix and suffix not in {ext.lower() for ext in config.discovery.html_extensions}:
         return False
-    lowered = url.lower()
-    return not any(pattern.lower() in lowered for pattern in config.discovery.exclude_patterns)
+    return not is_excluded_url(url, config.discovery.exclude_patterns)
 
 
 def discover(config: Config, client: HttpClient, *, save: bool = True) -> DiscoveryResult:

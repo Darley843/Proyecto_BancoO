@@ -20,10 +20,12 @@ def utc_now() -> str:
 
 
 def sha256_text(text: str) -> str:
+    """Hash SHA-256 del texto en UTF-8, usado como huella estable de contenido."""
     return hashlib.sha256(text.encode("utf-8", errors="replace")).hexdigest()
 
 
 def short_hash(text: str, length: int = 8) -> str:
+    """Prefijo del SHA-256, para identificadores cortos y estables."""
     return sha256_text(text)[:length]
 
 
@@ -65,6 +67,7 @@ def write_jsonl(path: Path, rows: Iterable[dict[str, Any]], *, overwrite: bool =
 
 
 def append_jsonl(path: Path, row: dict[str, Any]) -> None:
+    """Anexa un registro a un JSONL creando el directorio si hace falta."""
     path.parent.mkdir(parents=True, exist_ok=True)
     with path.open("a", encoding="utf-8", newline="\n") as fh:
         fh.write(json.dumps(row, ensure_ascii=False) + "\n")
@@ -89,16 +92,24 @@ def estimate_tokens(text: str) -> int:
 
 
 def count_words(text: str) -> int:
+    """Cuenta palabras (secuencias de letras o digitos) sin depender del idioma."""
     return len(re.findall(r"\b\w+\b", text, flags=re.UNICODE))
 
 
 def human_size(num_bytes: int) -> str:
+    """Formatea bytes en B/KB/MB/GB con un decimal, para los logs."""
     value = float(num_bytes)
     for unit in ("B", "KB", "MB", "GB"):
         if value < 1024 or unit == "GB":
             return f"{value:.1f} {unit}"
         value /= 1024
     return f"{value:.1f} GB"
+
+
+def is_excluded_url(url: str, patterns: Iterable[str]) -> bool:
+    """Indica si la URL contiene alguno de los patrones de exclusion del sitio."""
+    lowered = url.lower()
+    return any(pattern.lower() in lowered for pattern in patterns)
 
 
 def page_slug(url: str, title: str = "") -> str:

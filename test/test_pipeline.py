@@ -250,6 +250,32 @@ def test_gold_descarta_duplicados(tmp_path: Path):
     assert len(corpus) == 1
 
 
+def test_gold_descarta_urls_excluidas(tmp_path: Path):
+    config = make_config(tmp_path)
+    config.discovery.exclude_patterns = ["/ayuda/agendar-cita-asesor"]
+    config.paths.silver_markdown.mkdir(parents=True, exist_ok=True)
+    rows = [
+        {
+            "url": "https://x.co/ayuda/agendar-cita-asesor",
+            "titulo": "Agenda tu cita",
+            "texto": "Formulario para dejar los datos y que un asesor te contacte. " * 3,
+        },
+        {
+            "url": "https://x.co/cuentas",
+            "titulo": "Cuentas",
+            "texto": "Informacion publica de las cuentas de ahorro del banco. " * 3,
+        },
+    ]
+    (config.paths.processed / "silver.jsonl").write_text(
+        "\n".join(json.dumps(r, ensure_ascii=False) for r in rows) + "\n", encoding="utf-8"
+    )
+
+    corpus = build_gold(config)
+
+    assert [row["fuente"] for row in corpus] == ["https://x.co/cuentas"]
+    assert not (config.paths.gold_markdown / "agenda-tu-cita.md").exists()
+
+
 # ---------------------------------------------------------------- checklist
 
 

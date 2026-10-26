@@ -2,11 +2,11 @@
 
 **Empresa:** Banco de Occidente  
 **Fuente:** https://www.bancodeoccidente.com.co  
-**Documentos Gold:** 244  
-**Tokens totales:** 196,623 (promedio 805.8)  
+**Documentos Gold:** 243  
+**Tokens totales:** 196,564 (promedio 808.9)  
 **Documentos PDF:** 190 (10,954,933 tokens)  
 **Videos transcritos:** 32 (119,845 tokens)  
-**Tokens del corpus completo:** 11,271,401  
+**Tokens del corpus completo:** 11,271,342  
 **Cobertura del checklist:** 24/24 (100%) - heuristica
 
 ## Documentos por seccion
@@ -17,7 +17,7 @@
 | Presencia digital / noticias (`presencia`) | 60 |
 | Otros (`otros`) | 41 |
 | Identidad corporativa (`identidad`) | 13 |
-| Atencion al cliente (`atencion`) | 12 |
+| Atencion al cliente (`atencion`) | 11 |
 | Legal y terminos (`legal`) | 7 |
 | Datos duros e informes (`datos`) | 5 |
 
