@@ -156,7 +156,7 @@ El host `www.` devuelve `403` en algunos adjuntos; el pipeline reintenta en
 | URLs no capturadas | 3 (`404` reales) |
 | Peso del HTML crudo | 102.3 MB |
 | Páginas con texto útil (Silver) | 193 |
-| Documentos Gold (únicos) | 184 (9 duplicados descartados) |
+| Documentos Gold (únicos) | 183 (10 duplicados descartados) |
 | Tokens de páginas | 151.972 |
 | Documentos PDF | 190 (138 financieros) |
 | Tokens de PDFs | 10.954.933 |

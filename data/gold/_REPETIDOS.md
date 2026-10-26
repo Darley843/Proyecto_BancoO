@@ -2,8 +2,8 @@
 
 Diagnóstico de solo lectura sobre las páginas web de Gold. No modifica páginas, índices ni `corpus.jsonl`.
 
-**Páginas analizadas:** 184  
-**Líneas de contenido:** 7802  
+**Páginas analizadas:** 183  
+**Líneas de contenido:** 8131  
 
 ## Cobertura por umbral
 
@@ -11,9 +11,9 @@ Porcentaje de líneas de contenido que pertenecen a algún bloque presente en al
 
 | Umbral (páginas) | Líneas cubiertas | Total | Porcentaje |
 |---:|---:|---:|---:|
-| 5 | 1819 | 7802 | 23.3 % |
-| 10 | 1366 | 7802 | 17.5 % |
-| 20 | 800 | 7802 | 10.3 % |
+| 5 | 1815 | 8131 | 22.3 % |
+| 10 | 1362 | 8131 | 16.8 % |
+| 20 | 739 | 8131 | 9.1 % |
 
 ## Top 20 de bloques
 
@@ -46,8 +46,8 @@ Bloques de 1 a 3 líneas consecutivas ordenados por páginas, tamaño y texto. C
 
 Métrica existente que compara líneas normalizadas por página; es sensible a mayúsculas y tildes y no equivale al porcentaje de texto repetido.
 
-- **Global:** 52.4 %
-- **Promedio por página:** 92.8 %
+- **Global:** 54.1 %
+- **Promedio por página:** 92.9 %
 
 ### Páginas con menor proporción de contenido único
 
@@ -59,7 +59,7 @@ Métrica existente que compara líneas normalizadas por página; es sensible a m
 | asistencias-tarjetas-de-credito-banco-de-occidente-43cf51 | 46.9 % |
 | asistencias-tarjetas-de-credito-banco-de-occidente-ce551a | 49.0 % |
 | cuenta-activa-e61f74 | 50.0 % |
-| licitacion-companias-aseguradoras-banco-de-occidente-80320d | 50.0 % |
+| licitacion-companias-aseguradoras-banco-de-occidente-80320d | 52.2 % |
 | cuenta-de-ahorros-digital-banco-de-occidente-524d0d | 54.5 % |
 | de-tu-lado-da7b6a | 54.5 % |
 | cesion-de-derechos-en-leasing-habitacional-banco-de-occident-9e6a3f | 56.2 % |

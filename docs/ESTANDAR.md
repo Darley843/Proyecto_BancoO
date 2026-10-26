@@ -12,9 +12,9 @@ que el entregable sea verificable.
 | 🥇 **Gold** | «Markdown con metadatos. Es el insumo directo del Módulo 2.» | `data/gold/pages/*.md` + `corpus.jsonl` + `_INDICE.md`. `gold.py` y `stats.py`. |
 
 **Reprocesabilidad real del checkout actual:** Bronze conserva **1 HTML**,
-Silver está **vacío** y Gold tiene **184 páginas web** del sitio (más 40 fichas
-`hecho-*` y 20 `noticia-*`, para 244 archivos en `pages/`). Por tanto, hoy
-`make clean && make extract && make gold` **no** puede regenerar las 184 páginas
+Silver está **vacío** y Gold tiene **183 páginas web** del sitio (más 40 fichas
+`hecho-*` y 20 `noticia-*`, para 243 archivos en `pages/`). Por tanto, hoy
+`make clean && make extract && make gold` **no** puede regenerar las 183 páginas
 del sitio: el Gold versionado es la única fuente disponible para medirlas. Para
 volver a generar Silver y Gold hay que re-capturar Bronze con `make all`; ese
 trabajo sigue pendiente y se registra en `CONSTITUTION.md` §14.
@@ -49,9 +49,9 @@ deduplicación de **Gold** es distinta: **solo se mide**. `make repetidos` anali
 repetidos y escribe un único reporte, `data/gold/_REPETIDOS.md`; no elimina
 líneas, no reescribe páginas ni `corpus.jsonl` y no cambia el entregable.
 
-Sobre el Gold actual (184 páginas web, 7 802 líneas de contenido), el texto que
-pertenece a algún bloque presente en al menos 5, 10 y 20 páginas es el **23.3 %**,
-**17.5 %** y **10.3 %** respectivamente. Estas cifras son un diagnóstico, no una
+Sobre el Gold actual (183 páginas web, 8 131 líneas de contenido), el texto que
+pertenece a algún bloque presente en al menos 5, 10 y 20 páginas es el **22.3 %**,
+**16.8 %** y **9.1 %** respectivamente. Estas cifras son un diagnóstico, no una
 orden de borrado: cualquier política de deduplicación de Gold se decide aparte y
 debería regenerar el corpus desde Bronze, algo que hoy no es posible (ver §1).
 
@@ -159,8 +159,8 @@ documento_titulo: Informe Final Octubre 2026
 
 `make repetidos` ejecuta `uv run corpus repetidos`, analiza únicamente
 `data/gold/pages/*.md` (sin `hecho-*` ni `noticia-*`) y reescribe solo
-`data/gold/_REPETIDOS.md` con las 184 páginas analizadas, la tabla de umbrales
-5/10/20 (23.3 %, 17.5 % y 10.3 %), el top 20 de bloques y las métricas de
+`data/gold/_REPETIDOS.md` con las 183 páginas analizadas, la tabla de umbrales
+5/10/20 (22.3 %, 16.8 % y 9.1 %), el top 20 de bloques y las métricas de
 `unique_ratio`. No hace peticiones HTTP y es determinista: dos ejecuciones con
 el mismo Gold producen el mismo archivo.
 
