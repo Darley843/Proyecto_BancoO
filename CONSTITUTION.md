@@ -483,4 +483,6 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 - [ ] Procesar los 622 PDFs históricos restantes (hoy se captura 2022–2026).
 - [ ] Transcripciones de YouTube de todo el canal (hoy, las más recientes).
 - [ ] Chunking + embeddings para el Módulo 2 (Fase 4).
-- [ ] Configurar protección de `main` (PR + CI verde).
+- [ ] Configurar protección de `main` (PR + CI verde). **Bloqueado**: GitHub
+  exige plan Pro (o repo público) para proteger ramas en repos privados; la API
+  devuelve 403. Se retoma cuando el grupo decida publicar el repo o subir de plan.
