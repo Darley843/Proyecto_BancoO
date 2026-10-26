@@ -121,6 +121,23 @@ def cmd_stats(config: Config, args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_repetidos(config: Config, args: argparse.Namespace) -> int:
+    """Escribe el reporte de repeticiones de Gold e imprime su resumen sin usar la red."""
+    from .dedupe import analyze_gold_repetitions, write_repetitions_report
+
+    report = analyze_gold_repetitions(config.paths.gold_markdown)
+    target = write_repetitions_report(config)
+    print(f"Paginas analizadas  : {report.pages_analyzed}")
+    for coverage in report.thresholds:
+        print(
+            f"Repetido >= {coverage.threshold:>2} pag.: "
+            f"{coverage.percentage:.1f} % "
+            f"({coverage.covered_lines}/{coverage.total_lines} lineas)"
+        )
+    print(f"Reporte             : {target}")
+    return 0
+
+
 def cmd_chunks(config: Config, args: argparse.Namespace) -> int:
     from .knowledge import build_chunks
 
@@ -419,6 +436,8 @@ def build_parser() -> argparse.ArgumentParser:
     stats = sub.add_parser("stats", help="resumen y checklist del corpus")
     stats.add_argument("--write", action="store_true", help="escribe data/gold/_INDICE.md")
 
+    sub.add_parser("repetidos", help="mide repeticiones en las paginas Gold (sin red)")
+
     clean = sub.add_parser("clean", help="borra capas derivadas")
     clean.add_argument("--hard", action="store_true", help="borra tambien Bronze")
 
@@ -445,6 +464,7 @@ def main(argv: list[str] | None = None) -> int:
         "noticias": cmd_noticias,
         "all": cmd_all,
         "stats": cmd_stats,
+        "repetidos": cmd_repetidos,
         "status": cmd_status,
         "doctor": cmd_doctor,
         "clean": cmd_clean,

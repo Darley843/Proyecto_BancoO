@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import argparse
 import hashlib
+import socket
 from pathlib import Path
 
 import pytest
@@ -299,3 +301,40 @@ def test_escritura_solo_crea_reporte_y_no_altera_gold(tmp_path: Path) -> None:
     assert after - set(before) == {target}
     for path, digest in before.items():
         assert hashlib.sha256(path.read_bytes()).hexdigest() == digest
+
+
+def test_parser_incluye_repetidos() -> None:
+    """El CLI reconoce el subcomando ``repetidos``."""
+    from banco_occidente_corpus.cli import build_parser
+
+    args = build_parser().parse_args(["repetidos"])
+
+    assert args.command == "repetidos"
+
+
+def test_cmd_repetidos_termina_sin_red(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """El subcomando ``repetidos`` genera el reporte sin abrir conexiones de red."""
+    from banco_occidente_corpus import cli
+
+    def bloquear_conexiones(*_: object, **__: object) -> None:
+        """Falla si el comando intenta abrir un socket."""
+        raise AssertionError("repetidos no debe abrir conexiones de red")
+
+    monkeypatch.setattr(socket, "socket", bloquear_conexiones)
+    monkeypatch.setattr(socket, "create_connection", bloquear_conexiones)
+    shared = ["Solicita tu tarjeta", "Sin cuota de manejo"]
+    root = write_corpus(tmp_path, {"pagina-a": shared, "pagina-b": shared})
+    config = Config(paths=Paths(gold=root.parent))
+
+    code = cli.cmd_repetidos(config, argparse.Namespace())
+
+    salida = capsys.readouterr().out
+    assert code == 0
+    assert config.paths.repetitions_file.exists()
+    assert "Paginas analizadas  : 2" in salida
+    assert "Repetido >=  5 pag." in salida
+    assert "Repetido >= 10 pag." in salida
+    assert "Repetido >= 20 pag." in salida
+    assert str(config.paths.repetitions_file) in salida

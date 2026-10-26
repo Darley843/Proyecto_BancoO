@@ -14,8 +14,8 @@
 
 ## 3. CLI y Makefile
 
-- [ ] 3.1 Añadir `cmd_repetidos` y el subcomando `repetidos` en `cli.py`, sin importar `HttpClient` ni usar `net.py`; el comando debe imprimir páginas analizadas, porcentajes por umbral y la ruta del reporte. Verificar con `uv run corpus repetidos --help` y una prueba que bloquea conexiones de red y comprueba que el comando termina correctamente.
-- [ ] 3.2 Añadir solo el target `make repetidos` al `makefile` y verificar con `make help` que aparece, que `make repetidos` ejecuta el subcomando y que `make all`, `make gold` y `make deliver` no lo contienen; revisar el diff del Makefile para confirmar que no se modificó ningún otro target.
+- [x] 3.1 Añadir `cmd_repetidos` y el subcomando `repetidos` en `cli.py`, sin importar `HttpClient` ni usar `net.py`; el comando debe imprimir páginas analizadas, porcentajes por umbral y la ruta del reporte. Verificar con `uv run corpus repetidos --help` y una prueba que bloquea conexiones de red y comprueba que el comando termina correctamente.
+- [x] 3.2 Añadir solo el target `make repetidos` al `makefile` y verificar con `make help` que aparece, que `make repetidos` ejecuta el subcomando y que `make all`, `make gold` y `make deliver` no lo contienen; revisar el diff del Makefile para confirmar que no se modificó ningún otro target.
 
 ## 4. Documentación
 

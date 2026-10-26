@@ -112,6 +112,10 @@ media: docs videos ## Documentos PDF + videos de YouTube
 noticias: ## Hechos oficiales y prensa curada a Gold (independiente del pipeline)
 	$(CORPUS) noticias
 
+.PHONY: repetidos
+repetidos: ## Mide bloques repetidos en Gold y escribe _REPETIDOS.md (sin red)
+	$(CORPUS) repetidos
+
 .PHONY: all
 all: ## Pipeline completo: discover -> fetch -> extract -> gold -> stats
 	$(CORPUS) all $(if $(LIMIT),--limit $(LIMIT),) $(if $(DELAY),--delay $(DELAY),)
