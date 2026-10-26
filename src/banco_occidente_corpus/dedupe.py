@@ -395,8 +395,7 @@ def render_repetitions_report(report: RepetitionReport) -> str:
         for index, block in enumerate(report.top_blocks, start=1):
             examples = _escape_cell(", ".join(block.examples))
             lines.append(
-                f"| {index} | {block.size} | {block.pages} | {_format_block(block)} "
-                f"| {examples} |"
+                f"| {index} | {block.size} | {block.pages} | {_format_block(block)} | {examples} |"
             )
     else:
         lines.append("| - | - | 0 | Sin bloques repetidos | - |")

@@ -11,8 +11,13 @@ que el entregable sea verificable.
 | 🥈 **Silver** | «Solo el texto útil, sin menús, cookies ni duplicados.» | `data/processed/markdown/*.md` + `silver.jsonl`. `extract.py` usa trafilatura y `dedupe.py`. |
 | 🥇 **Gold** | «Markdown con metadatos. Es el insumo directo del Módulo 2.» | `data/gold/pages/*.md` + `corpus.jsonl` + `_INDICE.md`. `gold.py` y `stats.py`. |
 
-**Reprocesable:** `make clean && make extract && make gold` regenera Silver y
-Gold desde Bronze sin volver a la web.
+**Reprocesabilidad real del checkout actual:** Bronze conserva **1 HTML**,
+Silver está **vacío** y Gold tiene **184 páginas web** del sitio (más 40 fichas
+`hecho-*` y 20 `noticia-*`, para 244 archivos en `pages/`). Por tanto, hoy
+`make clean && make extract && make gold` **no** puede regenerar las 184 páginas
+del sitio: el Gold versionado es la única fuente disponible para medirlas. Para
+volver a generar Silver y Gold hay que re-capturar Bronze con `make all`; ese
+trabajo sigue pendiente y se registra en `CONSTITUTION.md` §14.
 
 ## 2. Cortesía y legalidad
 
@@ -34,6 +39,21 @@ Gold desde Bronze sin volver a la web.
 | `trafilatura` para extracción semántica | `extract._trafilatura()` → Markdown |
 | Quitar boilerplate repetido | `dedupe.find_boilerplate()`: líneas presentes en ≥35 % de los documentos |
 | «>90 % menos contexto» | se mide en `make stats` (tokens Gold vs. HTML crudo) |
+
+### Deduplicación de Gold: solo medición
+
+La deduplicación de **Silver** sigue siendo una limpieza: `find_boilerplate()`
+elimina líneas repetidas antes de escribir el Markdown procesado. La
+deduplicación de **Gold** es distinta: **solo se mide**. `make repetidos` analiza
+`data/gold/pages/*.md` en modo lectura, detecta líneas y bloques de 2-3 líneas
+repetidos y escribe un único reporte, `data/gold/_REPETIDOS.md`; no elimina
+líneas, no reescribe páginas ni `corpus.jsonl` y no cambia el entregable.
+
+Sobre el Gold actual (184 páginas web, 7 802 líneas de contenido), el texto que
+pertenece a algún bloque presente en al menos 5, 10 y 20 páginas es el **23.3 %**,
+**17.5 %** y **10.3 %** respectivamente. Estas cifras son un diagnóstico, no una
+orden de borrado: cualquier política de deduplicación de Gold se decide aparte y
+debería regenerar el corpus desde Bronze, algo que hoy no es posible (ver §1).
 
 ## 4. Capa Gold
 
@@ -128,10 +148,21 @@ documento_titulo: Informe Final Octubre 2026
 - `data/gold/corpus.jsonl` con todos los metadatos, incluidas las fichas
 - `data/gold/_INDICE.md` con el resumen y la cobertura
 - `data/gold/_NOTICIAS.md` con la ventana, los conteos y la tabla de fichas
+- `data/gold/_REPETIDOS.md` con el diagnóstico de bloques repetidos de las
+  páginas web (solo medición, no modifica el resto de Gold)
 - `data/knowledge/` con entidades, hechos y relaciones validados
 - Pipeline reproducible: `make all`
 - Noticias reproducibles por separado: `make noticias`
+- Diagnóstico de repeticiones por separado: `make repetidos` (offline; no forma
+  parte de `make all`, `make gold` ni `make deliver`, y no elimina contenido)
 - Paquete para entregar: `make deliver` → `dist/corpus-gold-YYYY-MM-DD.zip`
+
+`make repetidos` ejecuta `uv run corpus repetidos`, analiza únicamente
+`data/gold/pages/*.md` (sin `hecho-*` ni `noticia-*`) y reescribe solo
+`data/gold/_REPETIDOS.md` con las 184 páginas analizadas, la tabla de umbrales
+5/10/20 (23.3 %, 17.5 % y 10.3 %), el top 20 de bloques y las métricas de
+`unique_ratio`. No hace peticiones HTTP y es determinista: dos ejecuciones con
+el mismo Gold producen el mismo archivo.
 
 ## 8. Estándar de ingeniería (heredado de la CONSTITUTION del curso)
 
