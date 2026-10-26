@@ -15,9 +15,6 @@ Compra lo que necesitas y accede a promociones exclusivas.
 ###### Tu carro nuevo te espera, ¡maneja tu futuro!
 Financia tu próximo vehículo con cuotas cómodas y excelentes tasas.
 - Canales digitales
-- Segmentos
-- Mesa de dinero
-- Haz tus pagos
 Usa tu tarjeta en compras diarias y acumula beneficios exclusivos.
 Una alternativa para administrar mejor tus deudas y pagar menos con una tasa preferente.
 Tarjeta de Crédito especialmente diseñada para viajeros.
@@ -188,6 +185,9 @@ Para acceder al Formulario, haz clic en el botón “Diligencia el Formulario We
 Fuente: https://www.bancodeoccidente.com.co/quienes-somos/informacion-proveedor
 Sección: identidad
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 Información al Proveedor
 Nuestro propósito es apalancar la estrategia del Banco de Occidente, mediante la compra de bienes y/o servicios.
@@ -1327,18 +1327,6 @@ Mira el video aquí
 Aprende cómo destacar desde el primer minuto en tu próxima entrevista.
 Mira el video aquí
 
-## Agenda tu cita con un asesor
-Fuente: https://www.bancodeoccidente.com.co/ayuda/agendar-cita-asesor
-Sección: atencion
-
-Personas
-Empresas
-Ingresar
-Ingresar
-¿Interesado
-en nuestros productos o servicios?
-Déjanos tus datos y un asesor se comunicará contigo.
-
 ## App Móvil Banco de Occidente
 Fuente: https://www.bancodeoccidente.com.co/canales-digitales/banca-movil
 Sección: atencion
@@ -1416,6 +1404,9 @@ Invierte con una tasa atractiva y el respaldo de un banco sólido.
 Fuente: https://www.bancodeoccidente.com.co/ayuda/linea-conciliacion-negociacion
 Sección: atencion
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 Estamos para ayudarte
 Juntos podemos encontrar soluciones que te permitan ponerte al día con el pago de tu crédito.
@@ -1472,6 +1463,9 @@ Invierte con una tasa atractiva y el respaldo de un banco sólido.
 Fuente: https://www.bancodeoccidente.com.co/ayuda/linea-servicio-cliente
 Sección: atencion
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 Líneas de Servicio al Cliente
 Ponemos a tu disposición los números de nuestras líneas de servicio al cliente y de respuesta automática.
@@ -1729,6 +1723,9 @@ Bogotá (601) 390 20 58. Nacional 01 800 0514 652. Luego digita tu NIT y la opci
 Fuente: https://www.bancodeoccidente.com.co/cuenta-de-nomina
 Sección: oferta
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 Abre tu Cuenta de Nómina sin costos
 Accede a tu salario de forma inmediata, con todos los beneficios de una cuenta segura.
@@ -1879,6 +1876,9 @@ Descubre más información sobre Assisprex Asistencias.
 Fuente: https://www.bancodeoccidente.com.co/asistencia-de-viajes-internacionales
 Sección: oferta
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 ### Estamos trabajando para ti
 La página para radicar certificados AXA Asistencias no está disponible.
@@ -3044,6 +3044,9 @@ Sección: oferta
 Fuente: https://www.bancodeoccidente.com.co/asistencia-al-hogar
 Sección: oferta
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 ### Estamos trabajando para ti
 La página para radicar certificados AXA Asistencias no está disponible.
@@ -4028,6 +4031,9 @@ Sección: oferta
 Fuente: https://www.bancodeoccidente.com.co/cuenta-activa-basica
 Sección: oferta
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 Cuenta Activa Básica
 Respalda tus necesidades de crédito y ahorro con nuestro portafolio.
@@ -4096,6 +4102,9 @@ Optimiza tu patrimonio con nuestras opciones fiduciarias flexibles y rentables.
 Fuente: https://www.bancodeoccidente.com.co/cuenta-corriente
 Sección: oferta
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 Abre tu cuenta corriente hoy
 Gestiona tu dinero de manera ágil y segura. Sin cargos ocultos, acceso inmediato y total flexibilidad para tu día a día.
@@ -4326,6 +4335,9 @@ Con Bre-B, enviar y recibir dinero es más fácil que nunca. Realiza transferenc
 Fuente: https://www.bancodeoccidente.com.co/tarjetas-credito/visa-gold-mascotas
 Sección: oferta
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 Visa Mascotas
 Consiente a tu mejor amigo y ahorra con cada compra.
@@ -5568,6 +5580,9 @@ Invierte con una tasa atractiva y el respaldo de un banco sólido.
 Fuente: https://www.bancodeoccidente.com.co/tarjetas-credito/credencial-free
 Sección: oferta
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 Credencial Visa Free
 Respaldo y facilidad de pago en cada compra.
@@ -5717,6 +5732,9 @@ Descargar
 Fuente: https://www.bancodeoccidente.com.co/tarjetas-credito/latam-pass-gold-visa
 Sección: oferta
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 Visa LATAM Pass Gold
 Obtén descuentos, acumula millas y viaja con más ventajas.
@@ -5775,6 +5793,9 @@ Sección: oferta
 Fuente: https://www.bancodeoccidente.com.co/tarjetas-credito/latam-pass-platinum-visa
 Sección: oferta
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 Visa LATAM Pass Platinum
 Más beneficios para que tu experiencia de viaje sea única.
@@ -5887,6 +5908,9 @@ Descargar
 Fuente: https://www.bancodeoccidente.com.co/tarjetas-credito/santa-fe
 Sección: oferta
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 Credencial Santafé
 Beneficios y descuentos en el Centro Comercial Santafé
@@ -6016,6 +6040,9 @@ Descargar
 Fuente: https://www.bancodeoccidente.com.co/tarjetas-credito/mastercard-visa-clasica
 Sección: oferta
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 Credencial Visa Clásica
 Respaldo y facilidad de pago en cada compra.
@@ -6740,6 +6767,9 @@ Consulta nuestras políticas de: Redes Sociales Cookies Tratamiento de Datos Per
 Fuente: https://www.bancodeoccidente.com.co/asamblea-de-accionistas-2026
 Sección: datos
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 ### Asamblea General de Accionistas 2026
 Jueves 26 de Marzo - 2026
@@ -6799,6 +6829,9 @@ Desafíos de la banca en la nueva normalidad Video desafíos de la banca en la n
 Fuente: https://www.bancodeoccidente.com.co/sostenibilidad
 Sección: datos
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 Sostenibilidad
 En el Banco de Occidente, actuamos con responsabilidad ambiental, social y corporativa.
@@ -7316,6 +7349,9 @@ Instrumento de cobertura Flexible, que busca proteger al cliente de perfil expor
 Fuente: https://www.bancodeoccidente.com.co/coberturas-tasas-interes
 Sección: otros
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 Protege tu empresa contra la volatilidad del mercado
 Gestiona el riesgo cambiario con coberturas flexibles y asegura estabilidad financiera en tus operaciones internacionales.
@@ -8100,6 +8136,9 @@ Participa en proyectos sostenibles y de impacto.
 Fuente: https://www.bancodeoccidente.com.co/mesa-dinero/operaciones-cambiarias
 Sección: otros
 
+- Segmentos
+- Mesa de dinero
+- Haz tus pagos
 - Ingresar Ingresar
 Flexibilidad en tus transacciones
 Compra y vende divisas con rapidez y seguridad. Accede a tasas competitivas y optimiza la gestión cambiaria de tu empresa.
