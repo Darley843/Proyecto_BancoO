@@ -5,19 +5,19 @@ seccion: oferta
 empresa: Banco de Occidente
 fecha_captura: 2026-10-23
 idioma: es
-tokens: 721
-hash: 11a7ea6b
-palabras: 450
+tokens: 1202
+hash: 5b367278
+palabras: 760
 metodo: trafilatura
 keywords:
-- tarjeta
 - google
-- debito
+- tarjeta
 - cuenta
 - dispositivo
+- debito
+- billetera
+- clic
 - facil
-- rapido
-- tasas
 ---
 
 Facilita tu vida con Google Pay
@@ -59,3 +59,15 @@ Obtén tu crédito y haz realidad tus planes con plazos flexibles y tasas compet
 Protege tu dinero, hazlo crecer y úsalo cuando lo necesites. ¡Empieza hoy!
 Compra lo que necesitas y accede a promociones exclusivas.
 Financia tu próximo vehículo con cuotas cómodas y excelentes tasas.
+### ¿Qué necesitas para utilizar tu billetera Google Pay?
+Tener un dispositivo Android con versión 4,4 KitKat o superiores y que cuenten con tecnología NFC. Al usar Google Pay, debe aceptar los términos de uso y la política de privacidad de Google. Tenga en cuenta que el Banco de Occidente no tiene control sobre las decisiones de Google respecto a los cambios en Google Pay.
+### ¿Qué tarjeta puedes usar en Google Pay?
+Puedes añadir todas tus tarjetas débito de la franquicia Mastercard y Banco de Occidente.
+### ¿Dónde puedo pagar con Google Pay?
+En cualquier establecimiento de comercio que reciba pagos sin contacto y en páginas web o aplicaciones móviles que acepten pagos con Google Wallet.
+### ¿Qué debo hacer en Google Pay si recibo una nueva tarjeta?
+Si recibe una nueva tarjeta porque ha vencido la anterior o ha solicitado un cambio por deterioro, su tarjeta antigua se cambiará por la nueva automáticamente en Google Pay una vez esté activa.
+### ¿Qué debo hacer si pierdo o me roban el dispositivo?
+Debes desvincular el dispositivo de tu cuenta de Google así: Accede a tu cuenta de Google. Una vez iniciada la sesión, en la esquina superior derecha, selecciona tu foto de perfil y haz clic en "Gestionar tu cuenta de Google". Selecciona la opción "Seguridad". Desplázate hacia abajo hasta encontrar la sección "Tus dispositivos". Haz clic en "Administrar todos los dispositivos". Busca el dispositivo que deseas desvincular, selecciónalo y haz clic en "Cerrar sesión" En caso de pérdida o robo de tu(s) tarjeta(s), deberás comunicarte con la línea de Servicio al Cliente del Banco de Occidente con el fin de realizar el bloqueo. Líneas de servicio al cliente: Nacional 01 800 05 14652 Bogotá (601) 3902058
+### ¿El banco cobra comisión por el uso de la billetera?
+No, el Banco de Occidente no cobra comisión por el uso de la billetera.
