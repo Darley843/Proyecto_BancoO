@@ -111,6 +111,10 @@ noticias: ## Hechos oficiales y prensa curada a Gold (independiente del pipeline
 repetidos: ## Mide bloques repetidos en Gold y escribe _REPETIDOS.md (sin red)
 	$(CORPUS) repetidos
 
+.PHONY: contexto
+contexto: ## Genera data/contexto/contexto_banco.md y su manifest desde Gold
+	$(UV) run python -m banco_occidente_corpus.contexto
+
 .PHONY: all
 all: ## Pipeline completo: discover -> fetch -> extract -> gold -> stats
 	$(CORPUS) all $(if $(LIMIT),--limit $(LIMIT),) $(if $(DELAY),--delay $(DELAY),)

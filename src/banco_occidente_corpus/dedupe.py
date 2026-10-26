@@ -96,6 +96,28 @@ def strip_boilerplate(text: str, boilerplate: set[str]) -> str:
     return re.sub(r"\n{3,}", "\n\n", result).strip()
 
 
+def strip_boilerplate_detailed(text: str, boilerplate: set[str]) -> tuple[str, list[str]]:
+    """Como strip_boilerplate, pero devuelve ademas las lineas retiradas.
+
+    Solo se recogen las lineas que estan en ``boilerplate`` (contenido repetido que
+    no se quiere perder, como un telefono de atencion); el ruido de ``is_noise`` se
+    descarta sin recoger, igual que en ``strip_boilerplate``.
+    """
+    if not boilerplate:
+        return strip_boilerplate(text, boilerplate), []
+    kept: list[str] = []
+    retiradas: list[str] = []
+    for line in text.splitlines():
+        if normalize_line(line) in boilerplate:
+            retiradas.append(line.strip())
+            continue
+        if is_noise(line):
+            continue
+        kept.append(line.rstrip())
+    resultado = "\n".join(kept)
+    return re.sub(r"\n{3,}", "\n\n", resultado).strip(), retiradas
+
+
 def unique_ratio(lines: list[str]) -> float:
     """Proporcion de contenido unico: diagnostico rapido de una pagina."""
     if not lines:

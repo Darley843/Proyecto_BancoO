@@ -1,0 +1,30 @@
+# Contexto para el asistente Q&A: que secciones entran, con que prioridad y
+# cuanto ocupa. Se genera con `make contexto` a partir de data/gold.
+
+# Tope del prompt de sistema, medido con el estimador estable de utils.py
+# (chars/4, sin red): el recorte es identico en cualquier clon.
+max_tokens = 175000
+
+# Fichas noticia-*/hecho-* de data/gold/pages: solo las mas recientes.
+incluir_noticias = true
+max_noticias = 12
+
+# El prompt no necesita menus ni CTAs: umbral mas estricto que el de Gold (0.35).
+# Las lineas retiradas se conservan una vez en "Informacion comun del sitio".
+boilerplate_min_docs = 5
+boilerplate_ratio = 0.10
+bloque_comun = true
+
+# Regex sobre la URL (sin distinguir mayusculas). Antes de leer el archivo.
+patrones_url_excluidos = ["/buscador", "/error", "^https?://[^/]+/?$"]
+
+# Clave = seccion de Gold; valor = prioridad (1 = mas importante: se conserva
+# primero cuando el contexto no cabe). Lo que no este aqui no entra.
+[secciones]
+identidad = 1
+atencion = 2
+oferta = 3
+legal = 4
+datos = 5
+presencia = 6
+otros = 7
