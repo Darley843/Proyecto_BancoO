@@ -87,7 +87,7 @@ descarga masiva de PDF, transcripción de vídeo.
 | **Parseo HTML** | `lxml` + `beautifulsoup4` |
 | **Extracción semántica** | `trafilatura` (HTML → Markdown) |
 | **Frontmatter** | `PyYAML` |
-| **Tokens** | `tiktoken` (extra `tokens`; si falta, estimador) |
+| **Tokens** | `stable_tokens` (chars/4) para el presupuesto del contexto, sin red; `tiktoken` (extra `tokens`) solo para el campo informativo de Gold |
 | **Herramienta del agente** | `scrapling` (grupo `mcp`) — navegación ad hoc vía MCP, **fuera del pipeline** |
 | **Testing** | `pytest` (patrón AAA) |
 | **Lint / formato** | `ruff` (línea 100, comillas dobles) |
@@ -132,15 +132,18 @@ ProyectoAvance1/
 │   ├── dedupe.py         # boilerplate repetido por frecuencia
 │   ├── section.py        # clasificación en secciones + keywords
 │   ├── gold.py           # GOLD: Markdown + frontmatter + corpus.jsonl
+│   ├── contexto.py       # CONTEXTO: prompt del asistente derivado de Gold
 │   ├── checklist.py      # 24 casillas del Taller 1
 │   ├── stats.py          # _INDICE.md
 │   └── utils.py          # hashing, JSONL, tokens, slugs
 ├── test/                 # pytest + fixtures (sin red)
 ├── config/site.toml      # alcance, cortesía, filtros y secciones
+├── config/contexto.toml  # secciones, prioridad y presupuesto del contexto
 ├── data/
 │   ├── raw/              # Bronze (ignorado por Git)
 │   ├── processed/        # Silver (ignorado por Git)
 │   ├── gold/             # Gold (VERSIONADO) → páginas, documentos y videos
+│   ├── contexto/         # Contexto (VERSIONADO) → prompt del asistente + manifest
 │   └── knowledge/        # Knowledge (VERSIONADO) → entidades, hechos, relaciones
 ├── scripts/
 │   ├── tasks.py          # tareas del Makefile portables (Windows/Unix)
@@ -360,6 +363,73 @@ Reglas:
 
 Comandos: `make docs`, `make videos`, `make media`.
 
+### Capa Contexto (prompt del asistente)
+
+Sobre Gold se deriva el **prompt de sistema** del asistente Q&A:
+
+```text
+data/contexto/contexto_banco.md   CONTEXTO  páginas Gold unidas en un solo Markdown
+data/contexto/manifest.json       CONTEXTO  qué entró, qué quedó fuera y por qué
+config/contexto.toml              FUENTE    secciones, prioridad y presupuesto
+```
+
+**Contrato del archivo:**
+
+```markdown
+# Contexto del Banco de Occidente
+
+Documento generado a partir de data/gold. No editar a mano: make contexto.
+
+## Información común del sitio
+Fuente: data/gold/pages/*.md
+Sección: varias
+
+<líneas repetidas>
+...
+
+## Quiénes Somos | Banco de Occidente
+Fuente: https://www.bancodeoccidente.com.co/quienes-somos
+Sección: identidad
+
+<cuerpo Gold sin frontmatter, con los encabezados degradados un nivel>
+```
+
+**Reglas:**
+
+1. Solo lee `data/gold/corpus.jsonl` y `data/gold/pages/*.md`. Nunca Bronze,
+   Silver ni la web; `documents/` y `videos/` quedan fuera por contrato
+   (motivo `fuente_no_pagina`).
+2. Se quita el frontmatter YAML y los encabezados del cuerpo bajan **un nivel**
+   (`##` → `###`, `###` → `####`) fuera de bloques de código. Solo en memoria:
+   Gold no se modifica. Así `##` marca únicamente bloques y **cada línea que
+   empieza con `## ` va seguida de su `Fuente:`** (57 páginas de Gold traen `##`
+   propios en el cuerpo).
+3. Orden determinista: prioridad de sección y luego título. La misma entrada
+   produce el mismo archivo, sin fechas ni rutas absolutas.
+4. Primero se descartan los cuerpos clonados (hash del cuerpo) y **después** se
+   calculan las líneas repetidas de menú/pie, para que los clones no inflen el
+   conteo. Esas líneas **no se pierden**: se conservan una vez en
+   `## Información común del sitio` (teléfonos de atención, avisos).
+5. Fichas `noticia-*`/`hecho-*`: solo las `max_noticias` más recientes por
+   `fecha_publicacion`; una ficha `pendiente` no se publica.
+6. El presupuesto se mide con `utils.stable_tokens` (chars/4, sin red). El tope
+   por defecto es `max_tokens = 175000` (`config/contexto.toml`); si el texto
+   excede ese tope, se descartan primero las secciones de menor
+   prioridad y se informa en consola y en el manifest. Si aun sin páginas el
+   preámbulo y el bloque común no caben, el comando termina con error y **no
+   escribe** el archivo.
+7. `manifest.json` lista incluidas, excluidas con motivo
+   (`fuente_no_pagina`, `archivo_ausente`, `ficha_excluida`, `ficha_pendiente`,
+   `ficha_fuera_de_ventana`, `url_excluida`, `seccion_no_incluida`,
+   `cuerpo_vacio`, `duplicado`, `presupuesto`) y tokens por sección.
+8. El módulo no hace peticiones de red: solo lee Gold y mide con
+   `stable_tokens`.
+
+Comando: `make contexto` (`uv run python -m banco_occidente_corpus.contexto`).
+Es independiente de `make all`, `make gold`, `make deliver`, `make docs`,
+`make videos` y `make media`. `make clean` no toca `data/contexto/`: es un
+artefacto versionado y reproducible que se reconstruye con `make contexto`.
+
 ## 8. Repositorio y Git
 
 - **El corpus vive en este mismo repositorio.** No hay un repo aparte: Gold se
@@ -393,6 +463,8 @@ make check
 # 3. Captura (si hace falta) y regeneración
 make doctor          # red + robots.txt + estado
 make all             # discover -> fetch -> extract -> gold -> stats
+make noticias        # hechos oficiales y prensa curada
+make contexto        # prompt del asistente desde Gold (data/contexto/)
 
 # 4. Commit (los hooks corren solos)
 git add -A
@@ -453,6 +525,11 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 | 2026-10-25 | `/ayuda/agendar-cita-asesor` fuera de Gold: es un formulario | `AGENTS.md` prohíbe capturar formularios; el filtro de `exclude_patterns` se aplica también al construir Gold para que una página ya capturada no vuelva al entregable |
 | 2026-10-25 | Los 1,5 s entre peticiones son decisión del proyecto, no un `Crawl-delay` del sitio | `robots.txt` del banco no declara `Crawl-delay`; la documentación lo aclara para no atribuirle al sitio una directiva que no existe |
 | 2026-10-25 | Se elimina el fallback con Playwright (`--browser`) y el mínimo de 1,5 s se impone en `net.py` | Un navegador headless eludiría el WAF (evasión prohibida); el ritmo no puede bajarse desde el CLI ni desde una config relajada |
+| 2026-10-25 | Capa **Contexto** derivada de Gold y versionada (`data/contexto/`) | Es el artefacto que evalúa la rúbrica y el prompt del asistente; al clonar debe funcionar sin regenerar. `make clean` no la borra: se reconstruye con `make contexto` |
+| 2026-10-25 | El contexto no pasa por `cli.py`: se ejecuta con `uv run python -m banco_occidente_corpus.contexto` | Mantiene el cambio autocontenido: el CLI del pipeline no se modifica, y la configuración y las rutas del contexto viven en `contexto.py` |
+| 2026-10-25 | El contexto usa `stable_tokens` (chars/4) y no importa `tiktoken` | El tokenizador de OpenAI descarga datos la primera vez y no es el del modelo servido; el estimador es determinista, sin red e igual en la CI |
+| 2026-10-25 | Boilerplate del contexto a `0.10` (Gold usa `0.35`) y bloque `Información común del sitio` | Con `0.35` no se detectaba ninguna línea; con `0.10` se retiran 26 CTAs. Las líneas retiradas se conservan una vez para no perder datos repetidos (teléfonos de atención) |
+| 2026-10-25 | Los encabezados del cuerpo se degradan un nivel al renderizar el contexto (`##`→`###`) | 57 páginas de Gold traen `##` propios; degradarlos deja `##` como frontera exclusiva de bloque, sin editar Gold |
 
 ## 12. Configuración local (no trackear)
 

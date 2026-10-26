@@ -37,12 +37,16 @@ make docs        # PDFs: inventario -> descarga -> Gold (balances, informes)
 make videos      # YouTube: canal -> subtítulos -> transcripción Gold
 make media       # documentos + videos
 make noticias    # hechos oficiales + prensa curada (independiente de all/gold/deliver/docs/videos/media)
+make contexto    # prompt del asistente desde Gold (data/contexto/)
 make check       # lint + typecheck + pruebas
 make health      # integridad de las capas y del contrato de Gold
 make identity    # fija user.name / user.email del repo
 ```
 
-El CLI también funciona directo: `uv run corpus <comando>`.
+El CLI también funciona directo: `uv run corpus <comando>`. La capa Contexto es
+la excepción: se ejecuta como módulo, sin pasar por el CLI:
+`uv run python -m banco_occidente_corpus.contexto` (o `make contexto`). No hace
+peticiones de red: solo lee Gold y mide con `stable_tokens`.
 
 ## Skills del proyecto
 
@@ -76,6 +80,7 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | `.../dedupe.py` | Elimina boilerplate repetido |
 | `.../section.py` | Clasifica páginas y extrae keywords |
 | `.../gold.py` | Gold: Markdown + frontmatter + `corpus.jsonl` |
+| `.../contexto.py` | Contexto: prompt del asistente desde Gold, config propia y entrada `python -m` |
 | `.../checklist.py` | 24 casillas del Taller 1 |
 | `.../stats.py` | Genera `data/gold/_INDICE.md` |
 | `.../documents.py` | PDFs: inventario, descarga y extracción a Gold |
