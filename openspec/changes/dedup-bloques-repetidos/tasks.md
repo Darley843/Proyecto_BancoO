@@ -19,16 +19,16 @@
 
 ## 4. Documentación
 
-- [ ] 4.1 Actualizar `docs/ESTANDAR.md` §1 para corregir la reprocesabilidad real (Bronze con 1 HTML, Silver vacío, 184 páginas web en Gold), §3 para declarar la deduplicación de Gold como solo medición y §7 para incluir `_REPETIDOS.md` y `make repetidos` como artefacto independiente. Verificar que las rutas, comandos y cifras coinciden con `make status` y con el reporte generado.
-- [ ] 4.2 Actualizar `CONSTITUTION.md` §7 con `_REPETIDOS.md`, la regla de que Gold no se edita y el límite actual de Bronze, y §14 con el pendiente de re-capturar Bronze para poder regenerar las 184 páginas. Verificar que el contrato de Gold no cambia y que el texto distingue la deduplicación de Silver de la medición de Gold.
-- [ ] 4.3 Añadir la explicación de `make repetidos` en la documentación actualizada (comando, ausencia de red, independencia de `all`/`gold`/`deliver`) y verificar que el texto no promete eliminar contenido ni regenerar Gold desde Bronze.
+- [x] 4.1 Actualizar `docs/ESTANDAR.md` §1 para corregir la reprocesabilidad real (Bronze con 1 HTML, Silver vacío, 184 páginas web en Gold), §3 para declarar la deduplicación de Gold como solo medición y §7 para incluir `_REPETIDOS.md` y `make repetidos` como artefacto independiente. Verificar que las rutas, comandos y cifras coinciden con `make status` y con el reporte generado.
+- [x] 4.2 Actualizar `CONSTITUTION.md` §7 con `_REPETIDOS.md`, la regla de que Gold no se edita y el límite actual de Bronze, y §14 con el pendiente de re-capturar Bronze para poder regenerar las 184 páginas. Verificar que el contrato de Gold no cambia y que el texto distingue la deduplicación de Silver de la medición de Gold.
+- [x] 4.3 Añadir la explicación de `make repetidos` en la documentación actualizada (comando, ausencia de red, independencia de `all`/`gold`/`deliver`) y verificar que el texto no promete eliminar contenido ni regenerar Gold desde Bronze.
 
 ## 5. Verificación de integración
 
-- [ ] 5.1 Ejecutar `make fmt` y `make check`; verificar que lint, tipos y todas las pruebas pasan al 100 %.
-- [ ] 5.2 Ejecutar `make demo` y `make health`; verificar que el pipeline offline y el contrato de Gold siguen funcionando sin depender del reporte.
-- [ ] 5.3 Ejecutar `make repetidos` sobre el Gold real; verificar que el reporte declara 184 páginas analizadas, las filas de 5/10/20, el top 20 y la sección de `unique_ratio`, y que `git status` solo muestra `_REPETIDOS.md` como dato nuevo.
-- [ ] 5.4 Ejecutar `make repetidos` dos veces y comparar el hash de `_REPETIDOS.md`; verificar que es idéntico. Revisar el diff final y confirmar que no cambiaron páginas de Gold ni `corpus.jsonl`, que no se añadieron dependencias, que no hay peticiones HTTP nuevas y que `make all`/`gold`/`deliver` permanecen intactos.
+- [x] 5.1 Ejecutar `make fmt` y `make check`; verificar que lint, tipos y todas las pruebas pasan al 100 %.
+- [x] 5.2 Ejecutar `make demo` y `make health`; verificar que el pipeline offline y el contrato de Gold siguen funcionando sin depender del reporte.
+- [x] 5.3 Ejecutar `make repetidos` sobre el Gold real; verificar que el reporte declara 184 páginas analizadas, las filas de 5/10/20, el top 20 y la sección de `unique_ratio`, y que `git status` solo muestra `_REPETIDOS.md` como dato nuevo.
+- [x] 5.4 Ejecutar `make repetidos` dos veces y comparar el hash de `_REPETIDOS.md`; verificar que es idéntico. Revisar el diff final y confirmar que no cambiaron páginas de Gold ni `corpus.jsonl`, que no se añadieron dependencias, que no hay peticiones HTTP nuevas y que `make all`/`gold`/`deliver` permanecen intactos.
 
 ## Workflow follow-up
 

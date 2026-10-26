@@ -202,6 +202,7 @@ data/gold/pages/noticia-*.md  GOLD    fichas de prensa externa verificada
 data/gold/pages/hecho-*.md    GOLD    hechos relevantes oficiales
 data/gold/corpus.jsonl                metadatos consolidados
 data/gold/_NOTICIAS.md                índice de noticias y hechos
+data/gold/_REPETIDOS.md               diagnóstico de bloques repetidos (solo medición)
 data/noticias/prensa.yaml     FUENTE  curaduría externa (fuera de Gold)
 ```
 
@@ -230,6 +231,16 @@ keywords: [historia, misión, visión]
 3. `corpus.jsonl` es la fuente para el índice y para el RAG.
 4. El hash del cuerpo detecta duplicados y permite re-scrapear solo lo cambiado.
 5. Gold **nunca** se edita a mano: se regenera con `make gold`.
+6. La deduplicación de Gold es **solo de medición**. `make repetidos` analiza
+   `data/gold/pages/*.md` en modo lectura y escribe únicamente
+   `data/gold/_REPETIDOS.md`; no elimina líneas ni reescribe páginas,
+   `corpus.jsonl`, `documents.jsonl` o `videos.jsonl`. Esto es distinto de la
+   limpieza de Silver (`find_boilerplate`), que sí elimina boilerplate antes de
+   escribir el Markdown procesado.
+7. El reporte registra las 184 páginas web analizadas, el texto repetido en al
+   menos 5/10/20 páginas (23.3 %, 17.5 % y 10.3 %) y el top 20 de bloques. Es
+   un diagnóstico reproducible y offline, no una autorización para borrar
+   contenido del corpus.
 
 ### Fichas de noticias y hechos relevantes
 
@@ -289,6 +300,13 @@ Reglas de las fichas:
 
 `make clean && make extract && make gold` reconstruye Silver y Gold desde Bronze
 sin volver a la web. Bronze nunca se edita a mano.
+
+**Límite actual:** el checkout versiona Bronze con **1 HTML**, Silver con **0
+archivos** y Gold con **184 páginas web** del sitio (244 archivos en `pages/`,
+contando 40 `hecho-*` y 20 `noticia-*`). Por eso hoy ese comando no puede
+regenerar las 184 páginas del sitio; el Gold versionado es la única fuente
+disponible para medir. Recuperar esa capacidad exige re-capturar Bronze con
+`make all` (ver §14).
 
 ### Capa Knowledge (conocimiento semántico)
 
@@ -456,6 +474,8 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 - [x] Skill `semantic-extraction`, esquema JSON y validador de evidencia.
 - [x] Documentos PDF (balances e informes) y videos con subtítulos.
 - [ ] Poblar Knowledge para todas las secciones (semilla actual: identidad).
+- [ ] Re-capturar Bronze para poder regenerar desde cero las 184 páginas web del
+  sitio (hoy Bronze conserva 1 HTML y Silver está vacío).
 - [ ] Procesar los 622 PDFs históricos restantes (hoy se captura 2022–2026).
 - [ ] Transcripciones de YouTube de todo el canal (hoy, las más recientes).
 - [ ] Chunking + embeddings para el Módulo 2 (Fase 4).
