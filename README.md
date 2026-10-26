@@ -28,7 +28,7 @@ del Taller 1.
 | Sitemaps leídos | 210 |
 | URLs públicas | 196 |
 | Páginas Bronze | 193 (102.3 MB) |
-| Páginas Gold | 184 |
+| Páginas Gold | 183 |
 | Documentos PDF | 190 (11.0 M tokens) |
 | Videos transcritos | 32 (119.8 k tokens) |
 | Tokens del corpus completo | 11.2 M |
