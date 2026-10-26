@@ -2,9 +2,9 @@
 
 ## 1. Núcleo de análisis en `dedupe.py`
 
-- [ ] 1.1 Añadir las estructuras tipadas del reporte, las constantes de umbrales/top/tamaño y la carga de páginas Gold con separación de frontmatter, filtro de `hecho-*`/`noticia-*` y exclusión de archivos `_*`; toda función nueva debe llevar docstring en español y anotaciones. Verificar con `uv run pytest test/test_dedupe.py -k "paginas or excluye"` que solo se analizan las páginas del sitio y que documentos/videos no se leen.
-- [ ] 1.2 Implementar la normalización de comparación (mayúsculas y tildes), la construcción de líneas de contenido consecutivas y la detección de bloques de 1, 2 y 3 líneas con conteo único por página y hasta tres ejemplos. Verificar con pruebas de bloque de tarjeta repetido, línea suelta, bloque repetido dos veces en una página y variantes con mayúsculas/tildes.
-- [ ] 1.3 Implementar el porcentaje de texto repetido para 5, 10 y 20 páginas mediante cobertura única de líneas, y las métricas de `unique_ratio` global, promedio y páginas con menor ratio. Verificar con pruebas de tres umbrales, bloques solapados y página con alta repetición interna.
+- [x] 1.1 Añadir las estructuras tipadas del reporte, las constantes de umbrales/top/tamaño y la carga de páginas Gold con separación de frontmatter, filtro de `hecho-*`/`noticia-*` y exclusión de archivos `_*`; toda función nueva debe llevar docstring en español y anotaciones. Verificar con `uv run pytest test/test_dedupe.py -k "paginas or excluye"` que solo se analizan las páginas del sitio y que documentos/videos no se leen.
+- [x] 1.2 Implementar la normalización de comparación (mayúsculas y tildes), la construcción de líneas de contenido consecutivas y la detección de bloques de 1, 2 y 3 líneas con conteo único por página y hasta tres ejemplos. Verificar con pruebas de bloque de tarjeta repetido, línea suelta, bloque repetido dos veces en una página y variantes con mayúsculas/tildes.
+- [x] 1.3 Implementar el porcentaje de texto repetido para 5, 10 y 20 páginas mediante cobertura única de líneas, y las métricas de `unique_ratio` global, promedio y páginas con menor ratio. Verificar con pruebas de tres umbrales, bloques solapados y página con alta repetición interna.
 
 ## 2. Reporte `_REPETIDOS.md`
 
