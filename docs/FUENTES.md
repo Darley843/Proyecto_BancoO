@@ -42,9 +42,12 @@ Sitemap: https://www.bancodeoccidente.com.co/sitemap.xml
 | `/icbs-web/`, `/AjaxTx`, `/wps/` | ❌ | `Disallow` (backend/servicios) |
 | `/*!ut/p*` | ❌ | `Disallow` (parámetros de sesión) |
 | `/_next/`, `*.js`, `*.css`, `*.woff*`, `*.svg` | ➖ | Permitido, pero es ruido para el corpus |
+| `/ayuda/agendar-cita-asesor` | ❌ | Formulario de agendamiento: `AGENTS.md` prohíbe capturar formularios. Se excluye en `config/site.toml` y se filtra también al construir Gold |
 
 > El pipeline aplica además una lista de `exclude_patterns` en
-> `config/site.toml` (login, carrito, admin, documentos, imágenes).
+> `config/site.toml` (login, carrito, admin, documentos, imágenes y el
+> formulario de agendamiento). El filtro se usa en el descubrimiento y otra vez
+> en Gold, para que una página ya capturada en Bronze no vuelva al entregable.
 
 ### Hallazgo: el sitemap publica rutas `/w/`
 
@@ -136,7 +139,7 @@ El host `www.` devuelve `403` en algunos adjuntos; el pipeline reintenta en
 
 | Regla | Implementación |
 |-------|----------------|
-| 1.5 s entre peticiones | `crawl.delay_seconds` |
+| 1,5 s entre peticiones (decisión del proyecto: `robots.txt` no declara `Crawl-delay`) | `crawl.delay_seconds` |
 | Pausa de 10 s cada 50 peticiones | `crawl.politeness` |
 | Timeout de 30 s y 3 reintentos con backoff | `net.HttpClient` |
 | Identificación | UA de navegador + header `From` |

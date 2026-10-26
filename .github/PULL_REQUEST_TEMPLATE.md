@@ -17,7 +17,7 @@
 - [ ] Actualicé `CONSTITUTION.md` si cambió alcance, stack o formato de Gold.
 - [ ] No hay `pip` ni `requirements.txt` (`uv` es el único gestor).
 - [ ] No toqué `data/raw/` a mano.
-- [ ] Respeté `robots.txt`, el `Crawl-delay` y el header `From`.
+- [ ] Respeté `robots.txt`, el ritmo de cortesía de 1,5 s entre peticiones y el header `From`.
 - [ ] El commit sigue Conventional Commits en español.
 
 Closes #

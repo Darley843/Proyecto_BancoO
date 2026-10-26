@@ -250,7 +250,8 @@ cuáles ya tienen evidencia en el corpus.
 
 - Se respeta `robots.txt`: lo que está en `Disallow` no se toca
   (`/portaltransaccional/`, `/icbs-web/`, `/AjaxTx`, `/wps/`).
-- `Crawl-delay` y pausa de 1.5 s entre peticiones (configurable).
+- Ritmo de cortesía de 1,5 s entre peticiones (decisión del proyecto;
+  `robots.txt` no declara `Crawl-delay`) y pausa de 10 s cada 50.
 - Identificación en cada petición: UA de navegador + header HTTP `From` con el
   contacto académico. El WAF del sitio responde `403` a cualquier UA que se
   declare bot, aunque `robots.txt` permita el contenido (ver `CONSTITUTION.md`
