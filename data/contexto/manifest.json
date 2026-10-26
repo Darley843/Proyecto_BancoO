@@ -1,0 +1,2033 @@
+{
+  "version": 1,
+  "max_tokens": 175000,
+  "tokens": 166930,
+  "tokens_metodo": "stable_tokens (chars/4, sin red)",
+  "tokens_bloques": 166497,
+  "tokens_informacion_comun": 307,
+  "tokens_cabeceras": 126,
+  "paginas": {
+    "leidas": 244,
+    "incluidas": 194,
+    "excluidas": 50
+  },
+  "tokens_por_seccion": {
+    "identidad": 50924,
+    "atencion": 12315,
+    "oferta": 59247,
+    "legal": 18992,
+    "datos": 1892,
+    "presencia": 2479,
+    "otros": 20648
+  },
+  "informacion_comun": {
+    "lineas": 26,
+    "tokens": 307,
+    "texto": [
+      "##### Dinero para lo que quieras, sin explicaciones",
+      "Obtén tu crédito y haz realidad tus planes con plazos flexibles.",
+      "##### Ahorra con rentabilidad y sin complicaciones",
+      "Protege tu dinero, hazlo crecer y úsalo cuando lo necesites.",
+      "##### Tu tarjeta, tu mundo de posibilidades",
+      "Compra lo que necesitas y accede a promociones exclusivas.",
+      "##### Tu carro nuevo te espera, ¡maneja tu futuro!",
+      "Financia tu próximo vehículo con cuotas cómodas y excelentes tasas.",
+      "- Canales digitales",
+      "- Segmentos",
+      "- Mesa de dinero",
+      "- Haz tus pagos",
+      "Usa tu tarjeta en compras diarias y acumula beneficios exclusivos.",
+      "Una alternativa para administrar mejor tus deudas y pagar menos con una tasa preferente.",
+      "Tarjeta de Crédito especialmente diseñada para viajeros.",
+      "Descubre todo sobre las tasas de interés en Colombia: ¿Qué son y cómo te afectan?",
+      "#### Características y requisitos",
+      "Contrato del producto",
+      "Solicitud de vinculación",
+      "Solicitud de producto",
+      "Tasas personas",
+      "Causales de negación o modificación de créditos preabrobados",
+      "## Título máximo de caracteres 60",
+      "Chatea con un asesor y gestiona tu seguro cómodamente desde WhatsApp.",
+      "#### Adquiérelo con un asesor",
+      "Deja tus datos aquí:"
+    ]
+  },
+  "descartadas_por_presupuesto": [],
+  "incluidas": [
+    {
+      "id": "defensor-del-consumidor-financiero-banco-de-occidente-2226cd",
+      "titulo": "Defensor del Consumidor Financiero | Banco de Occidente",
+      "seccion": "identidad",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/defensor-consumidor-financiero",
+      "prioridad": 1,
+      "tokens": 2243
+    },
+    {
+      "id": "empleos-en-banco-de-occidente-postulate-aqui-a5ddfb",
+      "titulo": "Empleos en Banco de Occidente | ¡Postúlate Aquí!",
+      "seccion": "identidad",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/trabaja-nosotros",
+      "prioridad": 1,
+      "tokens": 670
+    },
+    {
+      "id": "filiales-y-vinculadas-banco-de-occidente-89358d",
+      "titulo": "Filiales y Vinculadas | Banco de Occidente",
+      "seccion": "identidad",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/filiales",
+      "prioridad": 1,
+      "tokens": 315
+    },
+    {
+      "id": "home-trabaja-con-nosotros-030ba6",
+      "titulo": "Home Trabaja con Nosotros",
+      "seccion": "identidad",
+      "fuente": "https://www.bancodeoccidente.com.co/home-trabaja-con-nosotros",
+      "prioridad": 1,
+      "tokens": 329
+    },
+    {
+      "id": "incentivo-a-la-generacion-de-empleo-banco-de-occidente-0cc72d",
+      "titulo": "Incentivo a la generación de empleo | Banco de Occidente",
+      "seccion": "identidad",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/subsidio-empleo-joven",
+      "prioridad": 1,
+      "tokens": 1960
+    },
+    {
+      "id": "informacion-al-proveedor-banco-de-occidente-5995d2",
+      "titulo": "Información al proveedor | Banco de Occidente",
+      "seccion": "identidad",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-proveedor",
+      "prioridad": 1,
+      "tokens": 1321
+    },
+    {
+      "id": "informacion-para-accionistas-banco-de-occidente-d95b2d",
+      "titulo": "Información para Accionistas | Banco de Occidente",
+      "seccion": "identidad",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "prioridad": 1,
+      "tokens": 38379
+    },
+    {
+      "id": "nuestro-banco-banco-de-occidente-4f58e4",
+      "titulo": "Nuestro Banco | Banco de Occidente",
+      "seccion": "identidad",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco",
+      "prioridad": 1,
+      "tokens": 1956
+    },
+    {
+      "id": "quienes-somos-banco-de-occidente-7f9f71",
+      "titulo": "Quiénes Somos | Banco de Occidente",
+      "seccion": "identidad",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos",
+      "prioridad": 1,
+      "tokens": 651
+    },
+    {
+      "id": "reglamentaciones-banco-de-occidente-fd7f3c",
+      "titulo": "Reglamentaciónes | Banco de Occidente",
+      "seccion": "identidad",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/reglamentacion",
+      "prioridad": 1,
+      "tokens": 261
+    },
+    {
+      "id": "servicios-aval-banco-de-occidente-abd1f7",
+      "titulo": "Servicios Aval | Banco de Occidente",
+      "seccion": "identidad",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/servicios-aval",
+      "prioridad": 1,
+      "tokens": 1935
+    },
+    {
+      "id": "tarjeta-de-credito-mastercard-unicef-banco-de-occidente-7b0f34",
+      "titulo": "Tarjeta de Crédito MasterCard Unicef | Banco de Occidente",
+      "seccion": "identidad",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/proposito",
+      "prioridad": 1,
+      "tokens": 108
+    },
+    {
+      "id": "trabaja-con-nosotros-d90f25",
+      "titulo": "Trabaja con nosotros",
+      "seccion": "identidad",
+      "fuente": "https://www.bancodeoccidente.com.co/trabaja-con-nosotros",
+      "prioridad": 1,
+      "tokens": 796
+    },
+    {
+      "id": "agenda-tu-cita-con-un-asesor-0ce9cf",
+      "titulo": "Agenda tu cita con un asesor",
+      "seccion": "atencion",
+      "fuente": "https://www.bancodeoccidente.com.co/ayuda/agendar-cita-asesor",
+      "prioridad": 2,
+      "tokens": 64
+    },
+    {
+      "id": "app-movil-banco-de-occidente-ae3601",
+      "titulo": "App Móvil Banco de Occidente",
+      "seccion": "atencion",
+      "fuente": "https://www.bancodeoccidente.com.co/canales-digitales/banca-movil",
+      "prioridad": 2,
+      "tokens": 339
+    },
+    {
+      "id": "ayuda-y-asesoria-en-productos-y-servicios-banco-de-occidente-3eedff",
+      "titulo": "Ayuda y Asesoría en Productos y Servicios Banco de Occidente",
+      "seccion": "atencion",
+      "fuente": "https://www.bancodeoccidente.com.co/ayuda",
+      "prioridad": 2,
+      "tokens": 388
+    },
+    {
+      "id": "canales-digitales-banco-de-occidente-05fb6e",
+      "titulo": "Canales Digitales Banco de Occidente",
+      "seccion": "atencion",
+      "fuente": "https://www.bancodeoccidente.com.co/canales-digitales",
+      "prioridad": 2,
+      "tokens": 351
+    },
+    {
+      "id": "linea-asesor-en-negociacion-banco-de-occidente-bf1794",
+      "titulo": "Línea Asesor en Negociación Banco de Occidente",
+      "seccion": "atencion",
+      "fuente": "https://www.bancodeoccidente.com.co/ayuda/linea-conciliacion-negociacion",
+      "prioridad": 2,
+      "tokens": 696
+    },
+    {
+      "id": "lineas-de-servicio-al-cliente-banco-de-occidente-7df324",
+      "titulo": "Líneas de Servicio al Cliente Banco de Occidente",
+      "seccion": "atencion",
+      "fuente": "https://www.bancodeoccidente.com.co/ayuda/linea-servicio-cliente",
+      "prioridad": 2,
+      "tokens": 414
+    },
+    {
+      "id": "portal-transaccional-banco-de-occidente-8b4df0",
+      "titulo": "Portal Transaccional Banco de Occidente",
+      "seccion": "atencion",
+      "fuente": "https://www.bancodeoccidente.com.co/canales-digitales/portal-transaccional",
+      "prioridad": 2,
+      "tokens": 356
+    },
+    {
+      "id": "preguntas-frecuentes-banco-de-occidente-ba08d9",
+      "titulo": "Preguntas Frecuentes Banco de Occidente",
+      "seccion": "atencion",
+      "fuente": "https://www.bancodeoccidente.com.co/ayuda/preguntas-frecuentes",
+      "prioridad": 2,
+      "tokens": 4300
+    },
+    {
+      "id": "reversion-de-pagos-banco-de-occidente-cfb0db",
+      "titulo": "Reversión de Pagos Banco de Occidente",
+      "seccion": "atencion",
+      "fuente": "https://www.bancodeoccidente.com.co/ayuda/reversion-pagos",
+      "prioridad": 2,
+      "tokens": 101
+    },
+    {
+      "id": "seguridad-y-fraude-banco-de-occidente-f3aa80",
+      "titulo": "Seguridad y Fraude Banco de Occidente",
+      "seccion": "atencion",
+      "fuente": "https://www.bancodeoccidente.com.co/ayuda/seguridad-fraude",
+      "prioridad": 2,
+      "tokens": 4544
+    },
+    {
+      "id": "solicita-productos-del-banco-por-whatsapp-facil-y-rapido-3d75e1",
+      "titulo": "Solicita Productos del Banco por WhatsApp Fácil y Rápido",
+      "seccion": "atencion",
+      "fuente": "https://www.bancodeoccidente.com.co/ayuda/whatsapp",
+      "prioridad": 2,
+      "tokens": 421
+    },
+    {
+      "id": "visacion-y-exigibilidades-de-libranza-banco-de-occidente-80262b",
+      "titulo": "Visación y Exigibilidades de Libranza Banco de Occidente",
+      "seccion": "atencion",
+      "fuente": "https://www.bancodeoccidente.com.co/canales-digitales/visacion-credito-libranza",
+      "prioridad": 2,
+      "tokens": 341
+    },
+    {
+      "id": "abre-tu-cuenta-de-nomina-online-en-el-banco-de-occidente-841f9c",
+      "titulo": "Abre tu Cuenta de Nómina Online en el Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/cuenta-de-nomina",
+      "prioridad": 3,
+      "tokens": 838
+    },
+    {
+      "id": "ahorros-e-inversion-con-banco-de-occidente-cbeeba",
+      "titulo": "Ahorros e Inversión con Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/inversion",
+      "prioridad": 3,
+      "tokens": 371
+    },
+    {
+      "id": "alianza-credito-porvenir-f6106f",
+      "titulo": "Alianza Crédito Porvenir",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/alianza-credito-porvenir",
+      "prioridad": 3,
+      "tokens": 197
+    },
+    {
+      "id": "asegura-tu-futuro-con-los-productos-del-banco-de-occidente-f5f20f",
+      "titulo": "Asegura tu futuro con los productos del Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/productos",
+      "prioridad": 3,
+      "tokens": 339
+    },
+    {
+      "id": "asistencia-total-hogar-vial-y-medica-en-un-solo-lugar-a62f06",
+      "titulo": "Asistencia Total: Hogar, Vial y Médica en un Solo Lugar",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/asistencia-total",
+      "prioridad": 3,
+      "tokens": 310
+    },
+    {
+      "id": "asistencias-para-salud-hogar-y-vehiculo-banco-de-occidente-f1212d",
+      "titulo": "Asistencias para Salud, Hogar y Vehículo | Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/asistencias-assisprex",
+      "prioridad": 3,
+      "tokens": 222
+    },
+    {
+      "id": "asistencias-tarjetas-de-credito-banco-de-occidente-0dabe9",
+      "titulo": "Asistencias Tarjetas de Crédito | Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/asistencia-de-viajes-internacionales",
+      "prioridad": 3,
+      "tokens": 3815
+    },
+    {
+      "id": "asistencias-tarjetas-de-credito-banco-de-occidente-43cf51",
+      "titulo": "Asistencias Tarjetas de Crédito | Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/asistencias-en-viajes-nacionales",
+      "prioridad": 3,
+      "tokens": 2373
+    },
+    {
+      "id": "asistencias-tarjetas-de-credito-banco-de-occidente-5e4948",
+      "titulo": "Asistencias Tarjetas de Crédito | Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/asistencias-tarjetas-de-credito",
+      "prioridad": 3,
+      "tokens": 3198
+    },
+    {
+      "id": "asistencias-tarjetas-de-credito-banco-de-occidente-ce551a",
+      "titulo": "Asistencias Tarjetas de Crédito | Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/asistencia-vehicular",
+      "prioridad": 3,
+      "tokens": 2018
+    },
+    {
+      "id": "asistencias-tarjetas-de-credito-banco-de-occidente-f64e0b",
+      "titulo": "Asistencias Tarjetas de Crédito | Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/asistencia-al-hogar",
+      "prioridad": 3,
+      "tokens": 3068
+    },
+    {
+      "id": "cdt-banco-de-occidente-inversion-segura-y-rentable-ef9226",
+      "titulo": "CDT Banco de Occidente: Inversión Segura y Rentable",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/inversion/cdt",
+      "prioridad": 3,
+      "tokens": 504
+    },
+    {
+      "id": "cesion-de-derechos-en-leasing-habitacional-banco-de-occident-9e6a3f",
+      "titulo": "Cesión de Derechos en Leasing Habitacional Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/cesion-leasing-habitacional",
+      "prioridad": 3,
+      "tokens": 158
+    },
+    {
+      "id": "compra-de-cartera-banco-de-occidente-unifica-tus-deudas-78c7fb",
+      "titulo": "Compra de Cartera Banco de Occidente: Unifica tus Deudas",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/compra-cartera",
+      "prioridad": 3,
+      "tokens": 410
+    },
+    {
+      "id": "compra-de-cartera-de-credito-de-vehiculo-banco-de-occidente-994a06",
+      "titulo": "Compra de Cartera de Crédito de Vehículo Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/compra-cartera-vehiculos",
+      "prioridad": 3,
+      "tokens": 1243
+    },
+    {
+      "id": "compra-de-cartera-de-credito-hipotecario-banco-de-occidente-2afec7",
+      "titulo": "Compra de Cartera de Crédito Hipotecario Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/compra-cartera-hipotecaria",
+      "prioridad": 3,
+      "tokens": 338
+    },
+    {
+      "id": "consulta-medica-domiciliaria-y-teleconsulta-24-7-emermedica-eb9033",
+      "titulo": "Consulta Médica Domiciliaria y Teleconsulta 24/7 - Emermédica",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/emermedica",
+      "prioridad": 3,
+      "tokens": 386
+    },
+    {
+      "id": "credito-cartera-ordinaria-banco-de-occidente-para-tu-negocio-ba65e6",
+      "titulo": "Crédito Cartera Ordinaria Banco de Occidente para tu Negocio",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/cartera-ordinaria",
+      "prioridad": 3,
+      "tokens": 383
+    },
+    {
+      "id": "credito-con-pensiones-voluntarias-banco-de-occidente-fae9f1",
+      "titulo": "Crédito con Pensiones Voluntarias Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/pensiones-voluntarias",
+      "prioridad": 3,
+      "tokens": 414
+    },
+    {
+      "id": "credito-de-libranza-para-pensionados-y-empleados-f1e4d0",
+      "titulo": "Crédito de Libranza para Pensionados y Empleados",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/libranza",
+      "prioridad": 3,
+      "tokens": 114
+    },
+    {
+      "id": "credito-de-vivienda-para-colombianos-en-el-exterior-banco-de-d88dba",
+      "titulo": "Crédito de Vivienda para Colombianos en el Exterior | Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/colombianos-en-el-exterior",
+      "prioridad": 3,
+      "tokens": 304
+    },
+    {
+      "id": "credito-hipotecario-para-compra-de-vivienda-nueva-o-usada-9d8c83",
+      "titulo": "Crédito Hipotecario para Compra de Vivienda Nueva o Usada",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/hipotecario",
+      "prioridad": 3,
+      "tokens": 374
+    },
+    {
+      "id": "credito-hipotecario-para-remodelacion-de-vivienda-b873d7",
+      "titulo": "Crédito Hipotecario para Remodelación de Vivienda",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/remodelacion-ampliacion",
+      "prioridad": 3,
+      "tokens": 295
+    },
+    {
+      "id": "credito-para-carro-nuevo-o-usado-banco-de-occidente-3f7512",
+      "titulo": "Crédito para Carro Nuevo o Usado Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/carros",
+      "prioridad": 3,
+      "tokens": 351
+    },
+    {
+      "id": "credito-para-construccion-de-vivienda-banco-de-occidente-5f1c29",
+      "titulo": "Crédito para Construcción de Vivienda Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/construccion-vivienda-propia",
+      "prioridad": 3,
+      "tokens": 152
+    },
+    {
+      "id": "credito-para-mejora-de-vivienda-banco-de-occidente-7d1491",
+      "titulo": "Crédito para Mejora de Vivienda Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/mejora-vivienda",
+      "prioridad": 3,
+      "tokens": 1030
+    },
+    {
+      "id": "credito-para-motos-nuevas-o-usadas-del-banco-de-occidente-d3e2b2",
+      "titulo": "Crédito para Motos Nuevas o Usadas del Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/motos",
+      "prioridad": 3,
+      "tokens": 1364
+    },
+    {
+      "id": "credito-para-vehiculos-electricos-e-hibridos-banco-de-occide-84146b",
+      "titulo": "Crédito para Vehículos Eléctricos e Híbridos Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/vehiculos-electricos-hibridos",
+      "prioridad": 3,
+      "tokens": 503
+    },
+    {
+      "id": "credito-para-vehiculos-productivos-de-carga-y-pasajeros-4992e5",
+      "titulo": "Crédito para Vehículos Productivos de Carga y Pasajeros",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/vehiculos-productivos",
+      "prioridad": 3,
+      "tokens": 1377
+    },
+    {
+      "id": "credito-rotativo-banco-de-occidente-soluciones-a-tu-medida-b6482f",
+      "titulo": "Crédito Rotativo Banco de Occidente: Soluciones a tu Medida",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/rotativo",
+      "prioridad": 3,
+      "tokens": 414
+    },
+    {
+      "id": "creditos-banco-de-occidente-financia-tus-proyectos-hoy-98ce4b",
+      "titulo": "Créditos Banco de Occidente: Financia Tus Proyectos Hoy",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos",
+      "prioridad": 3,
+      "tokens": 263
+    },
+    {
+      "id": "creditos-de-vivienda-compra-construye-o-remodela-tu-hogar-762747",
+      "titulo": "Créditos de Vivienda: Compra, Construye o Remodela tu Hogar",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/vivienda",
+      "prioridad": 3,
+      "tokens": 108
+    },
+    {
+      "id": "cuenta-activa-e61f74",
+      "titulo": "Cuenta Activa",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/cuenta-activa",
+      "prioridad": 3,
+      "tokens": 630
+    },
+    {
+      "id": "cuenta-activa-basica-983189",
+      "titulo": "Cuenta Activa Básica",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/cuenta-activa-basica",
+      "prioridad": 3,
+      "tokens": 453
+    },
+    {
+      "id": "cuenta-afc-banco-de-occidente-para-ahorrar-para-tu-vivienda-21969b",
+      "titulo": "Cuenta AFC Banco de Occidente para Ahorrar para tu Vivienda",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/cuenta-afc",
+      "prioridad": 3,
+      "tokens": 498
+    },
+    {
+      "id": "cuenta-corriente-banco-de-occidente-para-manejar-tu-dinero-f-1c88cc",
+      "titulo": "Cuenta Corriente Banco de Occidente para Manejar tu dinero fácil",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/cuenta-corriente",
+      "prioridad": 3,
+      "tokens": 652
+    },
+    {
+      "id": "cuenta-de-ahorros-digital-banco-de-occidente-524d0d",
+      "titulo": "Cuenta de Ahorros Digital | Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/cuenta-de-ahorros",
+      "prioridad": 3,
+      "tokens": 156
+    },
+    {
+      "id": "cuenta-de-ahorros-para-pensionados-banco-de-occidente-3c8571",
+      "titulo": "Cuenta de Ahorros para Pensionados Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/cuentas/cuenta-ahorros-pensionados",
+      "prioridad": 3,
+      "tokens": 511
+    },
+    {
+      "id": "cuenta-offshore-en-dolares-banco-de-occidente-ebd665",
+      "titulo": "Cuenta Offshore en Dólares | Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/inversion/offshore",
+      "prioridad": 3,
+      "tokens": 381
+    },
+    {
+      "id": "cuota-protegida-d1c897",
+      "titulo": "Cuota Protegida",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/libranza/cuota-protegida",
+      "prioridad": 3,
+      "tokens": 1434
+    },
+    {
+      "id": "cuota-protegida-prestamo-personal-y-cuenta-activa-768ff7",
+      "titulo": "Cuota Protegida Préstamo Personal y Cuenta Activa",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/prestamo-personal",
+      "prioridad": 3,
+      "tokens": 304
+    },
+    {
+      "id": "descubre-las-cuentas-del-banco-de-occidente-y-elige-la-tuya-2b2f4e",
+      "titulo": "Descubre las cuentas del Banco de Occidente y elige la tuya",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/cuentas",
+      "prioridad": 3,
+      "tokens": 184
+    },
+    {
+      "id": "descuentos-para-tus-mascotas-con-la-tarjeta-banco-de-occiden-045730",
+      "titulo": "Descuentos para tus Mascotas con la Tarjeta Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/visa-gold-mascotas",
+      "prioridad": 3,
+      "tokens": 446
+    },
+    {
+      "id": "google-pay-tarjeta-debito-16d726",
+      "titulo": "Google Pay Tarjeta Débito",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/google-pay-tarjeta-debito",
+      "prioridad": 3,
+      "tokens": 1045
+    },
+    {
+      "id": "leasing-habitacional-para-compra-de-vivienda-banco-de-occide-41187c",
+      "titulo": "Leasing Habitacional para Compra de Vivienda Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/leasing-habitacional",
+      "prioridad": 3,
+      "tokens": 109
+    },
+    {
+      "id": "licitacion-companias-aseguradoras-banco-de-occidente-780b24",
+      "titulo": "Licitación Compañías Aseguradoras | Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/licitacion-banca-seguros",
+      "prioridad": 3,
+      "tokens": 811
+    },
+    {
+      "id": "occiauto-credito-para-compra-de-vehiculo-nuevo-o-usado-acb9b9",
+      "titulo": "Occiauto: Crédito para Compra de Vehículo Nuevo o Usado",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/vehiculos",
+      "prioridad": 3,
+      "tokens": 330
+    },
+    {
+      "id": "occirenta-fondos-de-inversion-colectiva-en-renta-fija-d77dd2",
+      "titulo": "Occirenta: Fondos de Inversión Colectiva en Renta Fija",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/inversion/fondos-inversion",
+      "prioridad": 3,
+      "tokens": 841
+    },
+    {
+      "id": "pensionados-protegidos-52dc11",
+      "titulo": "Pensionados Protegidos",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/libranza/pensionados-protegidos",
+      "prioridad": 3,
+      "tokens": 1164
+    },
+    {
+      "id": "prestamo-personal-dinamico-d553c9",
+      "titulo": "Prestamo Personal Dinámico",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/prestamo-personal-dinamico",
+      "prioridad": 3,
+      "tokens": 412
+    },
+    {
+      "id": "promociones-con-tarjetas-de-credito-banco-de-occidente-67ac8f",
+      "titulo": "Promociones con Tarjetas de Crédito Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/promociones",
+      "prioridad": 3,
+      "tokens": 676
+    },
+    {
+      "id": "protege-los-contenidos-de-tu-hogar-vivienda-protegida-f698a8",
+      "titulo": "Protege los Contenidos de tu Hogar |Vivienda Protegida",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/contenidos",
+      "prioridad": 3,
+      "tokens": 488
+    },
+    {
+      "id": "proyectos-de-vivienda-ff136f",
+      "titulo": "Proyectos de Vivienda",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/proyectos-de-vivienda",
+      "prioridad": 3,
+      "tokens": 2307
+    },
+    {
+      "id": "proyectos-vivienda-ec2046",
+      "titulo": "Proyectos Vivienda",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/proyectos-vivienda-form",
+      "prioridad": 3,
+      "tokens": 349
+    },
+    {
+      "id": "prestamo-personal-banco-de-occidente-facil-y-rapido-f0777e",
+      "titulo": "Préstamo Personal Banco de Occidente: Fácil y Rápido",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/credito-personal",
+      "prioridad": 3,
+      "tokens": 360
+    },
+    {
+      "id": "seguro-cuenta-protegida-plus-banco-de-occidente-081e21",
+      "titulo": "Seguro Cuenta Protegida Plus Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/cuenta-ahorros",
+      "prioridad": 3,
+      "tokens": 409
+    },
+    {
+      "id": "seguro-cuota-protegida-libranza-banco-de-occidente-22e979",
+      "titulo": "Seguro Cuota Protegida Libranza Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/libranza",
+      "prioridad": 3,
+      "tokens": 317
+    },
+    {
+      "id": "seguro-cuota-protegida-libranza-banco-de-occidente-2e8b47",
+      "titulo": "Seguro Cuota Protegida Libranza | Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/seguros-de-libranza",
+      "prioridad": 3,
+      "tokens": 312
+    },
+    {
+      "id": "seguro-cuota-protegida-para-tu-credito-de-vivienda-6e0224",
+      "titulo": "Seguro Cuota Protegida para tu Crédito de Vivienda",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguro-de-vida-vivienda",
+      "prioridad": 3,
+      "tokens": 513
+    },
+    {
+      "id": "seguro-cuota-protegida-para-tu-credito-de-vivienda-99b2dd",
+      "titulo": "Seguro Cuota Protegida para tu Crédito de Vivienda",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/cuota-protegida",
+      "prioridad": 3,
+      "tokens": 475
+    },
+    {
+      "id": "seguro-cuota-protegida-para-vehiculos-banco-de-occidente-5f8907",
+      "titulo": "Seguro Cuota Protegida para Vehículos Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/vehiculos-cuota-protegida",
+      "prioridad": 3,
+      "tokens": 341
+    },
+    {
+      "id": "seguro-cuota-protegida-transportador-banco-de-occidente-601c81",
+      "titulo": "Seguro Cuota Protegida Transportador Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/vehiculos-cuota-protegida-transportador",
+      "prioridad": 3,
+      "tokens": 360
+    },
+    {
+      "id": "seguro-de-accidentes-integral-43234d",
+      "titulo": "Seguro de Accidentes integral",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguro-de-accidentes-integral",
+      "prioridad": 3,
+      "tokens": 141
+    },
+    {
+      "id": "seguro-de-depositos-fogafin-a8250d",
+      "titulo": "Seguro de Depósitos Fogafin",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguro-depositos-fogafin",
+      "prioridad": 3,
+      "tokens": 440
+    },
+    {
+      "id": "seguro-de-desempleo-cuota-protegida-empleados-banco-de-occid-82fadb",
+      "titulo": "Seguro de Desempleo Cuota Protegida Empleados Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/desempleo-empleados",
+      "prioridad": 3,
+      "tokens": 290
+    },
+    {
+      "id": "seguro-de-desempleo-cuota-protegida-independientes-1d244e",
+      "titulo": "Seguro de Desempleo Cuota Protegida Independientes",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/desempleo-independientes",
+      "prioridad": 3,
+      "tokens": 335
+    },
+    {
+      "id": "seguro-de-incendio-y-terremoto-vivienda-protegida-4a2bbb",
+      "titulo": "Seguro de Incendio y Terremoto | Vivienda Protegida",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/incendio",
+      "prioridad": 3,
+      "tokens": 506
+    },
+    {
+      "id": "seguro-de-viaje-assist-card-banco-de-occidente-d32808",
+      "titulo": "Seguro de Viaje Assist Card - Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/viaje-assist-card",
+      "prioridad": 3,
+      "tokens": 430
+    },
+    {
+      "id": "seguro-de-vida-vive-la-vida-banco-de-occidente-eaa4e4",
+      "titulo": "Seguro de Vida \"Vive la Vida\" Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/vive",
+      "prioridad": 3,
+      "tokens": 285
+    },
+    {
+      "id": "seguro-de-vivienda-protege-tu-hogar-con-banco-de-occidente-ed0b6f",
+      "titulo": "Seguro de Vivienda | Protege tu Hogar con Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/vivienda",
+      "prioridad": 3,
+      "tokens": 306
+    },
+    {
+      "id": "seguro-estamos-contigo-con-cobertura-por-cancer-bcdf47",
+      "titulo": "Seguro Estamos Contigo con Cobertura por Cáncer",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/estamos-contigo",
+      "prioridad": 3,
+      "tokens": 325
+    },
+    {
+      "id": "seguro-para-mascotas-proteccion-completa-para-tu-companero-12d6c5",
+      "titulo": "Seguro para Mascotas - Protección Completa para tu Compañero",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/mascotas",
+      "prioridad": 3,
+      "tokens": 293
+    },
+    {
+      "id": "seguro-para-mascotas-protege-a-tu-perro-o-gato-084d78",
+      "titulo": "Seguro para Mascotas - Protege a tu Perro o Gato",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/mascotas-perros-gatos",
+      "prioridad": 3,
+      "tokens": 356
+    },
+    {
+      "id": "seguro-para-vehiculos-banco-de-occidente-c815b0",
+      "titulo": "Seguro para vehículos Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/vehiculos",
+      "prioridad": 3,
+      "tokens": 354
+    },
+    {
+      "id": "seguro-para-vehiculos-pesados-banco-de-occidente-9a5775",
+      "titulo": "Seguro para vehículos pesados Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/vehiculos-productivos",
+      "prioridad": 3,
+      "tokens": 364
+    },
+    {
+      "id": "seguro-todo-riesgo-para-tu-carro-banco-de-occidente-8a66a9",
+      "titulo": "Seguro todo riesgo para tu carro Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/carros",
+      "prioridad": 3,
+      "tokens": 465
+    },
+    {
+      "id": "seguro-todo-riesgo-para-tu-moto-banco-de-occidente-3b1018",
+      "titulo": "Seguro todo riesgo para tu moto Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/motos",
+      "prioridad": 3,
+      "tokens": 350
+    },
+    {
+      "id": "seguro-vive-la-vida-tarjeta-credito-banco-de-occidente-87cdf9",
+      "titulo": "Seguro Vive la vida Tarjeta Crédito Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/tarjeta-credito",
+      "prioridad": 3,
+      "tokens": 235
+    },
+    {
+      "id": "seguros-para-personas-vivienda-vehiculos-mascotas-y-mas-4a9ebe",
+      "titulo": "Seguros para Personas: Vivienda, Vehículos, Mascotas y más",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros",
+      "prioridad": 3,
+      "tokens": 256
+    },
+    {
+      "id": "servicios-de-asistencia-en-salud-banco-de-occidente-ed3a2b",
+      "titulo": "Servicios de Asistencia en Salud Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/asistencia-salud",
+      "prioridad": 3,
+      "tokens": 317
+    },
+    {
+      "id": "solicita-tu-credito-de-libre-inversion-con-banco-de-occident-d8142b",
+      "titulo": "Solicita tu Crédito de Libre Inversión con Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/creditos/prestamo-personal",
+      "prioridad": 3,
+      "tokens": 510
+    },
+    {
+      "id": "solicitar-credito-1a3de6",
+      "titulo": "Solicitar Crédito",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/solicitar-credito",
+      "prioridad": 3,
+      "tokens": 175
+    },
+    {
+      "id": "tarifas-productos-y-servicios-2026-banco-de-occidente-2e5a54",
+      "titulo": "Tarifas Productos y Servicios 2026 | Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarifas",
+      "prioridad": 3,
+      "tokens": 318
+    },
+    {
+      "id": "tarjeta-de-credito-credencial-free-sin-cuota-de-manejo-d60318",
+      "titulo": "Tarjeta de Crédito Credencial Free Sin Cuota de Manejo",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/credencial-free",
+      "prioridad": 3,
+      "tokens": 451
+    },
+    {
+      "id": "tarjeta-de-credito-credencial-platinum-banco-de-occidente-c59b56",
+      "titulo": "Tarjeta de Crédito Credencial Platinum Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/mastercard-visa-platinum",
+      "prioridad": 3,
+      "tokens": 314
+    },
+    {
+      "id": "tarjeta-de-credito-digital-occiflex-banco-de-occidente-e1de25",
+      "titulo": "Tarjeta de Crédito Digital OcciFlex Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/occiflex",
+      "prioridad": 3,
+      "tokens": 473
+    },
+    {
+      "id": "tarjeta-de-credito-latam-pass-clasica-banco-de-occidente-3c3335",
+      "titulo": "Tarjeta de Crédito LATAM Pass Clásica Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/clasica-latam",
+      "prioridad": 3,
+      "tokens": 358
+    },
+    {
+      "id": "tarjeta-de-credito-latam-pass-gold-banco-de-occidente-27acae",
+      "titulo": "Tarjeta de Crédito LATAM Pass Gold Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/gold-latam",
+      "prioridad": 3,
+      "tokens": 130
+    },
+    {
+      "id": "tarjeta-de-credito-latam-pass-gold-banco-de-occidente-e989b8",
+      "titulo": "Tarjeta de Crédito LATAM Pass Gold Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/latam-pass-gold-visa",
+      "prioridad": 3,
+      "tokens": 572
+    },
+    {
+      "id": "tarjeta-de-credito-latam-pass-platinum-banco-de-occidente-1eee11",
+      "titulo": "Tarjeta de Crédito LATAM Pass Platinum Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/platinum-latam",
+      "prioridad": 3,
+      "tokens": 106
+    },
+    {
+      "id": "tarjeta-de-credito-latam-pass-platinum-banco-de-occidente-7b4bc8",
+      "titulo": "Tarjeta de Crédito LATAM Pass Platinum Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/latam-pass-platinum-visa",
+      "prioridad": 3,
+      "tokens": 646
+    },
+    {
+      "id": "tarjeta-de-credito-latam-pass-signature-banco-de-occidente-28ed65",
+      "titulo": "Tarjeta de Crédito LATAM Pass Signature Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/latam-pass-signature-visa",
+      "prioridad": 3,
+      "tokens": 154
+    },
+    {
+      "id": "tarjeta-de-credito-mastercard-black-banco-de-occidente-ae9d89",
+      "titulo": "Tarjeta de Crédito Mastercard Black Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/master-card-black",
+      "prioridad": 3,
+      "tokens": 298
+    },
+    {
+      "id": "tarjeta-de-credito-mastercard-unicef-banco-de-occidente-e89aad",
+      "titulo": "Tarjeta de Crédito Mastercard UNICEF Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/mastercard-unicef",
+      "prioridad": 3,
+      "tokens": 114
+    },
+    {
+      "id": "tarjeta-de-credito-santafe-banco-de-occidente-d99d15",
+      "titulo": "Tarjeta de Crédito Santafé Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/santa-fe",
+      "prioridad": 3,
+      "tokens": 439
+    },
+    {
+      "id": "tarjeta-debito-banco-de-occidente-con-beneficios-imperdibles-4d0871",
+      "titulo": "Tarjeta Débito Banco de Occidente con Beneficios Imperdibles",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/cuentas/tarjeta-debito",
+      "prioridad": 3,
+      "tokens": 402
+    },
+    {
+      "id": "tarjetas-de-credito-clasicas-banco-de-occidente-26c97a",
+      "titulo": "Tarjetas de Crédito Clásicas | Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/primera-tarjeta-credito",
+      "prioridad": 3,
+      "tokens": 119
+    },
+    {
+      "id": "tarjetas-de-credito-con-beneficios-exclusivos-banco-de-occid-720006",
+      "titulo": "Tarjetas de Crédito con Beneficios Exclusivos | Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito",
+      "prioridad": 3,
+      "tokens": 285
+    },
+    {
+      "id": "tarjetas-de-credito-visa-latam-pass-banco-de-occidente-67849b",
+      "titulo": "Tarjetas de Crédito Visa LATAM Pass | Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/tarjetas-credito-latam-pass",
+      "prioridad": 3,
+      "tokens": 203
+    },
+    {
+      "id": "tarjetas-de-credito-visa-y-mastercard-clasica-banco-de-occid-c17f17",
+      "titulo": "Tarjetas de Crédito Visa y Mastercard Clásica Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/mastercard-visa-clasica",
+      "prioridad": 3,
+      "tokens": 456
+    },
+    {
+      "id": "tarjetas-de-credito-visa-y-mastercard-gold-banco-de-occident-ab8ef8",
+      "titulo": "Tarjetas de Crédito Visa y Mastercard Gold Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/mastercard-visa-gold",
+      "prioridad": 3,
+      "tokens": 304
+    },
+    {
+      "id": "tarjetas-de-credito-visa-y-mastercard-premium-banco-de-occid-c940a2",
+      "titulo": "Tarjetas de Crédito Visa y Mastercard Premium | Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/tarjetas-credito/premium",
+      "prioridad": 3,
+      "tokens": 151
+    },
+    {
+      "id": "viaja-tranquilo-con-el-seguro-de-viaje-banco-de-occidente-8a4e42",
+      "titulo": "Viaja Tranquilo con el Seguro de Viaje Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/viaje",
+      "prioridad": 3,
+      "tokens": 298
+    },
+    {
+      "id": "vive-la-vida-7857a6",
+      "titulo": "Vive la Vida",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/libranza/vive-la-vida",
+      "prioridad": 3,
+      "tokens": 1094
+    },
+    {
+      "id": "vive-la-vida-seguro-de-vida-banco-de-occidente-0e1f77",
+      "titulo": "Vive la Vida Seguro de Vida Banco de Occidente",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/seguros/vida-desempleo",
+      "prioridad": 3,
+      "tokens": 327
+    },
+    {
+      "id": "legal-y-politicas-banco-de-occidente-ebbc7d",
+      "titulo": "Legal y Políticas | Banco de Occidente",
+      "seccion": "legal",
+      "fuente": "https://www.bancodeoccidente.com.co/legal-politicas",
+      "prioridad": 4,
+      "tokens": 307
+    },
+    {
+      "id": "ley-borron-y-cuenta-nueva-banco-de-occidente-84c862",
+      "titulo": "Ley Borrón y Cuenta Nueva | Banco de Occidente",
+      "seccion": "legal",
+      "fuente": "https://www.bancodeoccidente.com.co/legal-politicas/ley-borron-cuenta-nueva",
+      "prioridad": 4,
+      "tokens": 517
+    },
+    {
+      "id": "politica-de-tratamiento-de-datos-personales-banco-de-occiden-8e99e6",
+      "titulo": "Política de Tratamiento de Datos Personales | Banco de Occidente",
+      "seccion": "legal",
+      "fuente": "https://www.bancodeoccidente.com.co/legal-politicas/tratamiento-datos",
+      "prioridad": 4,
+      "tokens": 805
+    },
+    {
+      "id": "politicas-de-cookies-banco-de-occidente-a5b35c",
+      "titulo": "Políticas de Cookies | Banco de Occidente",
+      "seccion": "legal",
+      "fuente": "https://www.bancodeoccidente.com.co/legal-politicas/cookies",
+      "prioridad": 4,
+      "tokens": 780
+    },
+    {
+      "id": "politicas-redes-sociales-banco-de-occidente-77511b",
+      "titulo": "Políticas Redes Sociales | Banco de Occidente",
+      "seccion": "legal",
+      "fuente": "https://www.bancodeoccidente.com.co/legal-politicas/redes-sociales",
+      "prioridad": 4,
+      "tokens": 4143
+    },
+    {
+      "id": "transparencia-bf48c2",
+      "titulo": "Transparencia",
+      "seccion": "legal",
+      "fuente": "https://www.bancodeoccidente.com.co/transparencia",
+      "prioridad": 4,
+      "tokens": 8382
+    },
+    {
+      "id": "terminos-y-condiciones-banco-de-occidente-785acd",
+      "titulo": "Términos y Condiciones | Banco de Occidente",
+      "seccion": "legal",
+      "fuente": "https://www.bancodeoccidente.com.co/legal-politicas/terminos-condiciones",
+      "prioridad": 4,
+      "tokens": 4058
+    },
+    {
+      "id": "asamblea-de-accionistas-6a971b",
+      "titulo": "Asamblea de Accionistas",
+      "seccion": "datos",
+      "fuente": "https://www.bancodeoccidente.com.co/asamblea-de-accionistas-2026",
+      "prioridad": 5,
+      "tokens": 122
+    },
+    {
+      "id": "informacion-para-accionistas-banco-de-occidente-1cce2d",
+      "titulo": "Información para Accionistas | Banco de Occidente",
+      "seccion": "datos",
+      "fuente": "https://www.bancodeoccidente.com.co/boletin-empresarial",
+      "prioridad": 5,
+      "tokens": 266
+    },
+    {
+      "id": "informacion-para-accionistas-banco-de-occidente-91475a",
+      "titulo": "Información para Accionistas | Banco de Occidente",
+      "seccion": "datos",
+      "fuente": "https://www.bancodeoccidente.com.co/foros",
+      "prioridad": 5,
+      "tokens": 461
+    },
+    {
+      "id": "sostenibilidad-banco-de-occidente-81a33a",
+      "titulo": "Sostenibilidad Banco de Occidente",
+      "seccion": "datos",
+      "fuente": "https://www.bancodeoccidente.com.co/sostenibilidad",
+      "prioridad": 5,
+      "tokens": 756
+    },
+    {
+      "id": "tarjeta-de-credito-visa-infinite-banco-de-occidente-4fa0ad",
+      "titulo": "Tarjeta de Crédito Visa Infinite Banco de Occidente",
+      "seccion": "datos",
+      "fuente": "https://www.bancodeoccidente.com.co/visa-infinite",
+      "prioridad": 5,
+      "tokens": 287
+    },
+    {
+      "id": "noticia-2026-09-22-credito-subordinado-deg-portafolio",
+      "titulo": "Banco alemán presta US$150 millones a Banco de Occidente en crédito subordinado: qué es este tipo de préstamo",
+      "seccion": "presencia",
+      "fuente": "https://www.portafolio.co/mis-finanzas/creditos/banco-aleman-presta-us-150-millones-a-banco-de-occidente-en-credito-subordinado-que-es-este-tipo-de-prestamo-503016",
+      "prioridad": 6,
+      "tokens": 227
+    },
+    {
+      "id": "noticia-2026-09-03-absorcion-fiduciaria-larepublica",
+      "titulo": "Banco de Occidente completó la absorción por adquisición de Fiduciaria de Occidente",
+      "seccion": "presencia",
+      "fuente": "https://www.larepublica.co/finanzas/banco-de-occidente-completo-la-absorcion-por-adquisicion-de-fiduciaria-de-occidente-4472688",
+      "prioridad": 6,
+      "tokens": 188
+    },
+    {
+      "id": "noticia-2026-08-14-utilidad-semestral-portafolio",
+      "titulo": "Banco de Occidente eleva su utilidad semestral y gana $254.651 millones solo en segundo trimestre",
+      "seccion": "presencia",
+      "fuente": "https://www.portafolio.co/negocios/empresas/banco-de-occidente-eleva-su-utilidad-semestral-y-gana-254-651-millones-solo-en-segundo-trimestre-500377",
+      "prioridad": 6,
+      "tokens": 205
+    },
+    {
+      "id": "noticia-2026-10-19-parque-solar-portafolio",
+      "titulo": "Banco de Occidente financiará con $200.000 millones parque solar en Santander que generará 500 GWh al año",
+      "seccion": "presencia",
+      "fuente": "https://www.portafolio.co/energia/banco-de-occidente-financiara-con-200-000-millones-parque-solar-en-santander-que-generara-500-gwh-al-ano-504747",
+      "prioridad": 6,
+      "tokens": 206
+    },
+    {
+      "id": "noticia-2026-10-09-aprobacion-tarjetas-larepublica",
+      "titulo": "Banco de Occidente logró una tasa de aprobación superior a 90% en compras con tarjeta",
+      "seccion": "presencia",
+      "fuente": "https://www.larepublica.co/finanzas/banco-de-occidente-logro-una-tasa-de-aprobacion-superior-a-90-en-compras-con-tarjeta-4500599",
+      "prioridad": 6,
+      "tokens": 192
+    },
+    {
+      "id": "noticia-2026-08-24-alivio-terremoto-elcolombiano",
+      "titulo": "Banco de Occidente reduce 50% los intereses en compras con tarjetas de crédito para afectados por terremoto",
+      "seccion": "presencia",
+      "fuente": "https://www.elcolombiano.com/negocios/banco-de-occidente-baja-tasa-interes-terremoto-AH40219786",
+      "prioridad": 6,
+      "tokens": 195
+    },
+    {
+      "id": "noticia-2026-08-27-caf-reactivacion-caf",
+      "titulo": "CAF y Banco de Occidente destinan USD 50 millones a la reactivación",
+      "seccion": "presencia",
+      "fuente": "https://www.caf.com/es/actualidad/noticias/caf-y-banco-de-occidente-destinaran-hasta-usd-50-millones-para-la-reactivacion-economica-tras-el-terremoto/",
+      "prioridad": 6,
+      "tokens": 185
+    },
+    {
+      "id": "noticia-2026-10-07-crecimiento-23-valora",
+      "titulo": "Entrevista | Banco de Occidente creció 23 % en el primer semestre de 2026 y apuesta por la digitalización",
+      "seccion": "presencia",
+      "fuente": "https://www.valoraanalitik.com/entrevista-banco-de-occidente-crecio-23-en-el-primer-semestre-de-2026-y-apuesta-por-la-digitalizacion/",
+      "prioridad": 6,
+      "tokens": 204
+    },
+    {
+      "id": "hecho-2026-08-13-estados-financieros-consolidados-correspondientes-al-segundo-bfe625",
+      "titulo": "Estados Financieros Consolidados correspondientes al segundo trimestre de 2026",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "prioridad": 6,
+      "tokens": 240
+    },
+    {
+      "id": "hecho-2026-09-01-se-perfecciono-la-absorcion-por-adquisicion-de-fiduciaria-de-42cb1d",
+      "titulo": "Se perfeccionó la absorción por adquisición de Fiduciaria de Occidente S.A., operación en la que esta última entidad...",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "prioridad": 6,
+      "tokens": 297
+    },
+    {
+      "id": "hecho-2026-10-19-sfc-autorizo-a-clasificar-dentro-del-patrimonio-adicional-in-075130",
+      "titulo": "SFC autorizó a clasificar dentro del Patrimonio Adicional individual y consolidado, el crédito subordinado contratado...",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "prioridad": 6,
+      "tokens": 211
+    },
+    {
+      "id": "hecho-2026-09-21-suscripcion-o-terminacion-de-un-acuerdo-material-definitivo-82e010",
+      "titulo": "Suscripción o terminación de un acuerdo material definitivo",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "prioridad": 6,
+      "tokens": 129
+    },
+    {
+      "id": "activacion-tc-5c14b7",
+      "titulo": "Activacion TC",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/activacion-tc",
+      "prioridad": 7,
+      "tokens": 245
+    },
+    {
+      "id": "banco-de-las-empresas-a598a9",
+      "titulo": "Banco de las Empresas",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/bancodelasempresas",
+      "prioridad": 7,
+      "tokens": 234
+    },
+    {
+      "id": "bienes-para-la-venta-278bfe",
+      "titulo": "Bienes para la venta",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/bienes-para-la-venta",
+      "prioridad": 7,
+      "tokens": 268
+    },
+    {
+      "id": "bre-b-45f2a0",
+      "titulo": "Bre-B",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/bre-b",
+      "prioridad": 7,
+      "tokens": 418
+    },
+    {
+      "id": "click-to-pay-01871b",
+      "titulo": "Click to Pay",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/click-to-pay",
+      "prioridad": 7,
+      "tokens": 216
+    },
+    {
+      "id": "clientes-segmento-aval-banco-de-occidente-705f7f",
+      "titulo": "Clientes Segmento Aval Banco de Occidente",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/segmentos/aval",
+      "prioridad": 7,
+      "tokens": 696
+    },
+    {
+      "id": "clientes-segmento-elite-plus-banco-de-occidente-70f9fa",
+      "titulo": "Clientes Segmento Elite Plus Banco de Occidente",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/segmentos/elite-plus",
+      "prioridad": 7,
+      "tokens": 317
+    },
+    {
+      "id": "clientes-segmento-preferente-banco-de-occidente-59c7dd",
+      "titulo": "Clientes Segmento Preferente Banco de Occidente",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/segmentos/preferente",
+      "prioridad": 7,
+      "tokens": 269
+    },
+    {
+      "id": "clientes-segmento-preferente-plus-banco-de-occidente-3ca065",
+      "titulo": "Clientes Segmento Preferente Plus Banco de Occidente",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/segmentos/preferente-plus",
+      "prioridad": 7,
+      "tokens": 242
+    },
+    {
+      "id": "clientes-segmento-preferente-plus-banco-de-occidente-516518",
+      "titulo": "Clientes Segmento Preferente Plus Banco de Occidente",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/segmentos/elite",
+      "prioridad": 7,
+      "tokens": 300
+    },
+    {
+      "id": "club-de-mascotas-beneficios-y-cashback-para-tu-mascota-banco-15e4ae",
+      "titulo": "Club de Mascotas: Beneficios y Cashback para tu Mascota | Banco de Occidente",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/club-de-mascotas",
+      "prioridad": 7,
+      "tokens": 199
+    },
+    {
+      "id": "coberturas-de-tasa-de-cambio-banco-de-occidente-ec2399",
+      "titulo": "Coberturas de Tasa de Cambio Banco de Occidente",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/mesa-dinero/cobertura-tasas-cambio",
+      "prioridad": 7,
+      "tokens": 1450
+    },
+    {
+      "id": "coberturas-tasas-de-interes-banco-de-occidente-1ff08c",
+      "titulo": "Coberturas Tasas de Interés Banco de Occidente",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/coberturas-tasas-interes",
+      "prioridad": 7,
+      "tokens": 412
+    },
+    {
+      "id": "consulta-de-beneficios-tc-comerciales-9a3da5",
+      "titulo": "Consulta de beneficios TC comerciales",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/consulta-de-beneficios-tc-comerciales",
+      "prioridad": 7,
+      "tokens": 1204
+    },
+    {
+      "id": "de-tu-lado-da7b6a",
+      "titulo": "De tu lado",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/detulado",
+      "prioridad": 7,
+      "tokens": 907
+    },
+    {
+      "id": "duplica-tu-saldo-2807a7",
+      "titulo": "Duplica tu saldo",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/duplica-tu-saldo",
+      "prioridad": 7,
+      "tokens": 406
+    },
+    {
+      "id": "ecosistema-kubo-264cf3",
+      "titulo": "Ecosistema Kubo",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/ecosistema-kubo",
+      "prioridad": 7,
+      "tokens": 275
+    },
+    {
+      "id": "educacion-financiera-con-el-banco-de-occidente-9f2d6d",
+      "titulo": "Educación Financiera con el Banco de Occidente",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/educacion-financiera",
+      "prioridad": 7,
+      "tokens": 1004
+    },
+    {
+      "id": "formulario-autorizacion-7207c6",
+      "titulo": "Formulario Autorización",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/formulario-autorizacion",
+      "prioridad": 7,
+      "tokens": 61
+    },
+    {
+      "id": "giro-de-rigo-autogestion-9c52f8",
+      "titulo": "Giro de Rigo Autogestión",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/giro-de-rigo-ag",
+      "prioridad": 7,
+      "tokens": 339
+    },
+    {
+      "id": "google-wallet-97965c",
+      "titulo": "Google Wallet",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/google-wallet",
+      "prioridad": 7,
+      "tokens": 376
+    },
+    {
+      "id": "haz-tus-pagos-banco-de-occidente-5aa768",
+      "titulo": "Haz tus pagos | Banco de Occidente",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/haz-tus-pagos",
+      "prioridad": 7,
+      "tokens": 877
+    },
+    {
+      "id": "icesi-d1660d",
+      "titulo": "Icesi",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/icesi",
+      "prioridad": 7,
+      "tokens": 332
+    },
+    {
+      "id": "independientes-ced465",
+      "titulo": "Independientes",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/segmentos/independientes",
+      "prioridad": 7,
+      "tokens": 1524
+    },
+    {
+      "id": "instrucciones-permanentes-banco-de-occidente-944432",
+      "titulo": "Instrucciones Permanentes Banco de Occidente",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/instrucciones-permanentes",
+      "prioridad": 7,
+      "tokens": 616
+    },
+    {
+      "id": "kubo-1555ce",
+      "titulo": "Kubo",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/kubo",
+      "prioridad": 7,
+      "tokens": 239
+    },
+    {
+      "id": "licitacion-companias-aseguradoras-banco-de-occidente-80320d",
+      "titulo": "Licitación Compañías Aseguradoras | Banco de Occidente",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/occired",
+      "prioridad": 7,
+      "tokens": 2934
+    },
+    {
+      "id": "mesa-de-dinero-banco-de-occidente-338bf8",
+      "titulo": "Mesa de Dinero Banco de Occidente",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/mesa-dinero",
+      "prioridad": 7,
+      "tokens": 248
+    },
+    {
+      "id": "nuestros-beneficios-e3b12a",
+      "titulo": "Nuestros Beneficios",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/nuestros-beneficios",
+      "prioridad": 7,
+      "tokens": 327
+    },
+    {
+      "id": "operaciones-cambiarias-banco-de-occidente-89f098",
+      "titulo": "Operaciones Cambiarias Banco de Occidente",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/mesa-dinero/operaciones-cambiarias",
+      "prioridad": 7,
+      "tokens": 694
+    },
+    {
+      "id": "paso-a-paso-tc-6b8d2d",
+      "titulo": "Paso a Paso TC",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/paso-a-paso-tc",
+      "prioridad": 7,
+      "tokens": 367
+    },
+    {
+      "id": "portafolio-digital-f40960",
+      "titulo": "Portafolio Digital",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/portafolio-digital",
+      "prioridad": 7,
+      "tokens": 351
+    },
+    {
+      "id": "portafolios-integrales-627889",
+      "titulo": "Portafolios Integrales",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/portafolios-integrales",
+      "prioridad": 7,
+      "tokens": 366
+    },
+    {
+      "id": "referidos-fca163",
+      "titulo": "Referidos",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/referidos1",
+      "prioridad": 7,
+      "tokens": 75
+    },
+    {
+      "id": "segmentos-de-clientes-banco-de-occidente-a788ff",
+      "titulo": "Segmentos de Clientes Banco de Occidente",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/segmentos",
+      "prioridad": 7,
+      "tokens": 361
+    },
+    {
+      "id": "sistema-kubo-1fdde4",
+      "titulo": "Sistema Kubo",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/sistema-kubo",
+      "prioridad": 7,
+      "tokens": 486
+    },
+    {
+      "id": "talento-joven-241162",
+      "titulo": "Talento Joven",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/talento-joven",
+      "prioridad": 7,
+      "tokens": 466
+    },
+    {
+      "id": "tienda-rigo-674d40",
+      "titulo": "Tienda Rigo",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/tienda-rigo",
+      "prioridad": 7,
+      "tokens": 110
+    },
+    {
+      "id": "token-mobile-573ed8",
+      "titulo": "Token Mobile",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/token-mobile",
+      "prioridad": 7,
+      "tokens": 275
+    },
+    {
+      "id": "winback-02bbd0",
+      "titulo": "Winback",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/winback",
+      "prioridad": 7,
+      "tokens": 162
+    }
+  ],
+  "excluidas": [
+    {
+      "id": "buscador-0e8ccd",
+      "titulo": "Buscador",
+      "seccion": "otros",
+      "fuente": "https://www.bancodeoccidente.com.co/buscador",
+      "motivo": "url_excluida",
+      "detalle": "https://www.bancodeoccidente.com.co/buscador"
+    },
+    {
+      "id": "banco-de-occidente-productos-y-servicios-bancarios-en-linea-b4ad53",
+      "titulo": "Banco de Occidente - Productos y servicios bancarios en línea",
+      "seccion": "oferta",
+      "fuente": "https://www.bancodeoccidente.com.co/",
+      "motivo": "url_excluida",
+      "detalle": "https://www.bancodeoccidente.com.co/"
+    },
+    {
+      "id": "hecho-2026-06-09-aporte-en-especie-de-la-totalidad-de-las-acciones-ordinarias-9099ec",
+      "titulo": "Aporte en especie de la totalidad de las acciones ordinarias de las cuales es titular en Corficolombiana a favor de...",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-06-09 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2026-05-19-decisiones-adoptadas-por-la-asamblea-de-inversionistas-6362b7",
+      "titulo": "Decisiones adoptadas por la Asamblea de Inversionistas",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-05-19 < corte 2026-08-13"
+    },
+    {
+      "id": "noticia-2026-05-16-kubo-forbes",
+      "titulo": "Banco de Occidente lanza KUBO en una apuesta por competir con los neobancos",
+      "seccion": "presencia",
+      "fuente": "https://forbes.co/2026/05/16/economia-y-finanzas/banco-de-occidente-lanza-kubo-en-una-apuesta-por-competir-con-los-neobancos/",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-05-16 < corte 2026-08-13"
+    },
+    {
+      "id": "noticia-2026-05-14-utilidades-q1-larepublica",
+      "titulo": "Banco de Occidente reportó utilidades por $66.095 millones en el primer trimestre",
+      "seccion": "presencia",
+      "fuente": "https://www.larepublica.co/finanzas/banco-de-occidente-reporto-utilidades-por-66-095-millones-en-el-primer-trimestre-4393295",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-05-14 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2026-05-14-estados-financieros-consolidados-correspondientes-al-primer-20eb74",
+      "titulo": "Estados Financieros Consolidados correspondientes al primer trimestre de 2026",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-05-14 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2026-05-10-convocatorias-de-asambleas-de-inversionistas-c82244",
+      "titulo": "Convocatorias de Asambleas de Inversionistas",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-05-10 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2026-04-29-suscripcion-de-acuerdos-que-nazcan-obligaciones-financieras-cefec4",
+      "titulo": "Suscripción de acuerdos que nazcan obligaciones financieras materiales",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-04-29 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2026-03-26-novedades-de-los-directores-y-miembros-de-la-alta-gerencia-884088",
+      "titulo": "Novedades de los Directores y miembros de la Alta Gerencia",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-03-26 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2026-03-26-informe-periodico-de-fin-de-ejercicio-informe-de-gestion-y-s-aec324",
+      "titulo": "Informe Periódico de Fin de Ejercicio - Informe de Gestión y Sostenibilidad 2025, el cual contempla la gestión...",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-03-26 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2026-03-26-decisiones-adoptadas-por-la-asamblea-de-inversionistas-ef9093",
+      "titulo": "Decisiones adoptadas por la Asamblea de Inversionistas",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-03-26 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2026-03-19-novedades-de-los-directores-y-miembros-de-la-alta-gerencia-7cdc6e",
+      "titulo": "Novedades de los Directores y miembros de la Alta Gerencia",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-03-19 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2026-03-17-cancelacion-ante-el-rnve-del-cuarto-tramo-de-bonos-subordina-a5c256",
+      "titulo": "Cancelación ante el RNVE del cuarto tramo de Bonos Subordinados (decimoquinto tramo del programa) con cargo al programa...",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-03-17 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2026-03-11-convocatorias-de-asambleas-de-inversionistas-eed4f4",
+      "titulo": "Convocatorias de Asambleas de Inversionistas",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-03-11 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2026-03-04-dio-cumplimiento-a-las-medidas-establecidas-en-el-capitulo-v-bfcc86",
+      "titulo": "Dio cumplimiento a las medidas establecidas en el Capítulo VI, Título I, Parte III de la Circular Básica Jurídica de la...",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-03-04 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2026-02-27-proyecto-del-capitulo-sobre-las-practicas-politicas-procesos-5b0838",
+      "titulo": "Proyecto del capítulo sobre las prácticas, políticas, procesos e indicadores en relación con los asuntos sociales y...",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-02-27 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2026-02-27-junta-directiva-en-su-sesion-de-hoy-aprobo-presentar-a-la-as-0e4c05",
+      "titulo": "Junta Directiva en su sesión de hoy aprobó presentar a la Asamblea General Ordinaria de Accionistas el Proyecto de...",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-02-27 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2026-02-03-grupo-aval-acciones-y-valores-s-a-s-a-informo-a-esta-superin-f22e8b",
+      "titulo": "GRUPO AVAL ACCIONES Y VALORES S.A., S.A. informó a esta Superintendencia sobre una operación preacordada relacionada...",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-02-03 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2026-01-30-ha-transmitido-el-reporte-de-implementacion-de-mejores-pract-127865",
+      "titulo": "Ha transmitido el Reporte de Implementación de Mejores Prácticas Corporativas para el período 2025",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-01-30 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2026-01-02-reestructuraciones-a-la-estructura-corporativa-cambio-en-la-d09452",
+      "titulo": "Reestructuraciones a la estructura corporativa, cambio en la actividad principal o la terminación temporal o permanente...",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2026-01-02 < corte 2026-08-13"
+    },
+    {
+      "id": "noticia-2025-12-22-whatsapp-portafolio",
+      "titulo": "Así puede hacer transferencias de dinero por WhatsApp si es cliente del Banco de Occidente",
+      "seccion": "presencia",
+      "fuente": "https://www.portafolio.co/tecnologia/asi-puede-hacer-transferencias-de-dinero-por-whatsapp-si-es-cliente-del-banco-de-occidente-485133",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-12-22 < corte 2026-08-13"
+    },
+    {
+      "id": "noticia-2025-12-01-mejor-lugar-trabajar-eltiempo",
+      "titulo": "Banco de Occidente es reconocido como el mejor lugar para trabajar en Colombia por tercer año consecutivo",
+      "seccion": "presencia",
+      "fuente": "https://www.eltiempo.com/economia/empresas/banco-de-occidente-es-reconocido-como-el-mejor-lugar-para-trabajar-en-colombia-por-tercer-ano-consecutivo-3513407",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-12-01 < corte 2026-08-13"
+    },
+    {
+      "id": "noticia-2025-11-27-invest-bogota-eltiempo",
+      "titulo": "Invest in Bogotá y Banco de Occidente impulsan nuevas oportunidades de inversión en infraestructura desde Cartagena",
+      "seccion": "presencia",
+      "fuente": "https://www.eltiempo.com/bogota/invest-in-bogota-y-banco-de-occidente-impulsan-nuevas-oportunidades-de-inversion-en-infraestructura-desde-cartagena-3512459",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-11-27 < corte 2026-08-13"
+    },
+    {
+      "id": "noticia-2025-11-19-pagos-inmediatos-valora",
+      "titulo": "Banco de Occidente anuncia solución para pagos inmediatos empresariales; ¿de qué se trata?",
+      "seccion": "presencia",
+      "fuente": "https://www.valoraanalitik.com/banco-de-occidente-solucion-pagos-empresas/",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-11-19 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-11-18-calificaciones-de-riesgo-7e476f",
+      "titulo": "Calificaciones de riesgo",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-11-18 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-11-13-estados-financieros-separados-para-el-tercer-trimestre-2025-2e8192",
+      "titulo": "Estados Financieros Separados para el Tercer Trimestre 2025",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-11-13 < corte 2026-08-13"
+    },
+    {
+      "id": "noticia-2025-11-11-ia-reconocimiento-eltiempo",
+      "titulo": "Los usos con los que el Banco de Occidente lidera la transformación digital con inteligencia artificial y recibe reconocimiento internacional",
+      "seccion": "presencia",
+      "fuente": "https://www.eltiempo.com/economia/empresas/los-usos-con-los-que-el-banco-de-occidente-lidera-la-transformacion-digital-con-inteligencia-artificial-y-recibe-reconocimiento-internacional-3506331",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-11-11 < corte 2026-08-13"
+    },
+    {
+      "id": "noticia-2025-10-28-petromil-larepublica",
+      "titulo": "El Banco de Occidente lideró crédito sindicado por $797.500 millones Grupo Petromil",
+      "seccion": "presencia",
+      "fuente": "https://www.larepublica.co/finanzas/credito-que-recibio-el-grupo-petromil-4258265",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-10-28 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-09-26-novedades-de-los-directores-y-miembros-de-la-alta-gerencia-c5d552",
+      "titulo": "Novedades de los Directores y miembros de la Alta Gerencia",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-09-26 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-09-12-novedades-de-los-directores-y-miembros-de-la-alta-gerencia-ff4d7b",
+      "titulo": "Novedades de los Directores y miembros de la Alta Gerencia",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-09-12 < corte 2026-08-13"
+    },
+    {
+      "id": "noticia-2025-09-10-apple-pay-portafolio",
+      "titulo": "Banco de Occidente y Credencial estrenan Apple Pay para sus clientes en Colombia",
+      "seccion": "presencia",
+      "fuente": "https://www.portafolio.co/economia/finanzas/banco-de-occidente-y-credencial-estrenan-apple-pay-para-sus-clientes-en-colombia-639641",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-09-10 < corte 2026-08-13"
+    },
+    {
+      "id": "noticia-2025-09-06-aval-fiduciaria-portafolio",
+      "titulo": "Grupo Aval inicia la integración del negocio fiduciario a través de Aval Fiduciaria",
+      "seccion": "presencia",
+      "fuente": "https://www.portafolio.co/economia/finanzas/grupo-aval-inicia-la-integracion-del-negocio-fiduciario-a-traves-de-aval-fiduciaria-639319",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-09-06 < corte 2026-08-13"
+    },
+    {
+      "id": "noticia-2025-08-21-tunel-oriente-larepublica",
+      "titulo": "Banco de Occidente dará $200.000 millones para segunda etapa del Túnel de Oriente",
+      "seccion": "presencia",
+      "fuente": "https://www.larepublica.co/finanzas/banco-de-occidente-dara-200-000-millones-para-segunda-etapa-del-tunel-de-oriente-4206915",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-08-21 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-08-13-informe-periodico-trimestral-con-corte-al-30-de-junio-de-202-032a5d",
+      "titulo": "Informe periódico trimestral con corte al 30 de junio de 2025",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-08-13 < corte 2026-08-13"
+    },
+    {
+      "id": "noticia-2025-08-11-ia-amazon-portafolio",
+      "titulo": "Banco de Occidente se apoya en IA de Amazon para mejorar relación con sus clientes",
+      "seccion": "presencia",
+      "fuente": "https://www.portafolio.co/negocios/empresas/banco-de-occidente-se-apoya-en-ia-de-amazon-para-mejorar-relacion-con-sus-clientes-637437",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-08-11 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-06-25-calificaciones-de-riesgo-b14165",
+      "titulo": "Calificaciones de riesgo",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-06-25 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-06-17-calificaciones-de-riesgo-cf990a",
+      "titulo": "Calificaciones de riesgo",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-06-17 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-05-15-informe-periodico-trimestral-con-corte-al-31-de-marzo-de-202-2ed3c2",
+      "titulo": "Informe periódico trimestral con corte al 31 de marzo de 2025",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-05-15 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-05-15-cancelacion-ante-el-rnve-del-sexto-tramo-de-bonos-subordinad-61cb42",
+      "titulo": "Cancelación ante el RNVE del Sexto tramo de Bonos Subordinados con cargo al programa de emisión y colocación de bonos...",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-05-15 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-03-26-novedades-de-los-directores-y-miembros-de-la-alta-gerencia-d6c465",
+      "titulo": "Novedades de los Directores y miembros de la Alta Gerencia",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-03-26 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-03-26-informe-de-fin-de-ejercicio-que-contempla-la-gestion-del-ano-b54235",
+      "titulo": "Informe de fin de ejercicio que contempla la gestión del año 2024",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-03-26 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-03-26-decisiones-adoptadas-por-la-asamblea-de-inversionistas-97e150",
+      "titulo": "Decisiones adoptadas por la Asamblea de Inversionistas",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-03-26 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-03-18-calificaciones-de-riesgo-c978ea",
+      "titulo": "Calificaciones de riesgo",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-03-18 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-03-06-novedades-de-los-directores-y-miembros-de-la-alta-gerencia-94c77d",
+      "titulo": "Novedades de los Directores y miembros de la Alta Gerencia",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-03-06 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-03-04-dio-cumplimiento-a-las-medidas-establecidas-en-el-capitulo-v-02105f",
+      "titulo": "Dio cumplimiento a las medidas establecidas en el Capítulo VI, Título I, Parte III de la Circular Básica Jurídica de la...",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-03-04 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-02-28-junta-directiva-en-su-sesion-de-hoy-aprobo-presentar-a-la-as-3bb969",
+      "titulo": "Junta Directiva en su sesión de hoy aprobó presentar a la Asamblea General Ordinaria de Accionistas el Proyecto de...",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-02-28 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-02-27-proyecto-del-capitulo-sobre-las-practicas-politicas-procesos-defa22",
+      "titulo": "Proyecto del capítulo sobre las prácticas, políticas, procesos e indicadores en relación con los asuntos sociales y...",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-02-27 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-01-27-ha-transmitido-el-reporte-de-implementacion-de-mejores-pract-b338d9",
+      "titulo": "Ha transmitido el Reporte de Implementación de Mejores Prácticas Corporativas para el período 2024",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-01-27 < corte 2026-08-13"
+    },
+    {
+      "id": "hecho-2025-01-10-novedades-de-los-directores-y-miembros-de-la-alta-gerencia-43a809",
+      "titulo": "Novedades de los Directores y miembros de la Alta Gerencia",
+      "seccion": "presencia",
+      "fuente": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
+      "motivo": "ficha_fuera_de_ventana",
+      "detalle": "fecha_publicacion 2025-01-10 < corte 2026-08-13"
+    }
+  ],
+  "config": {
+    "secciones": {
+      "identidad": 1,
+      "atencion": 2,
+      "oferta": 3,
+      "legal": 4,
+      "datos": 5,
+      "presencia": 6,
+      "otros": 7
+    },
+    "patrones_url_excluidos": [
+      "/buscador",
+      "/error",
+      "^https?://[^/]+/?$"
+    ],
+    "incluir_noticias": true,
+    "max_noticias": 12,
+    "boilerplate_min_docs": 5,
+    "boilerplate_ratio": 0.1,
+    "bloque_comun": true
+  }
+}
