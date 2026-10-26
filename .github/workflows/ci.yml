@@ -3,8 +3,8 @@ name: ci
 on:
   push:
     branches: [main]
+  # Sin filtro de rama base: los PR apilados tambien deben pasar la CI.
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 # Minimo privilegio: la CI solo lee el repositorio.
@@ -45,7 +45,7 @@ jobs:
 
       - name: Tipos (ty)
         # --all-extras: 'uv run' re-sincroniza sin extras y ty no resolveria
-        # playwright, tiktoken ni yt-dlp (imports opcionales).
+        # tiktoken ni yt-dlp (imports opcionales).
         run: uv run --all-extras ty check src
 
       - name: Pruebas (pytest)
