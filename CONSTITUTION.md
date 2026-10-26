@@ -89,6 +89,8 @@ descarga masiva de PDF, transcripción de vídeo.
 | **Frontmatter** | `PyYAML` |
 | **Tokens** | `stable_tokens` (chars/4) para el presupuesto del contexto, sin red; `tiktoken` (extra `tokens`) solo para el campo informativo de Gold |
 | **Herramienta del agente** | `scrapling` (grupo `mcp`) — navegación ad hoc vía MCP, **fuera del pipeline** |
+| **LLM del asistente** | `langchain-deepseek` (`ChatDeepSeek`) + `langchain-core`; `pydantic` para la salida estructurada |
+| **Modelo** | `deepseek-flash` (DeepSeek-V4.1-Flash), `DEEPSEEK_API_KEY` solo desde el entorno; `.env` prohibido |
 | **Testing** | `pytest` (patrón AAA) |
 | **Lint / formato** | `ruff` (línea 100, comillas dobles) |
 | **Tipado** | `ty` (target `make typecheck`) |
@@ -98,6 +100,13 @@ descarga masiva de PDF, transcripción de vídeo.
 > ⚠️ **Regla dura heredada:** prohibido `pip` y `requirements.txt`. Toda
 > dependencia entra con `uv add` (o `uv add --dev`) y se fija en `uv.lock`.
 > Las pruebas de una tarde van con `uv run --with` o PEP 723, no al proyecto.
+
+> **Asistente:** el contexto va completo y verbatim al inicio del mensaje de
+> sistema, seguido de las reglas versionadas; el prefijo idéntico aprovecha la
+> caché del proveedor. Las llamadas a `api.deepseek.com` usan el cliente de
+> LangChain con `timeout` y reintentos acotados: no son scraping del sitio del
+> banco, no pasan por `net.py` ni les aplican `robots.txt`/1,5 s. La clave se
+> lee solo de `DEEPSEEK_API_KEY`; el proyecto no lee `.env`.
 
 ### Herramientas del agente (MCP)
 
@@ -133,12 +142,23 @@ ProyectoAvance1/
 │   ├── section.py        # clasificación en secciones + keywords
 │   ├── gold.py           # GOLD: Markdown + frontmatter + corpus.jsonl
 │   ├── contexto.py       # CONTEXTO: prompt del asistente derivado de Gold
+│   ├── asistente/        # ASISTENTE: Q&A, FAQ y resumen con DeepSeek
+│   │   ├── __main__.py   # uv run python -m banco_occidente_corpus.asistente
+│   │   ├── cli.py        # preguntar | faq | resumen + --version
+│   │   ├── modelo.py     # ChatDeepSeek desde DEEPSEEK_API_KEY
+│   │   ├── prompts.py    # config/prompts/<tarea>_<version>.md
+│   │   ├── contexto_prompt.py  # contexto completo + canal oficial + recorte experimental
+│   │   ├── qa.py         # Q&A temperatura 0
+│   │   ├── faq.py        # 10 FAQ con salida estructurada Pydantic
+│   │   ├── resumen.py    # resumen ejecutivo (temp. 0.2)
+│   │   └── validacion.py # límites, fuente, cifras, PII e inyección
 │   ├── checklist.py      # 24 casillas del Taller 1
 │   ├── stats.py          # _INDICE.md
 │   └── utils.py          # hashing, JSONL, tokens, slugs
 ├── test/                 # pytest + fixtures (sin red)
 ├── config/site.toml      # alcance, cortesía, filtros y secciones
 ├── config/contexto.toml  # secciones, prioridad y presupuesto del contexto
+├── config/prompts/       # prompts versionados (qa_v1.md, faq_v1.md, resumen_v1.md)
 ├── data/
 │   ├── raw/              # Bronze (ignorado por Git)
 │   ├── processed/        # Silver (ignorado por Git)
@@ -530,6 +550,15 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 | 2026-10-25 | El contexto usa `stable_tokens` (chars/4) y no importa `tiktoken` | El tokenizador de OpenAI descarga datos la primera vez y no es el del modelo servido; el estimador es determinista, sin red e igual en la CI |
 | 2026-10-25 | Boilerplate del contexto a `0.10` (Gold usa `0.35`) y bloque `Información común del sitio` | Con `0.35` no se detectaba ninguna línea; con `0.10` se retiran 26 CTAs. Las líneas retiradas se conservan una vez para no perder datos repetidos (teléfonos de atención) |
 | 2026-10-25 | Los encabezados del cuerpo se degradan un nivel al renderizar el contexto (`##`→`###`) | 57 páginas de Gold traen `##` propios; degradarlos deja `##` como frontera exclusiva de bloque, sin editar Gold |
+| 2026-10-26 | Asistente en subpaquete `asistente/` ejecutable con `python -m`, sin tocar `cli.py`, `net.py` ni `config.py` | Mantiene el pipeline intacto y sigue el patrón de `contexto.py`; el asistente consume el contexto, no Gold |
+| 2026-10-26 | Contexto completo y verbatim al inicio del mensaje de sistema, con `ChatDeepSeek` y `deepseek-flash` | El taller exige consolidar el texto limpio en el prompt de sistema; el prefijo idéntico aprovecha la caché del proveedor. La selección por consulta es del Módulo 2 |
+| 2026-10-26 | `--max-contexto` como experimento desactivado por defecto | Permite medir coste y latencia del recorte para el informe sin convertirlo en el comportamiento normal; conserva el bloque del canal oficial |
+| 2026-10-26 | Prompts versionados en `config/prompts/` y `--version` | Auditar cambios de instrucciones y reproducir respuestas sin incrustar prompts en el código |
+| 2026-10-26 | Salida estructurada de la FAQ con `json_mode` (esquema JSON en el prompt) y respaldo automático desde `function_calling` ante el 400 de `tool_choice` | DeepSeek Flash en modo pensamiento rechaza `function_calling` (`Thinking mode does not support this tool_choice`); `json_mode` evita el fallo y el reintento queda como red de seguridad |
+| 2026-10-26 | Topes de tokens por tarea: Q&A 2000, resumen 4000 y FAQ 8000, con `finish_reason` y razonamiento en el diagnóstico de respuesta vacía | El razonamiento consume `max_tokens`; con 512/900/3000 el contenido llegaba vacío y el error no explicaba por qué |
+| 2026-10-26 | PII bloqueada antes de llamar al modelo; URL y teléfono del canal se extraen del contexto | Ley 1581: no se envían datos personales a un tercero y no se repiten en la respuesta. Sin constantes que puedan quedar obsoletas |
+| 2026-10-26 | Cifras normalizadas (espacios, puntos, comas y guiones) antes de comparar con el contexto | Evita falsos positivos por formato (`018000 514652` = `018000514652`); limitación conocida: `10,5` y `105` colisionan |
+| 2026-10-26 | Salidas del asistente por stdout y `--salida` opcional, sin versionar | No altera Gold ni crea una capa nueva; `data/asistente/` queda ignorado |
 
 ## 12. Configuración local (no trackear)
 

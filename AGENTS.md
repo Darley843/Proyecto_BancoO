@@ -107,6 +107,7 @@ Instrucciones para quien revisa (GGA): el código a revisar ya viene completo en
 REJECT if:
 - Se usa `pip`, se crea `requirements.txt` o se edita `uv.lock` a mano.
 - Una petición HTTP no pasa por `net.py`, no tiene `timeout`, no envía el User-Agent y el header `From` del proyecto, o usa `verify=False`.
+  La regla anterior cubre el sitio del banco y las fuentes del corpus; las llamadas a la API del modelo desde `asistente/` van por el cliente de LangChain, con `timeout`, sin claves en el código y sin leer `.env`.
 - Se descarga una URL sin consultar antes `robots.txt` o se baja el ritmo de cortesía de 1,5 s entre peticiones (decisión del proyecto; `robots.txt` no declara `Crawl-delay`).
 - Se captura una página con login, formulario, simulador o datos personales (Ley 1581 de 2012).
 - Se usa cualquier técnica para evadir protecciones anti-bot o captchas.
