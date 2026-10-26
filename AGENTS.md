@@ -15,8 +15,11 @@ Taller 1 del curso TAAML (UAO). Antes de tocar código, lee
 3. **Gold es el entregable.** Si cambias el formato, actualiza
    `CONSTITUTION.md` §7 y `docs/ESTANDAR.md` en el mismo commit.
 4. **Respeta el sitio.** `robots.txt` manda: nada de `Disallow`. Mantén el
-   `Crawl-delay` (1.5 s) y el header `From` con el contacto académico.
-   No subas el ritmo para "terminar rápido".
+   ritmo de cortesía **decidido por el proyecto** (1,5 s entre peticiones, más
+   pausa de 10 s cada 50) y el header `From` con el contacto académico.
+   `robots.txt` del banco **no declara `Crawl-delay`**: los 1,5 s son una
+   decisión nuestra, no una directiva del sitio. No subas el ritmo para
+   "terminar rápido".
 5. **Sin datos personales.** Nada de zonas tras login ni información de
    clientes (Ley 1581 de 2012).
 6. **Commits:** Conventional Commits en español (`feat:`, `fix:`, `docs:`,
@@ -59,7 +62,7 @@ aquí. Se pueden mencionar como `@corpus-extraction` y `@semantic-extraction`.
 `reference-langchain` (remotos, solo consulta) y `scrapling` (local, navegación
 ad hoc). Scrapling se instala con el grupo `mcp` y **no** es dependencia del
 pipeline: no escribe en Bronze/Silver/Gold. Si lo usas contra el sitio del banco,
-aplican igual `robots.txt`, el `Crawl-delay` de 1.5 s y el header `From`
+aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 (ver `CONSTITUTION.md` §3).
 
 ## Mapa del código
@@ -99,7 +102,7 @@ Instrucciones para quien revisa (GGA): el código a revisar ya viene completo en
 REJECT if:
 - Se usa `pip`, se crea `requirements.txt` o se edita `uv.lock` a mano.
 - Una petición HTTP no pasa por `net.py`, no tiene `timeout`, no envía el User-Agent y el header `From` del proyecto, o usa `verify=False`.
-- Se descarga una URL sin consultar antes `robots.txt` o se baja el `Crawl-delay` de 1.5 s.
+- Se descarga una URL sin consultar antes `robots.txt` o se baja el ritmo de cortesía de 1,5 s entre peticiones (decisión del proyecto; `robots.txt` no declara `Crawl-delay`).
 - Se captura una página con login, formulario, simulador o datos personales (Ley 1581 de 2012).
 - Se usa cualquier técnica para evadir protecciones anti-bot o captchas.
 - `extract.py` hace peticiones de red: debe recibir HTML ya descargado.

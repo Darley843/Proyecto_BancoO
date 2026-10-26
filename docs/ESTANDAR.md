@@ -18,7 +18,7 @@ Gold desde Bronze sin volver a la web.
 
 | Regla | Implementación |
 |---|---|
-| 1-2 s entre peticiones | `crawl.delay_seconds = 1.5`, más pausa de 10 s cada 50 peticiones |
+| 1-2 s entre peticiones (aquí 1,5 s; `robots.txt` no declara `Crawl-delay`, es decisión del proyecto) | `crawl.delay_seconds = 1.5`, más pausa de 10 s cada 50 peticiones |
 | User-Agent identificable | UA de navegador + header `From` con el contacto académico (el WAF responde 403 a UA que se declaren bot; ver `CONSTITUTION.md` §10) |
 | Respetar `robots.txt` | `discover.parse_robots()` + `can_fetch()`; los `Disallow` se registran como descartados |
 | Leer el sitemap primero | `discover.py` expande el **índice de índices** de Liferay hasta 2 niveles |

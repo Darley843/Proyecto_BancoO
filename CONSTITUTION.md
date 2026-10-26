@@ -113,7 +113,7 @@ Reglas:
 1. Un MCP es herramienta del agente, no una etapa del corpus: no escribe en
    Bronze, Silver ni Gold.
 2. Si se usa contra el sitio del banco, siguen mandando `robots.txt`, el
-   `Crawl-delay` (1.5 s) y el header `From` de `net.py`.
+   ritmo de 1,5 s entre peticiones y el header `From` de `net.py`.
 3. Los fetchers de navegador requieren `uv run --group mcp scrapling install`
    una sola vez; el modo HTTP funciona sin ese paso.
 4. Toda herramienta nueva entra con su grupo propio y se documenta aquí en el
@@ -397,7 +397,9 @@ Decisión:
   `config/site.toml`.
 - Identificación académica: header HTTP **`From`** (RFC 9110 §10.1.2) con el
   correo del autor, enviado en **cada** petición.
-- `Crawl-delay` respetado (1.5 s) + pausa de 10 s cada 50 peticiones.
+- Ritmo de cortesía **del proyecto**: 1,5 s entre peticiones + pausa de 10 s
+  cada 50. `robots.txt` del banco **no declara `Crawl-delay`**: el valor es una
+  decisión propia, no una directiva del sitio.
 - `robots.txt` se parsea y sus `Disallow` se excluyen por código.
 - El HTML crudo se conserva para no repetir peticiones.
 
@@ -427,6 +429,8 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 | 2026-10-24 | Fichas de prensa con resumen propio y verificación humana antes de publicar | Respeta derechos de autor y evita publicar enlaces o fechas sin confirmar |
 | 2026-10-24 | Descarga con `httpx` (`HttpClient` de `net.py`) en vez del `Fetcher` de Scrapling que propone la guía del curso; Scrapling queda solo como servidor MCP del agente (grupo `mcp`) | El pipeline ya descarga con `HttpClient`, que aplica User-Agent, header `From`, `Crawl-delay`, reintentos y caché en Bronze; el motivo por el que no se adoptó Scrapling en el pipeline está pendiente de confirmar |
 | 2026-10-25 | Limitación conocida: `urllib.robotparser` no interpreta comodines (`/*!ut/p*`) del `robots.txt` del banco | `RobotFileParser` solo compara prefijos literales; se verificó que ninguna URL de `corpus.jsonl`, `documents.jsonl` ni `videos.jsonl` coincide con las rutas prohibidas |
+| 2026-10-25 | `/ayuda/agendar-cita-asesor` fuera de Gold: es un formulario | `AGENTS.md` prohíbe capturar formularios; el filtro de `exclude_patterns` se aplica también al construir Gold para que una página ya capturada no vuelva al entregable |
+| 2026-10-25 | Los 1,5 s entre peticiones son decisión del proyecto, no un `Crawl-delay` del sitio | `robots.txt` del banco no declara `Crawl-delay`; la documentación lo aclara para no atribuirle al sitio una directiva que no existe |
 
 ## 12. Configuración local (no trackear)
 
