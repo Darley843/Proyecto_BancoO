@@ -16,6 +16,8 @@ htmlcov/
 # es el entregable que consume el RAG del Modulo 2.
 data/raw/
 data/processed/
+# Salidas del asistente (no versionadas: se generan con --salida).
+data/asistente/
 # Los chunks se regeneran con 'make chunks'; el conocimiento curado SI se versiona.
 data/knowledge/chunks.jsonl
 data/knowledge/draft-*.jsonl
