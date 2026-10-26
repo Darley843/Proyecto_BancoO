@@ -86,7 +86,7 @@ def _opciones_comunes() -> argparse.ArgumentParser:
     parser.add_argument(
         "--verbose",
         action="store_true",
-        help="muestra modelo, prompt, contexto y metricas",
+        help="muestra modelo, prompt, contexto, respuesta cruda y metricas",
     )
     return parser
 
@@ -179,6 +179,13 @@ def _emitir(texto: str, salida: Path | None) -> None:
     print(f"Escrito: {destino}", file=sys.stderr)
 
 
+def _imprimir_respuesta_cruda(texto: str | None) -> None:
+    """Muestra lo que devolvio el modelo antes de la validacion (``--verbose``)."""
+    if texto is None:
+        return
+    print(f"Respuesta cruda:\n{texto}", file=sys.stderr)
+
+
 def _comando_preguntar(
     args: argparse.Namespace,
     modelo: BaseChatModel,
@@ -188,6 +195,8 @@ def _comando_preguntar(
     """Ejecuta el Q&A e imprime la respuesta validada."""
     pregunta = " ".join(args.texto).strip()
     resultado = responder(modelo, prompt, contexto, pregunta)
+    if args.verbose:
+        _imprimir_respuesta_cruda(resultado.texto_crudo)
     print(resultado.texto)
     if resultado.avisos:
         print(f"Avisos: {', '.join(resultado.avisos)}", file=sys.stderr)
