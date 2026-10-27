@@ -36,8 +36,24 @@ def load_capture(config: Config) -> dict[str, dict]:
     return {row["url"]: row for row in read_jsonl(config.paths.capture_file) if row.get("url")}
 
 
-def save_bronze(config: Config, url: str, html: str) -> dict:
-    """Guarda el HTML crudo y devuelve el registro de captura."""
+#: Tipos de contenido que la capa Bronze acepta como pagina HTML.
+HTML_CONTENT_TYPES = ("text/html", "application/xhtml+xml")
+
+
+def is_html(content_type: str) -> bool:
+    """True si el ``Content-Type`` es HTML (o no vino, como en pruebas locales)."""
+    tipo = content_type.split(";", 1)[0].strip().lower()
+    return not tipo or tipo in HTML_CONTENT_TYPES
+
+
+def save_bronze(config: Config, url: str, html: str, *, content_type: str = "text/html") -> dict:
+    """Guarda el HTML crudo y devuelve el registro de captura.
+
+    Falla con ``ValueError`` si ``content_type`` no es HTML: Bronze HTML solo
+    guarda paginas, los PDF van por ``documents.py``.
+    """
+    if not is_html(content_type):
+        raise ValueError(f"{url} no es HTML ({content_type}); no se guarda en Bronze")
     path = _raw_path(config, url)
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(html, encoding="utf-8", newline="")
@@ -46,7 +62,7 @@ def save_bronze(config: Config, url: str, html: str) -> dict:
         "url": url,
         "status": 200,
         "fecha_captura": utc_now(),
-        "content_type": "text/html",
+        "content_type": content_type.split(";", 1)[0].strip().lower() or "text/html",
         "bytes": len(payload),
         "sha256": sha256_text(html),
         "archivo": path.relative_to(config.paths.root).as_posix(),
@@ -77,6 +93,7 @@ def fetch_all(
         with config.paths.capture_file.open("a", encoding="utf-8", newline="\n") as log_file:
 
             def save(record: dict) -> None:
+                """Anexa un registro de captura y lo escribe de inmediato."""
                 log_file.write(json.dumps(record, ensure_ascii=False) + "\n")
                 log_file.flush()
 
@@ -122,7 +139,25 @@ def fetch_all(
                     log.warning("[%d] %s -> %s", index, url, response.error)
                     continue
 
-                record = save_bronze(config, url, response.text)
+                if not is_html(response.content_type):
+                    stats.failed += 1
+                    error = f"no es HTML ({response.content_type})"
+                    stats.failures.append({"url": url, "error": error})
+                    save(
+                        {
+                            "url": url,
+                            "status": response.status,
+                            "fecha_captura": utc_now(),
+                            "bytes": 0,
+                            "sha256": None,
+                            "archivo": None,
+                            "error": error,
+                        }
+                    )
+                    log.warning("[%d] %s -> %s", index, url, error)
+                    continue
+
+                record = save_bronze(config, url, response.text, content_type=response.content_type)
                 save(record)
                 stats.ok += 1
                 stats.bytes += record["bytes"]

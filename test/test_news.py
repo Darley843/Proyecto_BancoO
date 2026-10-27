@@ -587,6 +587,7 @@ def _config_temporal(tmp_path: Path) -> Config:
             name="Banco de Occidente",
             language="es",
             base_url="https://www.bancodeoccidente.com.co",
+            contact="grupo@uao.edu.co",
         ),
         news=NewsConfig(desde="2025-01-01", hasta="2026-12-31"),
         paths=Paths(

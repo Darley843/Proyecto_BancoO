@@ -45,6 +45,8 @@ _NOISE_SELECTORS = (
 
 @dataclass(slots=True)
 class ExtractedPage:
+    """Pagina limpia de Silver: URL, titulo y Markdown extraido."""
+
     url: str
     title: str
     markdown: str
@@ -256,4 +258,5 @@ def extract_all(config: Config, *, min_chars: int = 120) -> list[dict]:
 
 
 def load_silver(config: Config) -> list[dict]:
+    """Lee todos los registros de ``silver.jsonl``."""
     return list(read_jsonl(config.paths.silver_file))

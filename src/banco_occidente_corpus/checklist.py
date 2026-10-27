@@ -99,6 +99,8 @@ CHECKLIST: dict[str, list[tuple[str, str]]] = {
 
 @dataclass(slots=True)
 class ChecklistItem:
+    """Una casilla del checklist del Taller 1 y su evidencia en Gold."""
+
     categoria: str
     item: str
     encontrado: bool
@@ -150,6 +152,7 @@ def evaluate(corpus: list[dict], texts: dict[str, str] | None = None) -> list[Ch
 
 
 def coverage(items: list[ChecklistItem]) -> tuple[int, int, float]:
+    """Devuelve (encontradas, total, porcentaje) del checklist."""
     found = sum(1 for item in items if item.encontrado)
     total = len(items)
     return found, total, (found / total * 100 if total else 0.0)

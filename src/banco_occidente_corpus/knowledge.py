@@ -53,6 +53,7 @@ def split_page(page_id: str, meta: dict, body: str) -> list[dict]:
     buffer: list[str] = []
 
     def flush() -> None:
+        """Cierra el chunk en curso si tiene el tamano minimo."""
         text = "\n".join(buffer).strip()
         if len(text) < MIN_CHUNK_CHARS:
             return
@@ -367,4 +368,5 @@ def validate_file(config: Config, path: Path) -> tuple[list[str], list[str]]:
 
 
 def now_date() -> str:
+    """Fecha actual en UTC con formato ``AAAA-MM-DD``."""
     return utc_now()[:10]

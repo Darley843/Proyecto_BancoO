@@ -133,6 +133,7 @@ def fetch_videos(
     with config.paths.videos_capture.open("a", encoding="utf-8", newline="\n") as out:
 
         def save(record: dict) -> None:
+            """Anexa un registro de captura y lo escribe de inmediato."""
             out.write(json.dumps(record, ensure_ascii=False) + "\n")
             out.flush()
 

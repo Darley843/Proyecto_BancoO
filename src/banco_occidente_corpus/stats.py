@@ -24,6 +24,7 @@ def _read_gold_texts(config: Config) -> dict[str, str]:
 
 
 def build_index(config: Config) -> str:
+    """Escribe ``data/gold/_INDICE.md`` con cifras, secciones y checklist, y lo devuelve."""
     corpus = load_corpus(config)
     stats = corpus_stats(corpus)
     texts = _read_gold_texts(config)
