@@ -44,10 +44,7 @@ dev = [
     "ty>=0.0.91",
 ]
 # Herramienta del agente (MCP), fuera del pipeline: no entra en `uv sync`
-# ni en la CI. Se activa con `uv run --group mcp scrapling mcp`.
-mcp = [
-    "scrapling[ai,fetchers]>=0.5",
-]
+# ni en la CI. Se lanza en su propio entorno con `uvx` desde `opencode.json`.
 
 [project.scripts]
 corpus = "banco_occidente_corpus.cli:main"
