@@ -359,7 +359,8 @@ Sobre Gold se deriva una capa de conocimiento **verificable**:
 data/knowledge/entities.jsonl    entidades canónicas (ent:...)
 data/knowledge/facts.jsonl       hechos atómicos (fact:...)
 data/knowledge/relations.jsonl   relaciones (rel:...)
-data/knowledge/chunks.jsonl      segmentos por encabezado (derivado, no se versiona)
+data/knowledge/chunks.jsonl      segmentos por encabezado de todo Gold (~43 MB, no se versiona)
+data/knowledge/chunks_web.jsonl  segmentos de las páginas web (VERSIONADO): base del web scraping
 data/knowledge/_INDICE.md        conteos y revisión
 config/knowledge.schema.json     contrato JSON Schema 2020-12
 ```
@@ -375,6 +376,10 @@ config/knowledge.schema.json     contrato JSON Schema 2020-12
 6. Knowledge se regenera desde Gold + extractor; Gold sigue siendo la verdad.
 
 Comandos: `make chunks` (segmenta) y `make knowledge` (valida + índice).
+Los chunks cuentan tokens con `stable_tokens` (chars/4), como la capa Contexto:
+así el archivo es idéntico en cualquier clon y no depende de descargar
+`tiktoken`. La elección de embeddings, base vectorial y LLM para el Módulo 2
+está en `docs/MODELADO.md`.
 Borradores: `uv run corpus knowledge --file <jsonl>` y `--merge <jsonl>`.
 La skill responsable es `.opencode/skills/semantic-extraction/`.
 
@@ -586,6 +591,10 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 | 2026-10-27 | La barra lateral muestra «Contexto versionado el» con `git log -1 --format=%cI -- data/contexto/manifest.json` | El manifest no guarda fecha para seguir siendo reproducible; no se toca `make contexto` y la fecha se lee del commit, con `timeout`, sin shell y con `cwd` en la raíz del repositorio |
 | 2026-10-27 | `v0` solo se ofrece en la pestaña «Preguntas»; FAQ y resumen usan `v1` | La línea base `qa_v0` existe para comparar prompts; las otras tareas no tienen v0 y no se inventan |
 | 2026-10-27 | Scrapling MCP sale de `.venv` y del `uv.lock`: se lanza con `uvx --from "scrapling[ai,fetchers]>=0.5" scrapling mcp` y se elimina el grupo `mcp` | `uv run` sincroniza el entorno en modo exacto: cualquier `uv run`/`make` sin `--group mcp` desinstalaba Scrapling y sus 25 dependencias, y el MCP moría a mitad de sesión sin poder reconectarse; con `uvx` vive en un entorno propio que ningún comando del proyecto puede podar |
+| 2026-10-27 | Formularios `/formulario-autorizacion` y `/proyectos-vivienda-form` fuera de Gold (#33) | `AGENTS.md` prohíbe capturar formularios; la única tasa del CDT venía de uno de ellos, así que el asistente ahora remite al canal oficial para la tasa |
+| 2026-10-27 | `make evaluar` corre las 20 preguntas del alcance (`config/evaluacion/preguntas_alcance.toml`) y escribe `docs/RESULTADOS_20_PREGUNTAS.md` | El punto 5 de la actividad exige al menos 20 preguntas; la clasificación automática ordena la revisión y la columna de revisión humana es la que va al informe |
+| 2026-10-27 | `site.contact` obligatorio en `HttpClient` y robots.txt consultado también para PDF (#30) | Ninguna petición sale sin el header `From`; un PDF bajo una ruta con `Disallow` no se descarga, ni siquiera por el host alterno `portalpublico` |
+| 2026-10-27 | `chunks_web.jsonl` versionado; `chunks.jsonl` completo sigue ignorado | La actividad pide entregar la base de conocimiento del scraping en el repositorio; el archivo con PDF y videos pesa ~43 MB y se regenera en segundos con `make chunks` |
 
 ## 12. Configuración local (no trackear)
 
@@ -615,7 +624,10 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
   sitio (hoy Bronze conserva 1 HTML y Silver está vacío).
 - [ ] Procesar los 622 PDFs históricos restantes (hoy se captura 2022–2026).
 - [ ] Transcripciones de YouTube de todo el canal (hoy, las más recientes).
-- [ ] Chunking + embeddings para el Módulo 2 (Fase 4).
+- [x] Chunking por encabezados (`chunks_web.jsonl` versionado).
+- [ ] Embeddings y base vectorial para el Módulo 2 (propuesta en `docs/MODELADO.md`).
 - [ ] Configurar protección de `main` (PR + CI verde). **Bloqueado**: GitHub
   exige plan Pro (o repo público) para proteger ramas en repos privados; la API
   devuelve 403. Se retoma cuando el grupo decida publicar el repo o subir de plan.
+  Opción sin costo: GitHub Pro del Student Developer Pack con el correo
+  @uao.edu.co de la cuenta dueña del repositorio.

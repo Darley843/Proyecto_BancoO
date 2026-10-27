@@ -166,6 +166,7 @@ def cmd_chunks(config: Config, args: argparse.Namespace) -> int:
     tokens = sum(int(row["tokens"]) for row in rows)
     print(f"Chunks: {len(rows)} de {pages} paginas, {tokens:,} tokens")
     print(f"Archivo: {config.paths.knowledge_chunks}")
+    print(f"Web    : {config.paths.knowledge_chunks_web} (versionado)")
     return 0
 
 

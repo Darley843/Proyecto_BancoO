@@ -127,6 +127,11 @@ class Paths:
         return self.knowledge / "chunks.jsonl"
 
     @property
+    def knowledge_chunks_web(self) -> Path:
+        """Chunks de las paginas web (versionados): la base del web scraping."""
+        return self.knowledge / "chunks_web.jsonl"
+
+    @property
     def knowledge_entities(self) -> Path:
         """Ruta ``self.knowledge / "entities.jsonl"``."""
         return self.knowledge / "entities.jsonl"

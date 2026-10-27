@@ -117,6 +117,29 @@ def test_chunk_ids_son_estables(tmp_path: Path):
     assert first == second
 
 
+def test_chunks_web_solo_incluye_paginas(tmp_path: Path) -> None:
+    """chunks_web.jsonl (versionado) toma solo las paginas web, no PDF ni videos."""
+    import json
+
+    config = make_config(tmp_path)
+    write_gold(config)
+    config.paths.documents_gold.mkdir(parents=True, exist_ok=True)
+    (config.paths.documents_gold / "informe.md").write_text(
+        "---\nfuente: https://x.co/informe.pdf\nseccion: datos\n---\n## Informe\n"
+        + "Texto largo del informe anual del banco. " * 3,
+        encoding="utf-8",
+    )
+
+    todos = build_chunks(config)
+    web = [
+        json.loads(linea)
+        for linea in config.paths.knowledge_chunks_web.read_text(encoding="utf-8").splitlines()
+    ]
+
+    assert {c["page_id"] for c in todos} >= {"informe", PAGE_ID}
+    assert {c["page_id"] for c in web} == {PAGE_ID}
+
+
 def test_validacion_acepta_registro_con_evidencia(tmp_path: Path):
     config = make_config(tmp_path)
     write_gold(config)

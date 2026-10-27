@@ -18,7 +18,8 @@ data/raw/
 data/processed/
 # Salidas del asistente (no versionadas: se generan con --salida).
 data/asistente/
-# Los chunks se regeneran con 'make chunks'; el conocimiento curado SI se versiona.
+# chunks.jsonl (paginas + PDF + videos, ~43 MB) se regenera con 'make chunks'.
+# chunks_web.jsonl (solo paginas web) y el conocimiento curado SI se versionan.
 data/knowledge/chunks.jsonl
 data/knowledge/draft-*.jsonl
 .data/
