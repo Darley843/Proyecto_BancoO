@@ -88,7 +88,7 @@ descarga masiva de PDF, transcripción de vídeo.
 | **Extracción semántica** | `trafilatura` (HTML → Markdown) |
 | **Frontmatter** | `PyYAML` |
 | **Tokens** | `stable_tokens` (chars/4) para el presupuesto del contexto, sin red; `tiktoken` (extra `tokens`) solo para el campo informativo de Gold |
-| **Herramienta del agente** | `scrapling` (grupo `mcp`) — navegación ad hoc vía MCP, **fuera del pipeline** |
+| **Herramienta del agente** | `scrapling` (entorno `uvx` propio) — navegación ad hoc vía MCP, **fuera del pipeline** |
 | **LLM del asistente** | `langchain-deepseek` (`ChatDeepSeek`) + `langchain-core`; `pydantic` para la salida estructurada |
 | **Modelo** | `deepseek-flash` (DeepSeek-V4.1-Flash), `DEEPSEEK_API_KEY` solo desde el entorno; `.env` prohibido |
 | **App del asistente** | `streamlit` — capa delgada en `app/streamlit_app.py`; la lógica vive en `asistente/` |
@@ -123,9 +123,9 @@ descarga masiva de PDF, transcripción de vídeo.
 
 `opencode.json` declara los servidores MCP del agente: `docs-langchain`,
 `reference-langchain` (remotos, solo consulta) y `scrapling` (local). Scrapling
-vive en el grupo `mcp` de `pyproject.toml` y se lanza con
-`uv run --group mcp scrapling mcp`; **no** forma parte de las dependencias del
-pipeline ni de la CI.
+se lanza en su **propio entorno** con
+`uvx --from "scrapling[ai,fetchers]>=0.5" scrapling mcp`; **no** forma parte de las
+dependencias del pipeline, del `uv.lock` ni de la CI.
 
 Reglas:
 
@@ -133,9 +133,14 @@ Reglas:
    Bronze, Silver ni Gold.
 2. Si se usa contra el sitio del banco, siguen mandando `robots.txt`, el
    ritmo de 1,5 s entre peticiones y el header `From` de `net.py`.
-3. Los fetchers de navegador requieren `uv run --group mcp scrapling install`
-   una sola vez; el modo HTTP funciona sin ese paso.
-4. Toda herramienta nueva entra con su grupo propio y se documenta aquí en el
+3. Los fetchers de navegador requieren
+   `uvx --from "scrapling[ai,fetchers]>=0.5" scrapling install` una sola vez; el
+   modo HTTP funciona sin ese paso.
+4. El servidor vive fuera de `.venv` a propósito: `uv run` sincroniza el
+   entorno del proyecto en modo exacto y desinstalaría Scrapling (junto con
+   `playwright`, `patchright` y `curl-cffi`) en cada `make`/`uv run`, dejando el
+   MCP roto hasta reiniciar el agente.
+5. Toda herramienta nueva entra en su propio entorno y se documenta aquí en el
    mismo commit.
 
 ## 4. Estructura del repositorio
@@ -580,6 +585,7 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 | 2026-10-27 | Modelo con `st.cache_resource` (uno por tarea) y respuestas con `st.cache_data` | Streamlit reejecuta el script en cada interacción: así un clic es la única llamada al modelo. Los resultados con errores no se cachean y la PII se filtra antes de la caché |
 | 2026-10-27 | La barra lateral muestra «Contexto versionado el» con `git log -1 --format=%cI -- data/contexto/manifest.json` | El manifest no guarda fecha para seguir siendo reproducible; no se toca `make contexto` y la fecha se lee del commit, con `timeout`, sin shell y con `cwd` en la raíz del repositorio |
 | 2026-10-27 | `v0` solo se ofrece en la pestaña «Preguntas»; FAQ y resumen usan `v1` | La línea base `qa_v0` existe para comparar prompts; las otras tareas no tienen v0 y no se inventan |
+| 2026-10-27 | Scrapling MCP sale de `.venv` y del `uv.lock`: se lanza con `uvx --from "scrapling[ai,fetchers]>=0.5" scrapling mcp` y se elimina el grupo `mcp` | `uv run` sincroniza el entorno en modo exacto: cualquier `uv run`/`make` sin `--group mcp` desinstalaba Scrapling y sus 25 dependencias, y el MCP moría a mitad de sesión sin poder reconectarse; con `uvx` vive en un entorno propio que ningún comando del proyecto puede podar |
 
 ## 12. Configuración local (no trackear)
 

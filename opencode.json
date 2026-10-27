@@ -12,10 +12,9 @@
       "scrapling": {
         "type": "local",
         "command": [
-          "uv",
-          "run",
-          "--group",
-          "mcp",
+          "uvx",
+          "--from",
+          "scrapling[ai,fetchers]>=0.5",
           "scrapling",
           "mcp"
         ]
