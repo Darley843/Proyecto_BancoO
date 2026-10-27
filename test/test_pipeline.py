@@ -276,7 +276,6 @@ def test_gold_descarta_urls_excluidas(tmp_path: Path):
     assert not (config.paths.gold_markdown / "agenda-tu-cita.md").exists()
 
 
-
 FORMULARIOS_EXCLUIDOS = (
     "/ayuda/agendar-cita-asesor",
     "/formulario-autorizacion",
