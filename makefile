@@ -115,6 +115,10 @@ repetidos: ## Mide bloques repetidos en Gold y escribe _REPETIDOS.md (sin red)
 contexto: ## Genera data/contexto/contexto_banco.md y su manifest desde Gold
 	$(UV) run python -m banco_occidente_corpus.contexto
 
+.PHONY: app
+app: ## Abre la app Streamlit del asistente (requiere DEEPSEEK_API_KEY)
+	$(UV) run streamlit run app/streamlit_app.py
+
 .PHONY: all
 all: ## Pipeline completo: discover -> fetch -> extract -> gold -> stats
 	$(CORPUS) all $(if $(LIMIT),--limit $(LIMIT),) $(if $(DELAY),--delay $(DELAY),)

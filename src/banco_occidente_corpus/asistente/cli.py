@@ -21,7 +21,7 @@ from .contexto_prompt import (
 )
 from .faq import FAQInvalida, generar_faq, render_markdown
 from .metricas import formatear_metricas
-from .modelo import MODELO_POR_DEFECTO, FaltaApiKey, crear_modelo
+from .modelo import MODELO_POR_DEFECTO, FaltaApiKey, crear_modelo, parametros_de
 from .prompts import VERSION_POR_DEFECTO, Prompt, PromptNoEncontrado, cargar_prompt
 from .qa import responder
 from .resumen import ResumenInvalido, generar_resumen
@@ -128,15 +128,13 @@ def build_parser() -> argparse.ArgumentParser:
 def _parametros(comando: str) -> tuple[float, int]:
     """Temperatura y maximo de tokens fijos por tarea.
 
-    El maximo cubre el razonamiento de DeepSeek Flash ademas del contenido; con
-    topes bajos el razonamiento agotaba el presupuesto y la respuesta llegaba
-    vacia con ``finish_reason="length"``.
+    Los valores viven en ``modelo.PARAMETROS_POR_TAREA`` para que la app no los
+    duplique. El maximo cubre el razonamiento de DeepSeek Flash ademas del
+    contenido; con topes bajos el razonamiento agotaba el presupuesto y la
+    respuesta llegaba vacia con ``finish_reason="length"``.
     """
-    if comando == "faq":
-        return 0.0, 8000
-    if comando == "resumen":
-        return 0.2, 4000
-    return 0.0, 2000
+    parametros = parametros_de("qa" if comando == "preguntar" else comando)
+    return parametros.temperatura, parametros.max_tokens
 
 
 def _imprimir_metricas(metricas: dict[str, Any] | None) -> None:

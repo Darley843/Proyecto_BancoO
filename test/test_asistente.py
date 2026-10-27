@@ -43,6 +43,7 @@ from banco_occidente_corpus.asistente.modelo import (
     FaltaApiKey,
     api_key_desde_entorno,
     crear_modelo,
+    parametros_de,
 )
 from banco_occidente_corpus.asistente.prompts import (
     PromptNoEncontrado,
@@ -1019,6 +1020,20 @@ def test_parametros_de_tokens_dejan_espacio_al_razonamiento() -> None:
     assert cli_mod._parametros("preguntar") == (0.0, 2_000)
     assert cli_mod._parametros("resumen") == (0.2, 4_000)
     assert cli_mod._parametros("faq") == (0.0, 8_000)
+
+
+@pytest.mark.parametrize(
+    ("comando", "tarea"),
+    [("preguntar", "qa"), ("faq", "faq"), ("resumen", "resumen")],
+)
+def test_parametros_de_igualan_los_del_cli(comando: str, tarea: str) -> None:
+    """``parametros_de`` conserva temperatura y tope que tenia ``_parametros``."""
+    temperatura, max_tokens = cli_mod._parametros(comando)
+
+    parametros = parametros_de(tarea)
+
+    assert parametros.temperatura == temperatura
+    assert parametros.max_tokens == max_tokens
 
 
 def test_cli_faq_escribe_salida(

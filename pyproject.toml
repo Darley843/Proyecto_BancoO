@@ -25,6 +25,7 @@ dependencies = [
     "pydantic>=2.14.1",
     "pypdfium2>=5.14.0",
     "pyyaml>=6.0.2",
+    "streamlit>=1.66.1",
     "trafilatura>=1.12.2",
 ]
 
