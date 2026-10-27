@@ -276,6 +276,31 @@ def test_gold_descarta_urls_excluidas(tmp_path: Path):
     assert not (config.paths.gold_markdown / "agenda-tu-cita.md").exists()
 
 
+
+FORMULARIOS_EXCLUIDOS = (
+    "/ayuda/agendar-cita-asesor",
+    "/formulario-autorizacion",
+    "/proyectos-vivienda-form",
+)
+
+
+def test_gold_versionado_no_contiene_formularios() -> None:
+    """Regresion de #21 y #33: ningun formulario queda en el Gold versionado."""
+    from banco_occidente_corpus.config import load_config
+    from banco_occidente_corpus.utils import is_excluded_url
+
+    config = load_config()
+    for ruta in FORMULARIOS_EXCLUIDOS:
+        assert ruta in config.discovery.exclude_patterns
+    fuentes = [row["fuente"] for row in read_jsonl(config.paths.corpus_file)]
+    assert fuentes, "corpus.jsonl no deberia estar vacio"
+    excluidas = [f for f in fuentes if is_excluded_url(f, FORMULARIOS_EXCLUIDOS)]
+    assert excluidas == []
+    for pagina in config.paths.gold_markdown.glob("*.md"):
+        cabecera = pagina.read_text(encoding="utf-8")[:400]
+        assert not is_excluded_url(cabecera, FORMULARIOS_EXCLUIDOS), pagina.name
+
+
 # ---------------------------------------------------------------- checklist
 
 

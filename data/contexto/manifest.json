@@ -1,24 +1,24 @@
 {
   "version": 1,
   "max_tokens": 175000,
-  "tokens": 167057,
+  "tokens": 166647,
   "tokens_metodo": "stable_tokens (chars/4, sin red)",
-  "tokens_bloques": 166633,
+  "tokens_bloques": 166223,
   "tokens_informacion_comun": 296,
   "tokens_cabeceras": 128,
   "paginas": {
-    "leidas": 243,
-    "incluidas": 193,
+    "leidas": 241,
+    "incluidas": 191,
     "excluidas": 50
   },
   "tokens_por_seccion": {
     "identidad": 50935,
     "atencion": 12273,
-    "oferta": 59370,
+    "oferta": 59021,
     "legal": 18992,
     "datos": 1914,
     "presencia": 2479,
-    "otros": 20670
+    "otros": 20609
   },
   "informacion_comun": {
     "lineas": 23,
@@ -666,14 +666,6 @@
       "fuente": "https://www.bancodeoccidente.com.co/proyectos-de-vivienda",
       "prioridad": 3,
       "tokens": 2307
-    },
-    {
-      "id": "proyectos-vivienda-ec2046",
-      "titulo": "Proyectos Vivienda",
-      "seccion": "oferta",
-      "fuente": "https://www.bancodeoccidente.com.co/proyectos-vivienda-form",
-      "prioridad": 3,
-      "tokens": 349
     },
     {
       "id": "prestamo-personal-banco-de-occidente-facil-y-rapido-f0777e",
@@ -1418,14 +1410,6 @@
       "fuente": "https://www.bancodeoccidente.com.co/educacion-financiera",
       "prioridad": 7,
       "tokens": 1004
-    },
-    {
-      "id": "formulario-autorizacion-7207c6",
-      "titulo": "Formulario Autorización",
-      "seccion": "otros",
-      "fuente": "https://www.bancodeoccidente.com.co/formulario-autorizacion",
-      "prioridad": 7,
-      "tokens": 61
     },
     {
       "id": "giro-de-rigo-autogestion-9c52f8",

@@ -56,6 +56,10 @@ exclude_patterns = [
     # Formulario de contacto, no contenido: AGENTS.md prohibe capturar
     # formularios. Se descubrio ya en Bronze, por eso tambien se filtra en Gold.
     "/ayuda/agendar-cita-asesor",
+    # Issue #33: dos formularios mas que seguian en Gold. proyectos-vivienda-form
+    # era la unica fuente de la tasa promocional del CDT citada por el asistente.
+    "/formulario-autorizacion",
+    "/proyectos-vivienda-form",
 ]
 
 [gold]
