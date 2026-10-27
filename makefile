@@ -119,6 +119,10 @@ contexto: ## Genera data/contexto/contexto_banco.md y su manifest desde Gold
 app: ## Abre la app Streamlit del asistente (requiere DEEPSEEK_API_KEY)
 	$(UV) run streamlit run app/streamlit_app.py
 
+.PHONY: evaluar
+evaluar: ## Corre las 20 preguntas del alcance y escribe docs/RESULTADOS_20_PREGUNTAS.md (requiere DEEPSEEK_API_KEY)
+	$(UV) run python -m banco_occidente_corpus.asistente evaluar $(if $(SOLO),--solo $(SOLO),) $(if $(PAUSA),--pausa $(PAUSA),) $(if $(VERSION),--version $(VERSION),)
+
 .PHONY: all
 all: ## Pipeline completo: discover -> fetch -> extract -> gold -> stats
 	$(CORPUS) all $(if $(LIMIT),--limit $(LIMIT),) $(if $(DELAY),--delay $(DELAY),)
