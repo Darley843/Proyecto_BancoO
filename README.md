@@ -106,6 +106,42 @@ vive en `data/noticias/prensa.yaml`; `make clean` no la borra. Si el sitio
 responde `403`, el comando se detiene y avisa: no cambia User-Agent, proxies ni
 velocidad de las peticiones.
 
+## App del asistente (Streamlit)
+
+`app/streamlit_app.py` es una **capa delgada** sobre `asistente/`: la app solo
+pinta, cachea y delega; la lógica (prompts, validación, métricas) sigue en el
+subpaquete. Tiene tres pestañas: **Preguntas** (respuesta con su fuente),
+**Preguntas frecuentes** (diez preguntas con fuente) y **Resumen** (resumen
+ejecutivo con sus fuentes).
+
+```bash
+# PowerShell
+$env:DEEPSEEK_API_KEY = "<tu-clave>"
+make app        # uv run streamlit run app/streamlit_app.py
+```
+
+| Regla | Implementación |
+|---|---|
+| El modelo solo se llama al pulsar un botón | El `invoke` vive dentro de `if st.button(...)`; reejecutar la app no gasta tokens |
+| Contexto y modelo se cargan una vez | `st.cache_resource`: contexto y un modelo por tarea, con su temperatura y su tope |
+| Respuestas por pregunta y versión | `st.cache_data`, con los tokens y la fecha del contexto en la clave |
+| `v0` para comparar prompts | Solo en la pestaña Preguntas; FAQ y Resumen usan siempre `v1` |
+| Un resultado inválido no se cachea | El siguiente clic en Generar vuelve a llamar al modelo |
+| PII antes de la caché | `servicio.detectar_pii_pregunta` corta la pregunta y responde sin llamar al modelo |
+| Sin `DEEPSEEK_API_KEY` | Mensaje con los comandos de PowerShell y bash; la app no se cae |
+| Fecha del contexto | `git log -1 --format=%cI -- data/contexto/manifest.json`, como «Contexto versionado el» |
+
+La barra lateral muestra el modelo, la versión del prompt, los tokens del
+contexto (`data/contexto/manifest.json`) y la fecha del commit que lo versionó.
+Cada respuesta trae un desplegable **Detalles técnicos** con la respuesta cruda
+(la que `--verbose` muestra en el CLI), los avisos de validación (`sin_datos`,
+`fuente_invalida`, `pii_bloqueada`, ...) y las métricas: entrada, salida,
+razonamiento, aciertos de caché y `finish_reason`. Si editas un prompt, sube la
+versión (`v1` → `v2`) para invalidar la caché.
+
+> Aviso visible en la app: «Responde solo con información pública del sitio del
+> Banco de Occidente; no reemplaza la asesoría oficial».
+
 ---
 
 ## Requisitos
@@ -147,6 +183,7 @@ documentos por sección y la cobertura del checklist del Taller 1.
 | `make videos` | Lista el canal, baja subtítulos y transcribe a Gold |
 | `make media` | Documentos PDF + videos |
 | `make noticias` | Hechos oficiales y prensa curada a Gold (independiente del pipeline) |
+| `make app` | Abre la app Streamlit del asistente (requiere `DEEPSEEK_API_KEY`) |
 | `make all` | Pipeline completo |
 | `make stats` | Resumen y checklist → `data/gold/_INDICE.md` |
 | `make status` | Cuenta URLs/Bronze/Silver/Gold |
@@ -339,7 +376,10 @@ Variables en el Makefile: `GIT_USER`, `GIT_EMAIL`, `REPO`.
 │   ├── section.py            # clasificación en secciones
 │   ├── gold.py               # Gold + frontmatter
 │   ├── checklist.py          # 24 casillas del Taller 1
-│   └── stats.py              # _INDICE.md
+│   ├── stats.py              # _INDICE.md
+│   └── asistente/            # Q&A, FAQ y resumen con DeepSeek (+ servicio y manifest)
+├── app/
+│   └── streamlit_app.py      # app del asistente (make app)
 ├── scripts/
 │   ├── demo_offline.py       # pipeline con fixture, sin red
 │   └── scrape_empresa.py     # scraper autocontenido (PEP 723)

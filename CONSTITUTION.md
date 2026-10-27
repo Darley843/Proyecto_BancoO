@@ -91,6 +91,7 @@ descarga masiva de PDF, transcripción de vídeo.
 | **Herramienta del agente** | `scrapling` (entorno `uvx` propio) — navegación ad hoc vía MCP, **fuera del pipeline** |
 | **LLM del asistente** | `langchain-deepseek` (`ChatDeepSeek`) + `langchain-core`; `pydantic` para la salida estructurada |
 | **Modelo** | `deepseek-flash` (DeepSeek-V4.1-Flash), `DEEPSEEK_API_KEY` solo desde el entorno; `.env` prohibido |
+| **App del asistente** | `streamlit` — capa delgada en `app/streamlit_app.py`; la lógica vive en `asistente/` |
 | **Testing** | `pytest` (patrón AAA) |
 | **Lint / formato** | `ruff` (línea 100, comillas dobles) |
 | **Tipado** | `ty` (target `make typecheck`) |
@@ -107,6 +108,16 @@ descarga masiva de PDF, transcripción de vídeo.
 > LangChain con `timeout` y reintentos acotados: no son scraping del sitio del
 > banco, no pasan por `net.py` ni les aplican `robots.txt`/1,5 s. La clave se
 > lee solo de `DEEPSEEK_API_KEY`; el proyecto no lee `.env`.
+
+> **App del asistente:** `app/streamlit_app.py` es una **capa delgada**. Solo
+> pinta, cachea y delega en `asistente/servicio.py`, `asistente/manifest.py` y
+> `asistente/modelo.py`; no contiene reglas de negocio ni accede a la red por su
+> cuenta. El modelo se invoca **solo** al pulsar un botón: `st.cache_resource`
+> guarda el contexto y un modelo por tarea, y `st.cache_data` guarda respuestas
+> por pregunta y versión. Los resultados con errores de validación no se
+> cachean, y una pregunta con datos personales se responde sin llamar al modelo
+> y sin entrar en la caché. La versión de prompt `v0` solo aplica a la pestaña
+> «Preguntas»; FAQ y resumen usan siempre `v1`.
 
 ### Herramientas del agente (MCP)
 
@@ -150,12 +161,15 @@ ProyectoAvance1/
 │   ├── asistente/        # ASISTENTE: Q&A, FAQ y resumen con DeepSeek
 │   │   ├── __main__.py   # uv run python -m banco_occidente_corpus.asistente
 │   │   ├── cli.py        # preguntar | faq | resumen + --version
-│   │   ├── modelo.py     # ChatDeepSeek desde DEEPSEEK_API_KEY
+│   │   ├── modelo.py     # ChatDeepSeek desde DEEPSEEK_API_KEY + parámetros por tarea
 │   │   ├── prompts.py    # config/prompts/<tarea>_<version>.md
 │   │   ├── contexto_prompt.py  # contexto completo + canal oficial + recorte experimental
-│   │   ├── qa.py         # Q&A temperatura 0
+│   │   ├── qa.py         # Q&A temperatura 0 + texto crudo para --verbose
 │   │   ├── faq.py        # 10 FAQ con salida estructurada Pydantic
 │   │   ├── resumen.py    # resumen ejecutivo (temp. 0.2)
+│   │   ├── metricas.py   # uso del modelo: tokens, razonamiento, caché y fin
+│   │   ├── manifest.py   # APP: tokens del manifest + fecha del commit (git log)
+│   │   ├── servicio.py   # APP: ejecuta tareas, mide tiempo y captura errores
 │   │   └── validacion.py # límites, fuente, cifras, PII e inyección
 │   ├── checklist.py      # 24 casillas del Taller 1
 │   ├── stats.py          # _INDICE.md
@@ -163,7 +177,7 @@ ProyectoAvance1/
 ├── test/                 # pytest + fixtures (sin red)
 ├── config/site.toml      # alcance, cortesía, filtros y secciones
 ├── config/contexto.toml  # secciones, prioridad y presupuesto del contexto
-├── config/prompts/       # prompts versionados (qa_v1.md, faq_v1.md, resumen_v1.md)
+├── config/prompts/       # prompts versionados (qa_v0.md, qa_v1.md, faq_v1.md, resumen_v1.md)
 ├── data/
 │   ├── raw/              # Bronze (ignorado por Git)
 │   ├── processed/        # Silver (ignorado por Git)
@@ -174,6 +188,8 @@ ProyectoAvance1/
 │   ├── tasks.py          # tareas del Makefile portables (Windows/Unix)
 │   ├── demo_offline.py   # pipeline completo con un fixture, sin red
 │   └── scrape_empresa.py # scraper autocontenido PEP 723
+├── app/
+│   └── streamlit_app.py  # APP: capa delgada sobre asistente/ (make app)
 ├── docs/ESTANDAR.md      # trazabilidad regla de la clase → implementación
 ├── .opencode/skills/corpus-extraction/    # skill operativa del pipeline
 ├── .opencode/skills/semantic-extraction/  # skill de conocimiento semántico
@@ -490,6 +506,7 @@ make doctor          # red + robots.txt + estado
 make all             # discover -> fetch -> extract -> gold -> stats
 make noticias        # hechos oficiales y prensa curada
 make contexto        # prompt del asistente desde Gold (data/contexto/)
+make app             # app Streamlit del asistente (solo lee contexto y prompts)
 
 # 4. Commit (los hooks corren solos)
 git add -A
@@ -564,6 +581,10 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 | 2026-10-26 | PII bloqueada antes de llamar al modelo; URL y teléfono del canal se extraen del contexto | Ley 1581: no se envían datos personales a un tercero y no se repiten en la respuesta. Sin constantes que puedan quedar obsoletas |
 | 2026-10-26 | Cifras normalizadas (espacios, puntos, comas y guiones) antes de comparar con el contexto | Evita falsos positivos por formato (`018000 514652` = `018000514652`); limitación conocida: `10,5` y `105` colisionan |
 | 2026-10-26 | Salidas del asistente por stdout y `--salida` opcional, sin versionar | No altera Gold ni crea una capa nueva; `data/asistente/` queda ignorado |
+| 2026-10-27 | App Streamlit (`app/streamlit_app.py`) como capa delgada sobre `asistente/` | La app solo pinta y cachea; la lógica, la validación y las llamadas al modelo viven en el subpaquete, que ya se prueba sin red |
+| 2026-10-27 | Modelo con `st.cache_resource` (uno por tarea) y respuestas con `st.cache_data` | Streamlit reejecuta el script en cada interacción: así un clic es la única llamada al modelo. Los resultados con errores no se cachean y la PII se filtra antes de la caché |
+| 2026-10-27 | La barra lateral muestra «Contexto versionado el» con `git log -1 --format=%cI -- data/contexto/manifest.json` | El manifest no guarda fecha para seguir siendo reproducible; no se toca `make contexto` y la fecha se lee del commit, con `timeout`, sin shell y con `cwd` en la raíz del repositorio |
+| 2026-10-27 | `v0` solo se ofrece en la pestaña «Preguntas»; FAQ y resumen usan `v1` | La línea base `qa_v0` existe para comparar prompts; las otras tareas no tienen v0 y no se inventan |
 | 2026-10-27 | Scrapling MCP sale de `.venv` y del `uv.lock`: se lanza con `uvx --from "scrapling[ai,fetchers]>=0.5" scrapling mcp` y se elimina el grupo `mcp` | `uv run` sincroniza el entorno en modo exacto: cualquier `uv run`/`make` sin `--group mcp` desinstalaba Scrapling y sus 25 dependencias, y el MCP moría a mitad de sesión sin poder reconectarse; con `uvx` vive en un entorno propio que ningún comando del proyecto puede podar |
 
 ## 12. Configuración local (no trackear)

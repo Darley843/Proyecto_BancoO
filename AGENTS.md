@@ -38,6 +38,7 @@ make videos      # YouTube: canal -> subtítulos -> transcripción Gold
 make media       # documentos + videos
 make noticias    # hechos oficiales + prensa curada (independiente de all/gold/deliver/docs/videos/media)
 make contexto    # prompt del asistente desde Gold (data/contexto/)
+make app         # app Streamlit del asistente (llama a asistente/)
 make check       # lint + typecheck + pruebas
 make health      # integridad de las capas y del contrato de Gold
 make identity    # fija user.name / user.email del repo
@@ -88,6 +89,7 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | `.../documents.py` | PDFs: inventario, descarga y extracción a Gold |
 | `.../videos.py` | YouTube: canal, subtítulos y transcripción a Gold |
 | `.../news.py` | Noticias: hechos oficiales, prensa curada, Gold e índice |
+| `app/streamlit_app.py` | App Streamlit: capa delgada que delega en `asistente/` |
 | `scripts/tasks.py` | Tareas portables del Makefile |
 
 ## Verificación antes de dar algo por terminado
