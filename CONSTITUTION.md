@@ -280,8 +280,8 @@ keywords: [historia, misión, visión]
    `corpus.jsonl`, `documents.jsonl` o `videos.jsonl`. Esto es distinto de la
    limpieza de Silver (`find_boilerplate`), que sí elimina boilerplate antes de
    escribir el Markdown procesado.
-7. El reporte registra las 183 páginas web analizadas, el texto repetido en al
-   menos 5/10/20 páginas (22.3 %, 16.8 % y 9.1 %) y el top 20 de bloques. Es
+7. El reporte registra las 181 páginas web analizadas, el texto repetido en al
+   menos 5/10/20 páginas (22.3 %, 16.7 % y 9.1 %) y el top 20 de bloques. Es
    un diagnóstico reproducible y offline, no una autorización para borrar
    contenido del corpus.
 
@@ -345,9 +345,9 @@ Reglas de las fichas:
 sin volver a la web. Bronze nunca se edita a mano.
 
 **Límite actual:** el checkout versiona Bronze con **1 HTML**, Silver con **0
-archivos** y Gold con **183 páginas web** del sitio (243 archivos en `pages/`,
+archivos** y Gold con **181 páginas web** del sitio (241 archivos en `pages/`,
 contando 40 `hecho-*` y 20 `noticia-*`). Por eso hoy ese comando no puede
-regenerar las 183 páginas del sitio; el Gold versionado es la única fuente
+regenerar las 181 páginas del sitio; el Gold versionado es la única fuente
 disponible para medir. Recuperar esa capacidad exige re-capturar Bronze con
 `make all` (ver §14).
 
@@ -611,7 +611,7 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 - [x] Skill `semantic-extraction`, esquema JSON y validador de evidencia.
 - [x] Documentos PDF (balances e informes) y videos con subtítulos.
 - [ ] Poblar Knowledge para todas las secciones (semilla actual: identidad).
-- [ ] Re-capturar Bronze para poder regenerar desde cero las 183 páginas web del
+- [ ] Re-capturar Bronze para poder regenerar desde cero las 181 páginas web del
   sitio (hoy Bronze conserva 1 HTML y Silver está vacío).
 - [ ] Procesar los 622 PDFs históricos restantes (hoy se captura 2022–2026).
 - [ ] Transcripciones de YouTube de todo el canal (hoy, las más recientes).
