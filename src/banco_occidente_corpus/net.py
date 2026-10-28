@@ -5,6 +5,8 @@ from __future__ import annotations
 import time
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlsplit
+from urllib.robotparser import RobotFileParser
 
 import httpx
 
@@ -21,8 +23,14 @@ class BlockedError(RuntimeError):
     """El sitio rechaza la peticion (403/429) de forma persistente."""
 
 
+class FaltaContacto(ValueError):
+    """``site.contact`` esta vacio: no se puede enviar el header ``From``."""
+
+
 @dataclass(slots=True)
 class Response:
+    """Respuesta HTTP simplificada que devuelve ``HttpClient.get``."""
+
     url: str
     status: int
     text: str
@@ -41,7 +49,16 @@ class HttpClient:
     """Envoltorio de httpx que aplica UA, timeout, reintentos y pausas."""
 
     def __init__(self, config: Config, *, delay: float | None = None) -> None:
-        """Crea el cliente aplicando UA, `From`, timeout y el minimo de cortesia."""
+        """Crea el cliente aplicando UA, `From`, timeout y el minimo de cortesia.
+
+        Falla con ``FaltaContacto`` si ``site.contact`` esta vacio: toda
+        peticion del proyecto debe identificarse con el header ``From``.
+        """
+        if not config.site.contact.strip():
+            raise FaltaContacto(
+                "config/site.toml necesita site.contact (correo academico) para el "
+                "header From; el proyecto no hace peticiones sin identificarse."
+            )
         self.config = config
         requested = config.crawl.delay_seconds if delay is None else delay
         # El minimo se impone aqui, en el unico punto por el que pasa toda
@@ -64,17 +81,19 @@ class HttpClient:
             "Accept-Language": f"{self.config.site.language},es;q=0.9,en;q=0.5",
             "Accept-Encoding": "gzip, deflate, br",
         }
-        if self.config.site.contact:
-            headers["From"] = self.config.site.contact
+        headers["From"] = self.config.site.contact.strip()
         return headers
 
     def __enter__(self) -> HttpClient:
+        """Permite usar el cliente con ``with``."""
         return self
 
     def __exit__(self, *exc: object) -> None:
+        """Cierra la conexion al salir del bloque ``with``."""
         self.close()
 
     def close(self) -> None:
+        """Cierra el cliente httpx subyacente."""
         self.client.close()
 
     def _wait(self) -> None:
@@ -89,6 +108,11 @@ class HttpClient:
             time.sleep(self.config.crawl.pause_seconds)
 
     def get(self, url: str, *, accept: str | None = None) -> Response:
+        """Descarga ``url`` respetando la cortesia, con reintentos y backoff.
+
+        Devuelve un ``Response`` (con ``error`` para 4xx) o lanza
+        ``BlockedError`` si tras los reintentos el sitio sigue rechazando.
+        """
         headers = {"Accept": accept} if accept else None
         last_error = "sin intentos"
         attempts = max(1, self.config.crawl.max_retries)
@@ -99,6 +123,8 @@ class HttpClient:
             try:
                 response = self.client.get(url, headers=headers)
             except httpx.HTTPError as exc:  # red, DNS, timeout
+                # Tambien cuenta como peticion: la pausa siguiente se mide desde aqui.
+                self._last_request = time.monotonic()
                 last_error = f"{type(exc).__name__}: {exc}"
                 response = None
             else:
@@ -161,4 +187,38 @@ def describe_status(status: int) -> str:
 
 
 def response_headers(response: Any) -> dict[str, str]:  # pragma: no cover - auxiliar
+    """Headers de una respuesta httpx como ``dict`` (vacio si no tiene)."""
     return dict(getattr(response, "headers", {}) or {})
+
+
+class RobotsGuard:
+    """Consulta ``robots.txt`` por host antes de descargar una URL.
+
+    Lee el ``robots.txt`` de cada host una sola vez con el mismo ``HttpClient``
+    (cortesia, UA y ``From`` incluidos). Si no se puede leer, no bloquea: la
+    norma de robots trata un archivo ausente como "todo permitido".
+    """
+
+    def __init__(self, client: HttpClient, user_agent: str) -> None:
+        """Guarda el cliente y el User-Agent con el que se evaluan las reglas."""
+        self.client = client
+        self.user_agent = user_agent
+        self._parsers: dict[str, RobotFileParser | None] = {}
+
+    def _parser(self, url: str) -> RobotFileParser | None:
+        """Parser del host de ``url``, descargado la primera vez que se pide."""
+        parts = urlsplit(url)
+        host = f"{parts.scheme}://{parts.netloc}".lower()
+        if host not in self._parsers:
+            response = self.client.get_optional(f"{host}/robots.txt")
+            parser: RobotFileParser | None = None
+            if response is not None and response.ok:
+                parser = RobotFileParser()
+                parser.parse(response.text.splitlines())
+            self._parsers[host] = parser
+        return self._parsers[host]
+
+    def allowed(self, url: str) -> bool:
+        """True si ``robots.txt`` del host permite descargar ``url``."""
+        parser = self._parser(url)
+        return parser is None or parser.can_fetch(self.user_agent, url)

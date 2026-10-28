@@ -13,9 +13,11 @@ import yaml
 from bs4 import BeautifulSoup
 
 from .config import Config
-from .net import HttpClient
+from .discover import SOLO_HTML
+from .net import HttpClient, RobotsGuard
 from .utils import (
     estimate_tokens,
+    is_excluded_url,
     page_slug,
     read_jsonl,
     utc_now,
@@ -158,6 +160,7 @@ def _priority(tipo: str, year: int | None) -> int:
 def discover_documents(config: Config) -> list[dict]:
     """Inventaria todos los PDF enlazados desde el HTML Bronze."""
     base = config.site.base_url.rstrip("/") + "/"
+    exclusiones = [p for p in config.discovery.exclude_patterns if p.lower() not in SOLO_HTML]
     found: dict[str, dict] = {}
     for html_path in sorted(config.paths.raw_html.glob("*.html")):
         soup = BeautifulSoup(html_path.read_text(encoding="utf-8", errors="replace"), "lxml")
@@ -167,6 +170,8 @@ def discover_documents(config: Config) -> list[dict]:
                 continue
             url = urljoin(base, href)
             if not _is_document(url):
+                continue
+            if is_excluded_url(url, exclusiones):
                 continue
             key = _canonical(url)
             if key in found:
@@ -233,17 +238,23 @@ def fetch_documents(
         for row in read_jsonl(config.paths.documents_capture)
         if row.get("status") == 200
     }
-    stats = {"ok": 0, "cached": 0, "failed": 0, "bytes": 0, "skipped": 0}
+    stats = {"ok": 0, "cached": 0, "failed": 0, "bytes": 0, "skipped": 0, "robots": 0}
     config.paths.raw_documents.mkdir(parents=True, exist_ok=True)
 
     with (
         HttpClient(config, delay=delay) as client,
         config.paths.documents_capture.open("a", encoding="utf-8", newline="\n") as out,
     ):
+        robots = RobotsGuard(client, config.site.user_agent)
 
         def save(record: dict) -> None:
+            """Anexa un registro de captura y lo escribe de inmediato."""
             out.write(json.dumps(record, ensure_ascii=False) + "\n")
             out.flush()
+
+        def permitido(url: str) -> bool:
+            """True si robots.txt permite la URL (o si respect_robots esta apagado)."""
+            return not config.crawl.respect_robots or robots.allowed(url)
 
         for index, row in enumerate(selected, start=1):
             key = row["url_key"]
@@ -252,10 +263,16 @@ def fetch_documents(
                 continue
 
             url = row["url"]
+            # robots.txt se consulta antes de cada descarga, tambien en el host alterno.
+            if not permitido(url):
+                stats["robots"] += 1
+                save({**row, "status": 0, "error": "disallow-robots", "fecha": utc_now()})
+                log.info("[%d] %s -> bloqueado por robots.txt", index, url)
+                continue
             response = client.get(url)
             if not response.ok:
                 alternative = _fallback_url(url)
-                if alternative:
+                if alternative and permitido(alternative):
                     response = client.get(alternative)
             if not response.ok:
                 stats["failed"] += 1

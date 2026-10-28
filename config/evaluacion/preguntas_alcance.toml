@@ -1,0 +1,134 @@
+# Las 20 preguntas del alcance (docs/ALCANCE.md) para la evaluacion del Q&A.
+#
+# cobertura:
+#   "si"      el corpus tiene el dato; se espera una respuesta con fuente.
+#   "parcial" el corpus tiene parte del dato; se espera respuesta o remision.
+#   "no"      el corpus no tiene el dato; lo correcto es la frase fija y el canal oficial.
+#
+# terminos: grupos de terminos esperados en la respuesta. Cada grupo es una
+# lista de alternativas (basta una). Se comparan sin tildes ni mayusculas. Es
+# una heuristica para ordenar la revision, no reemplaza la revision humana.
+
+[[pregunta]]
+id = 1
+pregunta = "¿Cuál es el horario de atención de las oficinas?"
+cobertura = "no"
+terminos = []
+nota = "El buscador de oficinas usa JavaScript y un servicio externo."
+
+[[pregunta]]
+id = 2
+pregunta = "¿Dónde hay una oficina en Cali?"
+cobertura = "no"
+terminos = []
+nota = "Mismo caso que la pregunta 1."
+
+[[pregunta]]
+id = 3
+pregunta = "¿Cuál es la línea de atención telefónica?"
+cobertura = "si"
+terminos = [["018000", "601", "#626", "línea"]]
+
+[[pregunta]]
+id = 4
+pregunta = "¿Cómo presento una petición, queja o reclamo?"
+cobertura = "si"
+terminos = [["PQR", "petición", "queja", "reclamo"]]
+
+[[pregunta]]
+id = 5
+pregunta = "¿Quién es el Defensor del Consumidor Financiero y cómo lo contacto?"
+cobertura = "si"
+terminos = [["defensor"], ["@", "correo", "teléfono", "línea", "dirección"]]
+
+[[pregunta]]
+id = 6
+pregunta = "¿Cuál es el propósito o misión del banco?"
+cobertura = "parcial"
+terminos = [["propósito", "pilares", "valores"]]
+nota = "El sitio publica propósito, pilares y valores, no una misión."
+
+[[pregunta]]
+id = 7
+pregunta = "¿Cuándo y dónde se fundó el banco?"
+cobertura = "si"
+terminos = [["1965"], ["Cali"]]
+
+[[pregunta]]
+id = 8
+pregunta = "¿A qué grupo empresarial pertenece?"
+cobertura = "si"
+terminos = [["Grupo Aval", "Aval"]]
+
+[[pregunta]]
+id = 9
+pregunta = "¿Quién es el presidente del banco?"
+cobertura = "si"
+terminos = [["Gerardo Silva"]]
+
+[[pregunta]]
+id = 10
+pregunta = "¿Qué tipos de cuentas de ahorro ofrece?"
+cobertura = "si"
+terminos = [["cuenta"], ["ahorro"]]
+
+[[pregunta]]
+id = 11
+pregunta = "¿Qué requisitos necesito para abrir una cuenta?"
+cobertura = "si"
+terminos = [["documento", "cédula", "identidad", "requisito"]]
+
+[[pregunta]]
+id = 12
+pregunta = "¿Puedo abrir una cuenta en línea?"
+cobertura = "si"
+terminos = [["línea", "digital", "app", "web"]]
+
+[[pregunta]]
+id = 13
+pregunta = "¿Qué tarjetas de crédito ofrece y cuál es su cuota de manejo?"
+cobertura = "si"
+terminos = [["tarjeta"], ["cuota de manejo", "cuota"]]
+
+[[pregunta]]
+id = 14
+pregunta = "¿Qué es un CDT y cuál es su tasa?"
+cobertura = "parcial"
+terminos = [["CDT", "Certificado de Depósito"]]
+nota = "El corpus no publica la tasa desde el issue #33; debe remitir al canal oficial para la tasa."
+
+[[pregunta]]
+id = 15
+pregunta = "¿Qué créditos de vivienda ofrece?"
+cobertura = "si"
+terminos = [["vivienda", "leasing habitacional", "hipotecario"]]
+
+[[pregunta]]
+id = 16
+pregunta = "¿Ofrece crédito de vehículo?"
+cobertura = "si"
+terminos = [["vehículo", "carro", "auto"]]
+
+[[pregunta]]
+id = 17
+pregunta = "¿Qué hago si pierdo mi tarjeta o me la roban?"
+cobertura = "si"
+terminos = [["bloque", "report", "línea", "#626", "018000"]]
+
+[[pregunta]]
+id = 18
+pregunta = "¿Cómo uso la banca móvil o la app?"
+cobertura = "si"
+terminos = [["app", "banca móvil", "aplicación"]]
+
+[[pregunta]]
+id = 19
+pregunta = "¿Qué acciones de sostenibilidad realiza?"
+cobertura = "si"
+terminos = [["sostenib", "ambiental", "ASG", "ESG", "social"]]
+
+[[pregunta]]
+id = 20
+pregunta = "¿Cuáles son las noticias recientes del banco?"
+cobertura = "si"
+terminos = [["2026", "2025"]]

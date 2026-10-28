@@ -166,6 +166,7 @@ def cmd_chunks(config: Config, args: argparse.Namespace) -> int:
     tokens = sum(int(row["tokens"]) for row in rows)
     print(f"Chunks: {len(rows)} de {pages} paginas, {tokens:,} tokens")
     print(f"Archivo: {config.paths.knowledge_chunks}")
+    print(f"Web    : {config.paths.knowledge_chunks_web} (versionado)")
     return 0
 
 
@@ -248,6 +249,7 @@ def cmd_docs(config: Config, args: argparse.Namespace) -> int:
             "Documentos: "
             f"{stats['ok']} nuevos, {stats['cached']} en cache, "
             f"{stats['failed']} fallidos, {stats['skipped']} omitidos, "
+            f"{stats.get('robots', 0)} bloqueados por robots.txt, "
             f"{stats['bytes'] / 1_048_576:.1f} MB"
         )
 
@@ -353,7 +355,8 @@ def cmd_all(config: Config, args: argparse.Namespace) -> int:
     ):
         print(f"\n==> {step}")
         code = func(config, args)
-        if code != 0 and step in {"discover", "fetch"}:
+        if code != 0:
+            print(f"El paso {step} termino con codigo {code}; se detiene el pipeline.")
             return code
     return cmd_stats(config, args)
 

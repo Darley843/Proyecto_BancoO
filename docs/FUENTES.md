@@ -43,10 +43,11 @@ Sitemap: https://www.bancodeoccidente.com.co/sitemap.xml
 | `/*!ut/p*` | ❌ | `Disallow` (parámetros de sesión) |
 | `/_next/`, `*.js`, `*.css`, `*.woff*`, `*.svg` | ➖ | Permitido, pero es ruido para el corpus |
 | `/ayuda/agendar-cita-asesor` | ❌ | Formulario de agendamiento: `AGENTS.md` prohíbe capturar formularios. Se excluye en `config/site.toml` y se filtra también al construir Gold |
+| `/formulario-autorizacion`, `/proyectos-vivienda-form` | ❌ | Formularios detectados al probar el asistente (issue #33). Se excluyen en `config/site.toml` y se retiraron de Gold y del contexto. `proyectos-vivienda-form` era la única fuente de la tasa promocional del CDT, así que el asistente ya no la reporta |
 
 > El pipeline aplica además una lista de `exclude_patterns` en
-> `config/site.toml` (login, carrito, admin, documentos, imágenes y el
-> formulario de agendamiento). El filtro se usa en el descubrimiento y otra vez
+> `config/site.toml` (login, carrito, admin, documentos, imágenes y los
+> formularios). El filtro se usa en el descubrimiento y otra vez
 > en Gold, para que una página ya capturada en Bronze no vuelva al entregable.
 
 ### Hallazgo: el sitemap publica rutas `/w/`
@@ -156,7 +157,7 @@ El host `www.` devuelve `403` en algunos adjuntos; el pipeline reintenta en
 | URLs no capturadas | 3 (`404` reales) |
 | Peso del HTML crudo | 102.3 MB |
 | Páginas con texto útil (Silver) | 193 |
-| Documentos Gold (únicos) | 183 (10 duplicados descartados) |
+| Documentos Gold (únicos) | 183 (10 duplicados descartados); 181 después de excluir dos formularios (issue #33) |
 | Tokens de páginas | 151.972 |
 | Documentos PDF | 190 (138 financieros) |
 | Tokens de PDFs | 10.954.933 |

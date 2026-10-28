@@ -8,7 +8,7 @@ from pathlib import Path
 import pytest
 
 from banco_occidente_corpus.checklist import coverage, evaluate
-from banco_occidente_corpus.config import Config, GoldConfig, Paths
+from banco_occidente_corpus.config import Config, GoldConfig, Paths, SiteConfig
 from banco_occidente_corpus.dedupe import find_boilerplate, normalize_line, strip_boilerplate
 from banco_occidente_corpus.discover import (
     is_capture_target,
@@ -28,25 +28,29 @@ FIXTURES = Path(__file__).parent / "fixtures"
 # ---------------------------------------------------------------- descubrir
 
 
-def test_parse_sitemap_index():
+def test_parse_sitemap_index() -> None:
+    """Parse sitemap index."""
     kind, locs = parse_sitemap((FIXTURES / "sitemap_index.xml").read_text(encoding="utf-8"))
     assert kind == "sitemapindex"
     assert len(locs) == 2
     assert "&groupId" in locs[0]
 
 
-def test_parse_sitemap_urlset():
+def test_parse_sitemap_urlset() -> None:
+    """Parse sitemap urlset."""
     kind, locs = parse_sitemap((FIXTURES / "sitemap_child.xml").read_text(encoding="utf-8"))
     assert kind == "urlset"
     assert "https://www.bancodeoccidente.com.co/personas" in locs
 
 
-def test_parse_sitemap_invalid():
+def test_parse_sitemap_invalid() -> None:
+    """Parse sitemap invalid."""
     assert parse_sitemap("<html>no es un sitemap</html>") == ("", [])
     assert parse_sitemap("") == ("", [])
 
 
-def test_parse_robots():
+def test_parse_robots() -> None:
+    """Parse robots."""
     text = "User-agent: *\nDisallow: /portaltransaccional/\nCrawl-delay: 2\nSitemap: https://x.co/sitemap.xml\n"
     parser, delay, sitemaps = parse_robots(text)
     assert delay == 2.0
@@ -55,13 +59,15 @@ def test_parse_robots():
     assert parser.can_fetch("TAAML-bot/1.0", "https://x.co/personas")
 
 
-def test_normalize_url_quita_fragmento():
+def test_normalize_url_quita_fragmento() -> None:
+    """Normalize url quita fragmento."""
     assert normalize_url("https://www.bancodeoccidente.com.co/a#top") == (
         "https://www.bancodeoccidente.com.co/a"
     )
 
 
-def test_normalize_url_quita_prefijo_friendly_url():
+def test_normalize_url_quita_prefijo_friendly_url() -> None:
+    """Normalize url quita prefijo friendly url."""
     # Liferay publica /w/<slug> en el sitemap pero sirve /<slug>.
     assert normalize_url("https://www.bancodeoccidente.com.co/w/cuenta-de-ahorros") == (
         "https://www.bancodeoccidente.com.co/cuenta-de-ahorros"
@@ -71,7 +77,8 @@ def test_normalize_url_quita_prefijo_friendly_url():
     )
 
 
-def test_filtros_de_alcance(config: Config):
+def test_filtros_de_alcance(config: Config) -> None:
+    """Filtros de alcance."""
     assert is_capture_target("https://www.bancodeoccidente.com.co/quienes-somos", config)
     assert not is_capture_target(
         "https://www.bancodeoccidente.com.co/portaltransaccional/x", config
@@ -96,14 +103,16 @@ def test_filtros_de_alcance(config: Config):
         ("https://x.co/xyz", "otros"),
     ],
 )
-def test_classify(url: str, esperado: str):
+def test_classify(url: str, esperado: str) -> None:
+    """Classify."""
     assert classify(url) == esperado
 
 
 # ---------------------------------------------------------------- extraer
 
 
-def test_extract_page_quita_navegacion_y_footer():
+def test_extract_page_quita_navegacion_y_footer() -> None:
+    """Extract page quita navegacion y footer."""
     html = (FIXTURES / "quienes_somos.html").read_text(encoding="utf-8")
     page = extract_page(html, "https://www.bancodeoccidente.com.co/quienes-somos")
     assert page.title
@@ -114,7 +123,8 @@ def test_extract_page_quita_navegacion_y_footer():
     assert page.section == "identidad"
 
 
-def test_boilerplate_detecta_footer_repetido():
+def test_boilerplate_detecta_footer_repetido() -> None:
+    """Boilerplate detecta footer repetido."""
     footer = "Vigilado Superintendencia Financiera de Colombia"
     docs = [[f"Contenido unico {i}", "Mision del banco", footer] for i in range(6)]
     boilerplate = find_boilerplate(docs, min_docs=5, ratio=0.35)
@@ -122,19 +132,22 @@ def test_boilerplate_detecta_footer_repetido():
     assert normalize_line("Mision del banco") in boilerplate  # tambien se repite
 
 
-def test_strip_boilerplate_conserva_cuerpo():
+def test_strip_boilerplate_conserva_cuerpo() -> None:
+    """Strip boilerplate conserva cuerpo."""
     text = "# Titulo\n\nCuerpo util de la pagina.\n\nFooter repetido\n\n---"
     limpio = strip_boilerplate(text, {normalize_line("Footer repetido")})
     assert "Cuerpo util" in limpio
     assert "Footer repetido" not in limpio
 
 
-def test_pagina_corta_no_rompe():
+def test_pagina_corta_no_rompe() -> None:
+    """Pagina corta no rompe."""
     page = extract_page("<html><body><p>hola</p></body></html>", "https://x.co/a")
     assert page.markdown.strip() == "hola" or page.markdown == ""
 
 
-def test_nuestro_banco_conserva_la_cronologia():
+def test_nuestro_banco_conserva_la_cronologia() -> None:
+    """Nuestro banco conserva la cronologia."""
     # Arrange: recorte del Bronze real; la cronologia vive en acordeones
     html = (FIXTURES / "nuestro_banco.html").read_text(encoding="utf-8")
     url = "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
@@ -150,7 +163,8 @@ def test_nuestro_banco_conserva_la_cronologia():
     assert "Década de los 70s" in page.markdown
 
 
-def test_inversionistas_conserva_la_junta_directiva():
+def test_inversionistas_conserva_la_junta_directiva() -> None:
+    """Inversionistas conserva la junta directiva."""
     # Arrange: recorte del Bronze real; las fichas viven en acordeones
     html = (FIXTURES / "informacion_inversionistas.html").read_text(encoding="utf-8")
     url = "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas"
@@ -169,13 +183,15 @@ def test_inversionistas_conserva_la_junta_directiva():
 # ---------------------------------------------------------------- gold
 
 
-def test_page_slug_es_estable():
+def test_page_slug_es_estable() -> None:
+    """Page slug es estable."""
     url = "https://www.bancodeoccidente.com.co/quienes-somos"
     assert page_slug(url, "Quienes somos") == page_slug(url, "Quienes somos")
     assert page_slug(url, "Quienes somos").startswith("quienes-somos-")
 
 
-def test_render_document_tiene_frontmatter():
+def test_render_document_tiene_frontmatter() -> None:
+    """Render document tiene frontmatter."""
     doc = render_document(
         {"fuente": "https://x.co/a", "titulo": "A", "seccion": "identidad", "tokens": 10},
         "# A\n\nContenido",
@@ -185,7 +201,7 @@ def test_render_document_tiene_frontmatter():
     assert doc.rstrip().endswith("Contenido")
 
 
-def test_pipeline_completo(tmp_path: Path):
+def test_pipeline_completo(tmp_path: Path) -> None:
     """Bronze -> Silver -> Gold sin red, con la pagina de fixture."""
     config = make_config(tmp_path)
     html = (FIXTURES / "quienes_somos.html").read_text(encoding="utf-8")
@@ -227,7 +243,8 @@ def test_pipeline_completo(tmp_path: Path):
     assert len(guardado) == 1
 
 
-def test_gold_descarta_duplicados(tmp_path: Path):
+def test_gold_descarta_duplicados(tmp_path: Path) -> None:
+    """Gold descarta duplicados."""
     config = make_config(tmp_path)
     config.paths.silver_markdown.mkdir(parents=True, exist_ok=True)
     texto = "Contenido identico repetido en dos URLs distintas del sitio. " * 5
@@ -250,7 +267,8 @@ def test_gold_descarta_duplicados(tmp_path: Path):
     assert len(corpus) == 1
 
 
-def test_gold_descarta_urls_excluidas(tmp_path: Path):
+def test_gold_descarta_urls_excluidas(tmp_path: Path) -> None:
+    """Gold descarta urls excluidas."""
     config = make_config(tmp_path)
     config.discovery.exclude_patterns = ["/ayuda/agendar-cita-asesor"]
     config.paths.silver_markdown.mkdir(parents=True, exist_ok=True)
@@ -276,10 +294,35 @@ def test_gold_descarta_urls_excluidas(tmp_path: Path):
     assert not (config.paths.gold_markdown / "agenda-tu-cita.md").exists()
 
 
+FORMULARIOS_EXCLUIDOS = (
+    "/ayuda/agendar-cita-asesor",
+    "/formulario-autorizacion",
+    "/proyectos-vivienda-form",
+)
+
+
+def test_gold_versionado_no_contiene_formularios() -> None:
+    """Regresion de #21 y #33: ningun formulario queda en el Gold versionado."""
+    from banco_occidente_corpus.config import load_config
+    from banco_occidente_corpus.utils import is_excluded_url
+
+    config = load_config()
+    for ruta in FORMULARIOS_EXCLUIDOS:
+        assert ruta in config.discovery.exclude_patterns
+    fuentes = [row["fuente"] for row in read_jsonl(config.paths.corpus_file)]
+    assert fuentes, "corpus.jsonl no deberia estar vacio"
+    excluidas = [f for f in fuentes if is_excluded_url(f, FORMULARIOS_EXCLUIDOS)]
+    assert excluidas == []
+    for pagina in config.paths.gold_markdown.glob("*.md"):
+        cabecera = pagina.read_text(encoding="utf-8")[:400]
+        assert not is_excluded_url(cabecera, FORMULARIOS_EXCLUIDOS), pagina.name
+
+
 # ---------------------------------------------------------------- checklist
 
 
-def test_checklist_marca_evidencia(config: Config):
+def test_checklist_marca_evidencia(config: Config) -> None:
+    """Checklist marca evidencia."""
     corpus = [
         {
             "id": "a",
@@ -303,7 +346,8 @@ def test_checklist_marca_evidencia(config: Config):
 # ---------------------------------------------------------------- red
 
 
-def test_headers_incluyen_identificacion():
+def test_headers_incluyen_identificacion() -> None:
+    """Headers incluyen identificacion."""
     from banco_occidente_corpus.config import SiteConfig
     from banco_occidente_corpus.net import HttpClient
 
@@ -317,19 +361,18 @@ def test_headers_incluyen_identificacion():
         client.close()
 
 
-def test_headers_sin_contacto_no_envia_from():
+def test_cliente_sin_contacto_falla_antes_de_pedir() -> None:
+    """Issue #30: sin site.contact no se crea el cliente (From es obligatorio)."""
     from banco_occidente_corpus.config import SiteConfig
-    from banco_occidente_corpus.net import HttpClient
+    from banco_occidente_corpus.net import FaltaContacto, HttpClient
 
-    cfg = Config(site=SiteConfig(user_agent="UA-test", contact=""))
-    client = HttpClient(cfg, delay=0)
-    try:
-        assert "From" not in client._headers()
-    finally:
-        client.close()
+    cfg = Config(site=SiteConfig(user_agent="UA-test", contact="  "))
+    with pytest.raises(FaltaContacto):
+        HttpClient(cfg, delay=0)
 
 
-def test_config_real_identifica_al_autor():
+def test_config_real_identifica_al_autor() -> None:
+    """Config real identifica al autor."""
     from banco_occidente_corpus.config import load_config
 
     cfg = load_config()
@@ -338,7 +381,8 @@ def test_config_real_identifica_al_autor():
     assert "Mozilla" in cfg.site.user_agent
 
 
-def test_render_document_normaliza_cr():
+def test_render_document_normaliza_cr() -> None:
+    """Render document normaliza cr."""
     doc = render_document({"titulo": "x"}, "linea1\r\nlinea2\rlinea3")
     assert "\r" not in doc
     assert "linea1\nlinea2\nlinea3" in doc
@@ -348,6 +392,7 @@ def test_render_document_normaliza_cr():
 
 
 def make_config(tmp_path: Path) -> Config:
+    """Configuracion aislada en ``tmp_path``, sin tocar los datos del repositorio."""
     return Config(
         site=_site(),
         gold=GoldConfig(boilerplate_min_docs=5, boilerplate_ratio=0.35),
@@ -360,13 +405,13 @@ def make_config(tmp_path: Path) -> Config:
     )
 
 
-def _site():
-    from banco_occidente_corpus.config import SiteConfig
-
+def _site() -> SiteConfig:
+    """Sitio de prueba con contacto para el header From."""
     return SiteConfig(
         allowed_hosts=["www.bancodeoccidente.com.co"],
         sitemap_url="",
         user_agent="TAAML-bot/1.0",
+        contact="grupo@uao.edu.co",
     )
 
 

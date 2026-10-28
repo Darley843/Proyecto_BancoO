@@ -38,98 +38,127 @@ class Paths:
 
     @property
     def raw_html(self) -> Path:
+        """Ruta ``self.raw / "html"``."""
         return self.raw / "html"
 
     @property
     def raw_documents(self) -> Path:
+        """Ruta ``self.raw / "documents"``."""
         return self.raw / "documents"
 
     @property
     def documents_urls(self) -> Path:
+        """Ruta ``self.raw / "documents_urls.jsonl"``."""
         return self.raw / "documents_urls.jsonl"
 
     @property
     def documents_capture(self) -> Path:
+        """Ruta ``self.raw / "documents_capture.jsonl"``."""
         return self.raw / "documents_capture.jsonl"
 
     @property
     def documents_gold(self) -> Path:
+        """Ruta ``self.gold / "documents"``."""
         return self.gold / "documents"
 
     @property
     def documents_index(self) -> Path:
+        """Ruta ``self.gold / "documents.jsonl"``."""
         return self.gold / "documents.jsonl"
 
     @property
     def videos_raw(self) -> Path:
+        """Ruta ``self.raw / "videos"``."""
         return self.raw / "videos"
 
     @property
     def videos_urls(self) -> Path:
+        """Ruta ``self.raw / "videos_urls.jsonl"``."""
         return self.raw / "videos_urls.jsonl"
 
     @property
     def videos_capture(self) -> Path:
+        """Ruta ``self.raw / "videos_capture.jsonl"``."""
         return self.raw / "videos_capture.jsonl"
 
     @property
     def videos_gold(self) -> Path:
+        """Ruta ``self.gold / "videos"``."""
         return self.gold / "videos"
 
     @property
     def videos_index(self) -> Path:
+        """Ruta ``self.gold / "videos.jsonl"``."""
         return self.gold / "videos.jsonl"
 
     @property
     def urls_file(self) -> Path:
+        """Ruta ``self.raw / "urls.jsonl"``."""
         return self.raw / "urls.jsonl"
 
     @property
     def capture_file(self) -> Path:
+        """Ruta ``self.raw / "capture.jsonl"``."""
         return self.raw / "capture.jsonl"
 
     @property
     def pdfs_file(self) -> Path:
+        """Ruta ``self.raw / "documents.jsonl"``."""
         return self.raw / "documents.jsonl"
 
     @property
     def silver_markdown(self) -> Path:
+        """Ruta ``self.processed / "markdown"``."""
         return self.processed / "markdown"
 
     @property
     def silver_file(self) -> Path:
+        """Ruta ``self.processed / "silver.jsonl"``."""
         return self.processed / "silver.jsonl"
 
     @property
     def gold_markdown(self) -> Path:
+        """Ruta ``self.gold / "pages"``."""
         return self.gold / "pages"
 
     @property
     def knowledge_chunks(self) -> Path:
+        """Ruta ``self.knowledge / "chunks.jsonl"``."""
         return self.knowledge / "chunks.jsonl"
 
     @property
+    def knowledge_chunks_web(self) -> Path:
+        """Chunks de las paginas web (versionados): la base del web scraping."""
+        return self.knowledge / "chunks_web.jsonl"
+
+    @property
     def knowledge_entities(self) -> Path:
+        """Ruta ``self.knowledge / "entities.jsonl"``."""
         return self.knowledge / "entities.jsonl"
 
     @property
     def knowledge_facts(self) -> Path:
+        """Ruta ``self.knowledge / "facts.jsonl"``."""
         return self.knowledge / "facts.jsonl"
 
     @property
     def knowledge_relations(self) -> Path:
+        """Ruta ``self.knowledge / "relations.jsonl"``."""
         return self.knowledge / "relations.jsonl"
 
     @property
     def knowledge_index(self) -> Path:
+        """Ruta ``self.knowledge / "_INDICE.md"``."""
         return self.knowledge / "_INDICE.md"
 
     @property
     def corpus_file(self) -> Path:
+        """Ruta ``self.gold / "corpus.jsonl"``."""
         return self.gold / "corpus.jsonl"
 
     @property
     def index_file(self) -> Path:
+        """Ruta ``self.gold / "_INDICE.md"``."""
         return self.gold / "_INDICE.md"
 
     @property

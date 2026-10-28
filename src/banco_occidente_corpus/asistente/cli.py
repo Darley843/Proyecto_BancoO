@@ -1,4 +1,4 @@
-"""Linea de comandos del asistente: preguntar, faq y resumen.
+"""Linea de comandos del asistente: preguntar, faq, resumen y evaluar.
 
 Se ejecuta con ``uv run python -m banco_occidente_corpus.asistente``. No toca
 el CLI del pipeline ni escribe en Bronze, Silver o Gold.
@@ -19,6 +19,19 @@ from .contexto_prompt import (
     PresupuestoContextoError,
     cargar_contexto,
 )
+from .evaluacion import (
+    ETIQUETAS,
+    SALIDA_JSONL,
+    SALIDA_MARKDOWN,
+    PreguntasInvalidas,
+    ResultadoEvaluacion,
+    cargar_preguntas,
+    escribir_jsonl,
+    escribir_markdown,
+    evaluar,
+    resumen_clasificaciones,
+)
+from .evaluacion import render_markdown as render_evaluacion
 from .faq import FAQInvalida, generar_faq, render_markdown
 from .metricas import formatear_metricas
 from .modelo import MODELO_POR_DEFECTO, FaltaApiKey, crear_modelo, parametros_de
@@ -53,7 +66,7 @@ def _positivo(valor: str) -> int:
 
 
 def _opciones_comunes() -> argparse.ArgumentParser:
-    """Opciones compartidas por los tres subcomandos."""
+    """Opciones compartidas por los subcomandos."""
     parser = argparse.ArgumentParser(add_help=False)
     parser.add_argument(
         "--version",
@@ -92,7 +105,7 @@ def _opciones_comunes() -> argparse.ArgumentParser:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Construye el parser con los subcomandos preguntar, faq y resumen."""
+    """Construye el parser con los subcomandos preguntar, faq, resumen y evaluar."""
     comun = _opciones_comunes()
     parser = argparse.ArgumentParser(
         prog=PROG,
@@ -122,7 +135,56 @@ def build_parser() -> argparse.ArgumentParser:
     resumen.add_argument("--tema", default="", help="tema opcional para enfocar el resumen")
     resumen.add_argument("--salida", type=Path, default=None, help="archivo Markdown de salida")
 
+    evaluar_cmd = subparsers.add_parser(
+        "evaluar",
+        parents=[comun],
+        help="corre las 20 preguntas del alcance y escribe la tabla de resultados",
+    )
+    evaluar_cmd.add_argument(
+        "--preguntas",
+        type=Path,
+        default=None,
+        help="archivo TOML de preguntas (por defecto: config/evaluacion/preguntas_alcance.toml)",
+    )
+    evaluar_cmd.add_argument(
+        "--solo",
+        type=_lista_ids,
+        default=None,
+        metavar="IDS",
+        help="evalua solo estas preguntas, separadas por coma (ej. 1,7,9)",
+    )
+    evaluar_cmd.add_argument(
+        "--pausa",
+        type=float,
+        default=0.0,
+        metavar="SEG",
+        help="segundos de espera entre preguntas (por defecto: 0)",
+    )
+    evaluar_cmd.add_argument(
+        "--salida",
+        type=Path,
+        default=SALIDA_MARKDOWN,
+        help="tabla Markdown (por defecto: docs/RESULTADOS_20_PREGUNTAS.md)",
+    )
+    evaluar_cmd.add_argument(
+        "--jsonl",
+        type=Path,
+        default=SALIDA_JSONL,
+        help="detalle por pregunta (por defecto: data/evaluacion/resultados.jsonl)",
+    )
+
     return parser
+
+
+def _lista_ids(valor: str) -> set[int]:
+    """Convierte ``1,7,9`` en un conjunto de ids para ``--solo``."""
+    try:
+        ids = {int(parte) for parte in valor.split(",") if parte.strip()}
+    except ValueError as exc:
+        raise argparse.ArgumentTypeError("usa ids separados por coma, por ejemplo 1,7,9") from exc
+    if not ids:
+        raise argparse.ArgumentTypeError("indica al menos un id")
+    return ids
 
 
 def _parametros(comando: str) -> tuple[float, int]:
@@ -133,7 +195,7 @@ def _parametros(comando: str) -> tuple[float, int]:
     contenido; con topes bajos el razonamiento agotaba el presupuesto y la
     respuesta llegaba vacia con ``finish_reason="length"``.
     """
-    parametros = parametros_de("qa" if comando == "preguntar" else comando)
+    parametros = parametros_de("qa" if comando in {"preguntar", "evaluar"} else comando)
     return parametros.temperatura, parametros.max_tokens
 
 
@@ -203,11 +265,48 @@ def _comando_preguntar(
     return 0
 
 
+def _imprimir_avance(resultado: ResultadoEvaluacion) -> None:
+    """Muestra una linea por pregunta mientras corre la evaluacion."""
+    etiqueta = ETIQUETAS.get(resultado.clasificacion, resultado.clasificacion)
+    print(
+        f"{resultado.id:>2}. {etiqueta:<32} {resultado.segundos:5.1f} s  {resultado.pregunta}",
+        file=sys.stderr,
+    )
+
+
+def _comando_evaluar(
+    args: argparse.Namespace,
+    modelo: BaseChatModel,
+    prompt: Prompt,
+    contexto: ContextoPrompt,
+) -> int:
+    """Corre las preguntas del alcance y escribe la tabla y el detalle."""
+    preguntas = cargar_preguntas(args.preguntas)
+    if args.solo:
+        preguntas = [p for p in preguntas if p.id in args.solo]
+        if not preguntas:
+            print("Error: ninguna pregunta coincide con --solo.", file=sys.stderr)
+            return 2
+    print(f"Evaluando {len(preguntas)} preguntas con qa_{args.version_prompt}...", file=sys.stderr)
+    resultados = evaluar(
+        modelo, prompt, contexto, preguntas, pausa=args.pausa, al_terminar=_imprimir_avance
+    )
+    texto = render_evaluacion(resultados, modelo=args.modelo, version_prompt=args.version_prompt)
+    markdown = escribir_markdown(texto, args.salida.expanduser())
+    detalle = escribir_jsonl(resultados, args.jsonl.expanduser())
+    conteo = resumen_clasificaciones(resultados)
+    resumen = ", ".join(f"{ETIQUETAS[c]}: {n}" for c, n in conteo.items())
+    print(f"Resumen : {resumen}", file=sys.stderr)
+    print(f"Tabla   : {markdown}", file=sys.stderr)
+    print(f"Detalle : {detalle}", file=sys.stderr)
+    return 3 if conteo["error"] else 0
+
+
 def main(argv: list[str] | None = None) -> int:
     """Punto de entrada del asistente; devuelve el codigo de salida."""
     _configurar_salida()
     args = build_parser().parse_args(argv)
-    tarea = "qa" if args.comando == "preguntar" else args.comando
+    tarea = "qa" if args.comando in {"preguntar", "evaluar"} else args.comando
     temperatura, max_tokens = _parametros(args.comando)
 
     try:
@@ -222,6 +321,9 @@ def main(argv: list[str] | None = None) -> int:
 
         if args.comando == "preguntar":
             return _comando_preguntar(args, modelo, prompt, contexto)
+
+        if args.comando == "evaluar":
+            return _comando_evaluar(args, modelo, prompt, contexto)
 
         if args.comando == "faq":
             metricas: dict[str, Any] = {}
@@ -242,6 +344,9 @@ def main(argv: list[str] | None = None) -> int:
     except FaltaApiKey as exc:
         print(str(exc), file=sys.stderr)
         return 1
+    except PreguntasInvalidas as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        return 2
     except PromptNoEncontrado as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2

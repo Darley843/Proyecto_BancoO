@@ -2,8 +2,8 @@
 
 Diagnóstico de solo lectura sobre las páginas web de Gold. No modifica páginas, índices ni `corpus.jsonl`.
 
-**Páginas analizadas:** 183  
-**Líneas de contenido:** 8131  
+**Páginas analizadas:** 181  
+**Líneas de contenido:** 8094  
 
 ## Cobertura por umbral
 
@@ -11,9 +11,9 @@ Porcentaje de líneas de contenido que pertenecen a algún bloque presente en al
 
 | Umbral (páginas) | Líneas cubiertas | Total | Porcentaje |
 |---:|---:|---:|---:|
-| 5 | 1815 | 8131 | 22.3 % |
-| 10 | 1362 | 8131 | 16.8 % |
-| 20 | 739 | 8131 | 9.1 % |
+| 5 | 1804 | 8094 | 22.3 % |
+| 10 | 1350 | 8094 | 16.7 % |
+| 20 | 739 | 8094 | 9.1 % |
 
 ## Top 20 de bloques
 
@@ -47,7 +47,7 @@ Bloques de 1 a 3 líneas consecutivas ordenados por páginas, tamaño y texto. C
 Métrica existente que compara líneas normalizadas por página; es sensible a mayúsculas y tildes y no equivale al porcentaje de texto repetido.
 
 - **Global:** 54.1 %
-- **Promedio por página:** 92.9 %
+- **Promedio por página:** 93.0 %
 
 ### Páginas con menor proporción de contenido único
 

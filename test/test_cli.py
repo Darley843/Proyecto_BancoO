@@ -19,6 +19,7 @@ def make_config(tmp_path: Path) -> Config:
             allowed_hosts=["www.bancodeoccidente.com.co"],
             sitemap_url="",
             user_agent="TAAML-bot/1.0",
+            contact="grupo@uao.edu.co",
         ),
         gold=GoldConfig(boilerplate_min_docs=5, boilerplate_ratio=0.35),
         paths=Paths(
@@ -76,6 +77,7 @@ def test_cli_no_ofrece_fallback_con_navegador() -> None:
 def test_httpclient_impone_el_minimo_de_cortesia() -> None:
     """Ni el CLI ni una config relajada pueden bajar el ritmo de 1,5 s."""
     config = Config()
+    config.site.contact = "grupo@uao.edu.co"
     config.crawl.delay_seconds = 0.0
 
     with HttpClient(config, delay=0.1) as client:

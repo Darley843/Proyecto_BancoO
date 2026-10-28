@@ -16,7 +16,7 @@ import yaml
 from jsonschema import Draft202012Validator, FormatChecker
 
 from .config import PROJECT_ROOT, Config
-from .utils import estimate_tokens, read_jsonl, sha256_text, utc_now, write_jsonl
+from .utils import read_jsonl, sha256_text, stable_tokens, utc_now, write_jsonl
 
 HEADING = re.compile(r"^(#{1,6})\s+(.+?)\s*$")
 MARKDOWN_NOISE = re.compile(r"[*_`#>|]+")
@@ -53,6 +53,7 @@ def split_page(page_id: str, meta: dict, body: str) -> list[dict]:
     buffer: list[str] = []
 
     def flush() -> None:
+        """Cierra el chunk en curso si tiene el tamano minimo."""
         text = "\n".join(buffer).strip()
         if len(text) < MIN_CHUNK_CHARS:
             return
@@ -66,7 +67,7 @@ def split_page(page_id: str, meta: dict, body: str) -> list[dict]:
                 "heading": heading,
                 "level": level,
                 "text": text,
-                "tokens": estimate_tokens(text),
+                "tokens": stable_tokens(text),
                 "hash": digest,
             }
         )
@@ -98,13 +99,24 @@ def _gold_files(config: Config) -> list[Path]:
 
 
 def build_chunks(config: Config) -> list[dict]:
-    """Gold -> data/knowledge/chunks.jsonl (determinista, sin red)."""
+    """Gold -> chunks.jsonl (todo) y chunks_web.jsonl (solo paginas web).
+
+    Es determinista y sin red. ``chunks.jsonl`` incluye PDF y videos (decenas de
+    MB) y no se versiona; ``chunks_web.jsonl`` es el subconjunto del web
+    scraping y si se versiona, porque es la base de conocimiento del Modulo 1.
+    """
     rows: list[dict] = []
+    web: list[dict] = []
+    paginas = config.paths.gold_markdown.resolve()
     for path in _gold_files(config):
         meta, body = load_page(path)
-        rows.extend(split_page(path.stem, meta, body))
+        partes = split_page(path.stem, meta, body)
+        rows.extend(partes)
+        if path.parent.resolve() == paginas:
+            web.extend(partes)
     config.paths.knowledge.mkdir(parents=True, exist_ok=True)
     write_jsonl(config.paths.knowledge_chunks, rows)
+    write_jsonl(config.paths.knowledge_chunks_web, web)
     return rows
 
 
@@ -367,4 +379,5 @@ def validate_file(config: Config, path: Path) -> tuple[list[str], list[str]]:
 
 
 def now_date() -> str:
+    """Fecha actual en UTC con formato ``AAAA-MM-DD``."""
     return utc_now()[:10]

@@ -4776,46 +4776,6 @@ Renueva o amplía tu hogar con financiación a tu medida.
 ###### Compra de Cartera Crédito de vivienda
 Mejora las condiciones de tu hipoteca con nuestras opciones.
 
-## Proyectos Vivienda
-Fuente: https://www.bancodeoccidente.com.co/proyectos-vivienda-form
-Sección: oferta
-
-Haz crecer tu dinero desde hoy, tasas hasta 10,60% E.A\*
-Abre tu CDT desde $500.000 a 90 días y haz crecer tu dinero.
-### Proyectos de vivienda
-Encuentra tu
-nuevo hogar hoy
-Compara proyectos de vivienda en todo el país y da el paso hacia la compra de tu casa propia.
-#### Recibe asesoría personalizada
-Déjanos tus datos y un asesor se pondrá en contacto contigo.
-##### Rentabilidad
-Tasas competitivas de hasta 10,60% E.A.
-##### Desde bajo monto
-Abre tu CDT desde $500.000 a plazos de 90 días en adelante.
-##### Plazos flexibles
-Decide a cuánto tiempo invertir, desde 30 a 360 días.
-##### Recibe tus intereses fácil
-Recibe los intereses de tu CDT en tu cuenta del Banco de Occidente.
-Consulta los requisitos y descarga los documentos necesarios para abrir tu CDT.
-##### Plazo
-Mínimo 30 días
-##### Monto
-Mínimo $1.000.000
-##### Edad mínima
-Desde 18 años
-##### Rendimientos
-Pago de intereses mensual, bimestral, trimestral, semestral o anual.
-##### Asistencias
-Cuenta con seguro de depósitos FOGAFIN
-##### Plazo
-Mínimo 30 días
-##### Monto
-Mínimo $1.000.000
-##### Rendimientos
-Pago de intereses mensual, bimestral, trimestral, semestral o anual.
-### ¿Ya eres cliente? Ábrelo fácil en línea
-abre tu CDT Digital directamente desde tu portal transaccional o banca móvil sin trámites adicionales.
-
 ## Préstamo Personal Banco de Occidente: Fácil y Rápido
 Fuente: https://www.bancodeoccidente.com.co/creditos/credito-personal
 Sección: oferta
@@ -7590,13 +7550,6 @@ Ver más
 #### ¿Cómo mantener un buen historial crediticio?
 Al pedir un préstamo o contratar un servicio, una de las principales preocupaciones de las personas es que su historial ...
 Ver más
-
-## Formulario Autorización
-Fuente: https://www.bancodeoccidente.com.co/formulario-autorizacion
-Sección: otros
-
-### ¡Bienvenido al Banco de Occidente!
-Gracias por ser parte de nuestra comunidad. Tu experiencia será segura, ágil y personalizada.
 
 ## Giro de Rigo Autogestión
 Fuente: https://www.bancodeoccidente.com.co/giro-de-rigo-ag

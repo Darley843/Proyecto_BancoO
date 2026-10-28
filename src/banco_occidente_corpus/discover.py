@@ -12,9 +12,17 @@ from .config import Config
 from .net import HttpClient
 from .utils import is_excluded_url, utc_now, write_jsonl
 
+#: Patrones de ``exclude_patterns`` que solo sacan ruido de la captura HTML.
+#: Los PDF del sitio viven justamente bajo ``/documents/``, asi que para los
+#: documentos se aplican todos los demas patrones (transaccional, login,
+#: formularios...), pero no estos.
+SOLO_HTML = frozenset({"/documents/", "/image/"})
+
 
 @dataclass(slots=True)
 class DiscoveryResult:
+    """URLs capturables, documentos y descartes de una corrida de descubrimiento."""
+
     urls: list[str] = field(default_factory=list)
     documents: list[str] = field(default_factory=list)
     skipped: list[dict[str, str]] = field(default_factory=list)
@@ -26,6 +34,7 @@ class DiscoveryResult:
 
     @property
     def total(self) -> int:
+        """Paginas HTML mas documentos encontrados."""
         return len(self.urls) + len(self.documents)
 
 
@@ -99,6 +108,17 @@ def _suffix(url: str) -> str:
 def is_document(url: str, config: Config) -> bool:
     """True si la URL apunta a un documento descargable (PDF, Office, etc.)."""
     return _suffix(url) in {ext.lower() for ext in config.discovery.document_extensions}
+
+
+def is_document_target(url: str, config: Config) -> bool:
+    """Filtra documentos: mismo sitio y sin patrones de exclusion (salvo ``SOLO_HTML``)."""
+    parts = urlsplit(url)
+    if parts.scheme not in {"http", "https"}:
+        return False
+    if parts.netloc.lower() not in {h.lower() for h in config.site.allowed_hosts}:
+        return False
+    patterns = [p for p in config.discovery.exclude_patterns if p.lower() not in SOLO_HTML]
+    return not is_excluded_url(url, patterns)
 
 
 def is_capture_target(url: str, config: Config) -> bool:
@@ -178,18 +198,21 @@ def discover(config: Config, client: HttpClient, *, save: bool = True) -> Discov
             continue
         seen.add(url)
 
-        if is_document(url, config):
-            documents.append(url)
-            continue
-        if not is_capture_target(url, config):
+        document = is_document(url, config)
+        target = is_document_target(url, config) if document else is_capture_target(url, config)
+        if not target:
             result.skipped.append({"url": url, "motivo": "fuera-de-alcance"})
             continue
+        # robots.txt se consulta antes de aceptar cualquier URL, PDF incluido.
         if (
             config.crawl.respect_robots
             and robots_parser
             and not robots_parser.can_fetch(config.site.user_agent, url)
         ):
             result.skipped.append({"url": url, "motivo": "disallow-robots"})
+            continue
+        if document:
+            documents.append(url)
             continue
         urls.append(url)
 

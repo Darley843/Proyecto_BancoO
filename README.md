@@ -28,7 +28,7 @@ del Taller 1.
 | Sitemaps leídos | 210 |
 | URLs públicas | 196 |
 | Páginas Bronze | 193 (102.3 MB) |
-| Páginas Gold | 183 |
+| Páginas Gold | 183 (181 tras excluir dos formularios, issue #33) |
 | Documentos PDF | 190 (11.0 M tokens) |
 | Videos transcritos | 32 (119.8 k tokens) |
 | Tokens del corpus completo | 11.2 M |
@@ -142,6 +142,29 @@ versión (`v1` → `v2`) para invalidar la caché.
 > Aviso visible en la app: «Responde solo con información pública del sitio del
 > Banco de Occidente; no reemplaza la asesoría oficial».
 
+## Evaluación con las 20 preguntas del alcance
+
+`make evaluar` corre las 20 preguntas de `docs/ALCANCE.md` con el mismo flujo
+que la app (`qa_v1`, contexto completo, validación) y escribe:
+
+- `docs/RESULTADOS_20_PREGUNTAS.md`: resumen, tabla y respuesta de cada pregunta,
+  con una columna **Revisión humana** para completar en grupo.
+- `data/evaluacion/resultados.jsonl`: respuesta cruda, avisos y métricas.
+
+```bash
+# PowerShell
+$env:DEEPSEEK_API_KEY = "<tu-clave>"
+make evaluar                  # las 20 preguntas
+make evaluar SOLO=7,9,14      # solo algunas
+make evaluar VERSION=v0       # línea base, para comparar prompts
+```
+
+Las preguntas, su cobertura esperada (`si`, `parcial`, `no`) y los términos que
+se buscan en la respuesta viven en `config/evaluacion/preguntas_alcance.toml`.
+La clasificación automática (correcta, incompleta, rechazo correcto, remisión,
+falso negativo, revisar) solo ordena la revisión; la columna de revisión humana
+es la que se reporta en el informe.
+
 ---
 
 ## Requisitos
@@ -184,6 +207,7 @@ documentos por sección y la cobertura del checklist del Taller 1.
 | `make media` | Documentos PDF + videos |
 | `make noticias` | Hechos oficiales y prensa curada a Gold (independiente del pipeline) |
 | `make app` | Abre la app Streamlit del asistente (requiere `DEEPSEEK_API_KEY`) |
+| `make evaluar` | Corre las 20 preguntas del alcance y escribe `docs/RESULTADOS_20_PREGUNTAS.md` (requiere `DEEPSEEK_API_KEY`) |
 | `make all` | Pipeline completo |
 | `make stats` | Resumen y checklist → `data/gold/_INDICE.md` |
 | `make status` | Cuenta URLs/Bronze/Silver/Gold |
