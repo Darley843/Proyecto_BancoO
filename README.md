@@ -162,8 +162,18 @@ make evaluar VERSION=v0       # línea base, para comparar prompts
 Las preguntas, su cobertura esperada (`si`, `parcial`, `no`) y los términos que
 se buscan en la respuesta viven en `config/evaluacion/preguntas_alcance.toml`.
 La clasificación automática (correcta, incompleta, rechazo correcto, remisión,
-falso negativo, revisar) solo ordena la revisión; la columna de revisión humana
-es la que se reporta en el informe.
+falso negativo, revisar) solo ordena la revisión; la revisión humana es la que
+se reporta en el informe.
+
+La revisión humana vive en `config/evaluacion/revision_humana.toml` (veredicto,
+nota y revisor por pregunta), así que volver a correr la evaluación no la borra.
+Una fila sin revisor, o con «propuesta» en el revisor, sale marcada como
+propuesta pendiente de confirmar.
+
+```bash
+make evaluar SOLO=4,17        # repite solo esas preguntas y conserva las demás filas
+make evaluar REVALIDAR=1      # sin API: revalida las respuestas guardadas y aplica la revisión
+```
 
 ---
 
