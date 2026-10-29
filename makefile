@@ -117,7 +117,7 @@ contexto: ## Genera data/contexto/contexto_banco.md y su manifest desde Gold
 
 .PHONY: app
 app: ## Abre la app Streamlit del asistente (requiere DEEPSEEK_API_KEY)
-	$(UV) run streamlit run app/streamlit_app.py
+	$(UV) run streamlit run app.py
 
 .PHONY: evaluar
 evaluar: ## Corre las 20 preguntas del alcance y escribe docs/RESULTADOS_20_PREGUNTAS.md (requiere DEEPSEEK_API_KEY)

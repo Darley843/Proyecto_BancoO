@@ -1,169 +1,155 @@
 # Corpus web — Banco de Occidente
 
-Pipeline de extracción y limpieza del sitio público de **Banco de Occidente**
-(`https://www.bancodeoccidente.com.co`) siguiendo el estándar de la Clase 2:
-arquitectura **Medallion** (Bronze → Silver → Gold), `trafilatura`,
-`corpus.jsonl` y gestión del proyecto con **uv**.
+Pipeline **Medallion** (Bronze → Silver → Gold) del sitio público de **Banco de
+Occidente** (`https://www.bancodeoccidente.com.co`) y asistente que responde solo
+con el contexto consolidado del corpus, citando la fuente.
 
-El resultado es el corpus que alimenta el RAG y el agente de los Módulos 2 y 3
-del Taller 1.
+[![CI](https://github.com/Darley843/Proyecto_BancoO/actions/workflows/ci.yml/badge.svg)](https://github.com/Darley843/Proyecto_BancoO/actions/workflows/ci.yml)
+![Python 3.13](https://img.shields.io/badge/python-3.13-3776AB?logo=python&logoColor=white)
+![uv](https://img.shields.io/badge/managed%20with-uv-DE5FE9)
+[![Licencia MIT](https://img.shields.io/badge/licencia-MIT-green.svg)](./LICENSE)
 
-**Documentación**
+## Problema y solución
 
-| Documento | Contenido |
-|---|---|
-| [`CONSTITUTION.md`](./CONSTITUTION.md) | Verdad central: alcance, stack, convenciones y decisiones |
-| [`docs/ESTANDAR.md`](./docs/ESTANDAR.md) | Trazabilidad regla de la clase → implementación |
-| [`docs/FUENTES.md`](./docs/FUENTES.md) | Inventario de fuentes, `robots.txt` y hallazgos del sitio |
-| [`docs/IDENTIDAD.md`](./docs/IDENTIDAD.md) | Identidad de Git y GitHub del autor |
-| [`AGENTS.md`](./AGENTS.md) | Contexto y reglas para agentes LLM |
-| [`.opencode/skills/corpus-extraction/`](./.opencode/skills/corpus-extraction/SKILL.md) | Skill operativa del pipeline (flujo, diagnóstico, healthcheck) |
-| [`.opencode/skills/semantic-extraction/`](./.opencode/skills/semantic-extraction/SKILL.md) | Skill de extracción semántica (entidades, hechos y relaciones) |
-| [`docs/CONSTITUTION-curso-TAAML.md`](./docs/CONSTITUTION-curso-TAAML.md) | Estándar del curso (documento original) |
+La información pública del banco está dispersa en ~200 páginas HTML, 190 PDFs y
+32 videos, sin estructura común ni forma de citarla. Este proyecto la captura
+respetando `robots.txt`, la limpia a un corpus Gold con frontmatter y consolida un
+contexto único que alimenta un asistente LangChain con DeepSeek, con validación de
+fuente y app Streamlit. Esta fase usa el **contexto consolidado completo** en el
+prompt de sistema; la recuperación vectorial (RAG) es el Módulo 2.
 
-## Resultado de la captura (2026-10-23)
+## Arquitectura
+
+```mermaid
+flowchart LR
+    R["robots.txt"] --> S["sitemap.xml"]
+    S --> D["discover<br/>filtros de alcance"]
+    D --> B["BRONZE · data/raw<br/>HTML crudo + sha256"]
+    B --> SV["SILVER · data/processed<br/>trafilatura + limpieza"]
+    SV --> G["GOLD · data/gold<br/>Markdown + frontmatter + corpus.jsonl"]
+    P["PDFs · pypdfium2"] --> G
+    V["YouTube · subtítulos"] --> G
+    N["Noticias y hechos"] --> G
+    G --> K["Knowledge<br/>entidades · hechos · relaciones"]
+    G --> C["Contexto consolidado<br/>data/contexto/contexto_banco.md"]
+    K --> C
+    C --> A["Asistente LangChain<br/>langchain-deepseek · deepseek-flash"]
+    A --> ST["App Streamlit<br/>app.py · 4 pestañas"]
+```
+
+| Capa | Carpeta | Contenido | ¿Se versiona? |
+|---|---|---|---|
+| Bronze | `data/raw/` | HTML crudo, `urls.jsonl`, `capture.jsonl` con `sha256` | No |
+| Silver | `data/processed/` | Markdown limpio, sin boilerplate | No |
+| Gold | `data/gold/` | Markdown + frontmatter, `corpus.jsonl`, índices | **Sí** |
+| Contexto | `data/contexto/` | Contexto consolidado y `manifest.json` | Sí |
+| Knowledge | `data/knowledge/` | Entidades, hechos y relaciones con cita | Sí |
+
+Gold es el entregable: de ahí se generan el contexto consolidado y el índice. Los
+encabezados `##` son fronteras de *chunk* y los metadatos permiten citar el origen.
+
+## Estado de la captura
 
 | Métrica | Valor |
 |---|---:|
-| Sitemaps leídos | 210 |
-| URLs públicas | 196 |
-| Páginas Bronze | 193 (102.3 MB) |
-| Páginas Gold | 183 (181 tras excluir dos formularios, issue #33) |
-| Documentos PDF | 190 (11.0 M tokens) |
-| Videos transcritos | 32 (119.8 k tokens) |
-| Tokens del corpus completo | 11.2 M |
-| Cobertura del checklist | 24/24 (con evidencia) |
+| Documentos Gold | 241 (181 páginas web + 40 hechos + 20 noticias) |
+| Tokens de las páginas Gold | 196.139 (promedio 813,9) |
+| Documentos PDF y videos | 190 PDFs (10.954.933 tokens) · 32 videos (119.845 tokens) |
+| Tokens del corpus completo | 11.270.917 |
+| Contexto consolidado | 166.647 de 175.000 tokens (191 páginas incluidas, 50 excluidas) |
+| Capa Knowledge | 2 entidades, 6 hechos, 1 relación (semilla validada) |
+| Cobertura del checklist | 24/24 (heurística) |
 
-El detalle y las decisiones están en [`docs/FUENTES.md`](./docs/FUENTES.md).
-El entregable se regenera con `make all` y se empaqueta con `make deliver`.
+Bronze y Silver no se versionan: son capturas reproducibles que se reconstruyen
+con el pipeline sin volver a la web. El repositorio versiona Gold y el contexto.
+Fuente: `data/gold/_INDICE.md`, `corpus.jsonl` y `data/contexto/manifest.json`.
 
-**El corpus vive en este mismo repositorio.** Gold (`data/gold/`) se versiona
-porque es el entregable que consume el RAG; Bronze y Silver son reproducibles y
-se regeneran sin volver a la web (`make clean && make extract && make gold`).
-No hay un repositorio aparte para el corpus.
+## Requisitos e instalación
 
-## Capa Knowledge (conocimiento verificable)
+- Python 3.13 (uv lo instala si falta) y [uv](https://docs.astral.sh/uv/)
+- GNU Make 4.x para los atajos (el CLI funciona sin `make`)
+- `DEEPSEEK_API_KEY` solo para la app y la evaluación
 
-Sobre Gold se construye una capa semántica: entidades, hechos y relaciones, cada
-uno con su cita textual. Es lo que permite que el agente responda **con fuente**
-y no con paráfrasis.
+El sitio está detrás de CloudFront y puede responder `403` a tráfico de VPN o
+datacenter. Es una limitación documentada (`CONSTITUTION.md` §10): el pipeline se
+detiene y la reporta, sin cambiar User-Agent, proxies ni red para sortear el WAF.
 
 ```bash
-make chunks      # ~14.300 chunks de 406 documentos (páginas + PDFs + videos)
-make knowledge   # valida esquema + evidencia y actualiza el índice
+git clone https://github.com/Darley843/Proyecto_BancoO.git
+cd Proyecto_BancoO
+uv sync --all-extras
 ```
 
-| Archivo | Contenido |
-|---|---|
-| `data/knowledge/entities.jsonl` | Entidades canónicas (`ent:...`) |
-| `data/knowledge/facts.jsonl` | Hechos atómicos (`fact:...`) |
-| `data/knowledge/relations.jsonl` | Relaciones (`rel:...`) |
-| `data/knowledge/_INDICE.md` | Conteos y pendientes de revisión |
-| `config/knowledge.schema.json` | Contrato JSON Schema |
+La clave del modelo se pasa por variable de entorno, sin archivos `.env`:
 
-El estado actual es una **semilla validada** (2 entidades, 5 hechos, 1 relación)
-extraída de las páginas de identidad. El resto se puebla con la skill
-`semantic-extraction`, sección por sección. Regla dura: si la cita no está en el
-chunk, el validador rechaza el registro.
-
-## Documentos y videos
-
-Los balances, informes de gestión y documentos de gobierno corporativo no están
-en HTML: viven en PDF. Los videos aportan la parte cualitativa (entrevistas,
-vocería) que no aparece escrita.
-
-```bash
-make docs      # 622 PDFs inventariados -> descarga priorizada -> Gold
-make videos    # canal @BancodeOccidenteCol + videos enlazados -> Gold
-make media     # ambos
-```
-
-| Regla | Implementación |
-|---|---|
-| Solo documentos públicos enlazados desde el sitio | `documents.discover_documents()` + `robots.txt` |
-| Prioridad por año y categoría | financiero/gobierno 2024+ primero; tope `--max-mb 400` |
-| Texto por página | `pypdf` y encabezados `## Pagina N` |
-| PDF escaneado sin texto | se omite y se registra |
-| Video sin subtítulos | no entra al corpus |
-| Trazabilidad | `documents_capture.jsonl` y `videos_capture.jsonl` con URL y hash |
-
-## Noticias y hechos relevantes
-
-La actualidad corporativa se publica como fichas Gold: hechos oficiales de la
-tabla **“Información Relevante”** y prensa externa curada. `make noticias` es
-independiente: no forma parte de `make all`, `make gold`, `make deliver`,
-`make docs`, `make docs-finanzas`, `make videos` ni `make media`.
-
-```bash
-make noticias                              # usa Bronze; si falta, una petición puntual
-uv run corpus noticias --sin-red           # solo Bronze y curaduría, sin red
-uv run corpus noticias --desde 2025-01-01 --hasta 2026-10-24
-```
-
-Las fichas quedan en `data/gold/pages/noticia-*.md` y `hecho-*.md`, con su fila
-en `corpus.jsonl` y el índice `data/gold/_NOTICIAS.md`. La curaduría externa
-vive en `data/noticias/prensa.yaml`; `make clean` no la borra. Si el sitio
-responde `403`, el comando se detiene y avisa: no cambia User-Agent, proxies ni
-velocidad de las peticiones.
-
-## App del asistente (Streamlit)
-
-`app/streamlit_app.py` es una **capa delgada** sobre `asistente/`: la app solo
-pinta, cachea y delega; la lógica (prompts, validación, métricas) sigue en el
-subpaquete. Tiene tres pestañas: **Preguntas** (respuesta con su fuente),
-**Preguntas frecuentes** (diez preguntas con fuente) y **Resumen** (resumen
-ejecutivo con sus fuentes).
-
-```bash
+```powershell
 # PowerShell
 $env:DEEPSEEK_API_KEY = "<tu-clave>"
-make app        # uv run streamlit run app/streamlit_app.py
 ```
-
-| Regla | Implementación |
-|---|---|
-| El modelo solo se llama al pulsar un botón | El `invoke` vive dentro de `if st.button(...)`; reejecutar la app no gasta tokens |
-| Contexto y modelo se cargan una vez | `st.cache_resource`: contexto y un modelo por tarea, con su temperatura y su tope |
-| Respuestas por pregunta y versión | `st.cache_data`, con los tokens y la fecha del contexto en la clave |
-| `v0` para comparar prompts | Solo en la pestaña Preguntas; FAQ y Resumen usan siempre `v1` |
-| Un resultado inválido no se cachea | El siguiente clic en Generar vuelve a llamar al modelo |
-| PII antes de la caché | `servicio.detectar_pii_pregunta` corta la pregunta y responde sin llamar al modelo |
-| Sin `DEEPSEEK_API_KEY` | Mensaje con los comandos de PowerShell y bash; la app no se cae |
-| Fecha del contexto | `git log -1 --format=%cI -- data/contexto/manifest.json`, como «Contexto versionado el» |
-
-La barra lateral muestra el modelo, la versión del prompt, los tokens del
-contexto (`data/contexto/manifest.json`) y la fecha del commit que lo versionó.
-Cada respuesta trae un desplegable **Detalles técnicos** con la respuesta cruda
-(la que `--verbose` muestra en el CLI), los avisos de validación (`sin_datos`,
-`fuente_invalida`, `pii_bloqueada`, ...) y las métricas: entrada, salida,
-razonamiento, aciertos de caché y `finish_reason`. Si editas un prompt, sube la
-versión (`v1` → `v2`) para invalidar la caché.
-
-> Aviso visible en la app: «Responde solo con información pública del sitio del
-> Banco de Occidente; no reemplaza la asesoría oficial».
-
-## Evaluación con las 20 preguntas del alcance
-
-`make evaluar` corre las 20 preguntas de `docs/ALCANCE.md` con el mismo flujo
-que la app (`qa_v1`, contexto completo, validación) y escribe:
-
-- `docs/RESULTADOS_20_PREGUNTAS.md`: resumen, tabla y respuesta de cada pregunta,
-  con una columna **Revisión humana** para completar en grupo.
-- `data/evaluacion/resultados.jsonl`: respuesta cruda, avisos y métricas.
 
 ```bash
-# PowerShell
-$env:DEEPSEEK_API_KEY = "<tu-clave>"
-make evaluar                  # las 20 preguntas
-make evaluar SOLO=7,9,14      # solo algunas
-make evaluar VERSION=v0       # línea base, para comparar prompts
+# bash / zsh
+export DEEPSEEK_API_KEY="<tu-clave>"
 ```
 
-Las preguntas, su cobertura esperada (`si`, `parcial`, `no`) y los términos que
-se buscan en la respuesta viven en `config/evaluacion/preguntas_alcance.toml`.
-La clasificación automática (correcta, incompleta, rechazo correcto, remisión,
-falso negativo, revisar) solo ordena la revisión; la revisión humana es la que
-se reporta en el informe.
+Los comandos del corpus no necesitan la clave; solo la app y `make evaluar`.
+
+## Uso
+
+### App del asistente
+
+```bash
+uv run streamlit run app.py
+```
+
+| Pestaña | Qué muestra |
+|---|---|
+| **Scraping** | Etapas con sus conteos, métricas del corpus, deduplicación y captura en vivo de unas URLs en carpeta temporal |
+| **Preguntas** | Respuesta con su fuente; permite comparar `v0` y `v1` del prompt |
+| **Preguntas frecuentes** | Diez preguntas con fuente |
+| **Resumen** | Resumen ejecutivo con sus fuentes |
+
+La app solo pinta y cachea; la lógica vive en `asistente/`. El modelo se invoca
+solo al pulsar un botón, la pregunta pasa antes por detección de datos personales
+y cada respuesta se cachea por pregunta, versión y fecha del contexto.
+
+### Pipeline y evaluación
+
+```bash
+uv run corpus all                        # discover -> fetch -> extract -> gold -> stats
+uv run corpus docs all                   # PDFs (balances, informes)
+uv run corpus videos all                 # canal de YouTube
+uv run python -m banco_occidente_corpus.contexto   # contexto consolidado
+make check                               # ruff + ty + pytest
+make evaluar                             # 20 preguntas (requiere DEEPSEEK_API_KEY)
+```
+
+`make help` lista todos los atajos (`init`, `doctor`, `demo`, `health`, `deliver`, `clean`).
+
+### Scraper autocontenido
+
+Script PEP 723 autónomo (sitemap → HTML → Markdown); no usa la configuración del
+proyecto y sirve para demostrar la captura mínima.
+
+```bash
+uv run python scripts/scrape_empresa.py --limit 50
+```
+
+## Capturas
+
+<table>
+  <tr><td align="center"><img src="docs/capturas/app-scraping.png" alt="Pestaña Scraping" width="440"><br><sub>Scraping: pipeline y captura en vivo</sub></td><td align="center"><img src="docs/capturas/app-preguntas.png" alt="Pestaña Preguntas" width="440"><br><sub>Preguntas: respuesta con su fuente</sub></td></tr>
+  <tr><td align="center"><img src="docs/capturas/app-detalles.png" alt="Detalles técnicos" width="440"><br><sub>Detalles técnicos: métricas y avisos</sub></td><td align="center"><img src="docs/capturas/app-faq.png" alt="Preguntas frecuentes" width="440"><br><sub>Preguntas frecuentes</sub></td></tr>
+  <tr><td align="center"><img src="docs/capturas/app-resumen.png" alt="Resumen" width="440"><br><sub>Resumen ejecutivo con fuentes</sub></td><td align="center"><img src="docs/capturas/app-preguntas-v0.png" alt="Prompt v0" width="440"><br><sub>Línea base del prompt (<code>v0</code>)</sub></td></tr>
+  <tr><td align="center"><img src="docs/capturas/app-preguntas-v1-horario.png" alt="Prompt v1" width="440"><br><sub><code>v1</code>: rechazo correcto si el dato no está</sub></td><td align="center"><img src="docs/capturas/app-cache.png" alt="Caché" width="440"><br><sub>Caché por pregunta y versión</sub></td></tr>
+  <tr><td align="center"><img src="docs/capturas/app-pii.png" alt="Bloqueo de PII" width="440"><br><sub>Bloqueo de datos personales</sub></td><td align="center"><img src="docs/capturas/app-sin-clave.png" alt="Sin clave" width="440"><br><sub>Sin <code>DEEPSEEK_API_KEY</code>: aviso y comandos</sub></td></tr>
+</table>
+
+## Resultados de la evaluación
+
+`make evaluar` corre las 20 preguntas del alcance con el mismo flujo que la app:
+prompt `qa_v1`, contexto completo y validación de fuente. La clasificación
+automática solo ordena el trabajo; lo que se reporta es la revisión humana.
 
 La revisión humana vive en `config/evaluacion/revision_humana.toml` (veredicto,
 nota y revisor por pregunta), así que volver a correr la evaluación no la borra.
@@ -175,256 +161,100 @@ make evaluar SOLO=4,17        # repite solo esas preguntas y conserva las demás
 make evaluar REVALIDAR=1      # sin API: revalida las respuestas guardadas y aplica la revisión
 ```
 
----
+Resultados vigentes y respuestas completas:
+[`docs/RESULTADOS_20_PREGUNTAS.md`](./docs/RESULTADOS_20_PREGUNTAS.md).
 
-## Requisitos
+## Estructura del repositorio
 
-- Python 3.13 (uv lo instala si falta)
-- [uv](https://docs.astral.sh/uv/) — único gestor permitido
-- `make` (GNU Make 4.x)
-- Red con salida **colombiana**. El sitio está detrás de CloudFront y rechaza
-  con `403` el tráfico de VPN, datacenters y bots. Ver
-  [Solución de problemas](#el-sitio-devuelve-403).
-
-## Inicio rápido
-
-```bash
-make init       # instala Python, dependencias y extras
-make doctor     # verifica red, robots.txt y estado de las capas
-make demo       # prueba el pipeline completo con una página local (sin red)
-make all        # scraping real: discover -> fetch -> extract -> gold -> stats
+```text
+├── app.py                     # lanzador: uv run streamlit run app.py
+├── app/
+│   ├── streamlit_app.py       # interfaz: 4 pestañas, caché y validación
+│   └── scraping_ui.py         # pestaña Scraping (etapas, métricas, captura en vivo)
+├── src/banco_occidente_corpus/
+│   ├── net.py · discover.py · fetch.py · extract.py · dedupe.py
+│   ├── section.py · gold.py · checklist.py · stats.py · cli.py
+│   ├── panel.py               # lectura de artefactos para la app (sin red)
+│   ├── live_capture.py        # captura en vivo en carpeta temporal
+│   ├── contexto.py · knowledge.py · documents.py · videos.py · news.py
+│   └── asistente/             # Q&A, FAQ, resumen y evaluación con DeepSeek
+├── scripts/                   # demo_offline.py · scrape_empresa.py · tasks.py
+├── config/ · data/ · docs/    # configuración, capas y documentación
+├── test/                      # pytest con fixtures locales, sin red
+├── makefile · pyproject.toml · uv.lock
+└── CONSTITUTION.md · AGENTS.md
 ```
 
-Cuando termine, abre `data/gold/_INDICE.md`: ahí está el resumen, los
-documentos por sección y la cobertura del checklist del Taller 1.
-
----
-
-## Comandos
-
-| Comando | Qué hace |
-|---|---|
-| `make init` | Instala el entorno (`uv python install` + `uv sync --all-extras`) |
-| `make doctor` | Diagnóstico de red, `robots.txt` y estado del pipeline |
-| `make discover` | Lee `robots.txt` y expande el `sitemap.xml` |
-| `make fetch` | Descarga el HTML crudo → `data/raw/` (Bronze) |
-| `make extract` | Limpia y convierte a Markdown → `data/processed/` (Silver) |
-| `make gold` | Añade metadatos y consolida `corpus.jsonl` (Gold) |
-| `make chunks` | Segmenta Gold en chunks por encabezado |
-| `make knowledge` | Valida entidades/hechos/relaciones y escribe el índice |
-| `make docs` | Inventaría, descarga y extrae PDFs (balances, informes) |
-| `make videos` | Lista el canal, baja subtítulos y transcribe a Gold |
-| `make media` | Documentos PDF + videos |
-| `make noticias` | Hechos oficiales y prensa curada a Gold (independiente del pipeline) |
-| `make app` | Abre la app Streamlit del asistente (requiere `DEEPSEEK_API_KEY`) |
-| `make evaluar` | Corre las 20 preguntas del alcance y escribe `docs/RESULTADOS_20_PREGUNTAS.md` (requiere `DEEPSEEK_API_KEY`) |
-| `make all` | Pipeline completo |
-| `make stats` | Resumen y checklist → `data/gold/_INDICE.md` |
-| `make status` | Cuenta URLs/Bronze/Silver/Gold |
-| `make test` / `make check` | Pruebas / lint + tipos + pruebas |
-| `make health` | Integridad de Bronze/Silver/Gold y del contrato de Gold |
-| `make ci` | Lo mismo que corre GitHub Actions (check + demo) |
-| `make deliver` | Gold + índice + ZIP del entregable en `dist/` |
-| `make clean` | Borra Silver y Gold (conserva el crudo) |
-| `make clean-all` | Borra todas las capas |
-| `make identity` | Fija `user.name` y `user.email` del repo |
-| `make whoami` | Muestra la identidad de Git y el remoto |
-| `make remote` | Configura `origin` (`OWNER=`, `REPO=`) |
-| `make repo` | Crea el repositorio en GitHub (requiere `GITHUB_TOKEN`) |
-
-El CLI también se usa directo:
-
-```bash
-uv run corpus discover
-uv run corpus fetch --limit 50 --delay 2
-uv run corpus all --limit 100
-uv run corpus status
-```
-
----
-
-## Arquitectura del corpus
-
-```
-data/
-├── raw/                    # BRONZE — lo que devolvió la web, tal cual
-│   ├── html/               #   un .html por URL (nombre = hash de la URL)
-│   ├── urls.jsonl          #   plan de captura: url, fuente, fecha
-│   ├── capture.jsonl       #   url, status, fecha, bytes, sha256, archivo
-│   ├── documents/          #   PDFs descargados
-│   ├── videos/             #   metadatos y subtítulos .vtt
-│   ├── documents_urls.jsonl / documents_capture.jsonl
-│   └── videos_urls.jsonl / videos_capture.jsonl
-├── processed/              # SILVER — solo el texto útil, en Markdown
-│   ├── markdown/           #   un .md por página
-│   └── silver.jsonl        #   + título, sección, método, chars
-└── gold/                   # GOLD — lo único que entra al RAG
-    ├── pages/              #   un .md por página HTML
-    ├── documents/          #   un .md por PDF (balances, informes)
-    ├── videos/             #   un .md por video transcrito
-    ├── corpus.jsonl        #   metadatos de páginas
-    ├── documents.jsonl     #   metadatos de PDFs
-    ├── videos.jsonl        #   metadatos de videos
-    └── _INDICE.md          #   reporte y checklist
-```
-
-**Por qué capas.** Capturar e interpretar están separados: si mejoras el
-limpiador, regeneras Silver y Gold sin volver a pedirle 800 páginas al sitio.
-Bronze es el respaldo histórico y nunca se edita a mano.
-
-### Formato Gold
-
-Cada página en `data/gold/pages/` es Markdown con frontmatter:
+## Contrato de Gold
 
 ```yaml
 ---
 fuente: https://www.bancodeoccidente.com.co/quienes-somos
 titulo: Quiénes somos
-seccion: identidad
-empresa: Banco de Occidente
-fecha_captura: 2026-10-23
-idioma: es
+seccion: identidad        # identidad | oferta | presencia | datos | atencion | legal
 tokens: 812
 hash: 3f9c1a7d
-palabras: 190
-metodo: trafilatura
-keywords: [historia, misión, visión, oficinas]
 ---
-# Quiénes somos
-## Misión
-...
 ```
 
-Los encabezados son fronteras de *chunk*: al partir por `##`, cada trozo queda
-autocontenido. Los metadatos permiten filtrar por sección, citar la URL de
-origen y saber qué re-scrapear.
+Un `.md` por URL con nombre estable, `corpus.jsonl` como fuente del índice y del
+asistente, y `hash` para detectar cambios. Gold **nunca** se edita a mano: se
+regenera con `make gold`. Contrato completo en [`CONSTITUTION.md`](./CONSTITUTION.md) §7.
 
----
+## Knowledge, documentos y videos
 
-## Qué se captura
+- **Knowledge**: entidades, hechos y relaciones con cita obligatoria (`CONSTITUTION.md` §7).
+- **Documentos y videos**: solo material público, prioridad por año y trazabilidad por hash.
 
-| Sección | Contenido |
-|---|---|
-| `identidad` | Quiénes somos, misión, visión, historia, junta, directivos, sedes |
-| `oferta` | Productos y servicios: cuentas, tarjetas, créditos, seguros, CDTs |
-| `presencia` | Noticias, sala de prensa, blog, comunicados |
-| `datos` | Informes, sostenibilidad, inversionistas, tarifas |
-| `atencion` | Canales, sucursales, PQRS, contacto |
-| `legal` | Términos, políticas, habeas data |
+## Noticias y hechos relevantes
 
-`make stats` evalúa las **24 casillas** del checklist del Taller 1 y marca
-cuáles ya tienen evidencia en el corpus.
+`make noticias` genera fichas de prensa verificada y de la tabla «Información Relevante», y
+no forma parte de `make all`, `make gold`, `make deliver`, `make docs`, `make docs-finanzas`,
+`make videos` ni `make media`; la curaduría vive en `data/noticias/prensa.yaml`.
 
----
+## Documentación
+
+[`CONSTITUTION.md`](./CONSTITUTION.md) (verdad central) · [`docs/ESTANDAR.md`](./docs/ESTANDAR.md)
+(trazabilidad) · [`docs/FUENTES.md`](./docs/FUENTES.md) (fuentes y `robots.txt`) ·
+[`docs/ALCANCE.md`](./docs/ALCANCE.md) (20 preguntas) · [`AGENTS.md`](./AGENTS.md).
 
 ## Ética y legalidad
 
-- Se respeta `robots.txt`: lo que está en `Disallow` no se toca
-  (`/portaltransaccional/`, `/icbs-web/`, `/AjaxTx`, `/wps/`).
-- Ritmo de cortesía de 1,5 s entre peticiones (decisión del proyecto;
-  `robots.txt` no declara `Crawl-delay`) y pausa de 10 s cada 50.
-- Identificación en cada petición: UA de navegador + header HTTP `From` con el
-  contacto académico. El WAF del sitio responde `403` a cualquier UA que se
-  declare bot, aunque `robots.txt` permita el contenido (ver `CONSTITUTION.md`
-  §10).
-- Solo información **pública**. Nada de zonas privadas, datos tras login ni
-  datos personales (Ley 1581 de 2012 — Habeas Data).
-- El HTML crudo se conserva para poder reprocesar sin volver a molestar al
-  servidor.
+- `robots.txt` manda: lo que está en `Disallow` no se toca (`/portaltransaccional/`, `/icbs-web/`, `/AjaxTx`, `/wps/`).
+- Ritmo de cortesía de 1,5 s entre peticiones (decisión del proyecto; `robots.txt`
+  no declara `Crawl-delay`) y pausa de 10 s cada 50.
+- User-Agent de navegador y header `From` con el contacto académico (`config/site.toml`).
+- Solo información pública, sin zonas privadas, formularios ni datos personales
+  (Ley 1581 de 2012); el HTML crudo se conserva para reprocesar sin molestar al sitio.
 
----
+## Limitaciones y solución de problemas
 
-## Solución de problemas
+- **Bloqueo del WAF (`403`)**: limitación documentada en `CONSTITUTION.md` §10.
+  El pipeline se detiene e informa; no cambia el User-Agent, no usa proxies ni
+  navegadores y no busca otra red para sortear el WAF.
+- **`make` no existe en Windows**: `winget install ezwinports.make` o
+  `choco install make`. También puede usarse `uv run corpus <comando>`.
+- **Sin `DEEPSEEK_API_KEY`**: la app avisa y sigue en pie; el pipeline no la necesita.
 
-### El sitio devuelve 403
+## Licencia
 
-```
-ERROR  Request blocked. We can't connect to the server for this app...
-```
+[MIT](./LICENSE). El contenido del corpus pertenece a sus titulares y se usa con
+fines académicos, citando la fuente en el frontmatter de cada documento. La
+atribución de materiales de terceros está en [`NOTICE.md`](./NOTICE.md).
 
-CloudFront rechaza la petición antes de llegar al origen. Causas:
+## Créditos
 
-1. **VPN activa** con salida fuera de Colombia (es la causa más común).
-2. Red de datacenter, contenedor o CI.
-3. Un `User-Agent` que se declara bot: el WAF responde `403` aunque
-   `robots.txt` permita la página.
+| Persona | Rol |
+|---|---|
+| Darley Idárraga | Líder de repositorio e integración |
+| Yoldy Benavides | Ingeniería de datos |
+| Nayla Ledesma | Método y memoria; asistente LangChain y app Streamlit |
+| Anny Valencia | Seguridad y calidad |
 
-Diagnóstico: `make doctor`. Solución:
-
-- Desconecta la VPN y ejecuta desde una conexión residencial colombiana.
-- No cambies el UA a uno de bot: el proyecto ya usa un UA de navegador y envía
-  la identificación académica en el header `From` (configurable en
-  `config/site.toml`).
-- El proyecto **no** usa un navegador headless para sortear el WAF: si el sitio
-  responde `403`, se detiene y se documenta la limitación.
-
-### `make` no existe en Windows
-
-```powershell
-winget install ezwinports.make
-# o
-choco install make
-```
-
-En PowerShell también puedes usar `uv run corpus <comando>` sin `make`.
-
-### Ya no se usa Playwright
-
-El pipeline descarga solo con `httpx` (`net.py`). Si un `.venv` viejo conserva
-el extra `browser`, se corrige con `uv sync --all-extras`.
-
----
-
-## Identidad de Git
-
-```bash
-make identity
-# user.name  = Darley843
-# user.email = darley.idarraga@uao.edu.co
-```
-
-Variables en el Makefile: `GIT_USER`, `GIT_EMAIL`, `REPO`.
-
----
-
-## Estructura del proyecto
-
-```
-├── config/site.toml          # alcance, cortesía, filtros, secciones
-├── makefile                  # todos los comandos
-├── pyproject.toml            # proyecto uv (PEP 621)
-├── uv.lock                   # versiones exactas (se versiona)
-├── .python-version           # 3.13
-├── CONSTITUTION.md           # verdad central del proyecto
-├── AGENTS.md                 # contexto para agentes LLM
-├── .github/workflows/ci.yml  # lint + formato + pruebas
-├── .pre-commit-config.yaml   # hooks de calidad
-├── src/banco_occidente_corpus/
-│   ├── cli.py                # discover | fetch | extract | gold | stats
-│   ├── config.py             # carga de site.toml y rutas
-│   ├── discover.py           # robots.txt + sitemap index recursivo
-│   ├── net.py                # httpx con reintentos y backoff
-│   ├── fetch.py              # Bronze
-│   ├── extract.py            # Silver (trafilatura + fallback)
-│   ├── dedupe.py             # boilerplate repetido
-│   ├── section.py            # clasificación en secciones
-│   ├── gold.py               # Gold + frontmatter
-│   ├── checklist.py          # 24 casillas del Taller 1
-│   ├── stats.py              # _INDICE.md
-│   └── asistente/            # Q&A, FAQ y resumen con DeepSeek (+ servicio y manifest)
-├── app/
-│   └── streamlit_app.py      # app del asistente (make app)
-├── scripts/
-│   ├── demo_offline.py       # pipeline con fixture, sin red
-│   └── scrape_empresa.py     # scraper autocontenido (PEP 723)
-└── test/                     # pytest + fixtures
-```
-
----
+Curso **TAAML**, Universidad Autónoma de Occidente (UAO).
 
 ## Referencias
 
-- [uv — documentación](https://docs.astral.sh/uv/)
-- [trafilatura](https://trafilatura.readthedocs.io/)
-- [robots.txt — especificación](https://www.rfc-editor.org/rfc/rfc9309)
-- [Sitemaps protocol](https://www.sitemaps.org/protocol.html)
+- [uv](https://docs.astral.sh/uv/) · [trafilatura](https://trafilatura.readthedocs.io/)
+- [RFC 9309 — robots.txt](https://www.rfc-editor.org/rfc/rfc9309) · [Sitemaps](https://www.sitemaps.org/protocol.html)
+- [LangChain](https://python.langchain.com/) · [DeepSeek](https://api-docs.deepseek.com/)
