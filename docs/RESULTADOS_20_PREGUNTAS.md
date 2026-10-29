@@ -1,6 +1,6 @@
 # Resultados de las 20 preguntas del alcance
 
-Fecha: 2026-10-27. Modelo: `deepseek-flash`. Prompt: `qa_v1`. Contexto completo (`data/contexto/contexto_banco.md`).
+Fecha: 2026-10-29 (respuestas del modelo: 2026-10-27). Modelo: `deepseek-flash`. Prompt: `qa_v1`. Contexto completo (`data/contexto/contexto_banco.md`).
 
 Generado con `make evaluar`. Las preguntas y su cobertura esperada están en `config/evaluacion/preguntas_alcance.toml` (ver `docs/ALCANCE.md`). El detalle, con la respuesta cruda del modelo, queda en `data/evaluacion/resultados.jsonl`.
 
@@ -8,40 +8,47 @@ Generado con `make evaluar`. Las preguntas y su cobertura esperada están en `co
 
 | Clasificación automática | Preguntas |
 |---|---:|
-| Correcta | 17 |
+| Correcta | 19 |
 | Rechazo correcto | 1 |
-| Remisión al canal oficial | 1 |
-| Revisar | 1 |
 | **Total** | **20** |
 
-Comportamiento esperado (correctas, rechazos correctos y remisiones): **19 de 20**.
+Comportamiento esperado (correctas, rechazos correctos y remisiones): **20 de 20**.
 
 Cómo se clasifica: si el corpus no tiene el dato, lo esperado es la frase fija con el canal oficial (*rechazo correcto*). Si lo tiene, se buscan en la respuesta los términos esperados: todos (*correcta*), algunos (*incompleta*) o ninguno (*revisar*). Una respuesta sin datos cuando el corpus sí los tiene es un *falso negativo*. La clasificación es una heurística; la columna de revisión humana es la que vale para el informe.
+
+Revisión humana (20 de 20 preguntas, en `config/evaluacion/revision_humana.toml`). **20 son propuestas pendientes de confirmar por el grupo.**
+
+| Veredicto humano | Preguntas |
+|---|---:|
+| Correcta | 15 |
+| Parcial | 3 |
+| Incorrecta | 1 |
+| Rechazo correcto | 1 |
 
 ## Tabla
 
 | # | Pregunta | Cobertura | Clasificación | Términos | Fuente citada | Avisos | Revisión humana |
 |---:|---|---|---|---:|---|---|---|
-| 1 | ¿Cuál es el horario de atención de las oficinas? | no | Rechazo correcto | - | https://www.bancodeoccidente.com.co/ayuda/linea-servicio-cliente | sin_datos |  |
-| 2 | ¿Dónde hay una oficina en Cali? | no | Revisar | - | https://www.bancodeoccidente.com.co/ayuda/linea-servicio-cliente | - |  |
-| 3 | ¿Cuál es la línea de atención telefónica? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/ayuda/linea-servicio-cliente | - |  |
-| 4 | ¿Cómo presento una petición, queja o reclamo? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/ayuda | - |  |
-| 5 | ¿Quién es el Defensor del Consumidor Financiero y cómo lo contacto? | si | Correcta | 2/2 | https://www.bancodeoccidente.com.co/quienes-somos/defensor-consumidor-financiero | - |  |
-| 6 | ¿Cuál es el propósito o misión del banco? | parcial | Correcta | 1/1 | https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco | - |  |
-| 7 | ¿Cuándo y dónde se fundó el banco? | si | Correcta | 2/2 | https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco | - |  |
-| 8 | ¿A qué grupo empresarial pertenece? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/quienes-somos/filiales | - |  |
-| 9 | ¿Quién es el presidente del banco? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas | - |  |
-| 10 | ¿Qué tipos de cuentas de ahorro ofrece? | si | Correcta | 2/2 | https://www.bancodeoccidente.com.co/cuenta-de-ahorros | - |  |
-| 11 | ¿Qué requisitos necesito para abrir una cuenta? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/ayuda/preguntas-frecuentes | - |  |
-| 12 | ¿Puedo abrir una cuenta en línea? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/sistema-kubo | - |  |
-| 13 | ¿Qué tarjetas de crédito ofrece y cuál es su cuota de manejo? | si | Correcta | 2/2 | https://www.bancodeoccidente.com.co/tarjetas-credito | - |  |
-| 14 | ¿Qué es un CDT y cuál es su tasa? | parcial | Remisión al canal oficial | 0/1 | https://www.bancodeoccidente.com.co/ayuda/linea-servicio-cliente | sin_datos |  |
-| 15 | ¿Qué créditos de vivienda ofrece? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/creditos/vivienda | - |  |
-| 16 | ¿Ofrece crédito de vehículo? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/creditos/carros | - |  |
-| 17 | ¿Qué hago si pierdo mi tarjeta o me la roban? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/ayuda/preguntas-frecuentes | - |  |
-| 18 | ¿Cómo uso la banca móvil o la app? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/canales-digitales/banca-movil | - |  |
-| 19 | ¿Qué acciones de sostenibilidad realiza? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/sostenibilidad | - |  |
-| 20 | ¿Cuáles son las noticias recientes del banco? | si | Correcta | 1/1 | https://www.portafolio.co/energia/banco-de-occidente-financiara-con-200-000-millones-parque-solar-en-santander-que-generara-500-gwh-al-ano-504747 | - |  |
+| 1 | ¿Cuál es el horario de atención de las oficinas? | no | Rechazo correcto | - | https://www.bancodeoccidente.com.co/ayuda/linea-servicio-cliente | sin_datos | Rechazo correcto: El corpus no tiene horarios; remite a la linea de servicio. (propuesta) |
+| 2 | ¿Dónde hay una oficina en Cali? | parcial | Correcta | 1/1 | https://www.bancodeoccidente.com.co/ayuda/linea-servicio-cliente | - | Parcial: Sin listado de oficinas; da la sede de Cali (pagina de accionistas) y la linea de Cali, pero cita solo la pagina de lineas. (propuesta) |
+| 3 | ¿Cuál es la línea de atención telefónica? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/ayuda/linea-servicio-cliente | - | Correcta: Lineas por ciudad, nacional y EE. UU. coinciden con la fuente. (propuesta) |
+| 4 | ¿Cómo presento una petición, queja o reclamo? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/ayuda | - | Correcta: Formulario digital PQRS, lineas, oficinas y Defensor. (propuesta) |
+| 5 | ¿Quién es el Defensor del Consumidor Financiero y cómo lo contacto? | si | Correcta | 2/2 | https://www.bancodeoccidente.com.co/quienes-somos/defensor-consumidor-financiero | - | Parcial: Explica la funcion; el corpus no trae telefono ni correo del Defensor y lo dice. (propuesta) |
+| 6 | ¿Cuál es el propósito o misión del banco? | parcial | Correcta | 1/1 | https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco | - | Correcta: Proposito literal y cuatro pilares; aclara que no es una mision. (propuesta) |
+| 7 | ¿Cuándo y dónde se fundó el banco? | si | Correcta | 2/2 | https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco | - | Correcta: 3 de mayo de 1965, Cali. (propuesta) |
+| 8 | ¿A qué grupo empresarial pertenece? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/quienes-somos/filiales | - | Correcta: Grupo Aval, desde 1998. (propuesta) |
+| 9 | ¿Quién es el presidente del banco? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas | - | Correcta: Gerardo Silva Castro, presidente desde agosto de 2023. (propuesta) |
+| 10 | ¿Qué tipos de cuentas de ahorro ofrece? | si | Correcta | 2/2 | https://www.bancodeoccidente.com.co/cuenta-de-ahorros | - | Correcta: Seis tipos de cuenta, todos en el corpus. (propuesta) |
+| 11 | ¿Qué requisitos necesito para abrir una cuenta? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/ayuda/preguntas-frecuentes | - | Correcta: Documentos de persona natural; aclara que varian por producto. (propuesta) |
+| 12 | ¿Puedo abrir una cuenta en línea? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/sistema-kubo | - | Correcta: Apertura digital, entrega de tarjeta en 5 a 7 dias. (propuesta) |
+| 13 | ¿Qué tarjetas de crédito ofrece y cuál es su cuota de manejo? | si | Correcta | 2/2 | https://www.bancodeoccidente.com.co/tarjetas-credito | parcial | Parcial: Lista las tarjetas; el valor de la cuota solo esta publicado para RIGO y lo dice. (propuesta) |
+| 14 | ¿Qué es un CDT y cuál es su tasa? | parcial | Correcta | 1/1 | https://www.bancodeoccidente.com.co/inversion/cdt | parcial | Incorrecta: Error: dice $500.000 con plazo minimo de 30 dias; la fuente dice $500.000 desde 90 dias y $1.000.000 desde 30. La tasa no esta en el corpus y lo dice. (propuesta) |
+| 15 | ¿Qué créditos de vivienda ofrece? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/creditos/vivienda | - | Correcta: Hipotecario, leasing, compra de cartera y exterior. (propuesta) |
+| 16 | ¿Ofrece crédito de vehículo? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/creditos/carros | - | Correcta: Occiauto: hasta 100 %, 84 meses, 2,5 SMLMV, 18 a 74 anos. (propuesta) |
+| 17 | ¿Qué hago si pierdo mi tarjeta o me la roban? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/ayuda/preguntas-frecuentes | - | Correcta: Bloqueo por app o linea 24/7, ambos en la fuente. (propuesta) |
+| 18 | ¿Cómo uso la banca móvil o la app? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/canales-digitales/banca-movil | - | Correcta: Funciones de la app y seguridad. (propuesta) |
+| 19 | ¿Qué acciones de sostenibilidad realiza? | si | Correcta | 1/1 | https://www.bancodeoccidente.com.co/sostenibilidad | - | Correcta: Ejes ambiental, social y de gobierno; Pacto Global, GHG y GRI. (propuesta) |
+| 20 | ¿Cuáles son las noticias recientes del banco? | si | Correcta | 1/1 | https://www.portafolio.co/energia/banco-de-occidente-financiara-con-200-000-millones-parque-solar-en-santander-que-generara-500-gwh-al-ano-504747 | - | Correcta: Seis noticias de 2026, pero cita una sola fuente para todas. (propuesta) |
 
 ## Respuestas
 
@@ -55,7 +62,7 @@ Cobertura esperada: **no** · Clasificación: **Rechazo correcto** · 5.3 s
 
 ### 2. ¿Dónde hay una oficina en Cali?
 
-Cobertura esperada: **no** · Clasificación: **Revisar** · 5.4 s
+Cobertura esperada: **parcial** · Clasificación: **Correcta** · 5.4 s
 
 > No encuentro en las fuentes públicas un listado de oficinas del Banco en Cali. Lo que sí aparece es la dirección Carrera 3 No. 8-13, Piso 4, en la ciudad de Cali, usada para las Asambleas de Accionistas, y la línea de atención en Cali (602) 4851113, además de la línea nacional 018000514652 (solo teléfonos fijos).
 >
@@ -201,11 +208,20 @@ Cobertura esperada: **si** · Clasificación: **Correcta** · 6.2 s
 
 ### 14. ¿Qué es un CDT y cuál es su tasa?
 
-Cobertura esperada: **parcial** · Clasificación: **Remisión al canal oficial** · 5.3 s
+Cobertura esperada: **parcial** · Clasificación: **Correcta** · 5.3 s
 
-> No encuentro esa información en las fuentes públicas del banco
-> Puedes consultar la Línea de Servicio al Cliente 018000514652 o los canales oficiales en https://www.bancodeoccidente.com.co/ayuda/linea-servicio-cliente
-> Fuente: https://www.bancodeoccidente.com.co/ayuda/linea-servicio-cliente
+> Un CDT (Certificado de Depósito a Término) es un producto de inversión con el que haces crecer tu dinero a un plazo determinado. Según la información pública:
+>
+> - Apertura desde $500.000 (plazo mínimo de 30 días).
+> - Tú eliges el plazo según tu planificación financiera.
+> - Los intereses pueden pagarse de forma mensual, bimestral, trimestral, semestral o anual, abonados en tu cuenta del banco o retirados en efectivo en oficinas.
+> - Puedes renovarlo automáticamente, endosarlo o negociar sus condiciones.
+> - Cuenta con seguro de depósitos Fogafín.
+> - Si tienes cuenta de ahorros, puedes abrir tu CDT Digital desde el portal.
+>
+> Sobre la tasa: No encuentro esa información en las fuentes públicas del banco. Puedes consultar las tasas vigentes en la sección de tarifas y tasas del sitio, o comunicarte con la Línea Nacional 01 8000 514652 (solo teléfonos fijos).
+>
+> Fuente: https://www.bancodeoccidente.com.co/inversion/cdt
 
 ### 15. ¿Qué créditos de vivienda ofrece?
 

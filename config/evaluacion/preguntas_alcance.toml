@@ -19,9 +19,9 @@ nota = "El buscador de oficinas usa JavaScript y un servicio externo."
 [[pregunta]]
 id = 2
 pregunta = "¿Dónde hay una oficina en Cali?"
-cobertura = "no"
-terminos = []
-nota = "Mismo caso que la pregunta 1."
+cobertura = "parcial"
+terminos = [["Carrera 3", "602", "485"]]
+nota = "No hay buscador de oficinas, pero el corpus trae la sede de Cali (Carrera 3 No. 8-13, en la pagina de accionistas) y la linea de Cali."
 
 [[pregunta]]
 id = 3

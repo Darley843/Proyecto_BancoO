@@ -43,3 +43,16 @@ Modelo: DeepSeek Flash (deepseek-flash) por API, con LangChain. Contexto complet
 - Comparación v0 frente a v1: con el contexto completo, el modelo fue prudente incluso sin reglas y no inventó datos en estas pruebas. El aporte de la v1 es la estructura (frase fija y cita obligatoria), que permite que la validación automática verifique cada respuesta; sin cita, la validación rechaza incluso respuestas correctas.
 
 - Las pruebas revelaron dos páginas de formulario que siguen en Gold (formulario-autorizacion y proyectos-vivienda-form), prohibidas por AGENTS.md. Se reportaron en un issue para excluirlas y regenerar Gold y el contexto.
+
+## Evaluación con las 20 preguntas (27 y 29 de octubre de 2026)
+
+Resultados completos en `docs/RESULTADOS_20_PREGUNTAS.md`; revisión humana en `config/evaluacion/revision_humana.toml`.
+
+| Fecha | Hallazgo | Evidencia | Decisión |
+|---|---|---|---|
+| 2026-10-27 | 19 de 20 preguntas con el comportamiento esperado (`make evaluar`, `qa_v1`) | Tabla de resultados | Línea base de la evaluación |
+| 2026-10-29 | La validación descartaba respuestas parciales: si la frase fija aparecía en cualquier parte, toda la respuesta se reemplazaba por el mensaje estándar. Pregunta 14: el modelo explicó el CDT y solo dijo no tener la tasa | Respuesta cruda de la pregunta 14 | La frase fija cuenta como rechazo solo si abre la respuesta; si va en medio, la respuesta se valida y se marca con el aviso `parcial`. Se revalidó sin volver a llamar al modelo (`make evaluar REVALIDAR=1`) |
+| 2026-10-29 | La pregunta 2 tenía cobertura "no", pero el corpus sí trae la sede de Cali y la línea de Cali | Carrera 3 No. 8-13 en la página de accionistas | Cobertura cambiada a "parcial" |
+| 2026-10-29 | Cifra mal emparejada en la pregunta 14: "$500.000 con plazo mínimo de 30 días"; la fuente dice $500.000 desde 90 días y $1.000.000 desde 30 | Bloque de `/inversion/cdt` | Veredicto "incorrecta". La validación comprueba que cada cifra exista en el contexto, no con qué dato va: limitación para el informe |
+| 2026-10-29 | Una sola línea `Fuente:` para respuestas que combinan varias páginas (preguntas 2, 4, 5 y 20) | Cifras de la respuesta ausentes en el bloque de la fuente citada, presentes en otros bloques | Limitación para el informe; en el Módulo 2, citar cada chunk recuperado |
+
