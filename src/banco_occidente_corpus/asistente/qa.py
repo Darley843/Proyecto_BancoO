@@ -24,6 +24,7 @@ from .validacion import (
     contar_palabras,
     detectar_fuga_prompt,
     detectar_pii,
+    es_sin_datos,
     limitar_palabras,
     limpiar_respuesta,
     mensaje_pii,
@@ -115,10 +116,27 @@ def responder(
     respuesta = modelo.invoke(construir_mensajes(prompt, contexto, pregunta_limpia))
     metricas = extraer_metricas(respuesta)
     crudo = texto_de_contenido(respuesta.content)
+    return validar_respuesta(contexto, crudo, metricas)
+
+
+def validar_respuesta(
+    contexto: ContextoPrompt,
+    crudo: str,
+    metricas: dict[str, Any] | None = None,
+) -> RespuestaQA:
+    """Valida la salida cruda del modelo: frase fija, fuente, cifras, fuga y PII.
+
+    Se separa de ``responder`` para poder revalidar respuestas ya guardadas
+    (``make evaluar`` con ``--revalidar``) sin volver a llamar al modelo.
+    """
+    metricas = metricas or {}
+    permitidos = contexto.canal.telefonos if contexto.canal else ()
     texto = limpiar_respuesta(crudo)
 
-    if not texto or FRASE_SIN_DATOS in texto:
+    if not texto or es_sin_datos(texto):
         return _fallback(contexto, "sin_datos", metricas, crudo)
+    # La frase fija dentro de una respuesta con contenido = respuesta parcial.
+    parcial = FRASE_SIN_DATOS.casefold() in texto.casefold()
 
     fuente = validar_fuente(texto, contexto.urls)
     if not fuente:
@@ -135,6 +153,8 @@ def responder(
 
     texto, recortado = limitar_palabras(texto, LIMITE_QA)
     avisos: list[str] = []
+    if parcial:
+        avisos.append("parcial")
     if recortado:
         avisos.append("recortado")
 

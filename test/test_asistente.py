@@ -60,6 +60,7 @@ from banco_occidente_corpus.asistente.validacion import (
     cifras_inventadas,
     contar_palabras,
     detectar_pii,
+    es_sin_datos,
     mensaje_pii,
     normalizar_cifra,
     sanear_pregunta,
@@ -498,6 +499,31 @@ def test_responder_fallback_con_frase_exacta(prompt_qa: Any, contexto: Any) -> N
     assert respuesta.fuente == URL_CANAL
     assert respuesta.texto.rstrip().endswith(f"Fuente: {URL_CANAL}")
     assert "018000 514652" in respuesta.texto
+
+
+def test_responder_conserva_respuesta_parcial(prompt_qa: Any, contexto: Any) -> None:
+    """La frase fija para un solo dato no descarta lo que si esta en el contexto."""
+    texto = (
+        "Para abrir una cuenta de ahorros necesitas la cédula y un depósito inicial.\n"
+        f"Sobre la tasa: {FRASE_SIN_DATOS}.\n"
+        f"Fuente: {URL_CUENTA}"
+    )
+    respuesta = responder(_modelo(texto), prompt_qa, contexto, "¿Qué necesito y qué tasa da?")
+
+    assert respuesta.sin_datos is False
+    assert "cédula" in respuesta.texto
+    assert respuesta.fuente == URL_CUENTA
+    assert "parcial" in respuesta.avisos
+
+
+@pytest.mark.parametrize(
+    "texto",
+    [FRASE_SIN_DATOS, f"**{FRASE_SIN_DATOS}.**", f"> {FRASE_SIN_DATOS.lower()}"],
+)
+def test_es_sin_datos_solo_si_empieza_con_la_frase(texto: str) -> None:
+    """El rechazo completo empieza con la frase fija, con o sin formato."""
+    assert es_sin_datos(texto)
+    assert not es_sin_datos(f"El CDT es una inversión. Sobre la tasa: {texto}")
 
 
 def test_responder_rechaza_fuente_inventada(prompt_qa: Any, contexto: Any) -> None:

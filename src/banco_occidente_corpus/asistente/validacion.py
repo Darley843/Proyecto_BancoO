@@ -236,6 +236,17 @@ def detectar_fuga_prompt(texto: str) -> bool:
     return any(marcador in minusculas for marcador in _MARCADORES_FUGA)
 
 
+def es_sin_datos(texto: str) -> bool:
+    """True si la respuesta *empieza* con la frase fija (rechazo completo).
+
+    Una respuesta parcial que da lo que si esta en el contexto y usa la frase
+    fija solo para el dato que falta ("Sobre la tasa: No encuentro esa
+    informacion...") no es un rechazo: se valida como cualquier otra respuesta.
+    """
+    inicio = texto.lstrip(" \t\n*_>#-").casefold()
+    return inicio.startswith(FRASE_SIN_DATOS.casefold())
+
+
 def limpiar_respuesta(texto: str) -> str:
     """Quita espacios, cercas de codigo y lineas en blanco repetidas."""
     limpio = texto.strip()
