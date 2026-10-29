@@ -7,6 +7,7 @@ DeepSeek.
 from __future__ import annotations
 
 import json
+from dataclasses import asdict
 from datetime import date
 from pathlib import Path
 
@@ -18,11 +19,17 @@ from banco_occidente_corpus.asistente.contexto_prompt import cargar_contexto
 from banco_occidente_corpus.asistente.evaluacion import (
     PreguntaEvaluacion,
     PreguntasInvalidas,
+    ResultadoEvaluacion,
+    Revision,
+    RevisionInvalida,
     cargar_preguntas,
+    cargar_revision,
     clasificar,
     contar_terminos,
     evaluar,
+    fusionar,
     render_markdown,
+    revalidar,
 )
 from banco_occidente_corpus.asistente.prompts import cargar_prompt
 from banco_occidente_corpus.asistente.qa import RespuestaQA
@@ -221,3 +228,169 @@ def test_cli_evaluar_solo_sin_coincidencias_devuelve_2(
         ]
     )
     assert codigo == 2
+
+
+# ---------------------------------------------------------------- revision y revalidacion
+
+
+REVISION_TOML = """
+[[revision]]
+id = 7
+veredicto = "correcta"
+nota = "1965, Cali."
+revisor = "Ana"
+
+[[revision]]
+id = 1
+veredicto = "rechazo_correcto"
+revisor = "Claude (propuesta, confirmar)"
+"""
+
+
+def _resultado_guardado(id_: int, crudo: str, *, error: str = "") -> ResultadoEvaluacion:
+    """Fila de una corrida anterior, como la deja resultados.jsonl."""
+    return ResultadoEvaluacion(
+        id=id_,
+        pregunta=f"p{id_}",
+        cobertura="si",
+        clasificacion="revisar",
+        respuesta="",
+        fuente="",
+        sin_datos=False,
+        respuesta_cruda=crudo or None,
+        error=error,
+        fecha="2026-10-27",
+    )
+
+
+def test_cargar_revision_y_propuestas(tmp_path: Path) -> None:
+    """La revision se lee por id y distingue lo confirmado de lo propuesto."""
+    ruta = tmp_path / "revision.toml"
+    ruta.write_text(REVISION_TOML, encoding="utf-8")
+
+    revision = cargar_revision(ruta)
+
+    assert revision[7].texto == "Correcta: 1965, Cali."
+    assert not revision[7].es_propuesta
+    assert revision[1].es_propuesta
+    assert revision[1].texto.endswith("(propuesta)")
+    assert cargar_revision(tmp_path / "no-existe.toml") == {}
+
+
+def test_revision_con_veredicto_invalido_falla(tmp_path: Path) -> None:
+    """Un veredicto fuera de la lista es un error de formato."""
+    ruta = tmp_path / "revision.toml"
+    ruta.write_text('[[revision]]\nid = 1\nveredicto = "excelente"\n', encoding="utf-8")
+    with pytest.raises(RevisionInvalida):
+        cargar_revision(ruta)
+
+
+def test_render_muestra_la_revision_humana(contexto, preguntas_path: Path) -> None:
+    """La columna y el conteo de la revision humana salen del archivo de revision."""
+    modelo = FakeListChatModel(
+        responses=[f"{FRASE_SIN_DATOS}.", f"Nació en 1965 en Cali.\nFuente: {URL_HISTORIA}"]
+    )
+    resultados = evaluar(modelo, cargar_prompt("qa"), contexto, cargar_preguntas(preguntas_path))
+    revision = {7: Revision(veredicto="correcta", nota="ok", revisor="Ana")}
+
+    texto = render_markdown(
+        resultados, modelo="m", version_prompt="v1", fecha=date(2026, 10, 29), revision=revision
+    )
+
+    assert "| Correcta: ok |" in texto
+    assert "Revisión humana (1 de 2 preguntas" in texto
+    assert "propuestas pendientes" not in texto
+
+
+def test_fusionar_reemplaza_solo_las_preguntas_nuevas() -> None:
+    """--solo no borra las demas filas de la corrida anterior."""
+    previos = [_resultado_guardado(i, "x") for i in (1, 2, 3)]
+    nuevo = _resultado_guardado(2, "nuevo")
+
+    fusion = fusionar(previos, [nuevo])
+
+    assert [r.id for r in fusion] == [1, 2, 3]
+    assert fusion[1].respuesta_cruda == "nuevo"
+
+
+def test_revalidar_usa_la_respuesta_cruda_sin_modelo(contexto, preguntas_path: Path) -> None:
+    """Revalidar recalcula validacion y clasificacion y conserva fecha y errores."""
+    previos = [
+        _resultado_guardado(1, f"{FRASE_SIN_DATOS}."),
+        _resultado_guardado(7, "", error="TimeoutError: lento"),
+    ]
+
+    resultados = revalidar(previos, cargar_preguntas(preguntas_path), contexto)
+
+    assert resultados[0].clasificacion == "rechazo_correcto"
+    assert resultados[0].fecha == "2026-10-27"
+    assert resultados[1].error.startswith("TimeoutError")
+
+
+def test_cli_revalidar_no_necesita_api_key(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, preguntas_path: Path
+) -> None:
+    """Con --revalidar no se crea el modelo: funciona sin DEEPSEEK_API_KEY."""
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    ruta_contexto = tmp_path / "contexto_banco.md"
+    ruta_contexto.write_text(CONTEXTO, encoding="utf-8", newline="\n")
+    detalle = tmp_path / "resultados.jsonl"
+    fila = _resultado_guardado(7, f"Nació en 1965 en Cali.\nFuente: {URL_HISTORIA}")
+    detalle.write_text(json.dumps(asdict(fila), ensure_ascii=False) + "\n", encoding="utf-8")
+    salida = tmp_path / "resultados.md"
+
+    codigo = cli_mod.main(
+        [
+            "evaluar",
+            "--revalidar",
+            "--contexto",
+            str(ruta_contexto),
+            "--preguntas",
+            str(preguntas_path),
+            "--revision",
+            str(tmp_path / "sin-revision.toml"),
+            "--salida",
+            str(salida),
+            "--jsonl",
+            str(detalle),
+        ]
+    )
+
+    assert codigo == 0
+    assert "| 7 |" in salida.read_text(encoding="utf-8")
+    assert json.loads(detalle.read_text(encoding="utf-8"))["clasificacion"] == "correcta"
+
+
+def test_cli_solo_conserva_las_demas_filas(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path, preguntas_path: Path
+) -> None:
+    """make evaluar SOLO=7 reemplaza la fila 7 y deja intacta la 1."""
+    ruta_contexto = tmp_path / "contexto_banco.md"
+    ruta_contexto.write_text(CONTEXTO, encoding="utf-8", newline="\n")
+    detalle = tmp_path / "resultados.jsonl"
+    previa = _resultado_guardado(1, f"{FRASE_SIN_DATOS}.")
+    detalle.write_text(json.dumps(asdict(previa), ensure_ascii=False) + "\n", encoding="utf-8")
+    modelo = FakeListChatModel(responses=[f"Nació en 1965 en Cali.\nFuente: {URL_HISTORIA}"])
+    monkeypatch.setattr(cli_mod, "crear_modelo", lambda **_kwargs: modelo)
+
+    codigo = cli_mod.main(
+        [
+            "evaluar",
+            "--contexto",
+            str(ruta_contexto),
+            "--preguntas",
+            str(preguntas_path),
+            "--solo",
+            "7",
+            "--revision",
+            str(tmp_path / "sin-revision.toml"),
+            "--salida",
+            str(tmp_path / "r.md"),
+            "--jsonl",
+            str(detalle),
+        ]
+    )
+
+    ids = [json.loads(linea)["id"] for linea in detalle.read_text(encoding="utf-8").splitlines()]
+    assert codigo == 0
+    assert ids == [1, 7]

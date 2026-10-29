@@ -113,6 +113,7 @@ REJECT if:
 - Se usa `pip`, se crea `requirements.txt` o se edita `uv.lock` a mano.
 - Una petición HTTP no pasa por `net.py`, no tiene `timeout`, no envía el User-Agent y el header `From` del proyecto, o usa `verify=False`.
   La regla anterior cubre el sitio del banco y las fuentes del corpus; las llamadas a la API del modelo desde `asistente/` van por el cliente de LangChain, con `timeout`, sin claves en el código y sin leer `.env`.
+  El User-Agent de navegador de `config/site.toml` es una decisión del grupo documentada en `CONSTITUTION.md` §10 (el WAF responde 403 a todo User-Agent que se declare bot): **no** es motivo de REJECT ni cuenta como evasión, siempre que se envíe el header `From`, se respete `robots.txt` y el ritmo de 1,5 s, y ante un 403 el pipeline se detenga sin reintentar con otro cliente.
 - Se descarga una URL sin consultar antes `robots.txt` o se baja el ritmo de cortesía de 1,5 s entre peticiones (decisión del proyecto; `robots.txt` no declara `Crawl-delay`).
 - Se captura una página con login, formulario, simulador o datos personales (Ley 1581 de 2012).
 - Se usa cualquier técnica para evadir protecciones anti-bot o captchas.

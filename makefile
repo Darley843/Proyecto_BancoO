@@ -121,7 +121,7 @@ app: ## Abre la app Streamlit del asistente (requiere DEEPSEEK_API_KEY)
 
 .PHONY: evaluar
 evaluar: ## Corre las 20 preguntas del alcance y escribe docs/RESULTADOS_20_PREGUNTAS.md (requiere DEEPSEEK_API_KEY)
-	$(UV) run python -m banco_occidente_corpus.asistente evaluar $(if $(SOLO),--solo $(SOLO),) $(if $(PAUSA),--pausa $(PAUSA),) $(if $(VERSION),--version $(VERSION),)
+	$(UV) run python -m banco_occidente_corpus.asistente evaluar $(if $(SOLO),--solo $(SOLO),) $(if $(PAUSA),--pausa $(PAUSA),) $(if $(VERSION),--version $(VERSION),) $(if $(REVALIDAR),--revalidar,)
 
 .PHONY: all
 all: ## Pipeline completo: discover -> fetch -> extract -> gold -> stats

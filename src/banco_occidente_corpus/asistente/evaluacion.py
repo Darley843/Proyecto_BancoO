@@ -7,8 +7,9 @@ mismo flujo que la app (``qa.responder``) y escribe:
 - ``data/evaluacion/resultados.jsonl``: una fila por pregunta, con la respuesta
   cruda del modelo, avisos y metricas, para revisarlas despues.
 
-La clasificacion automatica es una heuristica que ordena la revision; la
-columna "Revision humana" la completa el grupo.
+La clasificacion automatica es una heuristica que ordena la revision. La
+revision humana vive aparte, en ``config/evaluacion/revision_humana.toml``, para
+que volver a correr la evaluacion no la borre.
 """
 
 from __future__ import annotations
@@ -27,7 +28,7 @@ from typing import TYPE_CHECKING, Any
 from .. import config as config_mod
 from .contexto_prompt import ContextoPrompt
 from .prompts import Prompt
-from .qa import RespuestaQA, responder
+from .qa import RespuestaQA, responder, validar_respuesta
 
 if TYPE_CHECKING:
     from langchain_core.language_models import BaseChatModel
@@ -38,6 +39,16 @@ ARCHIVO_PREGUNTAS = config_mod.PROJECT_ROOT / "config" / "evaluacion" / "pregunt
 SALIDA_MARKDOWN = config_mod.PROJECT_ROOT / "docs" / "RESULTADOS_20_PREGUNTAS.md"
 #: Detalle por pregunta (respuesta cruda, avisos y metricas).
 SALIDA_JSONL = config_mod.PROJECT_ROOT / "data" / "evaluacion" / "resultados.jsonl"
+#: Revision humana por pregunta; sobrevive a nuevas corridas de la evaluacion.
+ARCHIVO_REVISION = config_mod.PROJECT_ROOT / "config" / "evaluacion" / "revision_humana.toml"
+
+#: Veredictos validos de la revision humana y su texto en la tabla.
+VEREDICTOS: dict[str, str] = {
+    "correcta": "Correcta",
+    "parcial": "Parcial",
+    "incorrecta": "Incorrecta",
+    "rechazo_correcto": "Rechazo correcto",
+}
 
 COBERTURAS = ("si", "parcial", "no")
 
@@ -55,6 +66,31 @@ ETIQUETAS: dict[str, str] = {
 
 class PreguntasInvalidas(ValueError):
     """El archivo de preguntas no cumple el formato esperado."""
+
+
+class RevisionInvalida(ValueError):
+    """El archivo de revision humana no cumple el formato esperado."""
+
+
+@dataclass(frozen=True, slots=True)
+class Revision:
+    """Veredicto de una persona del grupo sobre una respuesta."""
+
+    veredicto: str
+    nota: str = ""
+    revisor: str = ""
+
+    @property
+    def es_propuesta(self) -> bool:
+        """True si nadie del grupo la ha confirmado (sin revisor o marcada como propuesta)."""
+        return not self.revisor or "propuesta" in self.revisor.casefold()
+
+    @property
+    def texto(self) -> str:
+        """Veredicto legible con la nota, para la celda de la tabla."""
+        base = VEREDICTOS[self.veredicto]
+        texto = f"{base}: {self.nota}" if self.nota else base
+        return f"{texto} (propuesta)" if self.es_propuesta else texto
 
 
 @dataclass(frozen=True, slots=True)
@@ -86,6 +122,15 @@ class ResultadoEvaluacion:
     respuesta_cruda: str | None = None
     metricas: dict[str, Any] = field(default_factory=dict)
     error: str = ""
+    fecha: str = ""
+
+    @classmethod
+    def desde_dict(cls, fila: dict[str, Any]) -> ResultadoEvaluacion:
+        """Reconstruye un resultado desde una fila de ``resultados.jsonl``."""
+        campos = {k: v for k, v in fila.items() if k in cls.__dataclass_fields__}
+        campos["avisos"] = list(campos.get("avisos") or [])
+        campos["metricas"] = dict(campos.get("metricas") or {})
+        return cls(**campos)
 
 
 def _normalizar(texto: str) -> str:
@@ -133,6 +178,48 @@ def cargar_preguntas(archivo: Path | None = None) -> list[PreguntaEvaluacion]:
     return sorted(preguntas, key=lambda p: p.id)
 
 
+def cargar_revision(archivo: Path | None = None) -> dict[int, Revision]:
+    """Lee la revision humana; si el archivo no existe, no hay revision."""
+    ruta = archivo or ARCHIVO_REVISION
+    if not ruta.exists():
+        return {}
+    try:
+        datos = tomllib.loads(ruta.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError as exc:
+        raise RevisionInvalida(f"TOML invalido en {ruta}: {exc}") from exc
+    revision: dict[int, Revision] = {}
+    for fila in datos.get("revision", []):
+        veredicto = str(fila.get("veredicto", "")).strip()
+        if veredicto not in VEREDICTOS:
+            raise RevisionInvalida(
+                f"Revision {fila.get('id')}: veredicto '{veredicto}' no es uno de "
+                f"{tuple(VEREDICTOS)}"
+            )
+        revision[int(fila["id"])] = Revision(
+            veredicto=veredicto,
+            nota=str(fila.get("nota", "")).strip(),
+            revisor=str(fila.get("revisor", "")).strip(),
+        )
+    return revision
+
+
+def cargar_resultados(archivo: Path) -> list[ResultadoEvaluacion]:
+    """Lee una corrida anterior desde ``resultados.jsonl`` (vacio si no existe)."""
+    if not archivo.exists():
+        return []
+    filas = [linea for linea in archivo.read_text(encoding="utf-8").splitlines() if linea.strip()]
+    return [ResultadoEvaluacion.desde_dict(json.loads(linea)) for linea in filas]
+
+
+def fusionar(
+    previos: Sequence[ResultadoEvaluacion], nuevos: Sequence[ResultadoEvaluacion]
+) -> list[ResultadoEvaluacion]:
+    """Reemplaza en la corrida anterior solo las preguntas recien evaluadas."""
+    por_id = {r.id: r for r in previos}
+    por_id.update({r.id: r for r in nuevos})
+    return [por_id[i] for i in sorted(por_id)]
+
+
 def contar_terminos(texto: str, grupos: Sequence[Sequence[str]]) -> int:
     """Cuantos grupos de terminos aparecen en el texto (basta una alternativa)."""
     normal = _normalizar(texto)
@@ -157,6 +244,58 @@ def clasificar(pregunta: PreguntaEvaluacion, respuesta: RespuestaQA) -> tuple[st
     if encontrados > 0:
         return "incompleta", encontrados
     return "revisar", encontrados
+
+
+def _resultado(
+    pregunta: PreguntaEvaluacion,
+    respuesta: RespuestaQA,
+    segundos: float,
+    fecha: str = "",
+) -> ResultadoEvaluacion:
+    """Arma el resultado de una pregunta a partir de la respuesta validada.
+
+    ``fecha`` es el dia en que respondio el modelo (hoy, si no se indica).
+    """
+    clasificacion, encontrados = clasificar(pregunta, respuesta)
+    return ResultadoEvaluacion(
+        id=pregunta.id,
+        pregunta=pregunta.pregunta,
+        cobertura=pregunta.cobertura,
+        clasificacion=clasificacion,
+        respuesta=respuesta.texto,
+        fuente=respuesta.fuente,
+        sin_datos=respuesta.sin_datos,
+        avisos=list(respuesta.avisos),
+        terminos_encontrados=encontrados,
+        terminos_esperados=len(pregunta.terminos),
+        segundos=segundos,
+        respuesta_cruda=respuesta.texto_crudo,
+        metricas=dict(respuesta.metricas),
+        fecha=fecha or date.today().isoformat(),
+    )
+
+
+def revalidar(
+    previos: Sequence[ResultadoEvaluacion],
+    preguntas: Iterable[PreguntaEvaluacion],
+    contexto: ContextoPrompt,
+) -> list[ResultadoEvaluacion]:
+    """Vuelve a validar y clasificar las respuestas crudas guardadas, sin llamar al modelo.
+
+    Sirve cuando cambia la validacion o la cobertura esperada: la salida del
+    modelo es la misma, solo se recalcula lo que el proyecto hace con ella. Las
+    filas con error o sin respuesta cruda se conservan tal cual.
+    """
+    por_id = {p.id: p for p in preguntas}
+    resultados: list[ResultadoEvaluacion] = []
+    for previo in previos:
+        pregunta = por_id.get(previo.id)
+        if pregunta is None or previo.error or previo.respuesta_cruda is None:
+            resultados.append(previo)
+            continue
+        respuesta = validar_respuesta(contexto, previo.respuesta_cruda, previo.metricas)
+        resultados.append(_resultado(pregunta, respuesta, previo.segundos, previo.fecha))
+    return resultados
 
 
 def evaluar(
@@ -192,24 +331,10 @@ def evaluar(
                 terminos_esperados=len(pregunta.terminos),
                 segundos=round(time.perf_counter() - inicio, 2),
                 error=f"{type(exc).__name__}: {exc}",
+                fecha=date.today().isoformat(),
             )
         else:
-            clasificacion, encontrados = clasificar(pregunta, respuesta)
-            resultado = ResultadoEvaluacion(
-                id=pregunta.id,
-                pregunta=pregunta.pregunta,
-                cobertura=pregunta.cobertura,
-                clasificacion=clasificacion,
-                respuesta=respuesta.texto,
-                fuente=respuesta.fuente,
-                sin_datos=respuesta.sin_datos,
-                avisos=list(respuesta.avisos),
-                terminos_encontrados=encontrados,
-                terminos_esperados=len(pregunta.terminos),
-                segundos=round(time.perf_counter() - inicio, 2),
-                respuesta_cruda=respuesta.texto_crudo,
-                metricas=dict(respuesta.metricas),
-            )
+            resultado = _resultado(pregunta, respuesta, round(time.perf_counter() - inicio, 2))
         resultados.append(resultado)
         if al_terminar:
             al_terminar(resultado)
@@ -235,9 +360,17 @@ def render_markdown(
     modelo: str,
     version_prompt: str,
     fecha: date | None = None,
+    revision: dict[int, Revision] | None = None,
 ) -> str:
     """Tabla de resultados para el informe, con resumen y detalle por pregunta."""
-    dia = (fecha or date.today()).isoformat()
+    revision = revision or {}
+    hoy = (fecha or date.today()).isoformat()
+    fechas = sorted({r.fecha for r in resultados if r.fecha})
+    if not fechas or fechas == [hoy]:
+        dia = hoy
+    else:
+        respuestas = fechas[0] if len(fechas) == 1 else f"{fechas[0]} a {fechas[-1]}"
+        dia = f"{hoy} (respuestas del modelo: {respuestas})"
     conteo = resumen_clasificaciones(resultados)
     total = len(resultados)
     aciertos = conteo["correcta"] + conteo["rechazo_correcto"] + conteo["remision"]
@@ -273,6 +406,9 @@ def render_markdown(
         "*falso negativo*. La clasificación es una heurística; la columna de revisión "
         "humana es la que vale para el informe.",
         "",
+    ]
+    lineas += _resumen_revision(resultados, revision)
+    lineas += [
         "## Tabla",
         "",
         "| # | Pregunta | Cobertura | Clasificación | Términos | Fuente citada | "
@@ -287,7 +423,8 @@ def render_markdown(
         lineas.append(
             f"| {r.id} | {_celda(r.pregunta)} | {r.cobertura} | "
             f"{ETIQUETAS.get(r.clasificacion, r.clasificacion)} | {terminos} | "
-            f"{_celda(r.fuente) or '-'} | {_celda(avisos)} |  |"
+            f"{_celda(r.fuente) or '-'} | {_celda(avisos)} | "
+            f"{_celda(revision[r.id].texto) if r.id in revision else ''} |"
         )
 
     lineas += ["", "## Respuestas", ""]
@@ -307,6 +444,36 @@ def render_markdown(
                 lineas.append(f"> {linea}".rstrip())
         lineas.append("")
     return "\n".join(lineas).rstrip() + "\n"
+
+
+def _resumen_revision(
+    resultados: Sequence[ResultadoEvaluacion], revision: dict[int, Revision]
+) -> list[str]:
+    """Bloque de conteo de la revision humana (vacio si nadie ha revisado)."""
+    revisadas = [revision[r.id] for r in resultados if r.id in revision]
+    if not revisadas:
+        return [
+            "Revisión humana: pendiente. Se registra en "
+            "`config/evaluacion/revision_humana.toml` y se refleja con "
+            "`make evaluar REVALIDAR=1` (no llama al modelo).",
+            "",
+        ]
+    conteo = Counter(r.veredicto for r in revisadas)
+    propuestas = sum(1 for r in revisadas if r.es_propuesta)
+    estado = (
+        f" **{propuestas} son propuestas pendientes de confirmar por el grupo.**"
+        if propuestas
+        else ""
+    )
+    lineas = [
+        f"Revisión humana ({len(revisadas)} de {len(resultados)} preguntas, "
+        f"en `config/evaluacion/revision_humana.toml`).{estado}",
+        "",
+        "| Veredicto humano | Preguntas |",
+        "|---|---:|",
+    ]
+    lineas += [f"| {VEREDICTOS[v]} | {conteo[v]} |" for v in VEREDICTOS if conteo[v]]
+    return [*lineas, ""]
 
 
 def escribir_jsonl(resultados: Sequence[ResultadoEvaluacion], destino: Path) -> Path:

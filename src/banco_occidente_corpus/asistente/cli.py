@@ -20,16 +20,22 @@ from .contexto_prompt import (
     cargar_contexto,
 )
 from .evaluacion import (
+    ARCHIVO_REVISION,
     ETIQUETAS,
     SALIDA_JSONL,
     SALIDA_MARKDOWN,
     PreguntasInvalidas,
     ResultadoEvaluacion,
+    RevisionInvalida,
     cargar_preguntas,
+    cargar_resultados,
+    cargar_revision,
     escribir_jsonl,
     escribir_markdown,
     evaluar,
+    fusionar,
     resumen_clasificaciones,
+    revalidar,
 )
 from .evaluacion import render_markdown as render_evaluacion
 from .faq import FAQInvalida, generar_faq, render_markdown
@@ -161,6 +167,20 @@ def build_parser() -> argparse.ArgumentParser:
         help="segundos de espera entre preguntas (por defecto: 0)",
     )
     evaluar_cmd.add_argument(
+        "--revalidar",
+        action="store_true",
+        help=(
+            "no llama al modelo: vuelve a validar y clasificar las respuestas guardadas "
+            "en --jsonl y aplica la revision humana (no requiere DEEPSEEK_API_KEY)"
+        ),
+    )
+    evaluar_cmd.add_argument(
+        "--revision",
+        type=Path,
+        default=ARCHIVO_REVISION,
+        help="revision humana (por defecto: config/evaluacion/revision_humana.toml)",
+    )
+    evaluar_cmd.add_argument(
         "--salida",
         type=Path,
         default=SALIDA_MARKDOWN,
@@ -276,22 +296,44 @@ def _imprimir_avance(resultado: ResultadoEvaluacion) -> None:
 
 def _comando_evaluar(
     args: argparse.Namespace,
-    modelo: BaseChatModel,
+    modelo: BaseChatModel | None,
     prompt: Prompt,
     contexto: ContextoPrompt,
 ) -> int:
-    """Corre las preguntas del alcance y escribe la tabla y el detalle."""
-    preguntas = cargar_preguntas(args.preguntas)
-    if args.solo:
-        preguntas = [p for p in preguntas if p.id in args.solo]
-        if not preguntas:
-            print("Error: ninguna pregunta coincide con --solo.", file=sys.stderr)
+    """Corre (o revalida) las preguntas del alcance y escribe la tabla y el detalle.
+
+    Con ``--solo`` solo se reemplazan esas filas en la corrida anterior; con
+    ``--revalidar`` no se llama al modelo.
+    """
+    revision = cargar_revision(args.revision.expanduser())
+    todas = cargar_preguntas(args.preguntas)
+    preguntas = [p for p in todas if p.id in args.solo] if args.solo else todas
+    if not preguntas:
+        print("Error: ninguna pregunta coincide con --solo.", file=sys.stderr)
+        return 2
+    destino_jsonl = args.jsonl.expanduser()
+    previos = cargar_resultados(destino_jsonl)
+
+    if modelo is None:
+        if not previos:
+            print(f"Error: no hay resultados para revalidar en {destino_jsonl}.", file=sys.stderr)
             return 2
-    print(f"Evaluando {len(preguntas)} preguntas con qa_{args.version_prompt}...", file=sys.stderr)
-    resultados = evaluar(
-        modelo, prompt, contexto, preguntas, pausa=args.pausa, al_terminar=_imprimir_avance
+        print(f"Revalidando {len(previos)} respuestas guardadas (sin API)...", file=sys.stderr)
+        resultados = revalidar(previos, todas, contexto)
+        for resultado in resultados:
+            _imprimir_avance(resultado)
+    else:
+        print(
+            f"Evaluando {len(preguntas)} preguntas con qa_{args.version_prompt}...",
+            file=sys.stderr,
+        )
+        nuevos = evaluar(
+            modelo, prompt, contexto, preguntas, pausa=args.pausa, al_terminar=_imprimir_avance
+        )
+        resultados = fusionar(previos, nuevos) if args.solo else nuevos
+    texto = render_evaluacion(
+        resultados, modelo=args.modelo, version_prompt=args.version_prompt, revision=revision
     )
-    texto = render_evaluacion(resultados, modelo=args.modelo, version_prompt=args.version_prompt)
     markdown = escribir_markdown(texto, args.salida.expanduser())
     detalle = escribir_jsonl(resultados, args.jsonl.expanduser())
     conteo = resumen_clasificaciones(resultados)
@@ -313,6 +355,8 @@ def main(argv: list[str] | None = None) -> int:
         contexto = cargar_contexto(archivo=args.contexto, max_tokens=args.max_contexto)
         _diagnostico(args, contexto)
         prompt = cargar_prompt(tarea, args.version_prompt)
+        if args.comando == "evaluar" and args.revalidar:
+            return _comando_evaluar(args, None, prompt, contexto)
         modelo = crear_modelo(
             modelo=args.modelo,
             temperatura=temperatura,
@@ -344,7 +388,7 @@ def main(argv: list[str] | None = None) -> int:
     except FaltaApiKey as exc:
         print(str(exc), file=sys.stderr)
         return 1
-    except PreguntasInvalidas as exc:
+    except (PreguntasInvalidas, RevisionInvalida) as exc:
         print(f"Error: {exc}", file=sys.stderr)
         return 2
     except PromptNoEncontrado as exc:

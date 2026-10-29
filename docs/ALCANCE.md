@@ -19,7 +19,7 @@ Responder las preguntas que haría un cliente en su primer contacto con el banco
 | # | Pregunta | Cobertura en el corpus |
 |---|---|---|
 | 1 | ¿Cuál es el horario de atención de las oficinas? | No: el buscador de oficinas usa JavaScript y un servicio externo. Responder con el enlace oficial |
-| 2 | ¿Dónde hay una oficina en Cali? | No: mismo caso. Responder con el enlace oficial |
+| 2 | ¿Dónde hay una oficina en Cali? | Parcial: no hay listado de oficinas, pero el corpus trae la sede de Cali (Carrera 3 No. 8-13, página de accionistas) y la línea de Cali (602) 4851113 |
 | 3 | ¿Cuál es la línea de atención telefónica? | Sí (Líneas de servicio al cliente) |
 | 4 | ¿Cómo presento una petición, queja o reclamo? | Sí, por verificar |
 | 5 | ¿Quién es el Defensor del Consumidor Financiero y cómo lo contacto? | Sí |
