@@ -14,118 +14,118 @@
 id = 1
 veredicto = "rechazo_correcto"
 nota = "El corpus no tiene horarios; remite a la linea de servicio."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 2
 veredicto = "parcial"
 nota = "Sin listado de oficinas; da la sede de Cali (pagina de accionistas) y la linea de Cali, pero cita solo la pagina de lineas."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 3
 veredicto = "correcta"
 nota = "Lineas por ciudad, nacional y EE. UU. coinciden con la fuente."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 4
 veredicto = "correcta"
 nota = "Formulario digital PQRS, lineas, oficinas y Defensor."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 5
 veredicto = "parcial"
 nota = "Explica la funcion; el corpus no trae telefono ni correo del Defensor y lo dice."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 6
 veredicto = "correcta"
 nota = "Proposito literal y cuatro pilares; aclara que no es una mision."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 7
 veredicto = "correcta"
 nota = "3 de mayo de 1965, Cali."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 8
 veredicto = "correcta"
 nota = "Grupo Aval, desde 1998."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 9
 veredicto = "correcta"
 nota = "Gerardo Silva Castro, presidente desde agosto de 2023."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 10
 veredicto = "correcta"
 nota = "Seis tipos de cuenta, todos en el corpus."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 11
 veredicto = "correcta"
 nota = "Documentos de persona natural; aclara que varian por producto."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 12
 veredicto = "correcta"
 nota = "Apertura digital, entrega de tarjeta en 5 a 7 dias."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 13
 veredicto = "parcial"
 nota = "Lista las tarjetas; el valor de la cuota solo esta publicado para RIGO y lo dice."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 14
 veredicto = "incorrecta"
 nota = "Error: dice $500.000 con plazo minimo de 30 dias; la fuente dice $500.000 desde 90 dias y $1.000.000 desde 30. La tasa no esta en el corpus y lo dice."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 15
 veredicto = "correcta"
 nota = "Hipotecario, leasing, compra de cartera y exterior."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 16
 veredicto = "correcta"
 nota = "Occiauto: hasta 100 %, 84 meses, 2,5 SMLMV, 18 a 74 anos."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 17
 veredicto = "correcta"
 nota = "Bloqueo por app o linea 24/7, ambos en la fuente."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 18
 veredicto = "correcta"
 nota = "Funciones de la app y seguridad."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 19
 veredicto = "correcta"
 nota = "Ejes ambiental, social y de gobierno; Pacto Global, GHG y GRI."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
 
 [[revision]]
 id = 20
 veredicto = "correcta"
 nota = "Seis noticias de 2026, pero cita una sola fuente para todas."
-revisor = "Claude (propuesta, confirmar)"
+revisor = "Yoldy Benavides"
