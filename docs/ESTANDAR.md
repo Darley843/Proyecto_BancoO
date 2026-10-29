@@ -131,7 +131,7 @@ documento_titulo: Informe Final Octubre 2026
 | `.venv/` **no** se versiona | `.gitignore` |
 | `uv add` para dependencias | `make add PKG=...` |
 | `uvx` para herramientas | `make lint` / `make fmt` vía `uv run ruff` |
-| Scripts PEP 723 para pruebas | `scripts/scrape_empresa.py` |
+| Scripts de demostración del pipeline | `scripts/scrape_empresa.py` |
 | Nada de `pip` ni `requirements.txt` | no hay ninguno en el repo |
 
 ## 6. Checklist del Taller 1

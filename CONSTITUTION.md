@@ -187,7 +187,7 @@ ProyectoAvance1/
 ├── scripts/
 │   ├── tasks.py          # tareas del Makefile portables (Windows/Unix)
 │   ├── demo_offline.py   # pipeline completo con un fixture, sin red
-│   └── scrape_empresa.py # scraper autocontenido PEP 723
+│   └── scrape_empresa.py # demo: sitemap -> pipeline -> .demo/
 ├── app/
 │   └── streamlit_app.py  # APP: capa delgada sobre asistente/ (make app)
 ├── docs/ESTANDAR.md      # trazabilidad regla de la clase → implementación

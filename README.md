@@ -126,14 +126,24 @@ make evaluar                             # 20 preguntas (requiere DEEPSEEK_API_K
 
 `make help` lista todos los atajos (`init`, `doctor`, `demo`, `health`, `deliver`, `clean`).
 
-### Scraper autocontenido
+### Scraper de demostración
 
-Script PEP 723 autónomo (sitemap → HTML → Markdown); no usa la configuración del
-proyecto y sirve para demostrar la captura mínima.
+Capa delgada sobre el pipeline: descubre hasta 5 URLs con el índice de sitemaps
+(`robots.txt` y filtros de `config/site.toml` incluidos), las captura con
+`net.HttpClient` y ejecuta Bronze → Silver → Gold con el contrato oficial. No
+tiene cliente HTTP ni formato propios.
 
 ```bash
-uv run python scripts/scrape_empresa.py --limit 50
+uv run python scripts/scrape_empresa.py          # 5 páginas en .demo/scrape_empresa/
+uv run scripts/scrape_empresa.py --limit 3      # la misma demo, sin `python`
+uv run python scripts/scrape_empresa.py --out .demo/prueba --delay 2
 ```
+
+La salida por defecto es `.demo/scrape_empresa/` (ignorada por Git) con las capas
+`raw/`, `processed/` y `gold/`. `--out` rechaza cualquier ruta dentro de `data/`.
+Al final imprime el resumen por etapa y la ruta de una página Gold generada. Ante
+un `403` o `429` se detiene con un mensaje neutro, sin cambiar de red ni de
+cliente.
 
 ## Capturas
 
