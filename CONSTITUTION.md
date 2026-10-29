@@ -546,6 +546,11 @@ Decisión:
 Esto no es evasión: es la única forma de acceder a contenido público que el
 propio `robots.txt` permite, manteniendo identificación y cortesía.
 
+**Decisión del grupo (2026-10-29, opción A):** se mantiene el User-Agent de
+navegador. La alternativa (un User-Agent que se declare bot) deja el pipeline
+bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
+`AGENTS.md` lo reconoce explícitamente para no marcarlo como violación.
+
 ## 11. Historial de decisiones técnicas
 
 | Fecha | Decisión | Motivo |
@@ -595,6 +600,10 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 | 2026-10-27 | `make evaluar` corre las 20 preguntas del alcance (`config/evaluacion/preguntas_alcance.toml`) y escribe `docs/RESULTADOS_20_PREGUNTAS.md` | El punto 5 de la actividad exige al menos 20 preguntas; la clasificación automática ordena la revisión y la columna de revisión humana es la que va al informe |
 | 2026-10-27 | `site.contact` obligatorio en `HttpClient` y robots.txt consultado también para PDF (#30) | Ninguna petición sale sin el header `From`; un PDF bajo una ruta con `Disallow` no se descarga, ni siquiera por el host alterno `portalpublico` |
 | 2026-10-27 | `chunks_web.jsonl` versionado; `chunks.jsonl` completo sigue ignorado | La actividad pide entregar la base de conocimiento del scraping en el repositorio; el archivo con PDF y videos pesa ~43 MB y se regenera en segundos con `make chunks` |
+| 2026-10-29 | User-Agent de navegador confirmado (opción A) y aclarado en la regla de GGA | El WAF bloquea cualquier User-Agent de bot; la identificación va en `From` y el pipeline no reintenta ante un 403 |
+| 2026-10-29 | La frase fija solo cuenta como rechazo si abre la respuesta; en medio marca una respuesta `parcial` | La validación descartaba respuestas parciales correctas (pregunta 14) |
+| 2026-10-29 | Revisión humana en `config/evaluacion/revision_humana.toml`, `--solo` fusiona con la corrida anterior y `--revalidar` reprocesa sin API | Volver a correr la evaluación borraba la revisión y las demás filas; revalidar permite corregir la validación sin gastar tokens |
+| 2026-10-29 | Hook `no-commit-to-branch` para `main` | Protección local mientras el repositorio privado no tenga GitHub Pro |
 
 ## 12. Configuración local (no trackear)
 
@@ -626,7 +635,9 @@ propio `robots.txt` permite, manteniendo identificación y cortesía.
 - [ ] Transcripciones de YouTube de todo el canal (hoy, las más recientes).
 - [x] Chunking por encabezados (`chunks_web.jsonl` versionado).
 - [ ] Embeddings y base vectorial para el Módulo 2 (propuesta en `docs/MODELADO.md`).
-- [ ] Configurar protección de `main` (PR + CI verde). **Bloqueado**: GitHub
+- [ ] Configurar protección de `main` (PR + CI verde). Mientras tanto, el hook
+  local `no-commit-to-branch` impide hacer commits directos sobre `main`.
+  **Bloqueado**: GitHub
   exige plan Pro (o repo público) para proteger ramas en repos privados; la API
   devuelve 403. Se retoma cuando el grupo decida publicar el repo o subir de plan.
   Opción sin costo: GitHub Pro del Student Developer Pack con el correo

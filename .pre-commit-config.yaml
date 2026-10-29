@@ -20,6 +20,10 @@ repos:
       - id: check-yaml
       - id: check-toml
       - id: check-merge-conflict
+      # Proteccion local de main mientras el repo privado no tenga GitHub Pro:
+      # todo cambio entra por Pull Request.
+      - id: no-commit-to-branch
+        args: [--branch, main]
       - id: check-added-large-files
         args: ["--maxkb=1024"]
       - id: mixed-line-ending
