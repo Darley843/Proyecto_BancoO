@@ -604,6 +604,7 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 | 2026-10-29 | La frase fija solo cuenta como rechazo si abre la respuesta; en medio marca una respuesta `parcial` | La validación descartaba respuestas parciales correctas (pregunta 14) |
 | 2026-10-29 | Revisión humana en `config/evaluacion/revision_humana.toml`, `--solo` fusiona con la corrida anterior y `--revalidar` reprocesa sin API | Volver a correr la evaluación borraba la revisión y las demás filas; revalidar permite corregir la validación sin gastar tokens |
 | 2026-10-29 | Hook `no-commit-to-branch` para `main` | Protección local mientras el repositorio privado no tenga GitHub Pro |
+| 2026-10-29 | Repositorio público y ruleset «Proteger-main» | La protección de ramas en un repositorio privado exige GitHub Pro; el corpus y el código son públicos. Se revisó el historial antes de publicar: sin claves ni secretos |
 
 ## 12. Configuración local (no trackear)
 
@@ -635,10 +636,8 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 - [ ] Transcripciones de YouTube de todo el canal (hoy, las más recientes).
 - [x] Chunking por encabezados (`chunks_web.jsonl` versionado).
 - [ ] Embeddings y base vectorial para el Módulo 2 (propuesta en `docs/MODELADO.md`).
-- [ ] Configurar protección de `main` (PR + CI verde). Mientras tanto, el hook
-  local `no-commit-to-branch` impide hacer commits directos sobre `main`.
-  **Bloqueado**: GitHub
-  exige plan Pro (o repo público) para proteger ramas en repos privados; la API
-  devuelve 403. Se retoma cuando el grupo decida publicar el repo o subir de plan.
-  Opción sin costo: GitHub Pro del Student Developer Pack con el correo
-  @uao.edu.co de la cuenta dueña del repositorio.
+- [x] Protección de `main` (2026-10-29): repositorio público y ruleset
+  «Proteger-main» activo, sin excepciones: PR con 1 aprobación (de alguien
+  distinto a quien hizo el último push), comentarios resueltos, CI
+  `lint + test (Python 3.13)` en verde, sin borrado ni force-push. El hook local
+  `no-commit-to-branch` queda como segunda barrera.
