@@ -1,12 +1,19 @@
-"""App Streamlit del asistente: capa delgada sobre ``banco_occidente_corpus.asistente``.
+"""App Streamlit del corpus y del asistente.
 
-La app no contiene reglas de negocio: solo pinta, cachea y delega. El modelo se
-invoca unicamente al pulsar un boton; ``st.cache_resource`` guarda el contexto y
-un modelo por tarea, y ``st.cache_data`` guarda las respuestas por pregunta y
-version. Los resultados con errores de contrato no se guardan, y una pregunta
-con datos personales se responde sin llamar al modelo y sin entrar en la cache.
+Capa delgada sobre ``banco_occidente_corpus``: la app solo pinta, cachea y
+delega. La pestana «Scraping» (primera) muestra el pipeline y su captura en
+vivo desde ``panel`` y ``live_capture``; las pestanas del asistente usan
+``banco_occidente_corpus.asistente``.
 
-Se ejecuta con ``make app`` (``uv run streamlit run app/streamlit_app.py``).
+El modelo se invoca unicamente al pulsar un boton; ``st.cache_resource`` guarda
+el contexto y un modelo por tarea, y ``st.cache_data`` guarda las respuestas por
+pregunta y version. Los resultados con errores de contrato no se guardan, y una
+pregunta con datos personales se responde sin llamar al modelo y sin entrar en
+la cache. Las pestanas del asistente necesitan contexto y clave; la de scraping
+funciona sin ninguna de las dos.
+
+Se ejecuta con ``make app`` (``uv run streamlit run app/streamlit_app.py``) o
+con ``uv run streamlit run app.py``.
 """
 
 from __future__ import annotations
@@ -16,6 +23,7 @@ from typing import Any
 
 import streamlit as st
 from langchain_core.language_models import BaseChatModel
+from scraping_ui import render_tab_scraping
 
 from banco_occidente_corpus.asistente.contexto_prompt import (
     ContextoAusente,
@@ -298,16 +306,17 @@ def _mostrar_resumen(resultado: ResultadoResumen, desde_cache: bool, modelo: str
 # --------------------------------------------------------------------- arranque
 
 
-st.set_page_config(page_title="Asistente del corpus - Banco de Occidente", layout="wide")
+st.set_page_config(page_title="Corpus Banco de Occidente", layout="wide")
 
-st.title("Asistente del Banco de Occidente")
+st.title("Corpus y asistente del Banco de Occidente")
 st.info(AVISO)
 
+contexto: ContextoPrompt | None = None
+aviso_contexto = ""
 try:
     contexto = _contexto()
 except ContextoAusente as exc:
-    st.error(str(exc))
-    st.stop()
+    aviso_contexto = str(exc)
 
 tokens = 0
 try:
@@ -330,8 +339,11 @@ try:
     api_key_desde_entorno()
 except FaltaApiKey as exc:
     hay_clave = False
-    st.error("Falta la clave de la API del modelo: los botones quedan deshabilitados.")
-    st.code(str(exc))
+    st.sidebar.error(
+        "Falta la clave de la API del modelo: los botones del asistente quedan deshabilitados."
+    )
+    st.sidebar.code(str(exc))
+    st.sidebar.caption("La pestaña Scraping no necesita clave ni contexto.")
 
 with st.sidebar:
     st.subheader("Configuración")
@@ -353,83 +365,98 @@ with st.sidebar:
     st.caption(f"Contexto versionado el {_formatear_fecha(fecha)}")
     st.caption(f"Páginas incluidas: {metadatos.paginas_incluidas:,}")
 
-tab_preguntas, tab_faq, tab_resumen = st.tabs(["Preguntas", "Preguntas frecuentes", "Resumen"])
+tab_scraping, tab_preguntas, tab_faq, tab_resumen = st.tabs(
+    ["Scraping", "Preguntas", "Preguntas frecuentes", "Resumen"]
+)
+
+with tab_scraping:
+    render_tab_scraping()
 
 with tab_preguntas:
-    st.markdown("Pregunta por productos, requisitos, tasas o canales de atención.")
-    pregunta = st.text_area(
-        "Tu pregunta",
-        value="",
-        height=100,
-        placeholder="¿Qué necesito para abrir una cuenta de ahorros?",
-    )
-    if st.button(
-        "Preguntar",
-        type="primary",
-        disabled=not hay_clave or not pregunta.strip(),
-    ):
-        deteccion = detectar_pii_pregunta(pregunta, contexto=contexto)
-        if deteccion is not None:
-            st.session_state[_CLAVE_PREGUNTA] = (respuesta_pii(contexto, deteccion), False)
-        else:
-            with st.spinner("Consultando al modelo..."):
-                resultado_qa, marca_qa = _pregunta(
-                    nombre_modelo,
-                    version_qa,
-                    tokens,
-                    versionada,
-                    pregunta,
+    if contexto is None:
+        st.error(aviso_contexto)
+    else:
+        st.markdown("Pregunta por productos, requisitos, tasas o canales de atención.")
+        pregunta = st.text_area(
+            "Tu pregunta",
+            value="",
+            height=100,
+            placeholder="¿Qué necesito para abrir una cuenta de ahorros?",
+        )
+        if st.button(
+            "Preguntar",
+            type="primary",
+            disabled=not hay_clave or not pregunta.strip(),
+        ):
+            deteccion = detectar_pii_pregunta(pregunta, contexto=contexto)
+            if deteccion is not None:
+                st.session_state[_CLAVE_PREGUNTA] = (respuesta_pii(contexto, deteccion), False)
+            else:
+                with st.spinner("Consultando al modelo..."):
+                    resultado_qa, marca_qa = _pregunta(
+                        nombre_modelo,
+                        version_qa,
+                        tokens,
+                        versionada,
+                        pregunta,
+                    )
+                st.session_state[_CLAVE_PREGUNTA] = (
+                    resultado_qa,
+                    not _recien_calculada(marca_qa),
                 )
-            st.session_state[_CLAVE_PREGUNTA] = (
-                resultado_qa,
-                not _recien_calculada(marca_qa),
-            )
 
-    if _CLAVE_PREGUNTA in st.session_state:
-        guardado_qa, desde_cache_qa = st.session_state[_CLAVE_PREGUNTA]
-        _mostrar_pregunta(guardado_qa, desde_cache_qa, nombre_modelo)
+        if _CLAVE_PREGUNTA in st.session_state:
+            guardado_qa, desde_cache_qa = st.session_state[_CLAVE_PREGUNTA]
+            _mostrar_pregunta(guardado_qa, desde_cache_qa, nombre_modelo)
 
 with tab_faq:
-    st.markdown("Genera diez preguntas frecuentes de un cliente nuevo, cada una con su fuente.")
-    if st.button("Generar", key="boton_faq", disabled=not hay_clave):
-        with st.spinner("Generando las diez preguntas frecuentes..."):
-            try:
-                resultado_faq, marca_faq = _faq(nombre_modelo, tokens, versionada)
-            except _SinCachear as exc:
-                resultado_faq, marca_faq = exc.resultado, exc.marca
-        st.session_state[_CLAVE_FAQ] = (
-            resultado_faq,
-            not _recien_calculada(marca_faq),
-        )
+    if contexto is None:
+        st.error(aviso_contexto)
+    else:
+        st.markdown("Genera diez preguntas frecuentes de un cliente nuevo, cada una con su fuente.")
+        if st.button("Generar", key="boton_faq", disabled=not hay_clave):
+            with st.spinner("Generando las diez preguntas frecuentes..."):
+                try:
+                    resultado_faq, marca_faq = _faq(nombre_modelo, tokens, versionada)
+                except _SinCachear as exc:
+                    resultado_faq, marca_faq = exc.resultado, exc.marca
+            st.session_state[_CLAVE_FAQ] = (
+                resultado_faq,
+                not _recien_calculada(marca_faq),
+            )
 
-    if _CLAVE_FAQ in st.session_state:
-        guardado_faq, desde_cache_faq = st.session_state[_CLAVE_FAQ]
-        _mostrar_faq(guardado_faq, desde_cache_faq, nombre_modelo)
+        if _CLAVE_FAQ in st.session_state:
+            guardado_faq, desde_cache_faq = st.session_state[_CLAVE_FAQ]
+            _mostrar_faq(guardado_faq, desde_cache_faq, nombre_modelo)
 
 with tab_resumen:
-    st.markdown("Genera un resumen ejecutivo del corpus público, con sus fuentes.")
-    if st.button("Generar", key="boton_resumen", disabled=not hay_clave):
-        with st.spinner("Generando el resumen ejecutivo..."):
-            try:
-                resultado_resumen, marca_resumen = _resumen(
-                    nombre_modelo,
-                    "",
-                    tokens,
-                    versionada,
-                )
-            except _SinCachear as exc:
-                resultado_resumen, marca_resumen = exc.resultado, exc.marca
-        st.session_state[_CLAVE_RESUMEN] = (
-            resultado_resumen,
-            not _recien_calculada(marca_resumen),
-        )
+    if contexto is None:
+        st.error(aviso_contexto)
+    else:
+        st.markdown("Genera un resumen ejecutivo del corpus público, con sus fuentes.")
+        if st.button("Generar", key="boton_resumen", disabled=not hay_clave):
+            with st.spinner("Generando el resumen ejecutivo..."):
+                try:
+                    resultado_resumen, marca_resumen = _resumen(
+                        nombre_modelo,
+                        "",
+                        tokens,
+                        versionada,
+                    )
+                except _SinCachear as exc:
+                    resultado_resumen, marca_resumen = exc.resultado, exc.marca
+            st.session_state[_CLAVE_RESUMEN] = (
+                resultado_resumen,
+                not _recien_calculada(marca_resumen),
+            )
 
-    if _CLAVE_RESUMEN in st.session_state:
-        guardado_resumen, desde_cache_resumen = st.session_state[_CLAVE_RESUMEN]
-        _mostrar_resumen(guardado_resumen, desde_cache_resumen, nombre_modelo)
+        if _CLAVE_RESUMEN in st.session_state:
+            guardado_resumen, desde_cache_resumen = st.session_state[_CLAVE_RESUMEN]
+            _mostrar_resumen(guardado_resumen, desde_cache_resumen, nombre_modelo)
 
 st.divider()
 st.caption(
-    "Cada clic en un botón hace una llamada al modelo; las respuestas repetidas de la "
-    "sesión se sirven desde la caché de la app."
+    "Cada clic en un botón del asistente hace una llamada al modelo; las respuestas repetidas "
+    "de la sesión se sirven desde la caché de la app. La captura en vivo escribe solo en una "
+    "carpeta temporal."
 )

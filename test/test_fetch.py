@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import argparse
 import json
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from pathlib import Path
 
 import httpx
@@ -84,6 +84,7 @@ class ClienteFalso:
         """Guarda las respuestas por URL; lo que no este responde 404."""
         self.respuestas = respuestas
         self.pedidas: list[str] = []
+        self.cerrado = False
         self.delay = 1.5
 
     def get(self, url: str, *, accept: str | None = None) -> Response:
@@ -102,7 +103,8 @@ class ClienteFalso:
             return None
 
     def close(self) -> None:
-        """No hay nada que cerrar."""
+        """Anota el cierre: las pruebas comprueban quien es el dueno del cliente."""
+        self.cerrado = True
 
     def __enter__(self) -> ClienteFalso:
         """Soporta ``with``."""
@@ -215,6 +217,37 @@ def test_fetch_all_se_detiene_ante_un_bloqueo(
 
     assert stats.failed == 1
     assert cliente.pedidas == [f"{BASE}/a"]
+
+
+def test_fetch_all_no_cierra_un_cliente_inyectado(tmp_path: Path) -> None:
+    """La app comparte un unico cliente con robots.txt: fetch_all no lo cierra."""
+    # Arrange
+    config = _config(tmp_path)
+    cliente = ClienteFalso({f"{BASE}/a": _ok(f"{BASE}/a", "<html>A</html>")})
+
+    # Act
+    stats = fetch.fetch_all(config, [f"{BASE}/a"], client=cliente)  # type: ignore[arg-type]
+
+    # Assert
+    assert stats.ok == 1
+    assert cliente.pedidas == [f"{BASE}/a"]
+    assert cliente.cerrado is False
+
+
+def test_fetch_all_cierra_el_cliente_que_crea(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """El cliente propio (creado aqui) si se cierra al terminar la captura."""
+    # Arrange
+    config = _config(tmp_path)
+    cliente = ClienteFalso({f"{BASE}/a": _ok(f"{BASE}/a", "<html>A</html>")})
+    _usar_cliente(monkeypatch, fetch, cliente)
+
+    # Act
+    fetch.fetch_all(config, [f"{BASE}/a"])
+
+    # Assert
+    assert cliente.cerrado is True
 
 
 def test_iter_bronze_devuelve_solo_capturas_ok(
@@ -332,6 +365,7 @@ def test_wait_cuenta_un_error_de_red_como_peticion(
     config.crawl.max_retries = 1
 
     def falla(*args: object, **kwargs: object) -> httpx.Response:
+        """Doble de ``client.get`` que siempre falla como un corte de red."""
         raise httpx.ConnectError("sin red")
 
     with HttpClient(config) as cliente:
@@ -350,8 +384,11 @@ def test_cmd_all_se_detiene_si_falla_un_paso(
     """Issue #30: cmd_all ya no ignora el codigo de salida de extract y gold."""
     llamados: list[str] = []
 
-    def paso(nombre: str, codigo: int):  # noqa: ANN202 - fabrica de dobles
+    def paso(nombre: str, codigo: int) -> Callable[[Config, argparse.Namespace], int]:
+        """Fabrica un doble de ``cmd_*`` que registra la llamada y devuelve el codigo."""
+
         def ejecutar(config: Config, args: argparse.Namespace) -> int:
+            """Doble de un paso del pipeline: anota su nombre y su codigo de salida."""
             llamados.append(nombre)
             return codigo
 

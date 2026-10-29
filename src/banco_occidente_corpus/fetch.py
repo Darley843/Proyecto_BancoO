@@ -76,18 +76,24 @@ def fetch_all(
     *,
     force: bool = False,
     delay: float | None = None,
+    client: HttpClient | None = None,
 ) -> FetchStats:
     """Recorre las URLs y llena data/raw. Reanudable: no repite lo ya bajado.
 
     Cada captura se anexa a ``capture.jsonl`` en el momento: si el proceso se
     interrumpe, lo ya descargado queda registrado y la siguiente ejecucion
     continua donde quedo.
+
+    ``client`` permite reutilizar un ``HttpClient`` ya abierto (la app lo
+    comparte con la consulta de robots.txt para que ambas peticiones respeten
+    la misma pausa de cortesia). Si se inyecta, no se cierra aqui: lo cierra
+    quien lo creo.
     """
     stats = FetchStats()
     cached = load_capture(config)
     config.paths.capture_file.parent.mkdir(parents=True, exist_ok=True)
 
-    client = HttpClient(config, delay=delay)
+    http = client if client is not None else HttpClient(config, delay=delay)
 
     try:
         with config.paths.capture_file.open("a", encoding="utf-8", newline="\n") as log_file:
@@ -104,7 +110,7 @@ def fetch_all(
                     continue
 
                 try:
-                    response = client.get(url)
+                    response = http.get(url)
                 except BlockedError as exc:
                     log.error("%s", exc)
                     stats.failed += 1
@@ -169,7 +175,8 @@ def fetch_all(
                     response.elapsed,
                 )
     finally:
-        client.close()
+        if client is None:
+            http.close()
 
     return stats
 
