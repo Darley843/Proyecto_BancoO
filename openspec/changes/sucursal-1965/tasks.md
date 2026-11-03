@@ -25,10 +25,10 @@
 
 ## 5. PR 3 — Fragmentos (Nayla — pendiente)
 
-- [ ] 5.1 Crear `boveda/__init__.py` y `boveda/tipos.py` con la dataclass `Fragmento` y el `Protocol` `Recuperador` de la sección Contratos, con docstrings en español; verificar con una prueba que un fragmento acepta los nueve campos y que un recuperador simulado cumple la firma `buscar(consulta, k=5)`.
-- [ ] 5.2 Implementar `boveda/fragmentos.py`: lectura de `chunks_web.jsonl` y `chunks.jsonl`, fusión de chunks consecutivos de la misma página mientras el acumulado tenga menos de 80 tokens (salvo el último), partición de los de más de 400 tokens por párrafos sin romper tablas, descarte de ruido con `dedupe.is_noise` y `dedupe.normalize_line`, e id estable `frag:<sha256>`. Verificar con fixtures en `tmp_path` que el fragmento fusionado llega a 80 tokens, que el último corto se conserva y que dos ejecuciones dan los mismos ids.
-- [ ] 5.3 Añadir los hechos de `data/knowledge/facts.jsonl` como tipo `hecho verificado`, con `url`, `seccion` y `encabezado` de la evidencia, omitiendo hechos sin URL o con PII; verificar con fixtures los casos indexado, sin evidencia y con dato personal, y que el conteo de omitidos se reporta.
-- [ ] 5.4 Verificar que `boveda/fragmentos.py` no hace red ni escribe en Gold, Knowledge ni `data/boveda/`; ejecutar `uv run pytest test/test_boveda_fragmentos.py` y `make check`.
+- [x] 5.1 Crear `boveda/__init__.py` y `boveda/tipos.py` con la dataclass `Fragmento` y el `Protocol` `Recuperador` de la sección Contratos, con docstrings en español; verificar con una prueba que un fragmento acepta los nueve campos y que un recuperador simulado cumple la firma `buscar(consulta, k=5)`.
+- [x] 5.2 Implementar `boveda/fragmentos.py`: lectura de `chunks_web.jsonl` y `chunks.jsonl`, fusión de chunks consecutivos de la misma página mientras el acumulado tenga menos de 80 tokens (salvo el último), partición de los de más de 400 tokens por párrafos sin romper tablas, descarte de ruido con `dedupe.is_noise` y `dedupe.normalize_line`, e id estable `frag:<sha256>`. Verificar con fixtures en `tmp_path` que el fragmento fusionado llega a 80 tokens, que el último corto se conserva y que dos ejecuciones dan los mismos ids.
+- [x] 5.3 Añadir los hechos de `data/knowledge/facts.jsonl` como tipo `hecho verificado`, con `url`, `seccion` y `encabezado` de la evidencia, omitiendo hechos sin URL o con PII; verificar con fixtures los casos indexado, sin evidencia y con dato personal, y que el conteo de omitidos se reporta.
+- [x] 5.4 Verificar que `boveda/fragmentos.py` no hace red ni escribe en Gold, Knowledge ni `data/boveda/`; ejecutar `uv run pytest test/test_boveda_fragmentos.py` y `make check`.
 
 ## 6. PR 4 — Índice (Nayla — pendiente)
 
