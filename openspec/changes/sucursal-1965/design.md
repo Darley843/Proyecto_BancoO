@@ -49,7 +49,7 @@ Alternativa descartada: empezar por el frontend y la API con datos falsos. Habr�
 
 1. Agrupa por `page_id` y respeta el orden de aparición.
 2. Fusiona chunks consecutivos de la misma página mientras el fragmento acumulado tenga menos de 80 tokens, de modo que el resultado tenga al menos 80 tokens (salvo el último de la página); el encabezado resultante es el del primero y el texto se une con un salto de línea.
-3. Si un chunk supera 400 tokens, lo parte por párrafos (líneas en blanco) y nunca corta un bloque de tabla Markdown: las líneas que empiezan por `|` y su separador se tratan como una unidad atómica.
+3. Ningún fragmento supera 400 tokens. Un bloque que no es tabla y supera 400 se parte por líneas; una línea que supera 400 se parte por oraciones (punto seguido de espacio) y, como último recurso, en ventanas de 400 tokens. Una tabla Markdown que supera 400 se parte por filas repitiendo en cada parte la fila de encabezado y el separador; las líneas que empiezan por `|` se conservan como unidad mientras quepan en el límite. El resumen distingue las tablas enteras de las tablas partidas por filas.
 4. Descarta líneas de ruido con `dedupe.is_noise` y `dedupe.normalize_line`; no reimplementa la detección.
 5. El id es `frag:<sha256(page_id|encabezado|texto)[:12]>`, igual que el patrón de `knowledge.split_page`, para que dos corridas produzcan el mismo id.
 6. `tipo` se deriva de la carpeta de origen: `pagina` para `pages/`, `pdf` para `documents/`, `video` para `videos/`.

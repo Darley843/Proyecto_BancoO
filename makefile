@@ -17,6 +17,7 @@ CORPUS ?= $(UV) run corpus
 TASKS ?= $(UV) run python scripts/tasks.py
 LIMIT ?=
 DELAY ?=
+ALCANCE ?= base
 MSG ?= corpus: actualiza el pipeline
 REPO ?= Proyecto_BancoO
 OWNER ?= Darley843
@@ -87,6 +88,10 @@ chunks: ## Segmenta Gold en chunks por encabezado (capa Knowledge)
 .PHONY: knowledge
 knowledge: chunks ## Valida entidades/hechos/relaciones y escribe el indice
 	$(CORPUS) knowledge
+
+.PHONY: fragmentos
+fragmentos: ## Construye los fragmentos de la Boveda desde chunks y hechos (sin red)
+	$(UV) run python -m banco_occidente_corpus.boveda fragmentos --alcance $(ALCANCE)
 
 .PHONY: docs
 docs: ## Inventaria, descarga y extrae PDFs (balances, informes, gobierno)
