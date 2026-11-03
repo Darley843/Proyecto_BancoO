@@ -91,7 +91,13 @@ descarga masiva de PDF, transcripción de vídeo.
 | **Herramienta del agente** | `scrapling` (entorno `uvx` propio) — navegación ad hoc vía MCP, **fuera del pipeline** |
 | **LLM del asistente** | `langchain-deepseek` (`ChatDeepSeek`) + `langchain-core`; `pydantic` para la salida estructurada |
 | **Modelo** | `deepseek-flash` (DeepSeek-V4.1-Flash), `DEEPSEEK_API_KEY` solo desde el entorno; `.env` prohibido |
-| **App del asistente** | `streamlit` — capa delgada en `app/streamlit_app.py`; la lógica vive en `asistente/` |
+| **Embeddings** | `langchain-ollama` contra Ollama local (`nomic-embed-text-v2-moe`); sin clave, sin costo y sin salida a internet |
+| **Índice vectorial** | `langchain-chroma` (Chroma persistente en `data/boveda/`, métrica coseno) |
+| **Recuperación híbrida** | `langchain-classic` (`EnsembleRetriever`) + `langchain-community` (`BM25Retriever`) + `rank-bm25` |
+| **Agente** | `langgraph` + `langgraph-checkpoint-sqlite` (memoria por `thread_id` en `data/asistente/`) |
+| **API** | `fastapi` + `uvicorn[standard]`, solo en `127.0.0.1:8000` |
+| **Mapa del corpus** | `scikit-learn` (`PCA(n_components=2)`, solo exploratorio) |
+| **App del asistente** | `streamlit` — capa delgada en `app/streamlit_app.py`; la lógica vive en `asistente/`. Se retira al final de la fase 2 y la reemplaza la app web de `app/web/` |
 | **Testing** | `pytest` (patrón AAA) |
 | **Lint / formato** | `ruff` (línea 100, comillas dobles) |
 | **Tipado** | `ty` (target `make typecheck`) |
@@ -108,6 +114,12 @@ descarga masiva de PDF, transcripción de vídeo.
 > LangChain con `timeout` y reintentos acotados: no son scraping del sitio del
 > banco, no pasan por `net.py` ni les aplican `robots.txt`/1,5 s. La clave se
 > lee solo de `DEEPSEEK_API_KEY`; el proyecto no lee `.env`.
+
+> **Embeddings:** corren locales en Ollama y se configuran con `base_url`
+> explícito (por defecto `http://127.0.0.1:11434`), no con el `OLLAMA_HOST` del
+> servidor: ese valor es la dirección de *bind* del daemon y puede ser
+> `0.0.0.0`. El plano de embeddings no usa clave y no aparece en el consumo de
+> DeepSeek; solo el chat se factura.
 
 > **App del asistente:** `app/streamlit_app.py` es una **capa delgada**. Solo
 > pinta, cachea y delega en `asistente/servicio.py`, `asistente/manifest.py` y
@@ -605,6 +617,7 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 | 2026-10-29 | Revisión humana en `config/evaluacion/revision_humana.toml`, `--solo` fusiona con la corrida anterior y `--revalidar` reprocesa sin API | Volver a correr la evaluación borraba la revisión y las demás filas; revalidar permite corregir la validación sin gastar tokens |
 | 2026-10-29 | Hook `no-commit-to-branch` para `main` | Protección local mientras el repositorio privado no tenga GitHub Pro |
 | 2026-10-29 | Repositorio público y ruleset «Proteger-main» | La protección de ramas en un repositorio privado exige GitHub Pro; el corpus y el código son públicos. Se revisó el historial antes de publicar: sin claves ni secretos |
+| 2026-11-03 | Fase 2: dependencias de Bóveda, Sucursal y Arqueo en un solo PR (`uv add`): `langgraph`, `langgraph-checkpoint-sqlite`, `langchain-chroma`, `langchain-classic`, `langchain-community`, `langchain-ollama`, `rank-bm25`, `fastapi`, `uvicorn[standard]` y `scikit-learn` | La Bóveda necesita Ollama/Chroma/BM25, la Sucursal LangGraph/FastAPI y el Arqueo PCA. Concentrarlas evita conflictos de `uv.lock` entre cuatro ramas; el resto de PR se rebasa sobre `main`. `sqlalchemy` no se añade directo: entra como dependencia de `langchain-community`. Embeddings locales: solo DeepSeek se paga (`langchain-community` está en sunset, se acepta por `BM25Retriever` y se revisará si se retira) |
 
 ## 12. Configuración local (no trackear)
 
