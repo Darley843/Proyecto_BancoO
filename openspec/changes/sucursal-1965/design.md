@@ -235,18 +235,20 @@ from typing import Literal, Protocol
 
 TipoFragmento = Literal["pagina", "pdf", "video", "hecho verificado"]
 
+
 @dataclass(frozen=True, slots=True)
 class Fragmento:
     """Unidad recuperable del corpus, con su fuente y su similitud."""
-    id: str                 # "frag:<12 hex>"
+
+    id: str  # "frag:<12 hex>"
     texto: str
     url: str
     titulo: str
-    seccion: str            # identidad | oferta | presencia | datos | atencion | legal | otros
+    seccion: str  # identidad | oferta | presencia | datos | atencion | legal | otros
     encabezado: str
     tipo: TipoFragmento
-    tokens: int             # utils.stable_tokens
-    puntaje: float = 0.0    # 0..1 = 1 - distancia coseno
+    tokens: int  # utils.stable_tokens
+    puntaje: float = 0.0  # 0..1 = 1 - distancia coseno
 ```
 
 ### Recuperador
@@ -270,19 +272,21 @@ El recuperador simulado de las pruebas y el híbrido real implementan esta firma
 from dataclasses import dataclass
 from typing import Literal
 
+
 @dataclass(frozen=True, slots=True)
 class Fila:
     """Una fila del tablero de tarifas, proveniente del PDF o de una tabla web."""
+
     concepto: str
     categoria: str
-    valor: str          # texto sin símbolo: "16.700", "2.000", "20"
-    moneda: str         # "COP" | "USD" | "EUR" | "%" | ""
-    recargos: str       # "+ IVA", "+ Seguro", ""
-    periodicidad: str   # "mensual" | "trimestral" | "anual" | "diaria" | "unica" | ""
+    valor: str  # texto sin símbolo: "16.700", "2.000", "20"
+    moneda: str  # "COP" | "USD" | "EUR" | "%" | ""
+    recargos: str  # "+ IVA", "+ Seguro", ""
+    periodicidad: str  # "mensual" | "trimestral" | "anual" | "diaria" | "unica" | ""
     vigente_desde: str  # ISO "AAAA-MM-DD" o ""
     origen: Literal["tarifario", "tabla_web"]
-    pagina: str         # ruta relativa del Gold de origen
-    fuente: str         # URL pública exacta
+    pagina: str  # ruta relativa del Gold de origen
+    fuente: str  # URL pública exacta
 ```
 
 El CSV usa exactamente esas diez columnas en ese orden: `concepto, categoria, valor, moneda, recargos, periodicidad, vigente_desde, origen, pagina, fuente`.
@@ -294,14 +298,16 @@ El CSV usa exactamente esas diez columnas en ese orden: `concepto, categoria, va
 from dataclasses import dataclass
 from typing import Literal
 
+
 @dataclass(frozen=True, slots=True)
 class Turno:
     """Decisión del digiturno para una pregunta."""
-    letra: Literal["B", "T", "X"]   # las mismas de ruta_esperada
-    numero: int                     # consecutivo visible en la Ventanilla
+
+    letra: Literal["B", "T", "X"]  # las mismas de ruta_esperada
+    numero: int  # consecutivo visible en la Ventanilla
     ruta: Literal["boveda", "tablero", "rechazo"]
-    motivo: str                     # texto corto y auditable
-    uso_modelo: bool                # True si el digiturno llamó a DeepSeek
+    motivo: str  # texto corto y auditable
+    uso_modelo: bool  # True si el digiturno llamó a DeepSeek
 ```
 
 Mapeo a JSON de `/api/preguntar`: `turno` es la letra (`"B"`, `"T"` o `"X"`), `ruta` es la ruta descriptiva, y se añaden `turno_numero` y `uso_modelo` para completar el contrato de la dataclass. El frontend muestra `turno` y `turno_numero` como el ticket.
