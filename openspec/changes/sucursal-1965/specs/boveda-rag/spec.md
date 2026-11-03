@@ -8,7 +8,7 @@ Preparar fragmentos verificables del corpus, indexarlos con embeddings locales y
 
 ### Requirement: Fragmentos desde los chunks de Gold
 
-La Bóveda SHALL construir fragmentos desde los chunks de `make chunks`: fusiona chunks consecutivos de la misma página mientras el acumulado tenga menos de 80 tokens, de modo que el resultado tenga al menos 80 tokens salvo el último de la página, parte los de más de 400 tokens por párrafos sin partir tablas Markdown y descarta el ruido de navegación con las reglas de `dedupe.py`. Cada fragmento MUST conservar id estable, texto, URL, título, sección, encabezado, tipo y tokens.
+La Bóveda SHALL construir fragmentos desde los chunks de `make chunks`: fusiona chunks consecutivos de la misma página mientras el acumulado tenga menos de 80 tokens, de modo que el resultado tenga al menos 80 tokens salvo el último de la página, y descarta el ruido de navegación con las reglas de `dedupe.py`. Cada fragmento MUST conservar id estable, texto, URL, título, sección, encabezado, tipo y tokens.
 
 #### Scenario: Fragmentos cortos de la misma página
 
@@ -20,11 +20,6 @@ La Bóveda SHALL construir fragmentos desde los chunks de `make chunks`: fusiona
 - **WHEN** el último chunk de una página queda por debajo de 80 tokens y no hay otro que lo siga
 - **THEN** se conserva como fragmento final aunque no llegue a 80 tokens
 
-#### Scenario: Fragmento largo con tabla
-
-- **WHEN** un chunk supera 400 tokens e incluye una tabla Markdown
-- **THEN** se parte por párrafos y la tabla queda íntegra en un único fragmento
-
 #### Scenario: Ruido de navegación
 
 - **WHEN** un chunk contiene líneas de menú, migas de pan o enlaces sueltos
@@ -34,6 +29,34 @@ La Bóveda SHALL construir fragmentos desde los chunks de `make chunks`: fusiona
 
 - **WHEN** se reconstruye el índice dos veces con el mismo Gold
 - **THEN** cada fragmento conserva el mismo id
+
+### Requirement: Límite de 400 tokens
+
+Ningún fragmento MUST superar 400 tokens. Un bloque que no es tabla se parte por líneas; una línea que lo supera se parte por oraciones (punto seguido de espacio) y, como último recurso, en ventanas de 400 tokens.
+
+#### Scenario: Bloque no tabla largo
+
+- **WHEN** un bloque que no es tabla supera 400 tokens
+- **THEN** se parte por líneas, luego por oraciones y como último recurso en ventanas de 400 tokens
+
+#### Scenario: Ningún fragmento supera el límite
+
+- **WHEN** se construyen los fragmentos
+- **THEN** ninguno supera 400 tokens y el resumen reporta cero fragmentos por encima del límite
+
+### Requirement: Tablas largas partidas por filas
+
+Una tabla Markdown que supera 400 tokens SHALL partirse por filas repitiendo en cada parte la fila de encabezado y el separador. El reporte SHALL distinguir las tablas enteras de las tablas partidas por filas y contar en cuántas partes quedó cada tabla partida.
+
+#### Scenario: Tabla larga partida por filas
+
+- **WHEN** una tabla Markdown supera 400 tokens
+- **THEN** se parte por filas y cada parte repite la fila de encabezado y el separador
+
+#### Scenario: Reporte de tablas
+
+- **WHEN** el resumen reporta las tablas del corpus
+- **THEN** separa las tablas enteras de las tablas partidas por filas y cuenta en cuántas partes quedó cada tabla partida
 
 ### Requirement: Hechos verificados como fragmentos
 
