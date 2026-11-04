@@ -40,10 +40,10 @@
 
 ## 7. PR 5 — Recuperador (Nayla — pendiente)
 
-- [ ] 7.1 Implementar `boveda/recuperador.py` con `EnsembleRetriever` de `langchain_classic`, `BM25Retriever` en memoria y pesos leídos de `config/sucursal.toml`; verificar con `DeterministicFakeEmbedding` que dos configuraciones de pesos producen órdenes diferentes sobre un corpus de prueba.
-- [ ] 7.2 Recalcular el `puntaje` de cada candidato como `1 - distancia coseno`, también para los que solo devuelve BM25; verificar con una prueba que todos los puntajes están entre 0 y 1, que el orden respeta los pesos y que `buscar` sin `k` devuelve como máximo cinco.
-- [ ] 7.3 Añadir la sección `[recuperacion]` de `config/sucursal.toml` (`k`, `peso_vectorial`, `peso_bm25`; los prefijos ya viven en `[embeddings]`) con validación de tipos y valores; verificar con pruebas de configuración inválida y con una prueba de contrato de que el recuperador real y el simulado satisfacen `Recuperador`.
-- [ ] 7.4 Documentar en `docs/MODELADO.md` el híbrido, el significado único de `puntaje` y cómo se eligen los pesos; verificar que el texto no promete normalizar BM25 y que el Arqueo puede variar los pesos desde configuración.
+- [x] 7.1 Implementar `boveda/recuperador.py` con `EnsembleRetriever` de `langchain_classic`, `BM25Retriever` en memoria y pesos leídos de `config/sucursal.toml`; verificar con `DeterministicFakeEmbedding` que dos configuraciones de pesos producen órdenes diferentes sobre un corpus de prueba.
+- [x] 7.2 Recalcular el `puntaje` de cada candidato como `1 - distancia coseno`, también para los que solo devuelve BM25; verificar con una prueba que todos los puntajes están entre 0 y 1, que el orden respeta los pesos y que `buscar` sin `k` devuelve como máximo cinco.
+- [x] 7.3 Añadir la sección `[recuperacion]` de `config/sucursal.toml` (`k`, `peso_vectorial`, `peso_bm25`; los prefijos ya viven en `[embeddings]`) con validación de tipos y valores; verificar con pruebas de configuración inválida y con una prueba de contrato de que el recuperador real y el simulado satisfacen `Recuperador`.
+- [x] 7.4 Documentar en `docs/MODELADO.md` el híbrido, el significado único de `puntaje` y cómo se eligen los pesos; verificar que el texto no promete normalizar BM25 y que el Arqueo puede variar los pesos desde configuración.
 
 ## 8. PR 6 — Prompt v2 y RAG (Anny — pendiente)
 

@@ -69,6 +69,8 @@ Fuente: `data/gold/_INDICE.md`, `corpus.jsonl` y `data/contexto/manifest.json`.
 - Python 3.13 (uv lo instala si falta) y [uv](https://docs.astral.sh/uv/)
 - GNU Make 4.x para los atajos (el CLI funciona sin `make`)
 - `DEEPSEEK_API_KEY` solo para la app y la evaluación
+- [Ollama](https://ollama.com/) con `nomic-embed-text-v2-moe` para la Bóveda
+  (`ollama pull nomic-embed-text-v2-moe`); no necesita clave ni genera costo
 
 El sitio está detrás de CloudFront y puede responder `403` a tráfico de VPN o
 datacenter. Es una limitación documentada (`CONSTITUTION.md` §10): el pipeline se
@@ -125,6 +127,29 @@ make evaluar                             # 20 preguntas (requiere DEEPSEEK_API_K
 ```
 
 `make help` lista todos los atajos (`init`, `doctor`, `demo`, `health`, `deliver`, `clean`).
+
+### Bóveda: fragmentos, índice y recuperación
+
+La fase 2 deja de enviar el corpus completo al modelo: construye fragmentos,
+los vectoriza con Ollama y recupera por similitud y por términos.
+
+```bash
+ollama pull nomic-embed-text-v2-moe     # una sola vez
+make fragmentos                          # data/boveda/fragmentos_base.jsonl (sin red)
+make indice                              # indexa web + PDF de producto + hechos
+make indice-completo                     # añade el resto de PDF y los videos
+```
+
+| Pieza | Dónde | Qué hace |
+|---|---|---|
+| Fragmentos | `boveda/fragmentos.py` | Fusiona chunks hasta 80 tokens, limita a 400 y parte tablas largas por filas |
+| Embeddings | `boveda/embeddings.py` | `nomic-embed-text-v2-moe` con `base_url` explícito y prefijos de tarea |
+| Índice | `boveda/almacen.py` | Chroma persistente en `data/boveda/chroma`, distancia coseno |
+| Recuperación | `boveda/recuperador.py` | Híbrido vectorial + BM25 con pesos de `config/sucursal.toml` |
+
+El índice **no se versiona**: se regenera con `make indice`. La configuración
+vive en `config/sucursal.toml` (`[embeddings]` y `[recuperacion]`); los
+embeddings no usan `DEEPSEEK_API_KEY` ni aparecen en el consumo de DeepSeek.
 
 ### Scraper de demostración
 
@@ -187,9 +212,11 @@ Resultados vigentes y respuestas completas:
 │   ├── panel.py               # lectura de artefactos para la app (sin red)
 │   ├── live_capture.py        # captura en vivo en carpeta temporal
 │   ├── contexto.py · knowledge.py · documents.py · videos.py · news.py
-│   └── asistente/             # Q&A, FAQ, resumen y evaluación con DeepSeek
+│   ├── asistente/             # Q&A, FAQ, resumen y evaluación con DeepSeek
+│   └── boveda/               # fragmentos, embeddings, índice Chroma y recuperador
 ├── scripts/                   # demo_offline.py · scrape_empresa.py · tasks.py
 ├── config/ · data/ · docs/    # configuración, capas y documentación
+├── config/sucursal.toml       # embeddings y recuperación de la fase 2
 ├── test/                      # pytest con fixtures locales, sin red
 ├── makefile · pyproject.toml · uv.lock
 └── CONSTITUTION.md · AGENTS.md

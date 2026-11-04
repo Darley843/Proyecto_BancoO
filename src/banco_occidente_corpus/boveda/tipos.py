@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Literal, Protocol
+from typing import Literal, Protocol, runtime_checkable
 
 TipoFragmento = Literal["pagina", "pdf", "video", "hecho verificado"]
 
@@ -23,6 +23,7 @@ class Fragmento:
     puntaje: float = 0.0
 
 
+@runtime_checkable
 class Recuperador(Protocol):
     """Contrato de cualquier recuperador de la Bóveda."""
 
