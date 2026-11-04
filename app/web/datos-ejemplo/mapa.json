@@ -1,0 +1,443 @@
+{
+  "puntos": [
+    {
+      "x": 24.0,
+      "y": 75.0,
+      "seccion": "identidad",
+      "titulo": "Fragmento de ejemplo 1 (identidad)"
+    },
+    {
+      "x": 14.5,
+      "y": 80.1,
+      "seccion": "identidad",
+      "titulo": "Fragmento de ejemplo 2 (identidad)"
+    },
+    {
+      "x": 21.0,
+      "y": 64.0,
+      "seccion": "identidad",
+      "titulo": "Fragmento de ejemplo 3 (identidad)"
+    },
+    {
+      "x": 22.4,
+      "y": 78.2,
+      "seccion": "identidad",
+      "titulo": "Fragmento de ejemplo 4 (identidad)"
+    },
+    {
+      "x": 12.6,
+      "y": 73.7,
+      "seccion": "identidad",
+      "titulo": "Fragmento de ejemplo 5 (identidad)"
+    },
+    {
+      "x": 29.3,
+      "y": 69.1,
+      "seccion": "identidad",
+      "titulo": "Fragmento de ejemplo 6 (identidad)"
+    },
+    {
+      "x": 19.0,
+      "y": 78.9,
+      "seccion": "identidad",
+      "titulo": "Fragmento de ejemplo 7 (identidad)"
+    },
+    {
+      "x": 16.5,
+      "y": 68.3,
+      "seccion": "identidad",
+      "titulo": "Fragmento de ejemplo 8 (identidad)"
+    },
+    {
+      "x": 30.3,
+      "y": 78.8,
+      "seccion": "identidad",
+      "titulo": "Fragmento de ejemplo 9 (identidad)"
+    },
+    {
+      "x": 41.3,
+      "y": 63.5,
+      "seccion": "oferta",
+      "titulo": "Fragmento de ejemplo 10 (oferta)"
+    },
+    {
+      "x": 48.2,
+      "y": 55.2,
+      "seccion": "oferta",
+      "titulo": "Fragmento de ejemplo 11 (oferta)"
+    },
+    {
+      "x": 48.3,
+      "y": 72.5,
+      "seccion": "oferta",
+      "titulo": "Fragmento de ejemplo 12 (oferta)"
+    },
+    {
+      "x": 41.5,
+      "y": 60.0,
+      "seccion": "oferta",
+      "titulo": "Fragmento de ejemplo 13 (oferta)"
+    },
+    {
+      "x": 52.3,
+      "y": 60.4,
+      "seccion": "oferta",
+      "titulo": "Fragmento de ejemplo 14 (oferta)"
+    },
+    {
+      "x": 38.7,
+      "y": 71.0,
+      "seccion": "oferta",
+      "titulo": "Fragmento de ejemplo 15 (oferta)"
+    },
+    {
+      "x": 44.5,
+      "y": 58.0,
+      "seccion": "oferta",
+      "titulo": "Fragmento de ejemplo 16 (oferta)"
+    },
+    {
+      "x": 50.7,
+      "y": 66.8,
+      "seccion": "oferta",
+      "titulo": "Fragmento de ejemplo 17 (oferta)"
+    },
+    {
+      "x": 34.0,
+      "y": 62.5,
+      "seccion": "oferta",
+      "titulo": "Fragmento de ejemplo 18 (oferta)"
+    },
+    {
+      "x": 80.8,
+      "y": 77.2,
+      "seccion": "presencia",
+      "titulo": "Fragmento de ejemplo 19 (presencia)"
+    },
+    {
+      "x": 77.7,
+      "y": 87.5,
+      "seccion": "presencia",
+      "titulo": "Fragmento de ejemplo 20 (presencia)"
+    },
+    {
+      "x": 70.9,
+      "y": 71.6,
+      "seccion": "presencia",
+      "titulo": "Fragmento de ejemplo 21 (presencia)"
+    },
+    {
+      "x": 82.0,
+      "y": 80.5,
+      "seccion": "presencia",
+      "titulo": "Fragmento de ejemplo 22 (presencia)"
+    },
+    {
+      "x": 71.9,
+      "y": 84.3,
+      "seccion": "presencia",
+      "titulo": "Fragmento de ejemplo 23 (presencia)"
+    },
+    {
+      "x": 80.4,
+      "y": 69.3,
+      "seccion": "presencia",
+      "titulo": "Fragmento de ejemplo 24 (presencia)"
+    },
+    {
+      "x": 80.0,
+      "y": 83.5,
+      "seccion": "presencia",
+      "titulo": "Fragmento de ejemplo 25 (presencia)"
+    },
+    {
+      "x": 70.8,
+      "y": 77.7,
+      "seccion": "presencia",
+      "titulo": "Fragmento de ejemplo 26 (presencia)"
+    },
+    {
+      "x": 88.0,
+      "y": 75.4,
+      "seccion": "presencia",
+      "titulo": "Fragmento de ejemplo 27 (presencia)"
+    },
+    {
+      "x": 68.5,
+      "y": 33.7,
+      "seccion": "datos",
+      "titulo": "Fragmento de ejemplo 28 (datos)"
+    },
+    {
+      "x": 67.4,
+      "y": 23.0,
+      "seccion": "datos",
+      "titulo": "Fragmento de ejemplo 29 (datos)"
+    },
+    {
+      "x": 79.8,
+      "y": 35.1,
+      "seccion": "datos",
+      "titulo": "Fragmento de ejemplo 30 (datos)"
+    },
+    {
+      "x": 66.1,
+      "y": 31.0,
+      "seccion": "datos",
+      "titulo": "Fragmento de ejemplo 31 (datos)"
+    },
+    {
+      "x": 74.0,
+      "y": 23.7,
+      "seccion": "datos",
+      "titulo": "Fragmento de ejemplo 32 (datos)"
+    },
+    {
+      "x": 71.9,
+      "y": 40.8,
+      "seccion": "datos",
+      "titulo": "Fragmento de ejemplo 33 (datos)"
+    },
+    {
+      "x": 66.8,
+      "y": 27.6,
+      "seccion": "datos",
+      "titulo": "Fragmento de ejemplo 34 (datos)"
+    },
+    {
+      "x": 77.5,
+      "y": 29.3,
+      "seccion": "datos",
+      "titulo": "Fragmento de ejemplo 35 (datos)"
+    },
+    {
+      "x": 62.6,
+      "y": 38.1,
+      "seccion": "datos",
+      "titulo": "Fragmento de ejemplo 36 (datos)"
+    },
+    {
+      "x": 30.0,
+      "y": 21.0,
+      "seccion": "atencion",
+      "titulo": "Fragmento de ejemplo 37 (atencion)"
+    },
+    {
+      "x": 35.1,
+      "y": 30.5,
+      "seccion": "atencion",
+      "titulo": "Fragmento de ejemplo 38 (atencion)"
+    },
+    {
+      "x": 19.0,
+      "y": 24.0,
+      "seccion": "atencion",
+      "titulo": "Fragmento de ejemplo 39 (atencion)"
+    },
+    {
+      "x": 33.2,
+      "y": 22.6,
+      "seccion": "atencion",
+      "titulo": "Fragmento de ejemplo 40 (atencion)"
+    },
+    {
+      "x": 28.7,
+      "y": 32.4,
+      "seccion": "atencion",
+      "titulo": "Fragmento de ejemplo 41 (atencion)"
+    },
+    {
+      "x": 24.1,
+      "y": 15.7,
+      "seccion": "atencion",
+      "titulo": "Fragmento de ejemplo 42 (atencion)"
+    },
+    {
+      "x": 33.9,
+      "y": 26.0,
+      "seccion": "atencion",
+      "titulo": "Fragmento de ejemplo 43 (atencion)"
+    },
+    {
+      "x": 23.3,
+      "y": 28.5,
+      "seccion": "atencion",
+      "titulo": "Fragmento de ejemplo 44 (atencion)"
+    },
+    {
+      "x": 33.8,
+      "y": 14.7,
+      "seccion": "atencion",
+      "titulo": "Fragmento de ejemplo 45 (atencion)"
+    },
+    {
+      "x": 56.5,
+      "y": 15.7,
+      "seccion": "legal",
+      "titulo": "Fragmento de ejemplo 46 (legal)"
+    },
+    {
+      "x": 48.2,
+      "y": 8.8,
+      "seccion": "legal",
+      "titulo": "Fragmento de ejemplo 47 (legal)"
+    },
+    {
+      "x": 65.5,
+      "y": 8.7,
+      "seccion": "legal",
+      "titulo": "Fragmento de ejemplo 48 (legal)"
+    },
+    {
+      "x": 53.0,
+      "y": 15.5,
+      "seccion": "legal",
+      "titulo": "Fragmento de ejemplo 49 (legal)"
+    },
+    {
+      "x": 53.4,
+      "y": 4.7,
+      "seccion": "legal",
+      "titulo": "Fragmento de ejemplo 50 (legal)"
+    },
+    {
+      "x": 64.0,
+      "y": 18.3,
+      "seccion": "legal",
+      "titulo": "Fragmento de ejemplo 51 (legal)"
+    },
+    {
+      "x": 51.0,
+      "y": 12.5,
+      "seccion": "legal",
+      "titulo": "Fragmento de ejemplo 52 (legal)"
+    },
+    {
+      "x": 59.8,
+      "y": 6.3,
+      "seccion": "legal",
+      "titulo": "Fragmento de ejemplo 53 (legal)"
+    },
+    {
+      "x": 55.5,
+      "y": 23.0,
+      "seccion": "legal",
+      "titulo": "Fragmento de ejemplo 54 (legal)"
+    },
+    {
+      "x": 85.2,
+      "y": 47.2,
+      "seccion": "otros",
+      "titulo": "Fragmento de ejemplo 55 (otros)"
+    },
+    {
+      "x": 95.5,
+      "y": 50.3,
+      "seccion": "otros",
+      "titulo": "Fragmento de ejemplo 56 (otros)"
+    },
+    {
+      "x": 79.6,
+      "y": 57.1,
+      "seccion": "otros",
+      "titulo": "Fragmento de ejemplo 57 (otros)"
+    },
+    {
+      "x": 88.5,
+      "y": 46.0,
+      "seccion": "otros",
+      "titulo": "Fragmento de ejemplo 58 (otros)"
+    },
+    {
+      "x": 92.3,
+      "y": 56.1,
+      "seccion": "otros",
+      "titulo": "Fragmento de ejemplo 59 (otros)"
+    },
+    {
+      "x": 77.3,
+      "y": 47.6,
+      "seccion": "otros",
+      "titulo": "Fragmento de ejemplo 60 (otros)"
+    },
+    {
+      "x": 91.5,
+      "y": 48.0,
+      "seccion": "otros",
+      "titulo": "Fragmento de ejemplo 61 (otros)"
+    },
+    {
+      "x": 85.7,
+      "y": 57.2,
+      "seccion": "otros",
+      "titulo": "Fragmento de ejemplo 62 (otros)"
+    },
+    {
+      "x": 83.4,
+      "y": 40.0,
+      "seccion": "otros",
+      "titulo": "Fragmento de ejemplo 63 (otros)"
+    }
+  ],
+  "pregunta": {
+    "x": 44.0,
+    "y": 60.5
+  },
+  "top": [
+    {
+      "id": "frag:ejemplo001",
+      "texto": "Texto de ejemplo del fragmento recuperado. En la app real aquí va el texto del corpus.",
+      "url": "https://www.bancodeoccidente.com.co/",
+      "titulo": "Fragmento de ejemplo 1",
+      "seccion": "oferta",
+      "encabezado": "Encabezado de ejemplo",
+      "tipo": "pagina",
+      "tokens": 120,
+      "puntaje": 0.83
+    },
+    {
+      "id": "frag:ejemplo002",
+      "texto": "Texto de ejemplo del fragmento recuperado. En la app real aquí va el texto del corpus.",
+      "url": "https://www.bancodeoccidente.com.co/",
+      "titulo": "Fragmento de ejemplo 2",
+      "seccion": "oferta",
+      "encabezado": "Encabezado de ejemplo",
+      "tipo": "pagina",
+      "tokens": 120,
+      "puntaje": 0.79
+    },
+    {
+      "id": "frag:ejemplo003",
+      "texto": "Texto de ejemplo del fragmento recuperado. En la app real aquí va el texto del corpus.",
+      "url": "https://www.bancodeoccidente.com.co/",
+      "titulo": "Fragmento de ejemplo 3",
+      "seccion": "oferta",
+      "encabezado": "Encabezado de ejemplo",
+      "tipo": "pagina",
+      "tokens": 120,
+      "puntaje": 0.74
+    },
+    {
+      "id": "frag:ejemplo004",
+      "texto": "Texto de ejemplo del fragmento recuperado. En la app real aquí va el texto del corpus.",
+      "url": "https://www.bancodeoccidente.com.co/",
+      "titulo": "Fragmento de ejemplo 4",
+      "seccion": "oferta",
+      "encabezado": "Encabezado de ejemplo",
+      "tipo": "pagina",
+      "tokens": 120,
+      "puntaje": 0.7
+    },
+    {
+      "id": "frag:ejemplo005",
+      "texto": "Texto de ejemplo del fragmento recuperado. En la app real aquí va el texto del corpus.",
+      "url": "https://www.bancodeoccidente.com.co/",
+      "titulo": "Fragmento de ejemplo 5",
+      "seccion": "oferta",
+      "encabezado": "Encabezado de ejemplo",
+      "tipo": "pagina",
+      "tokens": 120,
+      "puntaje": 0.66
+    }
+  ]
+}

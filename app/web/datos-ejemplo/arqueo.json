@@ -1,0 +1,10 @@
+{
+  "disponible": true,
+  "datos": {
+    "recuperacion": [],
+    "evaluacion": {},
+    "mcnemar": {},
+    "costo": {}
+  },
+  "error": null
+}

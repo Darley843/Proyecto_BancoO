@@ -1,0 +1,79 @@
+{
+  "etapas": [
+    {
+      "key": "discover",
+      "title": "Descubrir",
+      "hint": "Encuentra las URL públicas del sitio",
+      "metrics": [
+        {
+          "label": "URLs en cola",
+          "value": "1.234"
+        }
+      ],
+      "note": "",
+      "warning": ""
+    },
+    {
+      "key": "fetch",
+      "title": "Descargar",
+      "hint": "Guarda el HTML crudo en Bronze",
+      "metrics": [
+        {
+          "label": "Páginas descargadas",
+          "value": "181"
+        }
+      ],
+      "note": "",
+      "warning": ""
+    },
+    {
+      "key": "extract",
+      "title": "Extraer",
+      "hint": "Convierte el HTML en texto limpio (Silver)",
+      "metrics": [
+        {
+          "label": "Páginas extraídas",
+          "value": "181"
+        }
+      ],
+      "note": "",
+      "warning": ""
+    },
+    {
+      "key": "dedupe",
+      "title": "Deduplicar",
+      "hint": "Mide los bloques repetidos entre páginas",
+      "metrics": [
+        {
+          "label": "Líneas repetidas en 5 o más páginas",
+          "value": "22,3 %"
+        }
+      ],
+      "note": "",
+      "warning": ""
+    },
+    {
+      "key": "gold",
+      "title": "Publicar en Gold",
+      "hint": "Markdown con frontmatter listo para RAG",
+      "metrics": [
+        {
+          "label": "Páginas en Gold",
+          "value": "181"
+        }
+      ],
+      "note": "",
+      "warning": ""
+    }
+  ],
+  "fuentes": [
+    "data/raw/urls.jsonl"
+  ],
+  "repeticiones": null,
+  "indexacion": {
+    "indice_listo": true,
+    "fragmentos_indexados": 1520,
+    "modelo_embeddings": "nomic-embed-text-v2-moe",
+    "alcance": "base"
+  }
+}
