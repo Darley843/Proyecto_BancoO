@@ -34,7 +34,7 @@ flowchart LR
     G --> C["Contexto consolidado<br/>data/contexto/contexto_banco.md"]
     K --> C
     C --> A["Asistente LangChain<br/>langchain-deepseek · deepseek-flash"]
-    A --> ST["App Streamlit<br/>app.py · 4 pestañas"]
+    A --> ST["App Streamlit<br/>make app-streamlit · 4 pestañas"]
 ```
 
 | Capa | Carpeta | Contenido | ¿Se versiona? |
@@ -96,11 +96,42 @@ Los comandos del corpus no necesitan la clave; solo la app y `make evaluar`.
 
 ## Uso
 
-### App del asistente
+### Sucursal 1965 (app web de la fase 2)
 
 ```bash
-uv run streamlit run app.py
+make app            # o: uv run python app.py
 ```
+
+Abre `http://127.0.0.1:8000`. `app.py` levanta FastAPI con uvicorn solo en
+`127.0.0.1` y sirve la app web de `app/web/`, hecha con HTML, CSS y JavaScript
+propios: sin frameworks, sin Node y sin paso de compilación.
+
+| Ruta | Qué es |
+|---|---|
+| `app/web/index.html` | Armazón: encabezado, saldo del día y navegación de la sucursal |
+| `app/web/estilos.css` | Identidad visual (colores como variables, modo oscuro, celular) |
+| `app/web/app.js` | Cambia de vista y decide si usa la API o los datos de ejemplo |
+| `app/web/comun.js` | Utilidades de presentación que comparten `app.js` y las vistas |
+| `app/web/vistas/` | Una vista por archivo: `vestibulo`, `ventanilla`, `boveda`, `tablero`, `camara`, `arqueo`; cada una exporta `render(contenedor, estado)` |
+| `app/web/datos-ejemplo/` | Un JSON por endpoint, con la misma forma que la API (`estado`, `preguntar`, `tablero`, `mapa`, `pipeline`, `arqueo`, `vestibulo`) |
+
+**Maqueta frente a API.** Al abrir, `app.js` pide `/api/estado`. Si la API
+responde, todas las vistas usan la API; si no, usan `app/web/datos-ejemplo/`
+y el encabezado muestra el sello «Datos de ejemplo». Con `?ejemplo=1` en la
+URL se fuerza la maqueta aunque la API esté encendida. Para revisar solo el
+diseño, sin FastAPI ni claves:
+
+```bash
+uv run python -m http.server 8001 --directory app/web   # http://localhost:8001
+```
+
+### App Streamlit de la fase 1
+
+```bash
+make app-streamlit   # o: uv run streamlit run app/streamlit_app.py
+```
+
+Se retira al final de la fase 2 (OpenSpec `sucursal-1965`, tarea 23.1).
 
 | Pestaña | Qué muestra |
 |---|---|
@@ -177,9 +208,10 @@ Resultados vigentes y respuestas completas:
 ## Estructura del repositorio
 
 ```text
-├── app.py                     # lanzador: uv run streamlit run app.py
+├── app.py                     # arranque: FastAPI + app web en 127.0.0.1:8000 (make app)
 ├── app/
-│   ├── streamlit_app.py       # interfaz: 4 pestañas, caché y validación
+│   ├── web/                   # Sucursal 1965: index.html, estilos.css, app.js, vistas/, datos-ejemplo/
+│   ├── streamlit_app.py       # interfaz fase 1: 4 pestañas (make app-streamlit)
 │   └── scraping_ui.py         # pestaña Scraping (etapas, métricas, captura en vivo)
 ├── src/banco_occidente_corpus/
 │   ├── net.py · discover.py · fetch.py · extract.py · dedupe.py

@@ -4,8 +4,9 @@ Este documento alimenta la sección **Modelado** del informe. Separa lo que ya
 está implementado (Módulo 1) de lo que el grupo propone para el Módulo 2, donde
 el asistente pasa de "todo el contexto en el prompt" a recuperación (RAG).
 
-> Estado: la parte del Módulo 2 es una **propuesta para que el grupo la
-> confirme**. No hay código de embeddings ni base vectorial en el repositorio.
+> Estado: la Bóveda del Módulo 2 ya está implementada (fragmentos, embeddings
+> locales, índice Chroma y mapa); el recuperador híbrido y el grafo llegan en los
+> PR siguientes del cambio `sucursal-1965`.
 
 ## 1. Módulo 1 (implementado)
 
@@ -37,63 +38,67 @@ estable derivado del contenido.
 | `data/knowledge/chunks.jsonl` | 14 490 chunks: páginas, PDF y videos (~9 millones de tokens) | 43 MB | No (se regenera) |
 
 Limitación observada: algunos chunks arrancan con restos del menú del sitio
-(por ejemplo "Canales digitales / Segmentos / Mesa de dinero"). Antes de
-indexar conviene filtrar esas líneas con el mismo detector de líneas comunes que
-usa la capa Contexto, para que no dominen la similitud.
+(por ejemplo "Canales digitales / Segmentos / Mesa de dinero"). La Bóveda los
+descarta al construir fragmentos con `dedupe.is_noise` y con la detección de
+líneas repetidas entre páginas web (`boveda/fragmentos.py`), de modo que ese
+ruido no compite por similitud en el índice.
 
-## 3. Propuesta para el Módulo 2
+## 3. Módulo 2 (implementado en la Bóveda)
+
+| Pieza | Elección | Dónde |
+|---|---|---|
+| Fragmentos | 957 fragmentos (878 de páginas, 81 de PDF y 6 hechos); fusión hasta 80 tokens, límite de 400 y tablas largas partidas por filas | `boveda/fragmentos.py`, `make fragmentos` |
+| Embeddings | `nomic-embed-text-v2-moe` en Ollama local, 768 dimensiones, sin clave ni costo | `boveda/embeddings.py` |
+| Prefijos | `search_document: ` al indexar y `search_query: ` al consultar; se desactivan con `prefijos = false` | `config/sucursal.toml` |
+| Índice | Chroma persistente en `data/boveda/chroma`, colección `boveda`, distancia coseno | `boveda/almacen.py` |
+| Metadatos | `data/boveda/indice.json` con modelo, prefijos, alcance, fragmentos y dimensión | `make indice` |
+| Alcance base | Páginas web, PDF con `categoria_documento: producto` y hechos verificados | `make indice` |
+| Alcance completo | Añade el resto de PDF y los videos transcritos | `make indice-completo` |
+| Recuperación | Híbrida: vectorial + BM25 con pesos configurables (siguiente PR) | `boveda/recuperador.py` |
 
 ### Modelo de embeddings
 
-**Propuesta: `intfloat/multilingual-e5-base`**, local, con `sentence-transformers`.
+Ollama sirve `nomic-embed-text-v2-moe` en `127.0.0.1:11434`; la URL se declara
+como `base_url` en `[embeddings]` de `config/sucursal.toml`, no con
+`OLLAMA_HOST`. Ese último es la dirección de *bind* del daemon y puede ser
+`0.0.0.0`, que no sirve como destino; el módulo lo traduce a `127.0.0.1` solo
+cuando llega como respaldo del entorno. Con embeddings locales, el plano de
+vectores no consume la cuota de DeepSeek: solo el chat se factura.
 
-- Está entrenado para recuperación en varios idiomas, incluido el español, y
-  es pequeño (~280 M de parámetros): corre en CPU para ~15 000 chunks.
-- Es local y gratuito: no envía el corpus a otro proveedor y no depende de que
-  el proveedor del LLM ofrezca embeddings.
-- Requiere los prefijos `query:` y `passage:` al codificar preguntas y chunks.
-
-Alternativas a comparar con las mismas 20 preguntas:
-
-| Modelo | A favor | En contra |
-|---|---|---|
-| `BAAI/bge-m3` | Muy bueno en multilingüe, admite textos largos (8 192 tokens) | Más pesado (~570 M); más lento en CPU |
-| `paraphrase-multilingual-MiniLM-L12-v2` | Muy liviano y rápido | Menor calidad en recuperación |
-| Embeddings por API (por ejemplo OpenAI `text-embedding-3-small`) | Sin cómputo local | Costo por token y el corpus sale a un tercero |
+Alternativas descartadas: `sentence-transformers` con `multilingual-e5-base`
+(descarga pesos en la primera ejecución y complica la CI) y embeddings por API
+(el corpus saldría a un tercero y tendría costo por token).
 
 ### Base de datos vectorial
 
-**Propuesta: Chroma** (`langchain-chroma`), persistida en `data/vectorial/`.
+**Chroma** (`langchain-chroma`) persistida en `data/boveda/chroma`, con la
+métrica coseno fijada al crear la colección. Guarda los metadatos de cada
+fragmento (`url`, `titulo`, `seccion`, `encabezado`, `tipo`, `tokens`), así que
+la respuesta puede seguir citando la fuente.
 
-- Corre embebida en el mismo proceso, sin servidor, y persiste en disco.
-- Guarda los metadatos de cada chunk (`url`, `section`, `heading`), así que el
-  asistente puede seguir citando la fuente y filtrar por sección.
-- Se integra con LangChain, que el proyecto ya usa.
+La colección se reconstruye entera en cada `make indice`: no hay *upsert*
+incremental, para no dejar fragmentos huérfanos cuando cambia el chunking. El
+índice es un derivado, no se versiona (`data/boveda/` está en `.gitignore`) y se
+regenera desde Gold y Knowledge.
 
 Alternativa: **FAISS**, más rápido en búsquedas puras, pero sin metadatos ni
-persistencia propios; habría que guardarlos aparte.
+persistencia propios; habría que mantener un archivo aparte.
 
-La base vectorial es un derivado, como `chunks.jsonl`: no se versiona y se
-regenera desde `chunks_web.jsonl` (o `chunks.jsonl` si se incluyen los PDF).
+### Recuperación y prompt del Módulo 2
 
-### LLM del Módulo 2
-
-**Se mantiene DeepSeek Flash**, con el mismo prompt `qa_v1` y la misma
-validación. Lo que cambia es el contexto: en lugar del corpus completo se
-envían los *k* chunks más parecidos a la pregunta (propuesta inicial: *k* = 6,
-unos 3 000 a 5 000 tokens), cada uno con su URL para que la cita siga siendo
-verificable. Eso baja el costo por pregunta en más de 30 veces y permite sumar
-los PDF y los videos al conocimiento.
-
-Pendiente de confirmar con el profesor que DeepSeek por API es válido (la guía
-da como ejemplos Ollama o modelos privados como GPT o Gemini).
+**Se mantiene DeepSeek Flash**, con el prompt `qa_v2` y la validación de citas.
+Lo que cambia es el contexto: en lugar del corpus completo se envían los *k*
+fragmentos más parecidos a la pregunta (pesos del híbrido en
+`config/sucursal.toml`), cada uno con su URL para que la cita siga siendo
+verificable. Eso baja el costo por pregunta y permite sumar los PDF y los videos
+al conocimiento.
 
 ### Cómo se compara
 
 1. Correr `make evaluar` con la estrategia actual (contexto completo).
-2. Implementar la recuperación y correr `make evaluar` con las mismas 20
-   preguntas.
-3. Comparar aciertos, falsos negativos, tokens de entrada y latencia.
+2. Correr `make evaluar VERSION=v2` con la recuperación y las mismas preguntas.
+3. Comparar aciertos, falsos negativos, tokens de entrada, latencia y costo con
+   `docs/ARQUEO.md` y McNemar.
 
 ## 4. Diseño del prompt (resumen)
 

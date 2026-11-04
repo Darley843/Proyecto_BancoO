@@ -1,0 +1,8 @@
+{
+  "modo_demo": true,
+  "gasto_hoy_usd": 0.0123,
+  "tope_usd": 0.2,
+  "indice_listo": true,
+  "fragmentos_indexados": 1520,
+  "modelo_embeddings": "nomic-embed-text-v2-moe"
+}

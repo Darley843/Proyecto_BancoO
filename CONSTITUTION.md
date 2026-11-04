@@ -65,7 +65,7 @@ oferta, presencia digital y datos duros.
 | **Fase 1** | Captura del sitio (Bronze), limpieza (Silver) y corpus Gold con metadatos | ✅ |
 | **Fase 2** | Cobertura del checklist y reporte `_INDICE.md` | ✅ |
 | **Fase 3** | Documentos (PDF), YouTube (subtítulos) y noticias (hechos oficiales + prensa curada) como fuentes complementarias | 🚧 |
-| **Fase 4** | Chunking + embeddings y consumo desde el RAG del Módulo 2 | ⏳ |
+| **Fase 4** | Chunking + embeddings y consumo desde el RAG del Módulo 2 | 🚧 |
 
 **Dentro del alcance:** páginas HTML públicas del dominio, `robots.txt`,
 `sitemap.xml` (índice de índices de Liferay), noticias, blog, información
@@ -91,7 +91,13 @@ descarga masiva de PDF, transcripción de vídeo.
 | **Herramienta del agente** | `scrapling` (entorno `uvx` propio) — navegación ad hoc vía MCP, **fuera del pipeline** |
 | **LLM del asistente** | `langchain-deepseek` (`ChatDeepSeek`) + `langchain-core`; `pydantic` para la salida estructurada |
 | **Modelo** | `deepseek-flash` (DeepSeek-V4.1-Flash), `DEEPSEEK_API_KEY` solo desde el entorno; `.env` prohibido |
-| **App del asistente** | `streamlit` — capa delgada en `app/streamlit_app.py`; la lógica vive en `asistente/` |
+| **Embeddings** | `langchain-ollama` contra Ollama local (`nomic-embed-text-v2-moe`); sin clave, sin costo y sin salida a internet |
+| **Índice vectorial** | `langchain-chroma` (Chroma persistente en `data/boveda/`, métrica coseno) |
+| **Recuperación híbrida** | `langchain-classic` (`EnsembleRetriever`) + `langchain-community` (`BM25Retriever`) + `rank-bm25` |
+| **Agente** | `langgraph` + `langgraph-checkpoint-sqlite` (memoria por `thread_id` en `data/asistente/`) |
+| **API** | `fastapi` + `uvicorn[standard]`, solo en `127.0.0.1:8000` |
+| **Mapa del corpus** | `scikit-learn` (`PCA(n_components=2)`, solo exploratorio) |
+| **App del asistente** | `streamlit` — capa delgada en `app/streamlit_app.py`; la lógica vive en `asistente/`. Se retira al final de la fase 2 y la reemplaza la app web de `app/web/` |
 | **Testing** | `pytest` (patrón AAA) |
 | **Lint / formato** | `ruff` (línea 100, comillas dobles) |
 | **Tipado** | `ty` (target `make typecheck`) |
@@ -108,6 +114,14 @@ descarga masiva de PDF, transcripción de vídeo.
 > LangChain con `timeout` y reintentos acotados: no son scraping del sitio del
 > banco, no pasan por `net.py` ni les aplican `robots.txt`/1,5 s. La clave se
 > lee solo de `DEEPSEEK_API_KEY`; el proyecto no lee `.env`.
+
+> **Embeddings:** corren locales en Ollama y se configuran con `base_url`
+> explícito (por defecto `http://127.0.0.1:11434`), no con el `OLLAMA_HOST` del
+> servidor: ese valor es la dirección de *bind* del daemon y puede ser
+> `0.0.0.0`. Cada petición lleva `timeout` explícito
+> (`embeddings.timeout_segundos`, 30 s por defecto) para que una Ollama colgada
+> no bloquee `make indice`. El plano de embeddings no usa clave y no aparece en
+> el consumo de DeepSeek; solo el chat se factura.
 
 > **App del asistente:** `app/streamlit_app.py` es una **capa delgada**. Solo
 > pinta, cachea y delega en `asistente/servicio.py`, `asistente/manifest.py` y
@@ -171,6 +185,11 @@ ProyectoAvance1/
 │   │   ├── manifest.py   # APP: tokens del manifest + fecha del commit (git log)
 │   │   ├── servicio.py   # APP: ejecuta tareas, mide tiempo y captura errores
 │   │   └── validacion.py # límites, fuente, cifras, PII e inyección
+│   ├── boveda/           # BÓVEDA: fragmentos, embeddings, índice y recuperación
+│   │   ├── fragmentos.py # fragmentos deterministas desde chunks y hechos
+│   │   ├── embeddings.py # Ollama local con prefijos de tarea
+│   │   ├── almacen.py    # Chroma persistente con métrica coseno
+│   │   └── indice.py     # índice por alcance + indice.json
 │   ├── checklist.py      # 24 casillas del Taller 1
 │   ├── stats.py          # _INDICE.md
 │   └── utils.py          # hashing, JSONL, tokens, slugs
@@ -178,18 +197,20 @@ ProyectoAvance1/
 ├── config/site.toml      # alcance, cortesía, filtros y secciones
 ├── config/contexto.toml  # secciones, prioridad y presupuesto del contexto
 ├── config/prompts/       # prompts versionados (qa_v0.md, qa_v1.md, faq_v1.md, resumen_v1.md)
+├── config/sucursal.toml  # embeddings locales, prefijos y recuperación de la fase 2
 ├── data/
 │   ├── raw/              # Bronze (ignorado por Git)
 │   ├── processed/        # Silver (ignorado por Git)
 │   ├── gold/             # Gold (VERSIONADO) → páginas, documentos y videos
 │   ├── contexto/         # Contexto (VERSIONADO) → prompt del asistente + manifest
 │   └── knowledge/        # Knowledge (VERSIONADO) → entidades, hechos, relaciones
+├── data/boveda/          # BÓVEDA (ignorado) → Chroma, fragmentos e indice.json
 ├── scripts/
 │   ├── tasks.py          # tareas del Makefile portables (Windows/Unix)
 │   ├── demo_offline.py   # pipeline completo con un fixture, sin red
 │   └── scrape_empresa.py # demo: sitemap -> pipeline -> .demo/
 ├── app/
-│   └── streamlit_app.py  # APP: capa delgada sobre asistente/ (make app)
+│   └── streamlit_app.py  # APP: capa delgada sobre asistente/ (make app-streamlit)
 ├── docs/ESTANDAR.md      # trazabilidad regla de la clase → implementación
 ├── .opencode/skills/corpus-extraction/    # skill operativa del pipeline
 ├── .opencode/skills/semantic-extraction/  # skill de conocimiento semántico
@@ -511,7 +532,8 @@ make doctor          # red + robots.txt + estado
 make all             # discover -> fetch -> extract -> gold -> stats
 make noticias        # hechos oficiales y prensa curada
 make contexto        # prompt del asistente desde Gold (data/contexto/)
-make app             # app Streamlit del asistente (solo lee contexto y prompts)
+make app             # Sucursal 1965: FastAPI + app web en 127.0.0.1:8000
+make app-streamlit   # app Streamlit de la fase 1 (solo lee contexto y prompts)
 
 # 4. Commit (los hooks corren solos)
 git add -A
@@ -605,6 +627,8 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 | 2026-10-29 | Revisión humana en `config/evaluacion/revision_humana.toml`, `--solo` fusiona con la corrida anterior y `--revalidar` reprocesa sin API | Volver a correr la evaluación borraba la revisión y las demás filas; revalidar permite corregir la validación sin gastar tokens |
 | 2026-10-29 | Hook `no-commit-to-branch` para `main` | Protección local mientras el repositorio privado no tenga GitHub Pro |
 | 2026-10-29 | Repositorio público y ruleset «Proteger-main» | La protección de ramas en un repositorio privado exige GitHub Pro; el corpus y el código son públicos. Se revisó el historial antes de publicar: sin claves ni secretos |
+| 2026-11-03 | Fase 2: dependencias de Bóveda, Sucursal y Arqueo en un solo PR (`uv add`): `langgraph`, `langgraph-checkpoint-sqlite`, `langchain-chroma`, `langchain-classic`, `langchain-community`, `langchain-ollama`, `rank-bm25`, `fastapi`, `uvicorn[standard]` y `scikit-learn` | La Bóveda necesita Ollama/Chroma/BM25, la Sucursal LangGraph/FastAPI y el Arqueo PCA. Concentrarlas evita conflictos de `uv.lock` entre cuatro ramas; el resto de PR se rebasa sobre `main`. `sqlalchemy` no se añade directo: entra como dependencia de `langchain-community`. Embeddings locales: solo DeepSeek se paga (`langchain-community` está en sunset, se acepta por `BM25Retriever` y se revisará si se retira) |
+| 2026-11-03 | Bóveda: fragmentos deterministas, embeddings locales con `nomic-embed-text-v2-moe` y Chroma con distancia coseno en `data/boveda/` | El corpus no sale a un tercero y los vectores no consumen la cuota de DeepSeek. Se usa `base_url` explícito (`OLLAMA_HOST` solo como respaldo) porque el bind del daemon puede ser `0.0.0.0`. El índice se reconstruye entero en cada `make indice` para no dejar fragmentos huérfanos, y los ids repetidos se descartan al construir fragmentos. `make indice-completo` añade PDF restantes y videos |
 
 ## 12. Configuración local (no trackear)
 

@@ -38,7 +38,8 @@ make videos      # YouTube: canal -> subtítulos -> transcripción Gold
 make media       # documentos + videos
 make noticias    # hechos oficiales + prensa curada (independiente de all/gold/deliver/docs/videos/media)
 make contexto    # prompt del asistente desde Gold (data/contexto/)
-make app         # app Streamlit del asistente (llama a asistente/)
+make app         # Sucursal 1965: FastAPI + app web en 127.0.0.1:8000
+make app-streamlit  # app Streamlit de la fase 1 (se retira en la fase 2)
 make evaluar     # 20 preguntas del alcance -> docs/RESULTADOS_20_PREGUNTAS.md
 make check       # lint + typecheck + pruebas
 make health      # integridad de las capas y del contrato de Gold

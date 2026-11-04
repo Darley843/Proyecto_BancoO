@@ -17,6 +17,7 @@ CORPUS ?= $(UV) run corpus
 TASKS ?= $(UV) run python scripts/tasks.py
 LIMIT ?=
 DELAY ?=
+ALCANCE ?= base
 MSG ?= corpus: actualiza el pipeline
 REPO ?= Proyecto_BancoO
 OWNER ?= Darley843
@@ -88,6 +89,20 @@ chunks: ## Segmenta Gold en chunks por encabezado (capa Knowledge)
 knowledge: chunks ## Valida entidades/hechos/relaciones y escribe el indice
 	$(CORPUS) knowledge
 
+.PHONY: fragmentos
+fragmentos: ## Construye los fragmentos de la Boveda desde chunks y hechos (sin red)
+	$(UV) run python -m banco_occidente_corpus.boveda fragmentos --alcance $(ALCANCE)
+
+.PHONY: indice
+indice: fragmentos ## Indexa la Boveda con Ollama (web, PDF de producto y hechos)
+	$(UV) run python -m banco_occidente_corpus.boveda indice --alcance $(ALCANCE)
+
+.PHONY: indice-completo
+indice-completo: ## Indexa ademas el resto de PDF y los videos (Ollama)
+	$(UV) run python -m banco_occidente_corpus.boveda fragmentos --alcance completo
+	$(UV) run python -m banco_occidente_corpus.boveda indice --alcance completo
+
+
 .PHONY: docs
 docs: ## Inventaria, descarga y extrae PDFs (balances, informes, gobierno)
 	$(CORPUS) docs all
@@ -116,8 +131,12 @@ contexto: ## Genera data/contexto/contexto_banco.md y su manifest desde Gold
 	$(UV) run python -m banco_occidente_corpus.contexto
 
 .PHONY: app
-app: ## Abre la app Streamlit del asistente (requiere DEEPSEEK_API_KEY)
-	$(UV) run streamlit run app.py
+app: ## Abre la Sucursal 1965 en http://127.0.0.1:8000 (API + app web)
+	$(UV) run python app.py
+
+.PHONY: app-streamlit
+app-streamlit: ## Abre la app Streamlit de la fase 1 (se retira en la fase 2)
+	$(UV) run streamlit run app/streamlit_app.py
 
 .PHONY: evaluar
 evaluar: ## Corre las 20 preguntas del alcance y escribe docs/RESULTADOS_20_PREGUNTAS.md (requiere DEEPSEEK_API_KEY)
