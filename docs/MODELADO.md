@@ -54,7 +54,7 @@ ruido no compite por similitud en el índice.
 | Metadatos | `data/boveda/indice.json` con modelo, prefijos, alcance, fragmentos y dimensión | `make indice` |
 | Alcance base | Páginas web, PDF con `categoria_documento: producto` y hechos verificados | `make indice` |
 | Alcance completo | Añade el resto de PDF y los videos transcritos | `make indice-completo` |
-| Recuperación | Híbrida: vectorial + BM25 con pesos configurables (siguiente PR) | `boveda/recuperador.py` |
+| Recuperación | Híbrida: vectorial + BM25 con pesos configurables y `puntaje` = 1 − coseno | `boveda/recuperador.py` |
 
 ### Modelo de embeddings
 
@@ -86,12 +86,20 @@ persistencia propios; habría que mantener un archivo aparte.
 
 ### Recuperación y prompt del Módulo 2
 
-**Se mantiene DeepSeek Flash**, con el prompt `qa_v2` y la validación de citas.
-Lo que cambia es el contexto: en lugar del corpus completo se envían los *k*
-fragmentos más parecidos a la pregunta (pesos del híbrido en
-`config/sucursal.toml`), cada uno con su URL para que la cita siga siendo
-verificable. Eso baja el costo por pregunta y permite sumar los PDF y los videos
-al conocimiento.
+La recuperación es **híbrida**: `EnsembleRetriever` combina el almacén vectorial
+de Chroma con `BM25Retriever` en memoria sobre los fragmentos del alcance. Los
+pesos viven en `[recuperacion]` de `config/sucursal.toml` (`k`,
+`peso_vectorial`, `peso_bm25`) y se normalizan a suma 1 antes de pasarlos. El
+orden final lo decide el híbrido; después, cada candidato se vuelve a puntuar
+contra la consulta con el mismo embedding, de modo que `puntaje` significa
+siempre `1 − distancia coseno`, también para los fragmentos que solo devolvió
+BM25.
+
+**Se mantiene DeepSeek Flash** para redactar, con el prompt `qa_v2` y la
+validación de citas. Lo que cambia es el contexto: en lugar del corpus completo
+se envían los *k* fragmentos recuperados, cada uno con su URL para que la cita
+siga siendo verificable. Eso baja el costo por pregunta y permite sumar los PDF
+y los videos al conocimiento.
 
 ### Cómo se compara
 

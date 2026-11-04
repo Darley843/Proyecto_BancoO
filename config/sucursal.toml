@@ -12,3 +12,10 @@ base_url = "http://127.0.0.1:11434"
 prefijos = true
 # Segundos de espera para cada lote de embeddings: una Ollama colgada no bloquea make indice.
 timeout_segundos = 30.0
+
+[recuperacion]
+# Fragmentos que devuelve el recuperador cuando no se indica k.
+k = 5
+# Pesos del híbrido; se normalizan a suma 1 antes de pasarlos a EnsembleRetriever.
+peso_vectorial = 0.6
+peso_bm25 = 0.4
