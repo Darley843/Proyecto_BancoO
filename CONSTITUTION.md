@@ -201,7 +201,7 @@ ProyectoAvance1/
 │   ├── demo_offline.py   # pipeline completo con un fixture, sin red
 │   └── scrape_empresa.py # demo: sitemap -> pipeline -> .demo/
 ├── app/
-│   └── streamlit_app.py  # APP: capa delgada sobre asistente/ (make app)
+│   └── streamlit_app.py  # APP: capa delgada sobre asistente/ (make app-streamlit)
 ├── docs/ESTANDAR.md      # trazabilidad regla de la clase → implementación
 ├── .opencode/skills/corpus-extraction/    # skill operativa del pipeline
 ├── .opencode/skills/semantic-extraction/  # skill de conocimiento semántico
@@ -523,7 +523,8 @@ make doctor          # red + robots.txt + estado
 make all             # discover -> fetch -> extract -> gold -> stats
 make noticias        # hechos oficiales y prensa curada
 make contexto        # prompt del asistente desde Gold (data/contexto/)
-make app             # app Streamlit del asistente (solo lee contexto y prompts)
+make app             # Sucursal 1965: FastAPI + app web en 127.0.0.1:8000
+make app-streamlit   # app Streamlit de la fase 1 (solo lee contexto y prompts)
 
 # 4. Commit (los hooks corren solos)
 git add -A

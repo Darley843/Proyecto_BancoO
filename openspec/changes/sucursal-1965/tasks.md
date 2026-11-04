@@ -99,10 +99,10 @@
 
 ## 15. PR 12 — Base del frontend (Yoldy — pendiente)
 
-- [ ] 15.1 Crear `app/web/index.html`, `app/web/estilos.css` y `app/web/app.js` con la navegación de la sucursal y los seis contenedores de vista; verificar que las seis vistas (`vestibulo`, `ventanilla`, `boveda`, `tablero`, `camara`, `arqueo`) se cargan y que no hay framework ni paso de build.
-- [ ] 15.2 Crear `app/web/datos-ejemplo/` con `estado.json`, `preguntar.json`, `tablero.json`, `mapa.json`, `pipeline.json`, `arqueo.json` y `vestibulo.json`; verificar con una prueba de forma contra los modelos Pydantic que campos y tipos coinciden.
-- [ ] 15.3 Implementar `app.py` para montar la API y los archivos de `app/web/`, y cambiar `make app` a `uv run python app.py`; verificar con `TestClient` que `/` sirve el HTML y que la escucha configurada es `127.0.0.1:8000`.
-- [ ] 15.4 Documentar en `README.md` la estructura de `app/web/`, el modo de datos de ejemplo y la diferencia entre abrir la maqueta y usar la API; verificar que las rutas documentadas existen.
+- [x] 15.1 Crear `app/web/index.html`, `app/web/estilos.css` y `app/web/app.js` con la navegación de la sucursal y los seis contenedores de vista; verificar que las seis vistas (`vestibulo`, `ventanilla`, `boveda`, `tablero`, `camara`, `arqueo`) se cargan y que no hay framework ni paso de build.
+- [x] 15.2 Crear `app/web/datos-ejemplo/` con `estado.json`, `preguntar.json`, `tablero.json`, `mapa.json`, `pipeline.json`, `arqueo.json` y `vestibulo.json`; verificar con una prueba de forma contra los modelos Pydantic que campos y tipos coinciden.
+- [x] 15.3 Implementar `app.py` para montar la API y los archivos de `app/web/`, y cambiar `make app` a `uv run python app.py`; verificar con `TestClient` que `/` sirve el HTML y que la escucha configurada es `127.0.0.1:8000`.
+- [x] 15.4 Documentar en `README.md` la estructura de `app/web/`, el modo de datos de ejemplo y la diferencia entre abrir la maqueta y usar la API; verificar que las rutas documentadas existen.
 
 ## 16. PR 13 — Ventanilla (Nayla — pendiente)
 
