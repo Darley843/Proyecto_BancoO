@@ -8,6 +8,7 @@ from collections.abc import Sequence
 
 from ..config import load_config
 from .fragmentos import ALCANCES, escribir_fragmentos, formatear_resumen
+from .indice import construir_indice, formatear_resumen_indice
 
 
 def _crear_parser() -> argparse.ArgumentParser:
@@ -27,22 +28,36 @@ def _crear_parser() -> argparse.ArgumentParser:
         default="base",
         help="alcance del índice: base (por defecto) o completo",
     )
+    indice = subcomandos.add_parser(
+        "indice",
+        help="vectoriza los fragmentos con Ollama y reconstruye el índice Chroma",
+    )
+    indice.add_argument(
+        "--alcance",
+        choices=ALCANCES,
+        default="base",
+        help="alcance del índice: base (por defecto) o completo",
+    )
     return parser
 
 
 def main(argv: Sequence[str] | None = None) -> int:
     """Ejecuta el subcomando pedido y devuelve el código de salida."""
     args = _crear_parser().parse_args(argv)
-    if args.comando != "fragmentos":
-        return 1
     try:
         config = load_config()
-        ruta, resumen = escribir_fragmentos(config, args.alcance)
-    except (FileNotFoundError, ValueError) as error:
+        if args.comando == "fragmentos":
+            ruta, resumen = escribir_fragmentos(config, args.alcance)
+            print(formatear_resumen(resumen, ruta))
+            return 0
+        if args.comando == "indice":
+            resumen_indice = construir_indice(config, args.alcance)
+            print(formatear_resumen_indice(resumen_indice))
+            return 0
+    except (FileNotFoundError, ValueError, RuntimeError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
-    print(formatear_resumen(resumen, ruta))
-    return 0
+    return 1
 
 
 if __name__ == "__main__":

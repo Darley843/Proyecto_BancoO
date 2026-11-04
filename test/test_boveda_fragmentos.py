@@ -567,3 +567,18 @@ def test_alcance_invalido_falla(tmp_path: Path) -> None:
 
     with pytest.raises(ValueError, match="Alcance desconocido"):
         construir_fragmentos(config, "otro")  # type: ignore[arg-type]
+
+
+def test_fragmentos_con_id_repetido_se_descartan(tmp_path: Path) -> None:
+    """Dos chunks largos con el mismo texto generan un solo fragmento y un duplicado."""
+    config = make_config(tmp_path)
+    texto = "Cuota de manejo de la tarjeta debito por dieciseis mil setecientos pesos. " * 8
+    fila = chunk("pagina-repetida", texto)
+    repetido = dict(fila, chunk_id="chk:repetido")
+    write_jsonl(config.paths.knowledge_chunks_web, [fila, repetido])
+
+    resultado = construir_fragmentos(config)
+
+    assert len(resultado.fragmentos) == 1
+    assert resultado.resumen.total == 1
+    assert resultado.resumen.duplicados == 1
