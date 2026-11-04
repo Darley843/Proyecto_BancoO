@@ -21,6 +21,7 @@
   --borde: #d9dce3;
   --texto: #1b2333;
   --texto-suave: #5a6375;
+  --texto-sobre-azul: #ffffff;
 
   /* Estados */
   --exito: #1d7a46;
@@ -49,6 +50,7 @@
     --borde: #2c3550;
     --texto: #e7eaf2;
     --texto-suave: #a3abbe;
+    --texto-sobre-azul: #0b1630;
     --exito: #5fcf8f;
     --aviso: #f0b84c;
     --error: #ff8a80;
@@ -67,6 +69,7 @@
   --borde: #2c3550;
   --texto: #e7eaf2;
   --texto-suave: #a3abbe;
+  --texto-sobre-azul: #0b1630;
   --exito: #5fcf8f;
   --aviso: #f0b84c;
   --error: #ff8a80;
@@ -424,7 +427,7 @@ main:focus {
   padding: 10px 18px;
   border-radius: var(--radio);
   background: var(--azul);
-  color: var(--superficie);
+  color: var(--texto-sobre-azul);
   font-weight: 600;
   text-decoration: none;
 }

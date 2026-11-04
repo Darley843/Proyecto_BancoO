@@ -12,8 +12,8 @@ pregunta con datos personales se responde sin llamar al modelo y sin entrar en
 la cache. Las pestanas del asistente necesitan contexto y clave; la de scraping
 funciona sin ninguna de las dos.
 
-Se ejecuta con ``make app`` (``uv run streamlit run app/streamlit_app.py``) o
-con ``uv run streamlit run app.py``.
+Se ejecuta con ``make app-streamlit`` (``uv run streamlit run app/streamlit_app.py``).
+``make app`` abre ahora la Sucursal 1965 (``app.py``, fase 2).
 """
 
 from __future__ import annotations

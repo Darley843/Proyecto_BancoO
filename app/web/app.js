@@ -32,6 +32,12 @@ const ENDPOINTS = {
   vestibulo: "/api/vestibulo",
 };
 
+/** Tiempo límite de una petición normal a la API (la Ventanilla puede tardar). */
+const ESPERA_MS = 60000;
+
+/** Tiempo límite para detectar si la API está encendida al abrir la app. */
+const ESPERA_ESTADO_MS = 2500;
+
 /** Clave de `localStorage` para la preferencia de tema (no guarda preguntas). */
 const CLAVE_TEMA = "sucursal-tema";
 
@@ -81,15 +87,29 @@ async function pedir(nombre, opciones = {}) {
 }
 
 /**
- * Descarga un JSON y traduce los errores HTTP al mensaje del contrato.
+ * Descarga un JSON con tiempo límite y traduce los errores HTTP al mensaje
+ * del contrato.
  *
  * @param {string | URL} url Dirección del recurso.
  * @param {RequestInit} [init] Opciones de `fetch`.
+ * @param {number} [esperaMs] Milisegundos antes de abandonar la petición.
  * @returns {Promise<any>} El JSON ya interpretado.
- * @throws {Error} Si la respuesta no es 2xx o no es JSON.
+ * @throws {Error} Si la respuesta no es 2xx, no es JSON o se agota el tiempo.
  */
-async function leerJson(url, init = {}) {
-  const respuesta = await fetch(url, init);
+async function leerJson(url, init = {}, esperaMs = ESPERA_MS) {
+  const controlador = new AbortController();
+  const espera = setTimeout(() => controlador.abort(), esperaMs);
+  let respuesta;
+  try {
+    respuesta = await fetch(url, { ...init, signal: controlador.signal });
+  } catch (error) {
+    if (error.name === "AbortError") {
+      throw new Error(`La sucursal no respondió en ${esperaMs / 1000} s. Intenta de nuevo.`);
+    }
+    throw error;
+  } finally {
+    clearTimeout(espera);
+  }
   let datos = null;
   try {
     datos = await respuesta.json();
@@ -115,10 +135,7 @@ async function decidirModo() {
     return "ejemplo";
   }
   try {
-    const controlador = new AbortController();
-    const espera = setTimeout(() => controlador.abort(), 2500);
-    estado.resumen = await leerJson(ENDPOINTS.estado, { signal: controlador.signal });
-    clearTimeout(espera);
+    estado.resumen = await leerJson(ENDPOINTS.estado, {}, ESPERA_ESTADO_MS);
     return "api";
   } catch {
     return "ejemplo";
