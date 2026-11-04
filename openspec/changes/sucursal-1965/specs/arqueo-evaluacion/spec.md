@@ -99,7 +99,7 @@ El Arqueo SHALL reutilizar `arqueo/metricas.py` para hit@k, MRR, exactitud, cita
 #### Scenario: Una sola normalización
 
 - **WHEN** se comparan términos de una respuesta con los esperados
-- **THEN** se usa la misma normalización sin tildes de `asistente/evaluacion.py`
+- **THEN** se usa `banco_occidente_corpus.texto.normalizar`, la misma normalización sin tildes que reutiliza `asistente/evaluacion.py`
 
 ### Requirement: Comandos independientes
 

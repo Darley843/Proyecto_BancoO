@@ -17,7 +17,6 @@ from __future__ import annotations
 import json
 import time
 import tomllib
-import unicodedata
 from collections import Counter
 from collections.abc import Callable, Iterable, Sequence
 from dataclasses import asdict, dataclass, field
@@ -26,6 +25,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
 from .. import config as config_mod
+from ..texto import normalizar as _normalizar
 from .contexto_prompt import ContextoPrompt
 from .prompts import Prompt
 from .qa import RespuestaQA, responder, validar_respuesta
@@ -131,12 +131,6 @@ class ResultadoEvaluacion:
         campos["avisos"] = list(campos.get("avisos") or [])
         campos["metricas"] = dict(campos.get("metricas") or {})
         return cls(**campos)
-
-
-def _normalizar(texto: str) -> str:
-    """Minusculas y sin tildes, para comparar terminos."""
-    descompuesto = unicodedata.normalize("NFKD", texto.casefold())
-    return "".join(c for c in descompuesto if not unicodedata.combining(c))
 
 
 def cargar_preguntas(archivo: Path | None = None) -> list[PreguntaEvaluacion]:

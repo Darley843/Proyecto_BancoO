@@ -20,7 +20,7 @@
 ## 4. Métricas del Arqueo (Anny — en revisión en #45)
 
 - [ ] 4.1 Verificar que `arqueo/metricas.py` expone `hit_at_k`, `mrr`, `exactitud`, `citas_correctas`, `resumen_uso`, `mcnemar` y la dataclass `Tarifas` con `TARIFAS_DEEPSEEK_FLASH` y `TARIFAS_DEEPSEEK_FLASH_PICO`; ejecutar `uv run pytest test/test_arqueo_metricas.py` y comprobar los casos de listas vacías, `k <= 0`, pares incompletos y `p = 1` sin discordancias.
-- [ ] 4.2 Corregir `acierta_terminos` para que use la misma normalización sin tildes de `asistente/evaluacion.py` (NFKD y eliminación de marcas combinantes) y añadir una prueba con «línea» frente a «linea»; verificar que el resto de la suite de métricas sigue pasando.
+- [x] 4.2 Hacer que `acierta_terminos` use `banco_occidente_corpus.texto.normalizar` (``casefold``, NFKD y eliminación de marcas combinantes), la misma función que reutiliza `asistente/evaluacion.py`, y añadir pruebas con «petición»/«peticion» y con «línea» frente a «linea» en los dos sentidos; verificar que el resto de la suite de métricas sigue pasando.
 - [ ] 4.3 Verificar que `TARIFAS_DEEPSEEK_FLASH` y `TARIFAS_DEEPSEEK_FLASH_PICO` son la única fuente de precios y que el docstring declara la franja de pico (01:00–04:00 y 06:00–10:00 UTC de lunes a viernes); comprobar que ningún otro archivo del repo repite esos valores.
 
 ## 5. PR 3 — Fragmentos (Nayla — pendiente)

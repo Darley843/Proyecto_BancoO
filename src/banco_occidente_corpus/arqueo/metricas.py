@@ -8,12 +8,12 @@ exactamente, igual que en ``test/test_preguntas_fase2.py``.
 from __future__ import annotations
 
 import math
-import unicodedata
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, NamedTuple
 
 from ..asistente.metricas import leer_uso
+from ..texto import normalizar
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,21 +135,17 @@ def mrr(
     return suma / evaluables if evaluables else None
 
 
-def _nfc(texto: str) -> str:
-    """Normaliza a NFC y pasa a minusculas para comparar terminos."""
-    return unicodedata.normalize("NFC", texto).casefold()
-
-
 def acierta_terminos(respuesta: str, terminos: Sequence[Sequence[str]]) -> bool | None:
     """True si cada grupo tiene al menos una alternativa en la respuesta.
 
-    La comparacion normaliza a NFC y usa ``casefold``: ignora mayusculas pero
-    no quita tildes. ``terminos`` vacio devuelve ``None``.
+    La comparacion usa ``texto.normalizar``: ``casefold``, NFKD y sin marcas
+    combinantes, asi que ignora mayusculas y tildes. ``terminos`` vacio
+    devuelve ``None``.
     """
     if not terminos:
         return None
-    texto = _nfc(respuesta)
-    return all(any(_nfc(termino) in texto for termino in grupo) for grupo in terminos)
+    texto = normalizar(respuesta)
+    return all(any(normalizar(termino) in texto for termino in grupo) for grupo in terminos)
 
 
 def exactitud(aciertos: Sequence[bool | None]) -> float | None:
