@@ -456,7 +456,7 @@ def test_quita_lineas_repetidas_entre_paginas(tmp_path: Path) -> None:
 
     resultado = construir_fragmentos(config, "base")
 
-    assert RATIO_REPETIDAS == 0.15
+    assert RATIO_REPETIDAS == 0.07
     assert all("Linea repetida del menu" not in f.texto for f in resultado.fragmentos)
     assert any("Contenido propio de la pagina 0" in f.texto for f in resultado.fragmentos)
     assert resultado.resumen.lineas_repetidas == 1
