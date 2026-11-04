@@ -1,0 +1,14 @@
+# Configuración de la Sucursal (fase 2).
+# Solo se documentan aquí los valores; las claves nunca viven en este archivo.
+
+[embeddings]
+# Modelo local servido por Ollama: sin clave, sin costo y sin salida a internet.
+modelo = "nomic-embed-text-v2-moe"
+# URL del cliente. Es `base_url` y no `OLLAMA_HOST`: ese último es la dirección
+# de bind del daemon y puede ser 0.0.0.0, que no sirve como destino.
+# Si se omite, se toma OLLAMA_BASE_URL y, como respaldo, OLLAMA_HOST.
+base_url = "http://127.0.0.1:11434"
+# Prefijos de tarea de nomic. Se pueden desactivar para el experimento del Arqueo.
+prefijos = true
+# Segundos de espera para cada lote de embeddings: una Ollama colgada no bloquea make indice.
+timeout_segundos = 30.0

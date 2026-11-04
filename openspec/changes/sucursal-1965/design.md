@@ -66,7 +66,7 @@ Alternativa descartada: indexar solo `review: "approved"`. Hoy todos los hechos 
 
 ### 5. Embeddings locales con prefijos y proveedor inyectable
 
-`boveda/embeddings.py` envuelve `OllamaEmbeddings` con `model="nomic-embed-text-v2-moe"` y `base_url` leído de `OLLAMA_HOST` (por defecto `http://127.0.0.1:11434`). Aplica `search_document: ` al indexar y `search_query: ` al consultar; la bandera `prefijos` de `config/sucursal.toml` los desactiva para el experimento. El módulo expone una función que devuelve un objeto `Embeddings` de `langchain_core`, de modo que las pruebas inyectan `DeterministicFakeEmbedding`.
+`boveda/embeddings.py` envuelve `OllamaEmbeddings` con `model="nomic-embed-text-v2-moe"` y `base_url` explícito leído de `[embeddings]` en `config/sucursal.toml` (por defecto `http://127.0.0.1:11434`). `OLLAMA_BASE_URL` y, como último respaldo, `OLLAMA_HOST` solo cubren el caso de no declararlo; si el valor es un host de bind (`0.0.0.0`, `::`) se traduce a `127.0.0.1`, porque un bind no sirve como destino. Aplica `search_document: ` al indexar y `search_query: ` al consultar; la bandera `prefijos` de la misma sección los desactiva para el experimento. El módulo expone una función que devuelve un objeto `Embeddings` de `langchain_core`, de modo que las pruebas inyectan `DeterministicFakeEmbedding`.
 
 No hay caché propia de embeddings: Chroma guarda los vectores y el índice se reconstruye si cambia el modelo o la bandera de prefijos. `data/boveda/indice.json` guarda `modelo`, `prefijos`, `alcance`, `fragmentos` y `dimension` para detectar esa incompatibilidad.
 

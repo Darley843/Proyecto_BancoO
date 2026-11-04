@@ -93,6 +93,16 @@ knowledge: chunks ## Valida entidades/hechos/relaciones y escribe el indice
 fragmentos: ## Construye los fragmentos de la Boveda desde chunks y hechos (sin red)
 	$(UV) run python -m banco_occidente_corpus.boveda fragmentos --alcance $(ALCANCE)
 
+.PHONY: indice
+indice: fragmentos ## Indexa la Boveda con Ollama (web, PDF de producto y hechos)
+	$(UV) run python -m banco_occidente_corpus.boveda indice --alcance $(ALCANCE)
+
+.PHONY: indice-completo
+indice-completo: ## Indexa ademas el resto de PDF y los videos (Ollama)
+	$(UV) run python -m banco_occidente_corpus.boveda fragmentos --alcance completo
+	$(UV) run python -m banco_occidente_corpus.boveda indice --alcance completo
+
+
 .PHONY: docs
 docs: ## Inventaria, descarga y extrae PDFs (balances, informes, gobierno)
 	$(CORPUS) docs all
