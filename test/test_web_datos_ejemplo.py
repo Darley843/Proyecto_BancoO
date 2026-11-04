@@ -84,6 +84,19 @@ def leer(nombre: str) -> Any:
     return json.loads((DATOS / f"{nombre}.json").read_text(encoding="utf-8"))
 
 
+def leer_ventanilla() -> str:
+    """Lee el código de la vista Ventanilla (PR 13)."""
+    return (WEB / "vistas" / "ventanilla.js").read_text(encoding="utf-8")
+
+
+def bloque_ventanilla() -> str:
+    """Devuelve el bloque CSS de la Ventanilla, entre sus marcadores."""
+    css = (WEB / "estilos.css").read_text(encoding="utf-8")
+    inicio = css.index("/* --- ventanilla (PR 13) --- */")
+    fin = css.index("/* --- fin ventanilla --- */", inicio)
+    return css[inicio:fin]
+
+
 @pytest.mark.parametrize("nombre", sorted(CONTRATO))
 def test_datos_ejemplo_tienen_las_claves_del_contrato(nombre: str) -> None:
     """Cada archivo de ejemplo tiene exactamente las claves de su endpoint."""
@@ -153,3 +166,81 @@ def test_funciones_javascript_documentadas() -> None:
         for coincidencia in patron.finditer(texto):
             previo = texto[: coincidencia.start()].rstrip()
             assert previo.endswith("*/"), f"{archivo.name}: {coincidencia.group(0)}"
+
+
+def test_ventanilla_usa_el_contrato_y_el_hilo() -> None:
+    """La Ventanilla envía pregunta y thread_id, y solo persiste el hilo."""
+    codigo = leer_ventanilla()
+    assert 'pedir("preguntar"' in codigo
+    assert "pregunta" in codigo
+    assert "thread_id" in codigo
+    assert "sessionStorage" in codigo
+    assert "crypto.randomUUID" in codigo
+    assert 'CLAVE_HILO = "sucursal-ventanilla-hilo"' in codigo
+    assert codigo.count("setItem(") == 1
+    assert "localStorage" not in codigo
+    assert "fetch(" not in codigo
+    assert "innerHTML" not in codigo
+
+
+def test_ventanilla_tiene_los_ejemplos_y_los_estados() -> None:
+    """Están los cuatro ejemplos, el seguimiento y los textos de estado."""
+    codigo = leer_ventanilla()
+    for pregunta in (
+        "¿En qué año se fundó el Banco de Occidente?",
+        "¿Cuánto cuesta la cuota de manejo de la tarjeta débito?",
+        "¿Qué tarjetas Credencial Mastercard ofrece?",
+        "¿Y cuánto cuesta la Black?",
+        "¿En qué acciones me recomiendas invertir?",
+    ):
+        assert pregunta in codigo
+    assert "Tomar turno" in codigo
+    assert "Nueva conversación" in codigo
+    assert "Atendiendo…" in codigo
+    assert "Memoria: reformulada como" in codigo
+    assert "formatearUsd" in codigo
+    assert "crearTexto" in codigo
+    assert "aria-live" in codigo
+    assert 'setAttribute("role", "log")' in codigo
+    assert 'setAttribute("role", "alert")' in codigo
+
+
+def test_ventanilla_detecta_voz_y_microfono() -> None:
+    """La voz y el dictado se ofrecen solo si el navegador los expone."""
+    codigo = leer_ventanilla()
+    assert "speechSynthesis" in codigo
+    assert "SpeechSynthesisUtterance" in codigo
+    assert "webkitSpeechRecognition" in codigo
+    assert "window.SpeechRecognition" in codigo
+    assert "return null" in codigo
+
+
+def test_ventanilla_estilos_usan_variables() -> None:
+    """El bloque de la Ventanilla usa variables y prefija sus selectores."""
+    bloque = bloque_ventanilla()
+    sin_comentarios = re.sub(r"/\*.*?\*/", "", bloque, flags=re.DOTALL)
+    assert not re.search(r"#[0-9a-fA-F]{3,8}\b", sin_comentarios)
+    assert not re.search(r"\brgba?\(", sin_comentarios)
+    assert not re.search(r"\bhsla?\(", sin_comentarios)
+    for clase in (
+        ".ventanilla__ticket--b",
+        ".ventanilla__ticket--t",
+        ".ventanilla__ticket--x",
+        ".ventanilla__comprobante",
+        ".ventanilla__similitud",
+    ):
+        assert clase in bloque
+    assert "max-width: 900px" in bloque
+
+    for selector in re.findall(r"([^{}]+)\{", sin_comentarios):
+        for parte in selector.split(","):
+            limpio = parte.strip()
+            if limpio and not limpio.startswith("@"):
+                assert ".ventanilla" in limpio, limpio
+
+
+def test_preguntar_similitud_entre_0_y_1() -> None:
+    """La similitud de cada fuente de ejemplo está en el rango del contrato."""
+    for fuente in leer("preguntar")["fuentes"]:
+        if "similitud" in fuente:
+            assert 0 <= fuente["similitud"] <= 1

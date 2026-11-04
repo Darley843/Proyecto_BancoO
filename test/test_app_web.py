@@ -47,7 +47,15 @@ def test_raiz_sirve_el_html_de_la_sucursal(cliente: TestClient) -> None:
 
 @pytest.mark.parametrize(
     "ruta",
-    ["/estilos.css", "/app.js", "/comun.js", "/vistas/boveda.js", "/datos-ejemplo/estado.json"],
+    [
+        "/estilos.css",
+        "/app.js",
+        "/comun.js",
+        "/vistas/boveda.js",
+        "/vistas/ventanilla.js",
+        "/datos-ejemplo/estado.json",
+        "/datos-ejemplo/preguntar.json",
+    ],
 )
 def test_sirve_los_archivos_de_la_app(cliente: TestClient, ruta: str) -> None:
     """Los estáticos de ``app/web/`` se sirven con su ruta relativa."""
