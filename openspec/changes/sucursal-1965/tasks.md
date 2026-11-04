@@ -2,10 +2,10 @@
 
 ## 1. PR 0 — Dependencias (Darley — pendiente)
 
-- [ ] 1.1 Añadir con `uv add` las dependencias del diseño: `langgraph`, `langgraph-checkpoint-sqlite`, `langchain-chroma`, `langchain-classic`, `langchain-community`, `langchain-ollama`, `rank-bm25`, `fastapi`, `uvicorn[standard]` y `scikit-learn`; añadir `sqlalchemy` solo si las pruebas de `SqliteSaver` lo exigen. Verificar con `uv sync` que `uv.lock` cambia solo por `uv` y que `make check` sigue en verde.
-- [ ] 1.2 Comprobar que los imports nuevos cargan en el entorno del proyecto con `uv run python -c "import langgraph, chromadb, fastapi, sklearn, langchain_classic, langchain_community, langchain_ollama, rank_bm25"`; verificar que Streamlit sigue instalado para no romper `make app` antes del retiro.
-- [ ] 1.3 Añadir a `.gitignore` `data/boveda/` y confirmar que `data/asistente/` ya está ignorado; verificar con `git check-ignore -v data/boveda/chroma data/asistente/memoria.sqlite` que ambos quedan fuera de Git.
-- [ ] 1.4 Documentar la decisión de dependencias en `CONSTITUTION.md` §3 y §11 (tabla de stack y fila del historial) y verificar que el texto coincide con `pyproject.toml`; el PR no debe incluir código de los paquetes nuevos.
+- [x] 1.1 Añadir con `uv add` las dependencias del diseño: `langgraph`, `langgraph-checkpoint-sqlite`, `langchain-chroma`, `langchain-classic`, `langchain-community`, `langchain-ollama`, `rank-bm25`, `fastapi`, `uvicorn[standard]` y `scikit-learn`; añadir `sqlalchemy` solo si las pruebas de `SqliteSaver` lo exigen. Verificar con `uv sync` que `uv.lock` cambia solo por `uv` y que `make check` sigue en verde.
+- [x] 1.2 Comprobar que los imports nuevos cargan en el entorno del proyecto con `uv run python -c "import langgraph, chromadb, fastapi, sklearn, langchain_classic, langchain_community, langchain_ollama, rank_bm25"`; verificar que Streamlit sigue instalado para no romper `make app` antes del retiro.
+- [x] 1.3 Añadir a `.gitignore` `data/boveda/` y confirmar que `data/asistente/` ya está ignorado; verificar con `git check-ignore -v data/boveda/chroma data/asistente/memoria.sqlite` que ambos quedan fuera de Git.
+- [x] 1.4 Documentar la decisión de dependencias en `CONSTITUTION.md` §3 y §11 (tabla de stack y fila del historial) y verificar que el texto coincide con `pyproject.toml`; el PR no debe incluir código de los paquetes nuevos.
 
 ## 2. PR 2 — Plantilla de PR (Anny — hecho en #43)
 
