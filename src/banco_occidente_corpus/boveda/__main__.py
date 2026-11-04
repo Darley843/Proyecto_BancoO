@@ -4,11 +4,18 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
 from collections.abc import Sequence
 
 from ..config import load_config
 from .fragmentos import ALCANCES, escribir_fragmentos, formatear_resumen
-from .indice import construir_indice, formatear_resumen_indice
+from .indice import (
+    AvisoLote,
+    TiempoAgotadoEmbeddings,
+    construir_indice,
+    formatear_duracion,
+    formatear_resumen_indice,
+)
 
 
 def _crear_parser() -> argparse.ArgumentParser:
@@ -41,6 +48,19 @@ def _crear_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _mensaje_tiempo_agotado(error: TiempoAgotadoEmbeddings) -> str:
+    """Redacta el mensaje de un lote que agotó el tiempo de espera."""
+    return "\n".join(
+        [
+            f"Error: se agotó el tiempo de espera ({error.timeout_segundos:g} s) al vectorizar "
+            f"el lote {error.lote} de {error.lotes}.",
+            "El índice anterior queda intacto: no se reinició la colección.",
+            "Sube timeout_segundos en config/sucursal.toml o comprueba que Ollama responde "
+            "con `ollama ps`.",
+        ]
+    )
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Ejecuta el subcomando pedido y devuelve el código de salida."""
     args = _crear_parser().parse_args(argv)
@@ -51,9 +71,24 @@ def main(argv: Sequence[str] | None = None) -> int:
             print(formatear_resumen(resumen, ruta))
             return 0
         if args.comando == "indice":
-            resumen_indice = construir_indice(config, args.alcance)
+            inicio = time.monotonic()
+
+            def avisar(aviso: AvisoLote) -> None:
+                """Imprime el avance de un lote vectorizado."""
+                print(
+                    f"lote {aviso.lote}/{aviso.lotes} · "
+                    f"{aviso.procesados}/{aviso.total} fragmentos · "
+                    f"{formatear_duracion(time.monotonic() - inicio)}",
+                    flush=True,
+                )
+
+            resumen_indice = construir_indice(config, args.alcance, progreso=avisar)
             print(formatear_resumen_indice(resumen_indice))
+            print(f"Tiempo total: {formatear_duracion(time.monotonic() - inicio)}")
             return 0
+    except TiempoAgotadoEmbeddings as error:
+        print(_mensaje_tiempo_agotado(error), file=sys.stderr)
+        return 1
     except (FileNotFoundError, ValueError, RuntimeError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
