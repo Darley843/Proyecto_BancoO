@@ -218,20 +218,26 @@ def test_acierta_terminos_sin_terminos_devuelve_none() -> None:
     assert acierto is None
 
 
-def test_acierta_terminos_normaliza_nfc_sin_quitar_tildes() -> None:
-    """NFC iguala las formas compuesta y descompuesta, pero no quita tildes."""
+def test_acierta_terminos_quita_tildes_en_respuesta_y_terminos() -> None:
+    """«petición» y «peticion» coinciden, también con el término descompuesto."""
     # Arrange
     respuesta = "La petición se radica por el canal oficial."
     termino_descompuesto = unicodedata.normalize("NFD", "petición")
-    terminos = [[termino_descompuesto]]
 
     # Act
-    acierto = acierta_terminos(respuesta, terminos)
     sin_tilde = acierta_terminos(respuesta, [["peticion"]])
+    descompuesto = acierta_terminos(respuesta, [[termino_descompuesto]])
 
     # Assert
-    assert acierto is True
-    assert sin_tilde is False
+    assert sin_tilde is True
+    assert descompuesto is True
+
+
+def test_acierta_terminos_iguala_linea_con_tilde_en_los_dos_sentidos() -> None:
+    """«LÍNEA» y «linea» coinciden tanto en la respuesta como en el término."""
+    # Assert
+    assert acierta_terminos("LÍNEA de atención al cliente", [["linea"]]) is True
+    assert acierta_terminos("linea de atencion al cliente", [["LÍNEA"]]) is True
 
 
 def test_exactitud_ignora_none() -> None:

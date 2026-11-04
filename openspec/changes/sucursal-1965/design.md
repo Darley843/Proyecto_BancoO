@@ -123,7 +123,7 @@ Decisiones de parsing:
 - Las tablas de una sola columna (promociones, proyectos) usan adaptadores con expresiones regulares para extraer porcentaje o monto y el sujeto; si no se puede extraer un valor, la fila se omite y se cuenta.
 - `make tablero` cruza el CSV con las 8 preguntas de tipo `tabla` y falla si alguna no tiene fila con la fuente esperada.
 
-`buscar_filas` y `comparar_filas` son funciones puras sobre listas de `Fila`: normalizan sin tildes con la misma idea de `asistente.evaluacion._normalizar`, filtran y comparan; no tocan red ni modelo.
+`buscar_filas` y `comparar_filas` son funciones puras sobre listas de `Fila`: normalizan sin tildes con `banco_occidente_corpus.texto.normalizar`, filtran y comparan; no tocan red ni modelo.
 
 `data/estructurados/tablero.csv` se versiona: es pequeño, determinista y sirve de evidencia para las 8 preguntas de tabla. Solo se excluyen de Git el índice (`data/boveda/`) y las SQLite de `data/asistente/`, como pide el alcance del cambio.
 
@@ -203,7 +203,7 @@ Alternativa descartada: React o Vue con Vite. Añade Node, build y dependencias 
 2. Para cada combinación de pesos (`1/0`, `0/1`, `0.2/0.8`, `0.4/0.6`, `0.6/0.4` y `0.8/0.2`), recupera `k=5` y calcula `hit_at_k` y `mrr` con `arqueo.metricas`; `1/0` y `0/1` son las líneas base vectorial y BM25 pura. Los pesos no requieren reindexar: se aplican al recuperador sobre el mismo índice. El experimento de prefijos usa un único índice extra sin prefijos en `data/boveda/experimentos/sin_prefijos` (no `tmp_path`, que es solo para pruebas) y se mide con los pesos por defecto. No llama a DeepSeek.
 3. Compara v1 y v2 sobre las 20 preguntas `tipo="alcance"` usando `revision_humana.toml` y `revision_humana_v2.toml`: convierte cada veredicto en acierto booleano (`correcta` o `rechazo_correcto` → `True`; `parcial`/`incorrecta` → `False`; sin revisión → `None`) y aplica `mcnemar`.
 
-Antes de fusionar #45 hay que corregir `acierta_terminos`: hoy normaliza a NFC y no quita tildes, mientras `asistente.evaluacion._normalizar` usa NFKD y elimina las marcas combinantes. El Arqueo debe comparar «línea» con «linea», así que la métrica adopta la normalización de `evaluacion.py` y se prueba con un par con y sin tilde. Esa corrección pertenece al PR de métricas, no al de experimentos.
+Antes de fusionar #45 hay que corregir `acierta_terminos`: hoy normaliza a NFC y no quita tildes. La normalización sin tildes vive en `banco_occidente_corpus.texto.normalizar` (``casefold``, NFKD y eliminación de marcas combinantes) y `asistente/evaluacion.py` la reutiliza con `from ..texto import normalizar as _normalizar`, sin cambiar su comportamiento. El Arqueo debe comparar «línea» con «linea», así que la métrica usa `texto.normalizar` y se prueba con un par con y sin tilde. Esa corrección pertenece al PR de métricas, no al de experimentos.
 4. Escribe `data/evaluacion/arqueo.json` y `docs/ARQUEO.md` sin fecha ni rutas absolutas, para que dos corridas idénticas den los mismos bytes.
 
 `make evaluar VERSION=v2` en `asistente/cli.py` detecta `v2`, construye el grafo y llama a `arqueo.experimentos.evaluar_v2`, que envía la `previa` en el mismo `thread_id` antes de la pregunta de seguimiento. Los resultados van a `data/evaluacion/resultados_v2.jsonl` y `docs/RESULTADOS_FASE2.md`; no sobrescriben los de v1. La revisión humana v2 vive en `config/evaluacion/revision_humana_v2.toml`.
@@ -264,6 +264,17 @@ class Recuperador(Protocol):
 ```
 
 El recuperador simulado de las pruebas y el híbrido real implementan esta firma. `puntaje` siempre es similitud coseno, también para los resultados que solo aporta BM25.
+
+### Normalización de texto
+
+```python
+# texto.py
+def normalizar(texto: str) -> str:
+    """Minúsculas y sin tildes: casefold, NFKD y sin marcas combinantes."""
+    ...
+```
+
+Es la única normalización sin tildes del proyecto: `asistente/evaluacion.py` la importa como `_normalizar` para `contar_terminos`, `arqueo/metricas.py` la usa en `acierta_terminos` y el Tablero compara conceptos con ella. Un cambio aquí afecta a la evaluación, al Arqueo y a las pruebas de los dos.
 
 ### Fila del Tablero
 
