@@ -1,0 +1,17 @@
+{
+  "filas": [
+    {
+      "concepto": "Cuota de Manejo Tarjeta Débito",
+      "categoria": "Tarjeta Débito",
+      "valor": "16.700",
+      "moneda": "COP",
+      "recargos": "",
+      "periodicidad": "",
+      "vigente_desde": "2025-11-20",
+      "origen": "tarifario",
+      "pagina": "data/gold/documents/ver-tarifas-2025-2025-a46157.md",
+      "fuente": "https://www.bancodeoccidente.com.co/documents/d/guest/tarifas-persona-1"
+    }
+  ],
+  "total": 1
+}

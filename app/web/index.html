@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Sucursal 1965 · Banco de Occidente</title>
+  <meta name="description" content="Asistente de conocimiento sobre Banco de Occidente: proyecto académico TAAML, UAO.">
+  <link rel="stylesheet" href="estilos.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <a class="saltar" href="#contenido">Saltar al contenido</a>
+
+  <header class="encabezado">
+    <div class="guilloche" id="guilloche" aria-hidden="true"></div>
+    <div class="encabezado__fila">
+      <a class="marca" href="#vestibulo" aria-label="Sucursal 1965, ir al Vestíbulo">
+        <span class="marca__sello" aria-hidden="true">1965</span>
+        <span class="marca__texto">
+          <strong>Sucursal 1965</strong>
+          <small>Asistente de Banco de Occidente</small>
+        </span>
+      </a>
+
+      <div class="saldo" id="saldo" aria-live="polite">
+        <span class="saldo__etiqueta">Saldo del día</span>
+        <span class="saldo__cifra" id="saldo-cifra">—</span>
+        <span class="saldo__barra" aria-hidden="true"><span id="saldo-relleno"></span></span>
+      </div>
+
+      <div class="acciones">
+        <span class="sello-modo" id="sello-modo" hidden>Datos de ejemplo</span>
+        <button class="boton-tema" id="boton-tema" type="button" aria-label="Cambiar entre tema claro y oscuro">
+          <span aria-hidden="true">◐</span>
+        </button>
+      </div>
+    </div>
+
+    <nav class="navegacion" aria-label="Espacios de la sucursal">
+      <ul>
+        <li><a href="#vestibulo" data-vista="vestibulo">Vestíbulo</a></li>
+        <li><a href="#ventanilla" data-vista="ventanilla">Ventanilla</a></li>
+        <li><a href="#boveda" data-vista="boveda">Bóveda</a></li>
+        <li><a href="#tablero" data-vista="tablero">Tablero de tasas</a></li>
+        <li><a href="#camara" data-vista="camara">Cámara</a></li>
+        <li><a href="#arqueo" data-vista="arqueo">Arqueo</a></li>
+      </ul>
+    </nav>
+  </header>
+
+  <main id="contenido" tabindex="-1">
+    <section id="vista-vestibulo" class="vista" data-vista="vestibulo" aria-labelledby="titulo-vestibulo" hidden></section>
+    <section id="vista-ventanilla" class="vista" data-vista="ventanilla" aria-labelledby="titulo-ventanilla" hidden></section>
+    <section id="vista-boveda" class="vista" data-vista="boveda" aria-labelledby="titulo-boveda" hidden></section>
+    <section id="vista-tablero" class="vista" data-vista="tablero" aria-labelledby="titulo-tablero" hidden></section>
+    <section id="vista-camara" class="vista" data-vista="camara" aria-labelledby="titulo-camara" hidden></section>
+    <section id="vista-arqueo" class="vista" data-vista="arqueo" aria-labelledby="titulo-arqueo" hidden></section>
+  </main>
+
+  <footer class="pie">
+    <p>Proyecto académico del curso TAAML (UAO). Información tomada de fuentes públicas de Banco de Occidente; verifique siempre en los canales oficiales.</p>
+  </footer>
+
+  <noscript><p class="aviso aviso--error">La sucursal necesita JavaScript activado.</p></noscript>
+</body>
+</html>
