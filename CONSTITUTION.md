@@ -65,7 +65,7 @@ oferta, presencia digital y datos duros.
 | **Fase 1** | Captura del sitio (Bronze), limpieza (Silver) y corpus Gold con metadatos | ✅ |
 | **Fase 2** | Cobertura del checklist y reporte `_INDICE.md` | ✅ |
 | **Fase 3** | Documentos (PDF), YouTube (subtítulos) y noticias (hechos oficiales + prensa curada) como fuentes complementarias | 🚧 |
-| **Fase 4** | Chunking + embeddings y consumo desde el RAG del Módulo 2 | ⏳ |
+| **Fase 4** | Chunking + embeddings y consumo desde el RAG del Módulo 2 | 🚧 |
 
 **Dentro del alcance:** páginas HTML públicas del dominio, `robots.txt`,
 `sitemap.xml` (índice de índices de Liferay), noticias, blog, información
@@ -118,8 +118,10 @@ descarga masiva de PDF, transcripción de vídeo.
 > **Embeddings:** corren locales en Ollama y se configuran con `base_url`
 > explícito (por defecto `http://127.0.0.1:11434`), no con el `OLLAMA_HOST` del
 > servidor: ese valor es la dirección de *bind* del daemon y puede ser
-> `0.0.0.0`. El plano de embeddings no usa clave y no aparece en el consumo de
-> DeepSeek; solo el chat se factura.
+> `0.0.0.0`. Cada petición lleva `timeout` explícito
+> (`embeddings.timeout_segundos`, 30 s por defecto) para que una Ollama colgada
+> no bloquee `make indice`. El plano de embeddings no usa clave y no aparece en
+> el consumo de DeepSeek; solo el chat se factura.
 
 > **App del asistente:** `app/streamlit_app.py` es una **capa delgada**. Solo
 > pinta, cachea y delega en `asistente/servicio.py`, `asistente/manifest.py` y
@@ -183,6 +185,11 @@ ProyectoAvance1/
 │   │   ├── manifest.py   # APP: tokens del manifest + fecha del commit (git log)
 │   │   ├── servicio.py   # APP: ejecuta tareas, mide tiempo y captura errores
 │   │   └── validacion.py # límites, fuente, cifras, PII e inyección
+│   ├── boveda/           # BÓVEDA: fragmentos, embeddings, índice y recuperación
+│   │   ├── fragmentos.py # fragmentos deterministas desde chunks y hechos
+│   │   ├── embeddings.py # Ollama local con prefijos de tarea
+│   │   ├── almacen.py    # Chroma persistente con métrica coseno
+│   │   └── indice.py     # índice por alcance + indice.json
 │   ├── checklist.py      # 24 casillas del Taller 1
 │   ├── stats.py          # _INDICE.md
 │   └── utils.py          # hashing, JSONL, tokens, slugs
@@ -190,12 +197,14 @@ ProyectoAvance1/
 ├── config/site.toml      # alcance, cortesía, filtros y secciones
 ├── config/contexto.toml  # secciones, prioridad y presupuesto del contexto
 ├── config/prompts/       # prompts versionados (qa_v0.md, qa_v1.md, faq_v1.md, resumen_v1.md)
+├── config/sucursal.toml  # embeddings locales, prefijos y recuperación de la fase 2
 ├── data/
 │   ├── raw/              # Bronze (ignorado por Git)
 │   ├── processed/        # Silver (ignorado por Git)
 │   ├── gold/             # Gold (VERSIONADO) → páginas, documentos y videos
 │   ├── contexto/         # Contexto (VERSIONADO) → prompt del asistente + manifest
 │   └── knowledge/        # Knowledge (VERSIONADO) → entidades, hechos, relaciones
+├── data/boveda/          # BÓVEDA (ignorado) → Chroma, fragmentos e indice.json
 ├── scripts/
 │   ├── tasks.py          # tareas del Makefile portables (Windows/Unix)
 │   ├── demo_offline.py   # pipeline completo con un fixture, sin red
@@ -619,6 +628,7 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 | 2026-10-29 | Hook `no-commit-to-branch` para `main` | Protección local mientras el repositorio privado no tenga GitHub Pro |
 | 2026-10-29 | Repositorio público y ruleset «Proteger-main» | La protección de ramas en un repositorio privado exige GitHub Pro; el corpus y el código son públicos. Se revisó el historial antes de publicar: sin claves ni secretos |
 | 2026-11-03 | Fase 2: dependencias de Bóveda, Sucursal y Arqueo en un solo PR (`uv add`): `langgraph`, `langgraph-checkpoint-sqlite`, `langchain-chroma`, `langchain-classic`, `langchain-community`, `langchain-ollama`, `rank-bm25`, `fastapi`, `uvicorn[standard]` y `scikit-learn` | La Bóveda necesita Ollama/Chroma/BM25, la Sucursal LangGraph/FastAPI y el Arqueo PCA. Concentrarlas evita conflictos de `uv.lock` entre cuatro ramas; el resto de PR se rebasa sobre `main`. `sqlalchemy` no se añade directo: entra como dependencia de `langchain-community`. Embeddings locales: solo DeepSeek se paga (`langchain-community` está en sunset, se acepta por `BM25Retriever` y se revisará si se retira) |
+| 2026-11-03 | Bóveda: fragmentos deterministas, embeddings locales con `nomic-embed-text-v2-moe` y Chroma con distancia coseno en `data/boveda/` | El corpus no sale a un tercero y los vectores no consumen la cuota de DeepSeek. Se usa `base_url` explícito (`OLLAMA_HOST` solo como respaldo) porque el bind del daemon puede ser `0.0.0.0`. El índice se reconstruye entero en cada `make indice` para no dejar fragmentos huérfanos, y los ids repetidos se descartan al construir fragmentos. `make indice-completo` añade PDF restantes y videos |
 
 ## 12. Configuración local (no trackear)
 

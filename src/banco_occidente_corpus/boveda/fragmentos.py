@@ -26,9 +26,8 @@ Alcance = Literal["base", "completo"]
 #: Tokens mínimos que debe alcanzar un fragmento fusionado.
 TOKENS_MINIMOS: int = 80
 #: Tokens a partir de los cuales un fragmento se parte por párrafos.
-TOKENS_MAXIMOS: int = (
-    400  #: Proporción de páginas web en la que una línea debe aparecer para ser ruido repetido.
-)
+TOKENS_MAXIMOS: int = 400
+#: Proporción de páginas web en la que una línea debe aparecer para ser ruido repetido.
 RATIO_REPETIDAS: float = 0.15
 #: Mínimo absoluto de páginas web para considerar una línea como repetida.
 MIN_DOCS_REPETIDAS: int = 5
@@ -65,6 +64,7 @@ class ResumenFragmentos:
     hechos_por_revision: dict[str, int]
     omitidos_sin_evidencia: int
     omitidos_pii: int
+    duplicados: int = 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -153,6 +153,7 @@ def construir_fragmentos(config: Config, alcance: Alcance = "base") -> Resultado
 
     hechos, revisiones, omitidos_sin_evidencia, omitidos_pii = _fragmentos_de_hechos(config)
     fragmentos.extend(hechos)
+    fragmentos, duplicados = _sin_repetidos(fragmentos)
 
     resumen = _resumir(
         fragmentos,
@@ -164,6 +165,7 @@ def construir_fragmentos(config: Config, alcance: Alcance = "base") -> Resultado
         revisiones=revisiones,
         omitidos_sin_evidencia=omitidos_sin_evidencia,
         omitidos_pii=omitidos_pii,
+        duplicados=duplicados,
     )
     return ResultadoFragmentos(fragmentos=tuple(fragmentos), resumen=resumen)
 
@@ -196,6 +198,7 @@ def formatear_resumen(resumen: ResumenFragmentos, ruta: Path) -> str:
             f"en {resumen.partes_tablas_partidas} partes"
         ),
         f"lineas_repetidas: {resumen.lineas_repetidas} (líneas distintas marcadas)",
+        f"Duplicados descartados: {resumen.duplicados}",
     ]
     if resumen.lineas_frecuentes:
         lineas.append("Líneas repetidas más frecuentes:")
@@ -658,6 +661,7 @@ def _resumir(
     revisiones: dict[str, int],
     omitidos_sin_evidencia: int,
     omitidos_pii: int,
+    duplicados: int = 0,
 ) -> ResumenFragmentos:
     """Calcula las métricas del resumen a partir de los fragmentos construidos."""
     lista = list(fragmentos)
@@ -679,4 +683,17 @@ def _resumir(
         hechos_por_revision=dict(sorted(revisiones.items())),
         omitidos_sin_evidencia=omitidos_sin_evidencia,
         omitidos_pii=omitidos_pii,
+        duplicados=duplicados,
     )
+
+
+def _sin_repetidos(fragmentos: Sequence[Fragmento]) -> tuple[list[Fragmento], int]:
+    """Descarta fragmentos con id repetido y conserva el primero de cada uno."""
+    vistos: set[str] = set()
+    unicos: list[Fragmento] = []
+    for fragmento in fragmentos:
+        if fragmento.id in vistos:
+            continue
+        vistos.add(fragmento.id)
+        unicos.append(fragmento)
+    return unicos, len(fragmentos) - len(unicos)
