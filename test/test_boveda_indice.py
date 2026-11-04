@@ -11,6 +11,7 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
+import httpx
 import pytest
 from langchain_core.embeddings import DeterministicFakeEmbedding, Embeddings
 
@@ -19,6 +20,7 @@ from banco_occidente_corpus.boveda.almacen import ChromaAlmacen, Coincidencia
 from banco_occidente_corpus.boveda.configuracion import (
     PREFIJO_CONSULTA,
     PREFIJO_DOCUMENTO,
+    TIMEOUT_POR_DEFECTO,
     ConfiguracionEmbeddings,
     cargar_configuracion_embeddings,
     normalizar_base_url,
@@ -30,8 +32,12 @@ from banco_occidente_corpus.boveda.embeddings import (
 )
 from banco_occidente_corpus.boveda.fragmentos import escribir_fragmentos, ruta_fragmentos
 from banco_occidente_corpus.boveda.indice import (
+    AvisoLote,
+    Progreso,
     ResumenIndice,
+    TiempoAgotadoEmbeddings,
     construir_indice,
+    formatear_duracion,
     formatear_resumen_indice,
     ruta_almacen,
     ruta_metadatos,
@@ -70,6 +76,18 @@ class EspiaEmbeddings(Embeddings):
     def embed_query(self, text: str) -> list[float]:
         self.consultas.append(text)
         return [1.0] * self.dimension
+
+
+class ProveedorTiempoAgotado(Embeddings):
+    """Proveedor simulado que agota el tiempo de espera, sin llamar a Ollama."""
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Lanza el mismo error que httpx cuando Ollama no responde."""
+        raise httpx.ReadTimeout(f"sin respuesta para {len(texts)} textos")
+
+    def embed_query(self, text: str) -> list[float]:
+        """Lanza el mismo error que httpx cuando Ollama no responde."""
+        raise httpx.ReadTimeout(f"sin respuesta para {text!r}")
 
 
 class AlmacenFalso:
@@ -261,6 +279,14 @@ def test_config_rechaza_timeout_no_positivo(tmp_path: Path) -> None:
         cargar_configuracion_embeddings(ruta)
 
 
+def test_config_usa_timeout_para_equipos_sin_gpu(tmp_path: Path) -> None:
+    """Sin timeout en el TOML, el respaldo cubre un lote de 64 en CPU."""
+    ruta = escribir_toml(tmp_path, "[embeddings]\n")
+
+    assert TIMEOUT_POR_DEFECTO == 300.0
+    assert cargar_configuracion_embeddings(ruta).timeout == 300.0
+
+
 def test_opciones_ollama_fijan_el_timeout() -> None:
     """Toda petición a Ollama lleva un timeout explícito."""
     opciones = opciones_ollama(ConfiguracionEmbeddings(timeout=12.5))
@@ -393,6 +419,53 @@ def test_indice_escribe_metadatos_y_reinicia(tmp_path: Path) -> None:
     assert resumen.ruta_almacen == ruta_almacen(config)
 
 
+def test_indice_avisa_por_lote_con_los_conteos(tmp_path: Path) -> None:
+    """El callback recibe un aviso por lote con los fragmentos procesados."""
+    config = make_config(tmp_path)
+    write_jsonl(
+        ruta_fragmentos(config, "base"),
+        [fila_fragmento(f"frag:{numero}") for numero in range(150)],
+    )
+    avisos: list[AvisoLote] = []
+
+    construir_indice(
+        config,
+        "base",
+        configuracion=ConfiguracionEmbeddings(prefijos=False),
+        embeddings=DeterministicFakeEmbedding(size=4),
+        almacen=AlmacenFalso(),
+        progreso=avisos.append,
+    )
+
+    assert [(aviso.lote, aviso.lotes, aviso.procesados, aviso.total) for aviso in avisos] == [
+        (1, 3, 64, 150),
+        (2, 3, 128, 150),
+        (3, 3, 150, 150),
+    ]
+
+
+def test_indice_timeout_no_reinicia_el_almacen(tmp_path: Path) -> None:
+    """Un lote que agota el tiempo deja el índice anterior intacto."""
+    config = make_config(tmp_path)
+    write_jsonl(ruta_fragmentos(config, "base"), [fila_fragmento("frag:a")])
+    almacen = AlmacenFalso()
+
+    with pytest.raises(TiempoAgotadoEmbeddings) as error:
+        construir_indice(
+            config,
+            "base",
+            configuracion=ConfiguracionEmbeddings(timeout=300.0),
+            embeddings=ProveedorTiempoAgotado(),
+            almacen=almacen,
+        )
+
+    assert error.value.lote == 1
+    assert error.value.lotes == 1
+    assert error.value.timeout_segundos == 300.0
+    assert almacen.reinicios == 0
+    assert not ruta_metadatos(config).exists()
+
+
 def test_indice_falla_si_faltan_los_fragmentos(tmp_path: Path) -> None:
     """Sin JSONL de fragmentos el error dice qué comando ejecutar."""
     config = make_config(tmp_path)
@@ -443,6 +516,15 @@ def test_indice_completo_incluye_pdf_financiero(tmp_path: Path) -> None:
     assert "https://www.bancodeoccidente.com.co/balance" in urls
 
 
+@pytest.mark.parametrize(
+    ("segundos", "esperado"),
+    [(0.0, "0 s"), (45.0, "45 s"), (60.0, "1 min 0 s"), (130.7, "2 min 10 s")],
+)
+def test_formatear_duracion(segundos: float, esperado: str) -> None:
+    """El avance y el total usan minutos y segundos legibles."""
+    assert formatear_duracion(segundos) == esperado
+
+
 def test_resumen_indice_menciona_rutas_y_conteo(tmp_path: Path) -> None:
     """El texto de salida incluye alcance, modelo, dimensión y rutas."""
     resumen = ResumenIndice(
@@ -478,7 +560,7 @@ def test_cli_indice_imprime_el_resumen(
     )
     monkeypatch.setattr(
         "banco_occidente_corpus.boveda.__main__.construir_indice",
-        lambda config, alcance: resumen,
+        lambda *_args, **_kwargs: resumen,
     )
 
     codigo = main(["indice", "--alcance", "base"])
@@ -487,12 +569,83 @@ def test_cli_indice_imprime_el_resumen(
     assert "Fragmentos indexados: 3" in capsys.readouterr().out
 
 
+def test_cli_indice_muestra_el_avance_y_el_tiempo_total(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """El comando imprime cada lote terminado y el tiempo total al final."""
+    resumen = ResumenIndice(
+        alcance="base",
+        modelo="nomic-embed-text-v2-moe",
+        prefijos=True,
+        fragmentos=100,
+        dimension=8,
+        ruta_metadatos=tmp_path / "indice.json",
+        ruta_almacen=tmp_path / "chroma",
+    )
+
+    def construir(
+        config: Config,
+        alcance: str,
+        *,
+        progreso: Progreso | None = None,
+    ) -> ResumenIndice:
+        """Simula dos lotes terminados y devuelve el resumen."""
+        if progreso is not None:
+            progreso(AvisoLote(lote=1, lotes=2, procesados=64, total=100))
+            progreso(AvisoLote(lote=2, lotes=2, procesados=100, total=100))
+        return resumen
+
+    monkeypatch.setattr("banco_occidente_corpus.boveda.__main__.construir_indice", construir)
+
+    codigo = main(["indice"])
+
+    salida = capsys.readouterr().out
+    assert codigo == 0
+    assert "lote 1/2 · 64/100 fragmentos" in salida
+    assert "lote 2/2 · 100/100 fragmentos" in salida
+    assert "Tiempo total:" in salida
+
+
+def test_cli_indice_timeout_muestra_mensaje_y_codigo_1(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """Un proveedor que agota el tiempo deja un mensaje claro y código 1."""
+    config = make_config(tmp_path)
+    write_jsonl(ruta_fragmentos(config, "base"), [fila_fragmento("frag:a")])
+    monkeypatch.setattr("banco_occidente_corpus.boveda.__main__.load_config", lambda: config)
+    monkeypatch.setattr(
+        "banco_occidente_corpus.boveda.indice.crear_embeddings",
+        lambda *_args, **_kwargs: ProveedorTiempoAgotado(),
+    )
+    monkeypatch.setattr(
+        "banco_occidente_corpus.boveda.indice.cargar_configuracion_embeddings",
+        lambda *_args, **_kwargs: ConfiguracionEmbeddings(timeout=300.0),
+    )
+
+    codigo = main(["indice"])
+
+    salida = capsys.readouterr()
+    assert codigo == 1
+    assert "lote 1 de 1" in salida.err
+    assert "El índice anterior queda intacto" in salida.err
+    assert "timeout_segundos" in salida.err
+    assert "ollama ps" in salida.err
+    assert "Traceback" not in salida.err
+    assert not ruta_metadatos(config).exists()
+
+
 def test_cli_indice_reporta_error(
     monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
 ) -> None:
     """Un error de construcción devuelve 1 y explica el motivo por stderr."""
 
-    def fallar(config: Config, alcance: str) -> ResumenIndice:
+    def fallar(
+        config: Config,
+        alcance: str,
+        *,
+        progreso: Progreso | None = None,
+    ) -> ResumenIndice:
+        """Simula un fallo de construcción del índice."""
         raise FileNotFoundError("No hay fragmentos: ejecuta `make fragmentos`.")
 
     monkeypatch.setattr("banco_occidente_corpus.boveda.__main__.construir_indice", fallar)

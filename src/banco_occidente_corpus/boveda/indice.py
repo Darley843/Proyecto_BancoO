@@ -9,11 +9,12 @@ dimensión, para detectar cuándo el índice dejó de ser compatible.
 from __future__ import annotations
 
 import json
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
+import httpx
 from langchain_core.embeddings import Embeddings
 
 from ..config import Config
@@ -44,6 +45,31 @@ class ResumenIndice:
     dimension: int
     ruta_metadatos: Path
     ruta_almacen: Path
+
+
+@dataclass(frozen=True, slots=True)
+class AvisoLote:
+    """Avance de la vectorización después de terminar un lote."""
+
+    lote: int
+    lotes: int
+    procesados: int
+    total: int
+
+
+#: Callback opcional que recibe el avance de cada lote terminado.
+Progreso = Callable[[AvisoLote], None]
+
+
+class TiempoAgotadoEmbeddings(RuntimeError):
+    """El proveedor de embeddings no respondió dentro del tiempo configurado."""
+
+    def __init__(self, *, lote: int, lotes: int, timeout_segundos: float) -> None:
+        """Guarda el lote que falló y el tiempo de espera configurado."""
+        super().__init__(f"tiempo de espera agotado al vectorizar el lote {lote} de {lotes}")
+        self.lote = lote
+        self.lotes = lotes
+        self.timeout_segundos = timeout_segundos
 
 
 def carpeta_boveda(config: Config) -> Path:
@@ -97,6 +123,7 @@ def construir_indice(
     configuracion: ConfiguracionEmbeddings | None = None,
     embeddings: Embeddings | None = None,
     almacen: AlmacenVectorial | None = None,
+    progreso: Progreso | None = None,
 ) -> ResumenIndice:
     """Reconstruye el índice del alcance y escribe sus metadatos.
 
@@ -106,6 +133,7 @@ def construir_indice(
         configuracion: parámetros de embeddings; se cargan del TOML si faltan.
         embeddings: proveedor alternativo (pruebas); por defecto Ollama.
         almacen: almacén alternativo (pruebas); por defecto Chroma.
+        progreso: callback opcional que recibe el avance de cada lote.
 
     Returns:
         El resumen del índice construido.
@@ -118,7 +146,12 @@ def construir_indice(
     destino = almacen or ChromaAlmacen(ruta_almacen(config))
 
     # Vectorizar primero: si Ollama falla, el índice anterior queda intacto.
-    vectores = _vectorizar(proveedor, fragmentos)
+    vectores = _vectorizar(
+        proveedor,
+        fragmentos,
+        timeout_segundos=ajustes.timeout,
+        progreso=progreso,
+    )
     dimension = len(vectores[0])
     if dimension == 0:
         raise ValueError("El proveedor de embeddings devolvió vectores vacíos")
@@ -160,12 +193,45 @@ def formatear_resumen_indice(resumen: ResumenIndice) -> str:
     )
 
 
-def _vectorizar(proveedor: Embeddings, fragmentos: Sequence[Fragmento]) -> list[list[float]]:
-    """Vectoriza los fragmentos por lotes y devuelve listas de flotantes."""
+def formatear_duracion(segundos: float) -> str:
+    """Convierte segundos en un texto corto como `2 min 10 s`."""
+    total = max(0, int(segundos))
+    minutos, resto = divmod(total, 60)
+    if minutos == 0:
+        return f"{resto} s"
+    return f"{minutos} min {resto} s"
+
+
+def _vectorizar(
+    proveedor: Embeddings,
+    fragmentos: Sequence[Fragmento],
+    *,
+    timeout_segundos: float,
+    progreso: Progreso | None = None,
+) -> list[list[float]]:
+    """Vectoriza los fragmentos por lotes y avisa del avance de cada uno."""
     vectores: list[list[float]] = []
-    for lote in _lotes(fragmentos, LOTE_EMBEDDINGS):
-        calculados = proveedor.embed_documents([fragmento.texto for fragmento in lote])
+    total = len(fragmentos)
+    lotes = (total + LOTE_EMBEDDINGS - 1) // LOTE_EMBEDDINGS
+    for numero, lote in enumerate(_lotes(fragmentos, LOTE_EMBEDDINGS), start=1):
+        try:
+            calculados = proveedor.embed_documents([fragmento.texto for fragmento in lote])
+        except httpx.TimeoutException as error:
+            raise TiempoAgotadoEmbeddings(
+                lote=numero,
+                lotes=lotes,
+                timeout_segundos=timeout_segundos,
+            ) from error
         vectores.extend([float(valor) for valor in vector] for vector in calculados)
+        if progreso is not None:
+            progreso(
+                AvisoLote(
+                    lote=numero,
+                    lotes=lotes,
+                    procesados=len(vectores),
+                    total=total,
+                )
+            )
     if len(vectores) != len(fragmentos):
         raise ValueError(f"Se esperaban {len(fragmentos)} vectores y se obtuvieron {len(vectores)}")
     return vectores

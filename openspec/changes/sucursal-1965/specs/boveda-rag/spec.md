@@ -105,6 +105,11 @@ El sistema SHALL persistir el índice en `data/boveda/chroma` y MUST crear la co
 - **WHEN** se borra `data/boveda/` y se vuelve a ejecutar la indexación
 - **THEN** el índice se reconstruye con el mismo número de fragmentos
 
+#### Scenario: Avance y tiempo de espera agotado
+
+- **WHEN** `make indice` vectoriza por lotes y un lote supera `timeout_segundos`
+- **THEN** la salida muestra el avance de cada lote terminado (`lote 3/15 · 192/952 fragmentos · 2 min 10 s`) y, si un lote agota el tiempo, un mensaje sin traceback indica qué lote falló, que el índice anterior queda intacto y cómo subir el timeout o revisar Ollama con `ollama ps`, con código de salida 1
+
 #### Scenario: Índice fuera de Git
 
 - **WHEN** se revisa el estado de Git después de indexar

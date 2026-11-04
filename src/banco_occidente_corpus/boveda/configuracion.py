@@ -22,8 +22,8 @@ RUTA_CONFIG: Path = PROJECT_ROOT / "config" / "sucursal.toml"
 MODELO_POR_DEFECTO: str = "nomic-embed-text-v2-moe"
 #: URL local de Ollama (escucha en 127.0.0.1, no en 0.0.0.0).
 URL_POR_DEFECTO: str = "http://127.0.0.1:11434"
-#: Segundos de espera por petición al modelo de embeddings.
-TIMEOUT_POR_DEFECTO: float = 30.0
+#: Segundos de espera por lote de embeddings. Cubre un lote de 64 en CPU sin GPU.
+TIMEOUT_POR_DEFECTO: float = 300.0
 #: Prefijo que nomic espera al indexar documentos.
 PREFIJO_DOCUMENTO: str = "search_document: "
 #: Prefijo que nomic espera al consultar.

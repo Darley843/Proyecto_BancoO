@@ -10,5 +10,7 @@ modelo = "nomic-embed-text-v2-moe"
 base_url = "http://127.0.0.1:11434"
 # Prefijos de tarea de nomic. Se pueden desactivar para el experimento del Arqueo.
 prefijos = true
-# Segundos de espera para cada lote de embeddings: una Ollama colgada no bloquea make indice.
-timeout_segundos = 30.0
+# Segundos de espera para cada lote de embeddings. En un portátil sin GPU, Ollama
+# en CPU tarda cerca de un minuto en vectorizar un lote de 64 fragmentos; 300 s
+# deja margen sin permitir que una Ollama colgada bloquee make indice.
+timeout_segundos = 300.0
