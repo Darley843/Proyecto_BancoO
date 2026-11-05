@@ -14,3 +14,10 @@ prefijos = true
 # en CPU tarda cerca de un minuto en vectorizar un lote de 64 fragmentos; 300 s
 # deja margen sin permitir que una Ollama colgada bloquee make indice.
 timeout_segundos = 300.0
+
+[recuperacion]
+# Fragmentos que devuelve el recuperador cuando no se indica k.
+k = 5
+# Pesos del híbrido; se normalizan a suma 1 antes de pasarlos a EnsembleRetriever.
+peso_vectorial = 0.6
+peso_bm25 = 0.4

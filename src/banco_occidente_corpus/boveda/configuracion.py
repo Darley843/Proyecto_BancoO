@@ -24,6 +24,12 @@ MODELO_POR_DEFECTO: str = "nomic-embed-text-v2-moe"
 URL_POR_DEFECTO: str = "http://127.0.0.1:11434"
 #: Segundos de espera por lote de embeddings. Cubre un lote de 64 en CPU sin GPU.
 TIMEOUT_POR_DEFECTO: float = 300.0
+#: Fragmentos que devuelve el recuperador cuando no se indica k.
+K_POR_DEFECTO: int = 5
+#: Peso del componente vectorial en el híbrido.
+PESO_VECTORIAL_POR_DEFECTO: float = 0.6
+#: Peso del componente BM25 en el híbrido.
+PESO_BM25_POR_DEFECTO: float = 0.4
 #: Prefijo que nomic espera al indexar documentos.
 PREFIJO_DOCUMENTO: str = "search_document: "
 #: Prefijo que nomic espera al consultar.
@@ -42,6 +48,15 @@ class ConfiguracionEmbeddings:
     base_url: str = URL_POR_DEFECTO
     prefijos: bool = True
     timeout: float = TIMEOUT_POR_DEFECTO
+
+
+@dataclass(frozen=True, slots=True)
+class ConfiguracionRecuperacion:
+    """Parámetros del recuperador híbrido de la Bóveda."""
+
+    k: int = K_POR_DEFECTO
+    peso_vectorial: float = PESO_VECTORIAL_POR_DEFECTO
+    peso_bm25: float = PESO_BM25_POR_DEFECTO
 
 
 def normalizar_base_url(valor: str) -> str:
@@ -132,4 +147,48 @@ def cargar_configuracion_embeddings(ruta: Path | None = None) -> ConfiguracionEm
         base_url=normalizar_base_url(base_url),
         prefijos=prefijos,
         timeout=float(timeout),
+    )
+
+
+def cargar_configuracion_recuperacion(ruta: Path | None = None) -> ConfiguracionRecuperacion:
+    """Carga `[recuperacion]` de `config/sucursal.toml`.
+
+    Args:
+        ruta: archivo TOML alternativo; por defecto `config/sucursal.toml`.
+
+    Returns:
+        La configuración tipada del recuperador híbrido.
+
+    Raises:
+        ValueError: si k no es positivo, un peso es negativo o la suma es cero.
+    """
+    archivo = RUTA_CONFIG if ruta is None else ruta
+    datos: dict[str, Any] = {}
+    if archivo.exists():
+        with archivo.open("rb") as fh:
+            datos = dict(tomllib.load(fh).get("recuperacion", {}))
+
+    k = datos.get("k", K_POR_DEFECTO)
+    if isinstance(k, bool) or not isinstance(k, int) or k <= 0:
+        raise ValueError("recuperacion.k debe ser un entero mayor que cero")
+
+    pesos: dict[str, float] = {}
+    for nombre, defecto in (
+        ("peso_vectorial", PESO_VECTORIAL_POR_DEFECTO),
+        ("peso_bm25", PESO_BM25_POR_DEFECTO),
+    ):
+        valor = datos.get(nombre, defecto)
+        if isinstance(valor, bool) or not isinstance(valor, (int, float)) or valor < 0:
+            raise ValueError(f"recuperacion.{nombre} debe ser un número mayor o igual a cero")
+        pesos[nombre] = float(valor)
+
+    if pesos["peso_vectorial"] + pesos["peso_bm25"] <= 0:
+        raise ValueError(
+            "recuperacion.peso_vectorial + recuperacion.peso_bm25 debe ser mayor que cero"
+        )
+
+    return ConfiguracionRecuperacion(
+        k=k,
+        peso_vectorial=pesos["peso_vectorial"],
+        peso_bm25=pesos["peso_bm25"],
     )
