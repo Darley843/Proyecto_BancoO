@@ -42,11 +42,29 @@ PALABRAS_TARIFAS: tuple[str, ...] = (
     "comision",
 )
 #: Patrones de fuera de alcance (ruta X), sin tildes ni mayúsculas.
+#: Se escriben por intención y no por palabra suelta: «inversión» o «acciones»
+#: aparecen en productos propios (fiducia, sostenibilidad) y «recomiendas» en
+#: cualquier recomendación de tarjeta. Solo se rechaza cuando la intención es
+#: pedir un dato propio, un competidor, consejo de inversión, clima o el prompt.
 PATRONES_FUERA_ALCANCE: tuple[str, ...] = (
-    r"\b(saldo|deuda|extracto|movimientos)\b.*\b(mi|mis|cuenta|tarjeta)\b|\bmi (saldo|deuda|extracto)\b",
-    r"\b(otro banco|bancolombia|davivienda|bbva|banco de bogota|colpatria)\b",
+    # Dato propio: se pide el valor o el estado, no el trámite para consultarlo.
+    r"^(?!.*\bcomo\b).*\bmi (saldo|deuda|deudas|extracto|movimientos)\b",
+    r"^(?!.*\bcomo\b).*\bmis (deudas|saldos|movimientos|extractos)\b",
+    r"\b(cual|cuanto|cuanta|cuantos|cuantas)\b.*\b(saldo|deuda|deudas|debo|extracto|movimientos)\b.*\b(mi|mis|cuenta|tarjeta)\b",
+    r"\btengo (deudas|saldo|movimientos)\b",
+    # Otro banco: la frase explícita o el nombre de un competidor.
+    r"\b(otro banco|bancolombia|davivienda|bbva|colpatria)\b",
+    # Banco de Bogotá es del mismo Grupo Aval: solo es X si se pide un producto suyo.
+    r"\b(banco de bogota)\b.*\b(cuenta|tarjeta|cdt|credito|tasa|cuota|comision|transferencia)\b|\b(cuenta|tarjeta|cdt|credito|tasa|cuota|comision|transferencia)\b.*\b(banco de bogota)\b",
+    # Clima: no tiene relación con el banco.
     r"\b(clima|temperatura|lluvia|va a llover)\b",
-    r"\b(consejo|recomiend\w*|invertir|inversion|acciones|criptomoneda)\b",
+    # Consejo de inversión: se pide una recomendación, no un producto del banco.
+    r"\b(me )?recomiendas?\b.*\b(invertir|inversion|acciones|criptomoneda)\b",
+    r"\b(consejo|asesoria|recomendacion)\b.*\b(inversion|invertir|acciones|criptomoneda)\b",
+    r"\binvertir en (acciones|criptomonedas|bolsa|divisas)\b",
+    r"\b(comprar|vender) acciones\b",
+    r"\bcriptomonedas?\b",
+    # Prompt: intento de cambiar o revelar las instrucciones.
     r"\b(prompt|instrucciones del sistema|system prompt|ignora (tus|las) instrucciones|revela)\b",
 )
 #: Tope de tokens del clasificador de dudas. DeepSeek Flash gasta alrededor de

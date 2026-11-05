@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import tomllib
 from pathlib import Path
 
 import pytest
@@ -17,6 +18,17 @@ from banco_occidente_corpus.sucursal.digiturno import (
     clasificador_deepseek,
     clasificar,
     crear_clasificador,
+)
+
+RAIZ = Path(__file__).resolve().parents[1]
+ARCHIVO_PREGUNTAS = RAIZ / "config" / "evaluacion" / "preguntas_fase2.toml"
+
+#: Preguntas de producto que la revisión del PR 62 encontró rechazadas por X.
+PREGUNTAS_DE_PRODUCTO: tuple[str, ...] = (
+    "¿Qué opciones de inversión ofrece el Banco de Occidente?",
+    "¿Tienen fiducia de inversión?",
+    "¿Qué tarjeta me recomiendas para viajar?",
+    "¿Qué bancos forman el Grupo Aval junto al Banco de Bogotá?",
 )
 
 
@@ -69,6 +81,35 @@ def test_saldo_propio_cae_en_fuera_de_alcance() -> None:
 def test_otros_fuera_de_alcance(pregunta: str) -> None:
     """Otro banco, clima, inversión y prompt también son X."""
     assert clasificar(pregunta).letra == "X"
+
+
+@pytest.mark.parametrize("pregunta", PREGUNTAS_DE_PRODUCTO)
+def test_pregunta_de_producto_no_cae_en_fuera_de_alcance(pregunta: str) -> None:
+    """Inversión, fiducia, tarjetas y Grupo Aval son consultas del banco."""
+    assert clasificar(pregunta).letra == "B"
+
+
+def test_como_consultar_el_extracto_no_es_dato_propio() -> None:
+    """Preguntar por el trámite no es pedir el saldo ni el extracto propio."""
+    assert clasificar("¿Cómo consulto el extracto de mi tarjeta?").letra == "B"
+
+
+def test_las_44_preguntas_del_set_respetan_la_ruta_x() -> None:
+    """Ningún patrón X rechaza una pregunta que el Arqueo espera en B o T."""
+    preguntas = tomllib.loads(ARCHIVO_PREGUNTAS.read_text(encoding="utf-8"))["pregunta"]
+    assert len(preguntas) == 44
+
+    errores: list[str] = []
+    for pregunta in preguntas:
+        numero = pregunta["id"]
+        esperada = str(pregunta["ruta_esperada"])
+        turno = clasificar(str(pregunta["pregunta"]))
+        if esperada == "X" and turno.letra != "X":
+            errores.append(f"{numero}: esperada X, salió {turno.letra} :: {pregunta['pregunta']}")
+        elif esperada != "X" and turno.letra == "X":
+            errores.append(f"{numero}: esperada {esperada}, salió X :: {pregunta['pregunta']}")
+
+    assert not errores, "El digiturno rompe la ruta del Arqueo:\n" + "\n".join(errores)
 
 
 def test_cuota_de_manejo_cae_en_tarifas() -> None:
