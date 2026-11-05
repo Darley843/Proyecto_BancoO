@@ -9,6 +9,7 @@ devolvió BM25. El módulo no hace red propia: embeddings y almacén se inyectan
 from __future__ import annotations
 
 import math
+import re
 from collections.abc import Sequence
 from dataclasses import replace
 from typing import Any
@@ -21,6 +22,7 @@ from langchain_core.embeddings import Embeddings
 from langchain_core.retrievers import BaseRetriever
 
 from ..config import Config
+from ..texto import normalizar
 from .almacen import AlmacenVectorial, ChromaAlmacen
 from .configuracion import ConfiguracionRecuperacion, cargar_configuracion_recuperacion
 from .embeddings import crear_embeddings
@@ -86,7 +88,9 @@ class RecuperadorHibrido:
         ]
         self._k = max(ajustes.k, K_MINIMO)
         self._vectorial = RecuperadorVectorial(almacen=almacen, embeddings=embeddings, k=self._k)
-        self._bm25 = BM25Retriever.from_documents(self._documentos, k=self._k)
+        self._bm25 = BM25Retriever.from_documents(
+            self._documentos, k=self._k, preprocess_func=_tokenizar
+        )
         self._ensemble = EnsembleRetriever(
             retrievers=[self._vectorial, self._bm25],
             weights=_normalizar_pesos(ajustes),
@@ -150,6 +154,18 @@ def crear_recuperador(
     destino = almacen or ChromaAlmacen(ruta_almacen(config))
     fragmentos = leer_fragmentos(config, alcance)
     return RecuperadorHibrido(destino, proveedor, fragmentos, configuracion)
+
+
+def _tokenizar(texto: str) -> list[str]:
+    """Divide el texto en palabras en minúsculas y sin tildes para BM25.
+
+    Args:
+        texto: texto original del fragmento o de la consulta.
+
+    Returns:
+        Las palabras alfanuméricas normalizadas; el resto de signos se descarta.
+    """
+    return re.findall(r"\w+", normalizar(texto))
 
 
 def _normalizar_pesos(configuracion: ConfiguracionRecuperacion) -> list[float]:
