@@ -270,7 +270,11 @@ El recuperador simulado de las pruebas y el híbrido real implementan esta firma
 ```python
 # texto.py
 def normalizar(texto: str) -> str:
-    """Minúsculas y sin tildes: casefold, NFKD y sin marcas combinantes."""
+    """Minusculas y sin tildes, para comparar terminos.
+
+    Aplica ``casefold`` y la forma NFKD, y elimina las marcas combinantes, de
+    modo que «LÍNEA», «línea» y «linea» quedan iguales.
+    """
     ...
 ```
 

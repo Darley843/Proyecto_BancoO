@@ -7,7 +7,8 @@
 #   "X" fuera de alcance: rechazo o bloqueo
 # previa: solo en "seguimiento"; texto exacto de la pregunta anterior.
 # fuentes_esperadas: lista de URLs; cada una debe existir como "fuente"
-#                    en data/gold/corpus.jsonl, comparada exactamente.
+#                    en data/gold/corpus.jsonl o data/gold/documents.jsonl,
+#                    comparada exactamente.
 
 [[pregunta]]
 id = 1
@@ -29,7 +30,7 @@ terminos = [["Carrera 3", "602", "485"]]
 fuentes_esperadas = [
   "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas",
 ]
-nota = "No hay buscador de oficinas, pero el corpus trae la sede de Cali (Carrera 3 No. 8-13, en la pagina de accionistas) y la linea de Cali."
+nota = "No hay buscador de oficinas. La única dirección de Cali en Gold es la de la asamblea (Carrera 3 No. 8-13), en la página de inversionistas; las demás páginas dan el teléfono de Cali o remiten a un enlace sin dirección."
 
 [[pregunta]]
 id = 3
@@ -183,6 +184,8 @@ ruta_esperada = "B"
 terminos = [["vehículo", "carro", "auto"]]
 fuentes_esperadas = [
   "https://www.bancodeoccidente.com.co/creditos/carros",
+  "https://www.bancodeoccidente.com.co/creditos/vehiculos",
+  "https://www.bancodeoccidente.com.co/creditos/vehiculos-electricos-hibridos",
 ]
 
 [[pregunta]]
@@ -227,7 +230,15 @@ ruta_esperada = "B"
 terminos = [["2026", "2025"]]
 fuentes_esperadas = [
   "https://www.portafolio.co/energia/banco-de-occidente-financiara-con-200-000-millones-parque-solar-en-santander-que-generara-500-gwh-al-ano-504747",
+  "https://www.larepublica.co/finanzas/banco-de-occidente-logro-una-tasa-de-aprobacion-superior-a-90-en-compras-con-tarjeta-4500599",
+  "https://www.valoraanalitik.com/entrevista-banco-de-occidente-crecio-23-en-el-primer-semestre-de-2026-y-apuesta-por-la-digitalizacion/",
+  "https://www.portafolio.co/mis-finanzas/creditos/banco-aleman-presta-us-150-millones-a-banco-de-occidente-en-credito-subordinado-que-es-este-tipo-de-prestamo-503016",
+  "https://www.larepublica.co/finanzas/banco-de-occidente-completo-la-absorcion-por-adquisicion-de-fiduciaria-de-occidente-4472688",
+  "https://www.caf.com/es/actualidad/noticias/caf-y-banco-de-occidente-destinaran-hasta-usd-50-millones-para-la-reactivacion-economica-tras-el-terremoto/",
+  "https://www.elcolombiano.com/negocios/banco-de-occidente-baja-tasa-interes-terremoto-AH40219786",
+  "https://www.portafolio.co/negocios/empresas/banco-de-occidente-eleva-su-utilidad-semestral-y-gana-254-651-millones-solo-en-segundo-trimestre-500377",
 ]
+nota = "recientes = agosto a octubre de 2026, según la fecha de captura del corpus (2026-10-23)"
 
 [[pregunta]]
 id = 21
@@ -451,3 +462,47 @@ ruta_esperada = "X"
 terminos = []
 fuentes_esperadas = []
 nota = "rechazo: fuera del tema"
+
+[[pregunta]]
+id = 41
+pregunta = "¿Cuánto cuesta la cuota de manejo de la tarjeta débito?"
+cobertura = "si"
+tipo = "tabla"
+ruta_esperada = "T"
+terminos = [["16.700", "16700"]]
+fuentes_esperadas = [
+  "https://www.bancodeoccidente.com.co/documents/d/guest/tarifas-persona-1",
+]
+
+[[pregunta]]
+id = 42
+pregunta = "¿Cuál es la cuota de manejo de la Credencial Gold Mastercard?"
+cobertura = "si"
+tipo = "tabla"
+ruta_esperada = "T"
+terminos = [["37.300", "37300"]]
+fuentes_esperadas = [
+  "https://www.bancodeoccidente.com.co/documents/d/guest/tarifas-persona-1",
+]
+
+[[pregunta]]
+id = 43
+pregunta = "¿Cuánto vale una chequera de 30 cheques?"
+cobertura = "si"
+tipo = "tabla"
+ruta_esperada = "T"
+terminos = [["225.000", "225000"]]
+fuentes_esperadas = [
+  "https://www.bancodeoccidente.com.co/documents/d/guest/tarifas-persona-1",
+]
+
+[[pregunta]]
+id = 44
+pregunta = "¿Cuánto cuesta un cheque de gerencia?"
+cobertura = "si"
+tipo = "tabla"
+ruta_esperada = "T"
+terminos = [["34.400", "34400"]]
+fuentes_esperadas = [
+  "https://www.bancodeoccidente.com.co/documents/d/guest/tarifas-persona-1",
+]
