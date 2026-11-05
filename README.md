@@ -197,6 +197,20 @@ Las reglas van antes que el modelo (PII → fuera de alcance → tarifas → dud
 `B`), se configuran en `[digiturno]` de `config/sucursal.toml` y el modelo solo
 se usa para dudas, a temperatura 0. El turno no persiste la pregunta.
 
+### Tablero de tasas
+
+Las cifras exactas (cuotas, coberturas, carencias, precios) no se dejan al
+modelo: salen de un CSV determinista que se versiona.
+
+```bash
+make tablero    # tarifario PDF + tablas de Gold -> data/estructurados/tablero.csv
+```
+
+Cruza las 8 preguntas de tipo `tabla` del set de fase 2 y falla con el detalle si
+alguna no encuentra fila. Cada fila trae `concepto`, `categoria`, `valor`,
+`moneda`, `recargos`, `periodicidad`, `vigente_desde`, `origen`
+(`tarifario`/`tabla_web`), `pagina` y `fuente`.
+
 ### Scraper de demostración
 
 Capa delgada sobre el pipeline: descubre hasta 5 URLs con el índice de sitemaps
@@ -260,9 +274,9 @@ Resultados vigentes y respuestas completas:
 │   ├── live_capture.py        # captura en vivo en carpeta temporal
 │   ├── contexto.py · knowledge.py · documents.py · videos.py · news.py
 │   ├── asistente/             # Q&A, FAQ, resumen y evaluación con DeepSeek
-│   └── boveda/               # fragmentos, embeddings, índice Chroma y recuperador
 │   ├── boveda/               # fragmentos, embeddings, índice Chroma y recuperador
-│   └── sucursal/             # digiturno (B/T/X), grafo y API de la fase 2
+│   ├── sucursal/             # digiturno (B/T/X), grafo y API de la fase 2
+│   └── tablero/              # tarifario y tablas de Gold → data/estructurados/tablero.csv
 ├── scripts/                   # demo_offline.py · scrape_empresa.py · tasks.py
 ├── config/ · data/ · docs/    # configuración, capas y documentación
 ├── config/sucursal.toml       # embeddings y recuperación de la fase 2

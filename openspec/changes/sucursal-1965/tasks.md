@@ -54,12 +54,12 @@
 
 ## 9. PR 7 — Tablero con tarifario y tablas web (Darley — pendiente)
 
-- [ ] 9.1 Crear `tablero/__init__.py`, `tablero/tipos.py` con la dataclass `Fila` y el escritor del CSV con las diez columnas en orden; verificar con una prueba que el encabezado es exacto, que el archivo es UTF-8 y que dos escrituras del mismo contenido son idénticas.
-- [ ] 9.2 Implementar `tablero/tarifas.py` con la máquina de estados de categoría y periodicidad, el patrón «concepto, valor y fecha» y la normalización de fecha a ISO; verificar con fixtures las líneas `Cuota de Manejo Tarjeta Débito $16.700 20-nov-25`, una con `+ IVA`, una con `+ Seguro2` y una sin fecha.
-- [ ] 9.3 Implementar `tablero/tablas_web.py` con el lector de tablas Markdown (pipes escapados incluidos) y adaptadores para asistencias de tarjetas, viajes nacionales, Cuota Protegida, promociones, asistencia vehicular y proyectos de vivienda; verificar con fixtures que se obtienen `USD 2.000`, `USD 10.000`, `EUR 20.000`, 30 días, 90 días, 200, 20 % y 407,027,630 con su fuente.
-- [ ] 9.4 Implementar `tablero/construir.py` para unir ambas fuentes, ordenar de forma determinista y escribir `data/estructurados/tablero.csv`; verificar que `make tablero` regenera el archivo sin red y que el cruce con las 8 preguntas de tabla da 8 de 8 o falla con el detalle de la pregunta sin fila.
-- [ ] 9.5 Implementar `buscar_filas` y `comparar_filas` como funciones puras, sin tildes ni mayúsculas en la comparación, sin modelo ni red; verificar con pruebas de búsqueda por concepto, comparación Visa/Mastercard, comparación con filas solo en un lado y búsqueda sin coincidencias.
-- [ ] 9.6 Documentar en `docs/MODELADO.md` el esquema del CSV, el origen `tarifario`/`tabla_web`, la trazabilidad `pagina`/`fuente` y la regla de no inventar valores; verificar que el documento coincide con `tablero/tipos.py` y con `make tablero`.
+- [x] 9.1 Crear `tablero/__init__.py`, `tablero/tipos.py` con la dataclass `Fila` y el escritor del CSV con las diez columnas en orden; verificar con una prueba que el encabezado es exacto, que el archivo es UTF-8 y que dos escrituras del mismo contenido son idénticas.
+- [x] 9.2 Implementar `tablero/tarifas.py` con la máquina de estados de categoría y periodicidad, el patrón «concepto, valor y fecha» y la normalización de fecha a ISO; verificar con fixtures las líneas `Cuota de Manejo Tarjeta Débito $16.700 20-nov-25`, una con `+ IVA`, una con `+ Seguro2` y una sin fecha.
+- [x] 9.3 Implementar `tablero/tablas_web.py` con el lector de tablas Markdown (pipes escapados incluidos) y adaptadores para asistencias de tarjetas, viajes nacionales, Cuota Protegida, promociones, asistencia vehicular y proyectos de vivienda; verificar con fixtures que se obtienen `USD 2.000`, `USD 10.000`, `EUR 20.000`, 30 días, 90 días, 200, 20 % y 407,027,630 con su fuente.
+- [x] 9.4 Implementar `tablero/construir.py` para unir ambas fuentes, ordenar de forma determinista y escribir `data/estructurados/tablero.csv`; verificar que `make tablero` regenera el archivo sin red y que el cruce con las 8 preguntas de tabla da 8 de 8 o falla con el detalle de la pregunta sin fila.
+- [x] 9.5 Implementar `buscar_filas` y `comparar_filas` como funciones puras, sin tildes ni mayúsculas en la comparación, sin modelo ni red; verificar con pruebas de búsqueda por concepto, comparación Visa/Mastercard, comparación con filas solo en un lado y búsqueda sin coincidencias.
+- [x] 9.6 Documentar en `docs/MODELADO.md` el esquema del CSV, el origen `tarifario`/`tabla_web`, la trazabilidad `pagina`/`fuente` y la regla de no inventar valores; verificar que el documento coincide con `tablero/tipos.py` y con `make tablero`.
 
 ## 10. PR 8 — Digiturno (Darley — pendiente)
 
@@ -108,7 +108,7 @@
 
 - [ ] 16.1 Implementar `app/web/vistas/ventanilla.js`: envía `{pregunta, thread_id}`, guarda el hilo en `sessionStorage` y muestra turno, número, ruta, motivo, reformulada, respuesta, fuentes, tokens, costo, tiempo y caché; verificar con la API real una primera pregunta y un seguimiento en el mismo hilo.
 - [ ] 16.2 Mostrar los estados de error y de índice ausente sin perder el hilo, y permitir reintentar; verificar apagando la API y volviendo a encenderla.
-- [ ] 16.3 Verificar que la vista no decide rutas, no calcula costos y no escribe preguntas en `localStorage`; revisar el archivo y la prueba de forma de `preguntar.json`.
+- [x] 16.3 Verificar que la vista no decide rutas, no calcula costos y no escribe preguntas en `localStorage`; revisar el archivo y la prueba de forma de `preguntar.json`.
 
 ## 17. PR 14 — Bóveda (vista) (Yoldy — pendiente)
 

@@ -4,8 +4,8 @@
   "ruta": "tablero",
   "motivo": "tarifas y coberturas",
   "uso_modelo": false,
-  "reformulada": null,
-  "respuesta": "La cuota de manejo de la tarjeta débito es $16.700 ...",
+  "reformulada": "¿Cuánto cuesta la cuota de manejo de la tarjeta débito?",
+  "respuesta": "La cuota de manejo de la tarjeta débito es de $16.700, vigente desde el 20 de noviembre de 2025 [1].",
   "fuentes": [
     {
       "n": 1,

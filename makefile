@@ -102,6 +102,11 @@ indice-completo: ## Indexa ademas el resto de PDF y los videos (Ollama)
 	$(UV) run python -m banco_occidente_corpus.boveda fragmentos --alcance completo
 	$(UV) run python -m banco_occidente_corpus.boveda indice --alcance completo
 
+.PHONY: tablero
+tablero: ## Construye data/estructurados/tablero.csv y cruza las 8 preguntas de tabla
+	$(UV) run python -m banco_occidente_corpus.tablero
+
+
 
 .PHONY: docs
 docs: ## Inventaria, descarga y extrae PDFs (balances, informes, gobierno)

@@ -28,7 +28,10 @@ TOKENS_MINIMOS: int = 80
 #: Tokens a partir de los cuales un fragmento se parte por párrafos.
 TOKENS_MAXIMOS: int = 400
 #: Proporción de páginas web en la que una línea debe aparecer para ser ruido repetido.
-RATIO_REPETIDAS: float = 0.15
+#: 0.07 equivale a unas 17 de las 241 páginas web, de modo que se elimina el menú
+#: de navegación ("- Canales digitales", "- Segmentos", etc.), que aparece en 19
+#: páginas y quedaba al inicio de 19 fragmentos.
+RATIO_REPETIDAS: float = 0.07
 #: Mínimo absoluto de páginas web para considerar una línea como repetida.
 MIN_DOCS_REPETIDAS: int = 5
 #: Alcances que puede construir la Bóveda.
