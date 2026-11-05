@@ -21,3 +21,26 @@ k = 5
 # Pesos del híbrido; se normalizan a suma 1 antes de pasarlos a EnsembleRetriever.
 peso_vectorial = 0.6
 peso_bm25 = 0.4
+
+[digiturno]
+# Palabras que mandan la pregunta al Tablero (ruta T); se comparan sin tildes.
+palabras_tarifas = [
+  "cuota",
+  "tarifa",
+  "cobertura",
+  "carencia",
+  "descuento",
+  "promocion",
+  "asistencia",
+  "seguro",
+  "prima",
+  "comision",
+]
+# Patrones de fuera de alcance (ruta X); se aplican sobre el texto normalizado sin tildes.
+patrones_fuera_alcance = [
+  '\b(saldo|deuda|extracto|movimientos)\b.*\b(mi|mis|cuenta|tarjeta)\b|\bmi (saldo|deuda|extracto)\b',
+  '\b(otro banco|bancolombia|davivienda|bbva|banco de bogota|colpatria)\b',
+  '\b(clima|temperatura|lluvia|va a llover)\b',
+  '\b(consejo|recomiend\w*|invertir|inversion|acciones|criptomoneda)\b',
+  '\b(prompt|instrucciones del sistema|system prompt|ignora (tus|las) instrucciones|revela)\b',
+]

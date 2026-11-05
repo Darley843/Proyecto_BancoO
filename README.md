@@ -182,6 +182,21 @@ El índice **no se versiona**: se regenera con `make indice`. La configuración
 vive en `config/sucursal.toml` (`[embeddings]` y `[recuperacion]`); los
 embeddings no usan `DEEPSEEK_API_KEY` ni aparecen en el consumo de DeepSeek.
 
+### Digiturno
+
+Antes de recuperar o consultar el Tablero, cada pregunta recibe un turno con una
+letra:
+
+| Letra | Ruta |
+|---|---|
+| `B` | Bóveda: consulta general |
+| `T` | Tablero: tarifas, cuotas, coberturas o carencias |
+| `X` | Rechazo: datos personales o fuera de alcance |
+
+Las reglas van antes que el modelo (PII → fuera de alcance → tarifas → duda →
+`B`), se configuran en `[digiturno]` de `config/sucursal.toml` y el modelo solo
+se usa para dudas, a temperatura 0. El turno no persiste la pregunta.
+
 ### Scraper de demostración
 
 Capa delgada sobre el pipeline: descubre hasta 5 URLs con el índice de sitemaps
@@ -246,6 +261,8 @@ Resultados vigentes y respuestas completas:
 │   ├── contexto.py · knowledge.py · documents.py · videos.py · news.py
 │   ├── asistente/             # Q&A, FAQ, resumen y evaluación con DeepSeek
 │   └── boveda/               # fragmentos, embeddings, índice Chroma y recuperador
+│   ├── boveda/               # fragmentos, embeddings, índice Chroma y recuperador
+│   └── sucursal/             # digiturno (B/T/X), grafo y API de la fase 2
 ├── scripts/                   # demo_offline.py · scrape_empresa.py · tasks.py
 ├── config/ · data/ · docs/    # configuración, capas y documentación
 ├── config/sucursal.toml       # embeddings y recuperación de la fase 2

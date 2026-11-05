@@ -99,6 +99,8 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | `.../boveda/almacen.py` | Chroma persistente en `data/boveda/` con distancia coseno |
 | `.../boveda/indice.py` | Índice por alcance (`base`/`completo`) y `indice.json` |
 | `.../boveda/recuperador.py` | Recuperación híbrida vectorial + BM25 con pesos |
+| `.../sucursal/tipos.py` | Turno y letras B/T/X |
+| `.../sucursal/digiturno.py` | Reglas de enrutamiento y clasificación de dudas |
 | `app/streamlit_app.py` | App Streamlit: capa delgada que delega en `asistente/` |
 | `scripts/tasks.py` | Tareas portables del Makefile |
 

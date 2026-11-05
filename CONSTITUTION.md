@@ -191,6 +191,9 @@ ProyectoAvance1/
 │   │   ├── almacen.py    # Chroma persistente con métrica coseno
 │   │   ├── indice.py     # índice por alcance + indice.json
 │   │   └── recuperador.py # híbrido vectorial + BM25 con puntaje coseno
+│   ├── sucursal/         # SUCURSAL: digiturno, grafo y API de la fase 2
+│   │   ├── tipos.py      # Turno y letras B/T/X
+│   │   └── digiturno.py  # reglas de enrutamiento y clasificación de dudas
 │   ├── checklist.py      # 24 casillas del Taller 1
 │   ├── stats.py          # _INDICE.md
 │   └── utils.py          # hashing, JSONL, tokens, slugs
@@ -631,6 +634,8 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 | 2026-11-03 | Fase 2: dependencias de Bóveda, Sucursal y Arqueo en un solo PR (`uv add`): `langgraph`, `langgraph-checkpoint-sqlite`, `langchain-chroma`, `langchain-classic`, `langchain-community`, `langchain-ollama`, `rank-bm25`, `fastapi`, `uvicorn[standard]` y `scikit-learn` | La Bóveda necesita Ollama/Chroma/BM25, la Sucursal LangGraph/FastAPI y el Arqueo PCA. Concentrarlas evita conflictos de `uv.lock` entre cuatro ramas; el resto de PR se rebasa sobre `main`. `sqlalchemy` no se añade directo: entra como dependencia de `langchain-community`. Embeddings locales: solo DeepSeek se paga (`langchain-community` está en sunset, se acepta por `BM25Retriever` y se revisará si se retira) |
 | 2026-11-03 | Bóveda: fragmentos deterministas, embeddings locales con `nomic-embed-text-v2-moe` y Chroma con distancia coseno en `data/boveda/` | El corpus no sale a un tercero y los vectores no consumen la cuota de DeepSeek. Se usa `base_url` explícito (`OLLAMA_HOST` solo como respaldo) porque el bind del daemon puede ser `0.0.0.0`. El índice se reconstruye entero en cada `make indice` para no dejar fragmentos huérfanos, y los ids repetidos se descartan al construir fragmentos. `make indice-completo` añade PDF restantes y videos |
 | 2026-11-03 | Recuperación híbrida vectorial + BM25 (`EnsembleRetriever`) con pesos en `[recuperacion]` y `puntaje` = 1 − coseno en todos los candidatos | Combina la semántica del embedding con la coincidencia exacta de términos (cuotas, siglas, montos). Los pesos se normalizan a suma 1 y el Arqueo puede variarlos desde configuración sin reindexar; el orden lo decide el híbrido y el puntaje se recalcula contra la consulta para que signifique lo mismo en todo el sistema |
+| 2026-11-03 | Recuperación híbrida vectorial + BM25 (`EnsembleRetriever`) con pesos en `[recuperacion]` y `puntaje` = 1 - coseno en todos los candidatos | Combina la semántica del embedding con la coincidencia exacta de términos (cuotas, siglas, montos). Los pesos se normalizan a suma 1 y el Arqueo puede variarlos desde configuración sin reindexar; el orden lo decide el híbrido y el puntaje se recalcula contra la consulta para que signifique lo mismo en todo el sistema |
+| 2026-11-04 | Digiturno: reglas antes que modelo (PII → fuera de alcance → tarifas → duda → B), configurables desde `[digiturno]` | Las rutas más comunes se resuelven sin gastar tokens y de forma explicable; el modelo solo interviene en dudas, a temperatura 0 y con respaldo a B ante cualquier salida inválida. El turno es un consecutivo de proceso y no persiste la pregunta |
 
 ## 12. Configuración local (no trackear)
 
