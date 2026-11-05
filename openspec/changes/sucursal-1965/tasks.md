@@ -130,7 +130,7 @@
 ## 20. PR 17 — Vestíbulo (Yoldy — pendiente)
 
 - [ ] 20.1 Implementar `app/web/vistas/vestibulo.js` con los hitos de `config/vestibulo.toml` (año, texto, URL) y una entrada clara a la Ventanilla; verificar con `vestibulo.json` y con la API que los hitos coinciden con el TOML.
-- [ ] 20.2 Verificar que el vestíbulo funciona sin clave ni índice, porque es la pantalla de bienvenida, y que no hace llamadas al modelo.
+- [x] 20.2 Verificar que el vestíbulo funciona sin clave ni índice, porque es la pantalla de bienvenida, y que no hace llamadas al modelo.
 
 ## 21. PR 18 — Arqueo (vista) (Anny — pendiente)
 

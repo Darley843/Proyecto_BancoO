@@ -326,4 +326,17 @@ async function iniciar() {
   await mostrarVista(vistaDesdeHash());
 }
 
-iniciar();
+/**
+ * Muestra en la página un error que impidió arrancar la sucursal, para que no
+ * quede solo en la consola del navegador.
+ *
+ * @param {Error} error Error recibido al arrancar.
+ * @returns {void}
+ */
+function avisarErrorDeArranque(error) {
+  const aviso = crearTexto("p", `La sucursal no pudo arrancar: ${error?.message ?? error}`, "aviso aviso--error");
+  aviso.setAttribute("role", "alert");
+  document.getElementById("contenido")?.replaceChildren(aviso);
+}
+
+iniciar().catch(avisarErrorDeArranque);

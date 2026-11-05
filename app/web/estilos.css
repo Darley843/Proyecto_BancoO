@@ -395,6 +395,215 @@ main:focus {
   margin: 0 auto;
 }
 
+/* --- vestibulo (PR 17) --- */
+
+.vestibulo {
+  display: grid;
+  gap: 32px;
+}
+
+.vestibulo__portada {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 24px;
+  padding: 28px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  box-shadow: var(--sombra);
+  border-top: 4px solid var(--dorado);
+}
+
+.vestibulo__sello {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 112px;
+  height: 112px;
+  border-radius: 50%;
+  border: 3px double var(--dorado);
+  background: var(--dorado-suave);
+  color: var(--dorado);
+  font-family: var(--fuente-cifras);
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: 2px;
+}
+
+.vestibulo__portada-texto {
+  flex: 1 1 320px;
+  min-width: 0;
+}
+
+.vestibulo__antetitulo {
+  margin: 0 0 4px;
+  color: var(--dorado);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.vestibulo__lema {
+  margin: 0 0 8px;
+  color: var(--azul);
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.vestibulo__bajada {
+  margin: 0;
+  color: var(--texto-suave);
+  max-width: 60ch;
+}
+
+.vestibulo__subtitulo {
+  margin: 0 0 12px;
+  color: var(--azul);
+  font-size: 20px;
+}
+
+.vestibulo__espacios-lista {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vestibulo__espacio {
+  display: grid;
+  gap: 4px;
+  height: 100%;
+  padding: 14px 16px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  color: var(--texto);
+  text-decoration: none;
+}
+
+.vestibulo__espacio:hover {
+  border-color: var(--azul);
+  background: var(--azul-suave);
+}
+
+.vestibulo__espacio-titulo {
+  color: var(--azul);
+}
+
+.vestibulo__espacio-texto {
+  color: var(--texto-suave);
+  font-size: 14px;
+}
+
+.vestibulo__resumen {
+  margin: 0 0 16px;
+  color: var(--texto-suave);
+}
+
+.vestibulo__decada + .vestibulo__decada {
+  margin-top: 20px;
+}
+
+.vestibulo__decada-titulo {
+  margin: 0 0 8px;
+  color: var(--texto-suave);
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.vestibulo__hitos {
+  margin: 0;
+  padding: 0 0 0 20px;
+  list-style: none;
+  border-left: 2px solid var(--dorado);
+}
+
+.vestibulo__hito {
+  position: relative;
+  display: grid;
+  grid-template-columns: 64px 1fr;
+  gap: 2px 16px;
+  padding: 10px 0;
+}
+
+.vestibulo__hito::before {
+  content: "";
+  position: absolute;
+  top: 16px;
+  left: -27px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  border: 2px solid var(--dorado);
+  background: var(--fondo);
+}
+
+.vestibulo__anio {
+  color: var(--azul);
+  font-family: var(--fuente-cifras);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.vestibulo__texto {
+  margin: 0;
+}
+
+.vestibulo__fuente {
+  grid-column: 2;
+  font-size: 13px;
+}
+
+.vestibulo__error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.vestibulo__reintentar {
+  padding: 6px 14px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  color: var(--azul);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .vestibulo__portada {
+    padding: 20px;
+  }
+
+  .vestibulo__sello {
+    width: 84px;
+    height: 84px;
+    font-size: 20px;
+  }
+
+  .vestibulo__lema {
+    font-size: 20px;
+  }
+
+  .vestibulo__hito {
+    grid-template-columns: 1fr;
+  }
+
+  .vestibulo__fuente {
+    grid-column: 1;
+  }
+}
+
+/* --- fin vestibulo --- */
+
 /* -------------------------------------------------------------- celular */
 
 @media (max-width: 600px) {

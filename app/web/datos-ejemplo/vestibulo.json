@@ -2,7 +2,67 @@
   "hitos": [
     {
       "anio": 1965,
-      "texto": "Nace el Banco de Occidente en Cali",
+      "texto": "Nace el Banco de Occidente en Cali, el 3 de mayo, con el lema «el banco que lo conoce a usted».",
+      "url": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+    },
+    {
+      "anio": 1970,
+      "texto": "Abre sus primeras oficinas fuera de Cali, en Palmira, Pereira y Armenia, y llega a 15 oficinas.",
+      "url": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+    },
+    {
+      "anio": 1973,
+      "texto": "Inicia una nueva etapa bajo la orientación del Grupo Económico Sarmiento Angulo.",
+      "url": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+    },
+    {
+      "anio": 1976,
+      "texto": "Lanza su propio sistema de tarjeta de crédito: Credencial.",
+      "url": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+    },
+    {
+      "anio": 1982,
+      "texto": "Nace el Banco de Occidente Panamá, filial del banco en Colombia.",
+      "url": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+    },
+    {
+      "anio": 1991,
+      "texto": "Nace la filial Fiduciaria de Occidente.",
+      "url": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+    },
+    {
+      "anio": 1993,
+      "texto": "Crea el Premio Nacional de Ecología Planeta Azul, dedicado al cuidado del agua.",
+      "url": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+    },
+    {
+      "anio": 1998,
+      "texto": "Entra a formar parte del Grupo Aval, junto con los bancos AV Villas, Bogotá y Popular.",
+      "url": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+    },
+    {
+      "anio": 2004,
+      "texto": "Adquiere el Banco Aliadas y suma las líneas de vehículos, seguros y motos.",
+      "url": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+    },
+    {
+      "anio": 2012,
+      "texto": "Crea una nueva unidad de negocio para financiar vivienda.",
+      "url": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+    },
+    {
+      "anio": 2019,
+      "texto": "Renueva su lema y pasa a estar «Del lado de los que hacen».",
+      "url": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+    },
+    {
+      "anio": 2022,
+      "texto": "Se adhiere al Pacto Global de las Naciones Unidas y publica su primer informe de sostenibilidad GRI.",
+      "url": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+    },
+    {
+      "anio": 2023,
+      "texto": "Recibe la certificación Great Place to Work como mejor lugar para trabajar en su categoría.",
       "url": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
     }
   ]
