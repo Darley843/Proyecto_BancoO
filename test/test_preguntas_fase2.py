@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import tomllib
+from collections import Counter
 from pathlib import Path
 
 import pytest
@@ -11,6 +12,7 @@ import pytest
 RAIZ = Path(__file__).resolve().parents[1]
 ARCHIVO_PREGUNTAS = RAIZ / "config" / "evaluacion" / "preguntas_fase2.toml"
 ARCHIVO_CORPUS = RAIZ / "data" / "gold" / "corpus.jsonl"
+ARCHIVO_DOCUMENTOS = RAIZ / "data" / "gold" / "documents.jsonl"
 
 TIPOS = {"alcance", "tabla", "seguimiento", "fuera"}
 RUTAS = {"B", "T", "X"}
@@ -28,20 +30,25 @@ CAMPOS_OBLIGATORIOS = {
 
 @pytest.fixture(scope="module")
 def preguntas() -> list[dict[str, object]]:
-    """Lee las 40 preguntas del TOML de la fase 2."""
+    """Lee las 44 preguntas del TOML de la fase 2."""
     datos = tomllib.loads(ARCHIVO_PREGUNTAS.read_text(encoding="utf-8"))
     return list(datos["pregunta"])
 
 
+def _fuentes_de(archivo: Path) -> set[str]:
+    """Reune las URLs registradas como fuente en un JSONL del Gold."""
+    with archivo.open(encoding="utf-8") as datos:
+        return {json.loads(linea)["fuente"] for linea in datos if linea.strip()}
+
+
 @pytest.fixture(scope="module")
-def fuentes_corpus() -> set[str]:
-    """Reune las URLs registradas como fuente en el Gold, sin normalizar."""
-    with ARCHIVO_CORPUS.open(encoding="utf-8") as archivo:
-        return {json.loads(linea)["fuente"] for linea in archivo if linea.strip()}
+def fuentes_gold() -> set[str]:
+    """Reune las URLs de paginas y documentos del Gold, sin normalizar."""
+    return _fuentes_de(ARCHIVO_CORPUS) | _fuentes_de(ARCHIVO_DOCUMENTOS)
 
 
-def test_ids_unicos_del_1_al_40(preguntas: list[dict[str, object]]) -> None:
-    """Los ids son unicos y cubren exactamente del 1 al 40."""
+def test_ids_unicos_del_1_al_44(preguntas: list[dict[str, object]]) -> None:
+    """Los ids son unicos y cubren exactamente del 1 al 44."""
     # Arrange
     ids = [int(pregunta["id"]) for pregunta in preguntas]
 
@@ -49,9 +56,23 @@ def test_ids_unicos_del_1_al_40(preguntas: list[dict[str, object]]) -> None:
     ids_ordenados = sorted(ids)
 
     # Assert
-    assert len(ids) == 40
-    assert len(set(ids)) == 40
-    assert ids_ordenados == list(range(1, 41))
+    assert len(ids) == 44
+    assert len(set(ids)) == 44
+    assert ids_ordenados == list(range(1, 45))
+
+
+def test_conteos_por_tipo(preguntas: list[dict[str, object]]) -> None:
+    """Los cuatro tipos incluyen las nuevas preguntas del tarifario."""
+    # Act
+    conteo = Counter(str(pregunta["tipo"]) for pregunta in preguntas)
+
+    # Assert
+    assert dict(conteo) == {
+        "alcance": 20,
+        "tabla": 12,
+        "seguimiento": 6,
+        "fuera": 6,
+    }
 
 
 def test_tipo_y_ruta_validos(preguntas: list[dict[str, object]]) -> None:
@@ -113,10 +134,10 @@ def test_fuera_sin_fuentes(preguntas: list[dict[str, object]]) -> None:
     assert not con_fuentes
 
 
-def test_fuentes_esperadas_existen_en_corpus(
-    preguntas: list[dict[str, object]], fuentes_corpus: set[str]
+def test_fuentes_esperadas_existen_en_gold(
+    preguntas: list[dict[str, object]], fuentes_gold: set[str]
 ) -> None:
-    """Cada URL existe exactamente como fuente en el Gold."""
+    """Cada URL existe exactamente como fuente en corpus.jsonl o documents.jsonl."""
     # Arrange
     faltantes: list[tuple[object, object]] = []
 
@@ -127,7 +148,7 @@ def test_fuentes_esperadas_existen_en_corpus(
             faltantes.append((pregunta["id"], "fuentes_esperadas no es lista"))
             continue
         for url in fuentes:
-            if not isinstance(url, str) or url not in fuentes_corpus:
+            if not isinstance(url, str) or url not in fuentes_gold:
                 faltantes.append((pregunta["id"], url))
 
     # Assert
