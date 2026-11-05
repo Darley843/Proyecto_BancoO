@@ -54,7 +54,7 @@ export async function render(contenedor, estado) {
     vista.append(
       crearTexto(
         "p",
-        "Datos de ejemplo: filas reales del tarifario 2025 y de la tabla de asistencias. Aquí el filtro busca dentro de estas filas; con la API, el servidor filtra el CSV completo.",
+        "Datos de ejemplo: copia exacta de filas del CSV del tablero (tarifario 2025 y tablas de la web). Aquí el filtro busca dentro de estas filas; con la API, el servidor filtra el CSV completo.",
         "aviso tablero__aviso",
       ),
     );

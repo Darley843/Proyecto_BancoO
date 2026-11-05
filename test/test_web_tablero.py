@@ -8,6 +8,7 @@ sin recalcular ni comparar filas). La 18.1 se completa al verificar contra
 
 from __future__ import annotations
 
+import csv
 import json
 import re
 from pathlib import Path
@@ -18,6 +19,7 @@ import pytest
 RAIZ = Path(__file__).resolve().parents[1]
 WEB = RAIZ / "app" / "web"
 EJEMPLO = WEB / "datos-ejemplo" / "tablero.json"
+CSV = RAIZ / "data" / "estructurados" / "tablero.csv"
 VISTA = WEB / "vistas" / "tablero.js"
 
 COLUMNAS_CSV = (
@@ -37,6 +39,18 @@ COLUMNAS_CSV = (
 def leer_ejemplo() -> dict[str, Any]:
     """Lee ``app/web/datos-ejemplo/tablero.json``."""
     return json.loads(EJEMPLO.read_text(encoding="utf-8"))
+
+
+def leer_csv() -> list[dict[str, str]]:
+    """Lee las filas de ``data/estructurados/tablero.csv`` (el CSV del PR 7)."""
+    with CSV.open(encoding="utf-8", newline="") as archivo:
+        return list(csv.DictReader(archivo))
+
+
+def lineas_de_gold(ruta: str) -> list[str]:
+    """Devuelve las líneas de una página de Gold sin las negritas de Markdown."""
+    texto = (RAIZ / ruta).read_text(encoding="utf-8")
+    return [linea.replace("**", "") for linea in texto.splitlines()]
 
 
 def leer_vista() -> str:
@@ -61,7 +75,7 @@ def test_filas_de_ejemplo_tienen_las_diez_columnas() -> None:
         assert tuple(fila) == COLUMNAS_CSV
         assert all(isinstance(valor, str) for valor in fila.values())
         assert fila["origen"] in {"tarifario", "tabla_web"}
-        assert fila["moneda"] in {"COP", "USD", "EUR"}
+        assert fila["moneda"] in {"COP", "USD", "EUR", "%"}
         assert fila["fuente"].startswith("https://")
 
 
@@ -74,13 +88,43 @@ def test_vigencia_de_ejemplo_es_fecha_iso_o_vacia() -> None:
 
 
 @pytest.mark.parametrize("fila", leer_ejemplo()["filas"], ids=lambda fila: fila["concepto"])
-def test_valor_de_ejemplo_sale_de_su_pagina_de_gold(fila: dict[str, str]) -> None:
-    """El valor de cada fila de ejemplo aparece en su página de Gold (no se inventa)."""
+def test_fila_de_ejemplo_es_identica_a_una_fila_del_csv(fila: dict[str, str]) -> None:
+    """Cada fila de la maqueta es una copia exacta de una fila del CSV canónico.
+
+    Así la maqueta muestra lo mismo que mostrará ``/api/tablero``: el mismo
+    concepto, la misma categoría y la misma periodicidad (vacía si el CSV la deja
+    vacía), sin textos «bonitos» ni datos que el corpus no sostiene.
+    """
+    assert fila in leer_csv()
+
+
+@pytest.mark.parametrize("fila", leer_ejemplo()["filas"], ids=lambda fila: fila["concepto"])
+def test_concepto_y_valor_estan_en_la_misma_linea_de_gold(fila: dict[str, str]) -> None:
+    """El concepto y su valor aparecen juntos en una misma línea de su página de Gold.
+
+    El valor se busca como número completo (``2.800`` no vale dentro de
+    ``112.800``). Al concepto se le quitan los asteriscos de nota y la franquicia
+    entre paréntesis que agrega el CSV, porque la página la pone en la columna.
+    """
     pagina = (RAIZ / fila["pagina"]).read_text(encoding="utf-8")
     fuente = re.search(r"^fuente: (.+)$", pagina, re.MULTILINE)
     assert fuente is not None
     assert fuente.group(1).strip() == fila["fuente"]
-    assert fila["valor"] in pagina
+    concepto = re.sub(r"\s*\((Visa|Mastercard)\)$", "", fila["concepto"]).rstrip("*")
+    valor = re.compile(rf"(?<![\d.,]){re.escape(fila['valor'])}(?![\d.,])")
+    assert any(concepto in linea and valor.search(linea) for linea in lineas_de_gold(fila["pagina"]))
+
+
+def test_maqueta_no_repite_concepto_con_valores_distintos() -> None:
+    """Si el CSV trae un concepto con varios valores (por categoría de tarjeta), no va a la maqueta.
+
+    Una sola fila daría a entender una cobertura igual para todas las tarjetas.
+    """
+    valores: dict[tuple[str, str], set[str]] = {}
+    for fila in leer_csv():
+        valores.setdefault((fila["concepto"], fila["categoria"]), set()).add(fila["valor"])
+    for fila in leer_ejemplo()["filas"]:
+        assert valores[(fila["concepto"], fila["categoria"])] == {fila["valor"]}
 
 
 def test_vista_consulta_la_api_con_q() -> None:
