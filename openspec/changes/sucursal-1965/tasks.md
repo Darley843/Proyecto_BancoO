@@ -78,11 +78,11 @@
 
 ## 12. PR 10a — Servidor y servicios (Darley — pendiente)
 
-- [ ] 12.1 Implementar `sucursal/api.py` con `GET /api/estado`, `/api/tablero`, `/api/pipeline`, `/api/vestibulo`, `/api/arqueo` y `/api/boveda/mapa`, y los modelos Pydantic de respuesta; verificar con `TestClient` que cada endpoint devuelve la forma del contrato y que un archivo de arqueo ausente devuelve `disponible: false`.
-- [ ] 12.2 Implementar `sucursal/costo.py` con `tarifas_para(momento_utc)`, `GastoDiario` y `CacheRespuestas`; verificar con pruebas la hora valle, la hora pico, el tope alcanzado, la sobrescritura de `SUCURSAL_TOPE_USD` para la sesión, el acierto de caché, la clave por pregunta reformulada/ruta/versión y el TTL.
-- [ ] 12.3 Implementar el modo demo con `SUCURSAL_DEMO=1`: sin cliente DeepSeek, costo cero y sin escritura de gasto; verificar con pruebas que arranca sin `DEEPSEEK_API_KEY` y que `/api/estado` informa `modo_demo: true`.
-- [ ] 12.4 Verificar que `app.py` y `make app` levantan uvicorn solo en `127.0.0.1:8000`, que `config/sucursal.toml` no repite precios de DeepSeek y que el endpoint del mapa responde con un estado explicable cuando `data/boveda/mapa.json` aún no existe.
-- [ ] 12.5 Documentar en `README.md` el arranque de la app, las variables `DEEPSEEK_API_KEY`, `OLLAMA_HOST` y `SUCURSAL_DEMO`, y la dirección local; verificar que los comandos documentados funcionan tal cual.
+- [x] 12.1 Implementar `sucursal/api.py` con `GET /api/estado`, `/api/tablero`, `/api/pipeline`, `/api/vestibulo`, `/api/arqueo` y `/api/boveda/mapa`, y los modelos Pydantic de respuesta; verificar con `TestClient` que cada endpoint devuelve la forma del contrato y que un archivo de arqueo ausente devuelve `disponible: false`.
+- [x] 12.2 Implementar `sucursal/costo.py` con `tarifas_para(momento_utc)`, `GastoDiario` y `CacheRespuestas`; verificar con pruebas la hora valle, la hora pico, el tope alcanzado, la sobrescritura de `SUCURSAL_TOPE_USD` para la sesión, el acierto de caché, la clave por pregunta reformulada/ruta/versión y el TTL.
+- [x] 12.3 Implementar el modo demo con `SUCURSAL_DEMO=1`: sin cliente DeepSeek, costo cero y sin escritura de gasto; verificar con pruebas que arranca sin `DEEPSEEK_API_KEY` y que `/api/estado` informa `modo_demo: true`.
+- [x] 12.4 Verificar que `app.py` y `make app` levantan uvicorn solo en `127.0.0.1:8000`, que `config/sucursal.toml` no repite precios de DeepSeek y que el endpoint del mapa responde con un estado explicable cuando `data/boveda/mapa.json` aún no existe.
+- [x] 12.5 Documentar en `README.md` el arranque de la app, las variables `DEEPSEEK_API_KEY`, `OLLAMA_HOST` y `SUCURSAL_DEMO`, y la dirección local; verificar que los comandos documentados funcionan tal cual.
 
 ## 13. PR 10b — Endpoint `preguntar` (Nayla — pendiente)
 

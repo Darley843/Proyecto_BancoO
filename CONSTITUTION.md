@@ -199,7 +199,10 @@ ProyectoAvance1/
 │   ├── sucursal/         # SUCURSAL: digiturno, grafo y API de la fase 2
 │   │   ├── tipos.py      # Turno y letras B/T/X
 │   │   ├── digiturno.py  # reglas de enrutamiento y clasificación de dudas
-│   │   └── grafo.py      # StateGraph con memoria, rutas y redacción
+│   │   ├── grafo.py      # StateGraph con memoria, rutas y redacción
+│   │   ├── ajustes.py    # tope de gasto, TTL y modo demo
+│   │   ├── costo.py      # tarifas valle/pico, gasto diario y caché
+│   │   └── api.py        # endpoints de estado, datos y trazabilidad
 │   ├── checklist.py      # 24 casillas del Taller 1
 │   ├── stats.py          # _INDICE.md
 │   └── utils.py          # hashing, JSONL, tokens, slugs
@@ -644,6 +647,7 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 | 2026-11-04 | Digiturno: reglas antes que modelo (PII → fuera de alcance → tarifas → duda → B), configurables desde `[digiturno]` | Las rutas más comunes se resuelven sin gastar tokens y de forma explicable; el modelo solo interviene en dudas, a temperatura 0 y con respaldo a B ante cualquier salida inválida. El turno es un consecutivo de proceso y no persiste la pregunta |
 | 2026-11-04 | Digiturno: el clasificador de dudas pide 512 tokens y el respaldo distingue `defecto` de `defecto:modelo_sin_respuesta` | Con `max_tokens=80` DeepSeek Flash agotaba el tope en el razonamiento (52–60 tokens), `response_format` fallaba con `LengthFinishReasonError` y 2 de cada 5 dudas caían al respaldo sin avisar. El motivo nuevo deja auditar si el modelo decidió o si el turno salió por defecto |
 | 2026-11-04 | Grafo con memoria `SqliteSaver`, reformulación condicionada y plantilla del Tablero | El estado guarda datos serializables y se aísla por `thread_id`; el historial se recorta antes de cada llamada. La PII se rechaza antes de invocar el grafo, así no entra al checkpointer. Con 1–3 filas del Tablero responde sin modelo (costo cero); con 0 o 4+ pasa a la Bóveda |
+| 2026-11-05 | API local de solo lectura, costo diario y caché SQLite | La API escucha solo en `127.0.0.1:8000` y sirve estado, Tablero, Bóveda, pipeline, Arqueo y Vestíbulo; el endpoint de preguntas va en el PR 10b. Las tarifas se importan de `arqueo/metricas.py` y se elige valle/pico por hora UTC; el gasto y la caché viven en `data/asistente/`, fuera de Git |
 | 2026-11-04 | Tablero: tarifario PDF y tablas web a `data/estructurados/tablero.csv` con diez columnas, versionado y determinista | Las cifras de tasas y coberturas no se pueden dejar al modelo: el CSV es la evidencia de las 8 preguntas de tabla. Se conserva el formato original del valor, la moneda o unidad de la fuente y la trazabilidad `pagina`+`fuente`; si una línea no trae fecha o no se puede extraer el valor, no se inventa: se omite o queda vacía |
 
 ## 12. Configuración local (no trackear)
