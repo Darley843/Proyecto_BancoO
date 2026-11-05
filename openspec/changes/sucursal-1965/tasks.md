@@ -70,11 +70,11 @@
 
 ## 11. PR 9 — Grafo con recuperador simulado (Darley — pendiente)
 
-- [ ] 11.1 Implementar `sucursal/grafo.py` con el `StateGraph` de nodos `reformular`, `digiturno`, `boveda`, `tablero`, `rechazo` y `redactar`, y compilarlo con `SqliteSaver` en `data/asistente/memoria.sqlite`; verificar con un recuperador simulado que cumple `Recuperador` y `FakeListChatModel` que el grafo responde de punta a punta sin red.
-- [ ] 11.2 Verificar el aislamiento por `thread_id` con dos conversaciones simultáneas y que el historial se recorta con `trim_messages` y `count_tokens_approximately` antes de llamar al modelo; comprobar que `data/asistente/memoria.sqlite` se crea fuera de Git.
-- [ ] 11.3 Implementar la reformulación condicionada: solo con historial y pregunta de seguimiento; verificar con pruebas que el primer turno no reformula, que «¿Y cuánto cuesta?» sí reformula y que una pregunta autónoma con historial no reformula.
-- [ ] 11.4 Implementar la respuesta del Tablero con plantilla sin modelo cuando hay de una a tres filas y paso a la Bóveda con turno `B` cuando hay cero o cuatro o más; verificar con pruebas que en 1–3 filas `uso_modelo` es falso y el costo es cero, y que 0 y 4+ no usan plantilla.
-- [ ] 11.5 Verificar que el grafo rechaza PII antes de entrar en la memoria y que un fallo del modelo en `redactar` cae en la frase fija sin romper el hilo; ejecutar `make check`.
+- [x] 11.1 Implementar `sucursal/grafo.py` con el `StateGraph` de nodos `reformular`, `digiturno`, `boveda`, `tablero`, `rechazo` y `redactar`, y compilarlo con `SqliteSaver` en `data/asistente/memoria.sqlite`; verificar con un recuperador simulado que cumple `Recuperador` y `FakeListChatModel` que el grafo responde de punta a punta sin red.
+- [x] 11.2 Verificar el aislamiento por `thread_id` con dos conversaciones simultáneas y que el historial se recorta con `trim_messages` y `count_tokens_approximately` antes de llamar al modelo; comprobar que `data/asistente/memoria.sqlite` se crea fuera de Git.
+- [x] 11.3 Implementar la reformulación condicionada: solo con historial y pregunta de seguimiento; verificar con pruebas que el primer turno no reformula, que «¿Y cuánto cuesta?» sí reformula y que una pregunta autónoma con historial no reformula.
+- [x] 11.4 Implementar la respuesta del Tablero con plantilla sin modelo cuando hay de una a tres filas y paso a la Bóveda con turno `B` cuando hay cero o cuatro o más; verificar con pruebas que en 1–3 filas `uso_modelo` es falso y el costo es cero, y que 0 y 4+ no usan plantilla.
+- [x] 11.5 Verificar que el grafo rechaza PII antes de entrar en la memoria y que un fallo del modelo en `redactar` cae en la frase fija sin romper el hilo; ejecutar `make check`.
 
 ## 12. PR 10a — Servidor y servicios (Darley — pendiente)
 
