@@ -108,7 +108,7 @@
 
 - [ ] 16.1 Implementar `app/web/vistas/ventanilla.js`: envía `{pregunta, thread_id}`, guarda el hilo en `sessionStorage` y muestra turno, número, ruta, motivo, reformulada, respuesta, fuentes, tokens, costo, tiempo y caché; verificar con la API real una primera pregunta y un seguimiento en el mismo hilo.
 - [ ] 16.2 Mostrar los estados de error y de índice ausente sin perder el hilo, y permitir reintentar; verificar apagando la API y volviendo a encenderla.
-- [ ] 16.3 Verificar que la vista no decide rutas, no calcula costos y no escribe preguntas en `localStorage`; revisar el archivo y la prueba de forma de `preguntar.json`.
+- [x] 16.3 Verificar que la vista no decide rutas, no calcula costos y no escribe preguntas en `localStorage`; revisar el archivo y la prueba de forma de `preguntar.json`.
 
 ## 17. PR 14 — Bóveda (vista) (Yoldy — pendiente)
 
