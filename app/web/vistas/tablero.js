@@ -224,7 +224,8 @@ function normalizar(texto) {
  * @returns {HTMLElement} El párrafo de resumen.
  */
 function crearResumen(mostradas, total, q) {
-  const cuantas = mostradas === total ? `${total} filas` : `${mostradas} de ${total} filas`;
+  const palabra = total === 1 ? "fila" : "filas";
+  const cuantas = mostradas === total ? `${total} ${palabra}` : `${mostradas} de ${total} ${palabra}`;
   const texto = q ? `${cuantas} para «${q}».` : `${cuantas} en el tablero.`;
   return crearTexto("p", texto, "tablero__resumen");
 }
@@ -352,7 +353,8 @@ function contenidoDeCelda(clave, fila) {
 }
 
 /**
- * Une moneda y valor tal como vienen, por ejemplo `COP 16.700`.
+ * Une moneda y valor tal como vienen, por ejemplo `COP 16.700`. Si la
+ * «moneda» es `%` (descuentos y comisiones del CSV), va después: `17 %`.
  *
  * @param {Record<string, string>} fila Fila del contrato.
  * @returns {string} Texto del valor, o «—» si falta.
@@ -363,6 +365,9 @@ function valorConMoneda(fila) {
     return "—";
   }
   const moneda = textoODefecto(fila.moneda, "");
+  if (moneda === "%") {
+    return `${valor} %`;
+  }
   return moneda ? `${moneda} ${valor}` : valor;
 }
 

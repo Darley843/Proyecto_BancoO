@@ -152,3 +152,10 @@ def test_estilos_del_tablero_usan_variables_y_su_prefijo() -> None:
             limpio = parte.strip()
             if limpio and not limpio.startswith("@"):
                 assert limpio.startswith(".tablero"), limpio
+
+
+def test_porcentaje_va_despues_del_valor() -> None:
+    """El CSV del PR 7 usa ``%`` como moneda en descuentos: se muestra ``17 %``."""
+    codigo = leer_vista()
+    assert 'if (moneda === "%") {' in codigo
+    assert "return `${valor} %`;" in codigo
