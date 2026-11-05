@@ -7,13 +7,16 @@ from pathlib import Path
 import pytest
 from langchain_core.language_models.fake_chat_models import FakeListChatModel
 
+from banco_occidente_corpus.asistente import modelo as modulo_modelo
 from banco_occidente_corpus.sucursal.digiturno import (
+    MAX_TOKENS_CLASIFICADOR,
     Clasificacion,
     ConfiguracionDigiturno,
     ContadorTurnos,
     cargar_configuracion_digiturno,
     clasificador_deepseek,
     clasificar,
+    crear_clasificador,
 )
 
 
@@ -86,6 +89,42 @@ def test_abrir_cuenta_de_nomina_sigue_en_boveda() -> None:
 def test_duda_sin_modelo_usa_la_ruta_por_defecto() -> None:
     """Sin clasificador, una pregunta dudosa va a B."""
     assert clasificar("¿qué necesito para un crédito?").letra == "B"
+
+
+def test_duda_sin_modelo_marca_el_motivo_defecto() -> None:
+    """Sin clasificador, el motivo distingue la ruta por defecto."""
+    turno = clasificar("¿qué necesito para un crédito?")
+
+    assert (turno.letra, turno.motivo) == ("B", "defecto")
+
+
+def test_duda_con_modelo_sin_respuesta_lo_dice_en_el_motivo() -> None:
+    """Si el clasificador no responde, el motivo no finge que decidió."""
+
+    def clasificador_sin_respuesta(pregunta: str) -> Clasificacion | None:
+        return None
+
+    turno = clasificar("¿qué necesito para un crédito?", clasificador=clasificador_sin_respuesta)
+
+    assert (turno.letra, turno.motivo) == ("B", "defecto:modelo_sin_respuesta")
+
+
+def test_clasificador_deja_margen_para_el_razonamiento(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """El tope de tokens cubre el razonamiento del modelo además del JSON."""
+    capturado: dict[str, object] = {}
+
+    def crear_modelo_falso(**opciones: object) -> FakeListChatModel:
+        capturado.update(opciones)
+        return FakeListChatModel(responses=['{"letra": "B", "motivo": "requisitos"}'])
+
+    monkeypatch.setattr(modulo_modelo, "crear_modelo", crear_modelo_falso)
+    turno = clasificar("¿qué necesito para un crédito?", clasificador=crear_clasificador())
+
+    assert capturado["max_tokens"] == MAX_TOKENS_CLASIFICADOR
+    assert capturado["temperatura"] == 0.0
+    assert (turno.letra, turno.motivo) == ("B", "requisitos")
 
 
 def test_duda_con_clasificador_usa_su_letra() -> None:

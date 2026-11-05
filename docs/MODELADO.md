@@ -115,8 +115,10 @@ primera coincidencia:
 3. **Tarifas y coberturas** (`cuota`, `tarifa`, `cobertura`, `carencia`,
    `descuento`, `promoción`, `asistencia`, `seguro`…) → `T`.
 4. **Duda**: si se inyecta un clasificador, se pregunta a DeepSeek a temperatura
-   0 con salida JSON `{letra, motivo}`; cualquier salida inválida cae a `B`.
-5. Por defecto, **`B`** (Bóveda).
+   0 con salida JSON `{letra, motivo}` y hasta 512 tokens: el modelo gasta medio
+   centenar solo en razonar y con topes bajos la duda caía siempre al respaldo.
+   Cualquier salida inválida cae a `B` con motivo `defecto:modelo_sin_respuesta`.
+5. Por defecto, **`B`** (Bóveda), con motivo `defecto` cuando no hay clasificador.
 
 `numero` es un consecutivo por proceso (empieza en 1) y **no se persiste**; la
 pregunta tampoco se guarda. `T` es provisional: el grafo confirmará la ruta solo
