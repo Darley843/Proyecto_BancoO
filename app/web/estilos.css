@@ -628,6 +628,261 @@ main:focus {
   }
 }
 
+/* --- camara (PR 16) --- */
+
+.camara {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 20px;
+}
+
+.camara__resumen {
+  margin: 0;
+  color: var(--texto-suave);
+}
+
+.camara__resumen-nota {
+  font-size: 14px;
+}
+
+.camara__etapas {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.camara__etapa {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  padding: 18px;
+  border: 1px solid var(--borde);
+  border-top: 3px solid var(--azul);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  box-shadow: var(--sombra);
+}
+
+.camara__etapa[data-etapa="indexacion"] {
+  border-top-color: var(--dorado);
+}
+
+.camara__cabecera {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+
+.camara__numero {
+  display: grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--azul);
+  color: var(--texto-sobre-azul);
+  font-family: var(--fuente-cifras);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.camara__titulo {
+  flex: 1;
+  margin: 0;
+  color: var(--azul);
+  font-size: 17px;
+}
+
+.camara__sello {
+  padding: 2px 10px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.camara__sello--ok {
+  background: var(--azul-suave);
+  color: var(--exito);
+}
+
+.camara__sello--aviso,
+.camara__sello--pendiente {
+  background: var(--dorado-suave);
+  color: var(--aviso);
+}
+
+.camara__pista {
+  margin: 0;
+  color: var(--texto-suave);
+  font-size: 14px;
+}
+
+.camara__metricas {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  margin: 0;
+}
+
+.camara__metrica {
+  padding: 8px 10px;
+  border-radius: var(--radio);
+  background: var(--fondo);
+}
+
+.camara__metrica dt {
+  color: var(--texto-suave);
+  font-size: 12px;
+}
+
+.camara__metrica dd {
+  margin: 2px 0 0;
+}
+
+.camara__valor {
+  color: var(--texto);
+  font-family: var(--fuente-cifras);
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.camara__nota {
+  margin: 0;
+  padding-left: 10px;
+  border-left: 2px solid var(--borde);
+  color: var(--texto-suave);
+  font-size: 13px;
+}
+
+.camara__aviso {
+  margin: 0;
+  padding: 8px 12px;
+  border-left: 3px solid var(--aviso);
+  border-radius: var(--radio);
+  background: var(--dorado-suave);
+  font-size: 14px;
+}
+
+.camara__repeticiones,
+.camara__fuentes {
+  padding: 18px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+}
+
+.camara__repeticiones {
+  display: grid;
+  gap: 10px;
+}
+
+.camara__subtitulo {
+  margin: 0;
+  color: var(--azul);
+  font-size: 18px;
+}
+
+.camara__subtitulo-menor {
+  margin: 8px 0 0;
+  font-size: 15px;
+}
+
+.camara__umbral {
+  display: grid;
+  grid-template-columns: 170px minmax(0, 1fr) 70px;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+}
+
+.camara__barra {
+  height: 10px;
+  border-radius: 999px;
+  background: var(--fondo);
+  border: 1px solid var(--borde);
+  overflow: hidden;
+}
+
+.camara__relleno {
+  display: block;
+  height: 100%;
+  background: var(--dorado);
+}
+
+.camara__bloques {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding-left: 20px;
+  font-size: 14px;
+}
+
+.camara__bloque-paginas {
+  margin-right: 8px;
+  color: var(--azul);
+  font-family: var(--fuente-cifras);
+  font-weight: 700;
+}
+
+.camara__bloque-texto {
+  color: var(--texto-suave);
+}
+
+.camara__fuentes summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.camara__fuentes ul {
+  margin: 10px 0 0;
+  padding-left: 20px;
+  font-size: 13px;
+}
+
+.camara__fuentes code {
+  font-family: var(--fuente-cifras);
+  overflow-wrap: anywhere;
+}
+
+.camara__error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.camara__reintentar {
+  padding: 6px 14px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  color: var(--azul);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .camara__etapas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .camara__umbral {
+    grid-template-columns: minmax(0, 1fr) 60px;
+  }
+
+  .camara__umbral-etiqueta {
+    grid-column: 1 / -1;
+  }
+}
+
+/* --- fin camara --- */
+
 /* -------------------------------------------------------------- botones */
 
 .boton-primario {
