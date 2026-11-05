@@ -105,6 +105,7 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | `.../tablero/construir.py` | Une fuentes, escribe el CSV y cruza las 8 preguntas |
 | `.../sucursal/tipos.py` | Turno y letras B/T/X |
 | `.../sucursal/digiturno.py` | Reglas de enrutamiento y clasificación de dudas |
+| `.../sucursal/grafo.py` | StateGraph con memoria, rutas y redacción |
 | `app/streamlit_app.py` | App Streamlit: capa delgada que delega en `asistente/` |
 | `scripts/tasks.py` | Tareas portables del Makefile |
 

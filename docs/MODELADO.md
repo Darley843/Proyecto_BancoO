@@ -163,6 +163,30 @@ en valor.
 
 Estado actual: 622 filas únicas en el CSV y 8 de 8 preguntas de tabla cubiertas.
 
+### Grafo con memoria
+
+`sucursal/grafo.py` compila un `StateGraph` con seis nodos y `SqliteSaver` en
+`data/asistente/memoria.sqlite`:
+
+```text
+reformular → digiturno ─┬─ X → rechazo
+                        ├─ T → tablero ─┬─ 1–3 filas → plantilla → redactar
+                        │               └─ 0 o 4+ → boveda
+                        └─ B → boveda ──┬─ hay fragmentos → redactar
+                                        └─ sin fragmentos → rechazo
+```
+
+- `reformular` solo actúa si hay historial y la pregunta es un seguimiento
+  («¿Y…», «y…», «cuánto», «cuál», «cómo» o menos de seis palabras); el historial
+  se recorta con `trim_messages` y `count_tokens_approximately`.
+- `redactar` usa la plantilla si el Tablero ya respondió (costo cero) o
+  `ContextoRag` con `qa_v2`; si el modelo falla, cae en la frase fija sin romper
+  el hilo.
+- La pregunta con PII se rechaza **antes** de invocar el grafo, así que no entra
+  al checkpointer; cada conversación se aísla por `thread_id`.
+- El estado guarda datos serializables (diccionarios) y las respuestas de
+  `RespuestaCitas` se propagan en `fuentes`, `uso` y `avisos`.
+
 ### Cómo se compara
 
 1. Correr `make evaluar` con la estrategia actual (contexto completo).

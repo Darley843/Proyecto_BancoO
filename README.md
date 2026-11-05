@@ -211,6 +211,14 @@ alguna no encuentra fila. Cada fila trae `concepto`, `categoria`, `valor`,
 `moneda`, `recargos`, `periodicidad`, `vigente_desde`, `origen`
 (`tarifario`/`tabla_web`), `pagina` y `fuente`.
 
+### Grafo con memoria
+
+El grafo encadena `reformular → digiturno → Bóveda/Tablero/rechazo → redactar`,
+guarda la conversación con `SqliteSaver` en `data/asistente/memoria.sqlite` y
+aísla cada sesión por `thread_id`. Un seguimiento se reformula solo si hay
+historial; el Tablero responde sin modelo cuando hay 1–3 filas y la Bóveda toma
+el relevo con 0 o 4+.
+
 ### Scraper de demostración
 
 Capa delgada sobre el pipeline: descubre hasta 5 URLs con el índice de sitemaps
