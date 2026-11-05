@@ -19,7 +19,11 @@ from banco_occidente_corpus.boveda.configuracion import (
     ConfiguracionRecuperacion,
     cargar_configuracion_recuperacion,
 )
-from banco_occidente_corpus.boveda.recuperador import RecuperadorHibrido, _similitud_coseno
+from banco_occidente_corpus.boveda.recuperador import (
+    RecuperadorHibrido,
+    _similitud_coseno,
+    _tokenizar,
+)
 from banco_occidente_corpus.boveda.tipos import Fragmento, Recuperador
 
 URL = "https://www.bancodeoccidente.com.co/tarifas"
@@ -188,6 +192,39 @@ def test_similitud_coseno_acota_a_cero_y_uno() -> None:
     assert _similitud_coseno([1.0, 0.0], [1.0, 0.0]) == pytest.approx(1.0)
     assert _similitud_coseno([1.0, 0.0], [0.0, 1.0]) == 0.0
     assert _similitud_coseno([0.0, 0.0], [1.0, 0.0]) == 0.0
+
+
+def test_tokenizar_normaliza_palabras() -> None:
+    """La tokenización pasa a minúsculas, quita tildes y descarta signos."""
+    assert _tokenizar("¿Cuál es la línea telefónica?") == [
+        "cual",
+        "es",
+        "la",
+        "linea",
+        "telefonica",
+    ]
+
+
+def test_bm25_encuentra_fragmento_con_tilde() -> None:
+    """BM25 compara palabras normalizadas: «linea atencion» halla «Línea de atención»."""
+    objetivo = fragmento("A", "Línea de atención: 018000 123 456")
+    relleno = [
+        fragmento("B", "cuota de manejo de la tarjeta de credito"),
+        fragmento("C", "tasa de interes del credito de vivienda"),
+        fragmento("D", "requisitos para abrir una cuenta de ahorros"),
+        fragmento("E", "red de oficinas y cajeros en el pais"),
+    ]
+    fragmentos = [objetivo, *relleno]
+    recuperador = crear(
+        fragmentos,
+        [coincidencia(item, 0.9 if item.id == "A" else 0.5) for item in fragmentos],
+        peso_vectorial=0.0,
+        peso_bm25=1.0,
+    )
+
+    resultados = recuperador.buscar("linea atencion", k=2)
+
+    assert resultados[0].id == "A"
 
 
 class RecuperadorSimulado:
