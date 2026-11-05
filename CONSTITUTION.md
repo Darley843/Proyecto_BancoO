@@ -194,7 +194,8 @@ ProyectoAvance1/
 │   │   └── recuperador.py # híbrido vectorial + BM25 con puntaje coseno
 │   ├── sucursal/         # SUCURSAL: digiturno, grafo y API de la fase 2
 │   │   ├── tipos.py      # Turno y letras B/T/X
-│   │   └── digiturno.py  # reglas de enrutamiento y clasificación de dudas
+│   │   ├── digiturno.py  # reglas de enrutamiento y clasificación de dudas
+│   │   └── grafo.py      # StateGraph con memoria, rutas y redacción
 │   ├── tablero/          # TABLERO: tarifario y tablas de Gold → CSV
 │   │   ├── tarifas.py    # líneas «concepto, valor y fecha» del tarifario
 │   │   ├── tablas_web.py # lector de tablas Markdown y adaptadores
@@ -642,6 +643,7 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 | 2026-11-03 | Recuperación híbrida vectorial + BM25 (`EnsembleRetriever`) con pesos en `[recuperacion]` y `puntaje` = 1 − coseno en todos los candidatos | Combina la semántica del embedding con la coincidencia exacta de términos (cuotas, siglas, montos). Los pesos se normalizan a suma 1 y el Arqueo puede variarlos desde configuración sin reindexar; el orden lo decide el híbrido y el puntaje se recalcula contra la consulta para que signifique lo mismo en todo el sistema |
 | 2026-11-03 | Recuperación híbrida vectorial + BM25 (`EnsembleRetriever`) con pesos en `[recuperacion]` y `puntaje` = 1 - coseno en todos los candidatos | Combina la semántica del embedding con la coincidencia exacta de términos (cuotas, siglas, montos). Los pesos se normalizan a suma 1 y el Arqueo puede variarlos desde configuración sin reindexar; el orden lo decide el híbrido y el puntaje se recalcula contra la consulta para que signifique lo mismo en todo el sistema |
 | 2026-11-04 | Digiturno: reglas antes que modelo (PII → fuera de alcance → tarifas → duda → B), configurables desde `[digiturno]` | Las rutas más comunes se resuelven sin gastar tokens y de forma explicable; el modelo solo interviene en dudas, a temperatura 0 y con respaldo a B ante cualquier salida inválida. El turno es un consecutivo de proceso y no persiste la pregunta |
+| 2026-11-04 | Grafo con memoria `SqliteSaver`, reformulación condicionada y plantilla del Tablero | El estado guarda datos serializables y se aísla por `thread_id`; el historial se recorta antes de cada llamada. La PII se rechaza antes de invocar el grafo, así no entra al checkpointer. Con 1–3 filas del Tablero responde sin modelo (costo cero); con 0 o 4+ pasa a la Bóveda |
 | 2026-11-03 | Recuperación híbrida vectorial + BM25 (`EnsembleRetriever`) con pesos en `[recuperacion]` y `puntaje` = 1 - coseno en todos los candidatos | Combina la semántica del embedding con la coincidencia exacta de términos (cuotas, siglas, montos). Los pesos se normalizan a suma 1 y el Arqueo puede variarlos desde configuración sin reindexar; el orden lo decide el híbrido y el puntaje se recalcula contra la consulta para que signifique lo mismo en todo el sistema |
 | 2026-11-04 | Tablero: tarifario PDF y tablas web a `data/estructurados/tablero.csv` con diez columnas, versionado y determinista | Las cifras de tasas y coberturas no se pueden dejar al modelo: el CSV es la evidencia de las 8 preguntas de tabla. Se conserva el formato original del valor, la moneda o unidad de la fuente y la trazabilidad `pagina`+`fuente`; si una línea no trae fecha o no se puede extraer el valor, no se inventa: se omite o queda vacía |
 

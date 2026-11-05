@@ -102,6 +102,7 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | `.../boveda/recuperador.py` | Recuperación híbrida vectorial + BM25 con pesos |
 | `.../sucursal/tipos.py` | Turno y letras B/T/X |
 | `.../sucursal/digiturno.py` | Reglas de enrutamiento y clasificación de dudas |
+| `.../sucursal/grafo.py` | StateGraph con memoria, rutas y redacción |
 | `.../tablero/tarifas.py` | Tarifario PDF → filas «concepto, valor y fecha» |
 | `.../tablero/tablas_web.py` | Lector de tablas Markdown y adaptadores por página |
 | `.../tablero/construir.py` | Une fuentes, escribe el CSV y cruza las 8 preguntas |
