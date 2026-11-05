@@ -112,7 +112,9 @@ def test_concepto_y_valor_estan_en_la_misma_linea_de_gold(fila: dict[str, str]) 
     assert fuente.group(1).strip() == fila["fuente"]
     concepto = re.sub(r"\s*\((Visa|Mastercard)\)$", "", fila["concepto"]).rstrip("*")
     valor = re.compile(rf"(?<![\d.,]){re.escape(fila['valor'])}(?![\d.,])")
-    assert any(concepto in linea and valor.search(linea) for linea in lineas_de_gold(fila["pagina"]))
+    assert any(
+        concepto in linea and valor.search(linea) for linea in lineas_de_gold(fila["pagina"])
+    )
 
 
 def test_maqueta_no_repite_concepto_con_valores_distintos() -> None:
