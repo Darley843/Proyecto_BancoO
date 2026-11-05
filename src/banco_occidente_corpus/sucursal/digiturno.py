@@ -49,6 +49,11 @@ PATRONES_FUERA_ALCANCE: tuple[str, ...] = (
     r"\b(consejo|recomiend\w*|invertir|inversion|acciones|criptomoneda)\b",
     r"\b(prompt|instrucciones del sistema|system prompt|ignora (tus|las) instrucciones|revela)\b",
 )
+#: Tope de tokens del clasificador de dudas. DeepSeek Flash gasta alrededor de
+#: 50-60 tokens solo en razonar antes de emitir el JSON; con un tope de 80 el
+#: razonamiento lo agotaba, `response_format` fallaba con
+#: `LengthFinishReasonError` y la duda caía al respaldo por defecto.
+MAX_TOKENS_CLASIFICADOR: int = 512
 #: Instrucción del clasificador de dudas.
 INSTRUCCION_DUDA = (
     "Eres el digiturno del Banco de Occidente. Clasifica la pregunta del cliente "
@@ -140,7 +145,9 @@ def clasificar(
         contador: consecutivo de turnos; si falta se usa uno nuevo.
 
     Returns:
-        El turno con su número, letra y motivo.
+        El turno con su número, letra y motivo. Si no hay clasificador, el
+        respaldo es `B` con motivo `defecto`; si el clasificador no responde,
+        el respaldo es `B` con motivo `defecto:modelo_sin_respuesta`.
 
     Raises:
         ValueError: si la pregunta queda vacía después de sanearla.
@@ -168,6 +175,7 @@ def clasificar(
         clasificacion = clasificador(texto)
         if clasificacion is not None:
             return Turno(numero=numero, letra=clasificacion.letra, motivo=clasificacion.motivo)
+        return Turno(numero=numero, letra="B", motivo="defecto:modelo_sin_respuesta")
 
     return Turno(numero=numero, letra="B", motivo="defecto")
 
@@ -217,7 +225,7 @@ def crear_clasificador(modelo: BaseChatModel | None = None) -> Clasificador:
     if modelo is None:
         from ..asistente.modelo import crear_modelo
 
-        modelo = crear_modelo(temperatura=0.0, max_tokens=80)
+        modelo = crear_modelo(temperatura=0.0, max_tokens=MAX_TOKENS_CLASIFICADOR)
     return clasificador_deepseek(modelo)
 
 
