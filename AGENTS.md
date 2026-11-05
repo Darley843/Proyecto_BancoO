@@ -41,6 +41,7 @@ make contexto    # prompt del asistente desde Gold (data/contexto/)
 make fragmentos  # fragmentos de la Bóveda desde chunks y hechos (sin red)
 make indice      # indexa la Bóveda con Ollama (web + PDF de producto + hechos)
 make indice-completo  # añade el resto de PDF y los videos
+make tablero     # tarifario + tablas de Gold -> data/estructurados/tablero.csv
 make app         # Sucursal 1965: FastAPI + app web en 127.0.0.1:8000
 make app-streamlit  # app Streamlit de la fase 1 (se retira en la fase 2)
 make evaluar     # 20 preguntas del alcance -> docs/RESULTADOS_20_PREGUNTAS.md
@@ -101,6 +102,9 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | `.../boveda/recuperador.py` | Recuperación híbrida vectorial + BM25 con pesos |
 | `.../sucursal/tipos.py` | Turno y letras B/T/X |
 | `.../sucursal/digiturno.py` | Reglas de enrutamiento y clasificación de dudas |
+| `.../tablero/tarifas.py` | Tarifario PDF → filas «concepto, valor y fecha» |
+| `.../tablero/tablas_web.py` | Lector de tablas Markdown y adaptadores por página |
+| `.../tablero/construir.py` | Une fuentes, escribe el CSV y cruza las 8 preguntas |
 | `app/streamlit_app.py` | App Streamlit: capa delgada que delega en `asistente/` |
 | `scripts/tasks.py` | Tareas portables del Makefile |
 

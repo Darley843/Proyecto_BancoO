@@ -122,6 +122,43 @@ primera coincidencia:
 pregunta tampoco se guarda. `T` es provisional: el grafo confirmará la ruta solo
 si el Tablero devuelve de una a tres filas; con cero o más de tres, la pregunta
 pasa a `B`.
+### Tablero de tasas (datos estructurados)
+
+`make tablero` convierte el tarifario PDF y las tablas Markdown de Gold en
+`data/estructurados/tablero.csv`, un archivo pequeño, determinista y versionado
+que responde con cifras exactas sin pasar por el modelo.
+
+| Origen | De dónde sale | Cómo se extrae |
+|---|---|---|
+| `tarifario` | `ver-tarifas-2025-*.md` | Máquina de estados sobre las líneas «concepto, valor y fecha» (`Cuota de Manejo Tarjeta Débito $16.700 20-nov-25`) |
+| `tabla_web` | Páginas de asistencias, Cuota Protegida, promociones, asistencia vehicular y proyectos de vivienda | Lector de tablas Markdown con adaptadores por página |
+
+Columnas exactas, en este orden:
+
+```text
+concepto, categoria, valor, moneda, recargos, periodicidad,
+vigente_desde, origen, pagina, fuente
+```
+
+Reglas:
+
+1. `valor` conserva el formato original (`16.700`, `2.000`, `407,027,630`) y la
+   `moneda` es `COP`, `USD`, `EUR` o `%` según la fuente.
+2. `recargos` conserva `+ IVA` o `+ Seguro` y nunca se suma al valor.
+3. `vigente_desde` se normaliza a ISO (`20-nov-25` → `2025-11-20`); si la fuente
+   no trae fecha, queda vacío: no se inventa una vigencia.
+4. `pagina` es la ruta relativa del Gold y `fuente` la URL pública exacta.
+5. El CSV se ordena de forma determinista y dos ejecuciones producen el mismo
+   archivo; `data/boveda/` sigue fuera de Git, pero este CSV sí se versiona.
+6. `make tablero` cruza las 8 preguntas de tipo `tabla` del set de fase 2 y
+   termina con error si alguna no encuentra fila o valor, con el detalle de cuál.
+
+`buscar_filas` y `comparar_filas` son funciones puras: filtran por concepto y
+categoría sin tildes ni mayúsculas, y comparan dos grupos (por ejemplo Visa y
+Mastercard) devolviendo las filas que solo existen en un lado y las que difieren
+en valor.
+
+Estado actual: 622 filas únicas en el CSV y 8 de 8 preguntas de tabla cubiertas.
 
 ### Cómo se compara
 
