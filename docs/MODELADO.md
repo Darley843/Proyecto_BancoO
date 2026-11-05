@@ -101,6 +101,30 @@ se envían los *k* fragmentos recuperados, cada uno con su URL para que la cita
 siga siendo verificable. Eso baja el costo por pregunta y permite sumar los PDF
 y los videos al conocimiento.
 
+### Digiturno (router)
+
+`boveda` y `tablero` no se eligen por azar: el **digiturno** asigna un turno a
+cada pregunta antes de llamar a nada. El orden es fijo y se detiene en la
+primera coincidencia:
+
+1. **PII** (`validacion.detectar_pii`) → `X`. Los teléfonos públicos del canal
+   se aceptan como permitidos; si falta `data/contexto/`, la lista queda vacía.
+2. **Fuera de alcance** (patrones de `[digiturno]` en `config/sucursal.toml`):
+   saldo o deudas propias, otro banco, clima, consejo de inversión, intento de
+   revelar instrucciones → `X`.
+3. **Tarifas y coberturas** (`cuota`, `tarifa`, `cobertura`, `carencia`,
+   `descuento`, `promoción`, `asistencia`, `seguro`…) → `T`.
+4. **Duda**: si se inyecta un clasificador, se pregunta a DeepSeek a temperatura
+   0 con salida JSON `{letra, motivo}` y hasta 512 tokens: el modelo gasta medio
+   centenar solo en razonar y con topes bajos la duda caía siempre al respaldo.
+   Cualquier salida inválida cae a `B` con motivo `defecto:modelo_sin_respuesta`.
+5. Por defecto, **`B`** (Bóveda), con motivo `defecto` cuando no hay clasificador.
+
+`numero` es un consecutivo por proceso (empieza en 1) y **no se persiste**; la
+pregunta tampoco se guarda. `T` es provisional: el grafo confirmará la ruta solo
+si el Tablero devuelve de una a tres filas; con cero o más de tres, la pregunta
+pasa a `B`.
+
 ### Tablero de tasas (datos estructurados)
 
 `make tablero` convierte el tarifario PDF y las tablas Markdown de Gold en

@@ -196,6 +196,9 @@ ProyectoAvance1/
 │   │   ├── tarifas.py    # líneas «concepto, valor y fecha» del tarifario
 │   │   ├── tablas_web.py # lector de tablas Markdown y adaptadores
 │   │   └── construir.py  # une fuentes, escribe el CSV y cruza las 8 preguntas
+│   ├── sucursal/         # SUCURSAL: digiturno, grafo y API de la fase 2
+│   │   ├── tipos.py      # Turno y letras B/T/X
+│   │   └── digiturno.py  # reglas de enrutamiento y clasificación de dudas
 │   ├── checklist.py      # 24 casillas del Taller 1
 │   ├── stats.py          # _INDICE.md
 │   └── utils.py          # hashing, JSONL, tokens, slugs
@@ -637,6 +640,8 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 | 2026-11-03 | Fase 2: dependencias de Bóveda, Sucursal y Arqueo en un solo PR (`uv add`): `langgraph`, `langgraph-checkpoint-sqlite`, `langchain-chroma`, `langchain-classic`, `langchain-community`, `langchain-ollama`, `rank-bm25`, `fastapi`, `uvicorn[standard]` y `scikit-learn` | La Bóveda necesita Ollama/Chroma/BM25, la Sucursal LangGraph/FastAPI y el Arqueo PCA. Concentrarlas evita conflictos de `uv.lock` entre cuatro ramas; el resto de PR se rebasa sobre `main`. `sqlalchemy` no se añade directo: entra como dependencia de `langchain-community`. Embeddings locales: solo DeepSeek se paga (`langchain-community` está en sunset, se acepta por `BM25Retriever` y se revisará si se retira) |
 | 2026-11-03 | Bóveda: fragmentos deterministas, embeddings locales con `nomic-embed-text-v2-moe` y Chroma con distancia coseno en `data/boveda/` | El corpus no sale a un tercero y los vectores no consumen la cuota de DeepSeek. Se usa `base_url` explícito (`OLLAMA_HOST` solo como respaldo) porque el bind del daemon puede ser `0.0.0.0`. El índice se reconstruye entero en cada `make indice` para no dejar fragmentos huérfanos, y los ids repetidos se descartan al construir fragmentos. `make indice-completo` añade PDF restantes y videos |
 | 2026-11-03 | Recuperación híbrida vectorial + BM25 (`EnsembleRetriever`) con pesos en `[recuperacion]` y `puntaje` = 1 - coseno en todos los candidatos | Combina la semántica del embedding con la coincidencia exacta de términos (cuotas, siglas, montos). Los pesos se normalizan a suma 1 y el Arqueo puede variarlos desde configuración sin reindexar; el orden lo decide el híbrido y el puntaje se recalcula contra la consulta para que signifique lo mismo en todo el sistema |
+| 2026-11-04 | Digiturno: reglas antes que modelo (PII → fuera de alcance → tarifas → duda → B), configurables desde `[digiturno]` | Las rutas más comunes se resuelven sin gastar tokens y de forma explicable; el modelo solo interviene en dudas, a temperatura 0 y con respaldo a B ante cualquier salida inválida. El turno es un consecutivo de proceso y no persiste la pregunta |
+| 2026-11-04 | Digiturno: el clasificador de dudas pide 512 tokens y el respaldo distingue `defecto` de `defecto:modelo_sin_respuesta` | Con `max_tokens=80` DeepSeek Flash agotaba el tope en el razonamiento (52–60 tokens), `response_format` fallaba con `LengthFinishReasonError` y 2 de cada 5 dudas caían al respaldo sin avisar. El motivo nuevo deja auditar si el modelo decidió o si el turno salió por defecto |
 | 2026-11-04 | Tablero: tarifario PDF y tablas web a `data/estructurados/tablero.csv` con diez columnas, versionado y determinista | Las cifras de tasas y coberturas no se pueden dejar al modelo: el CSV es la evidencia de las 8 preguntas de tabla. Se conserva el formato original del valor, la moneda o unidad de la fuente y la trazabilidad `pagina`+`fuente`; si una línea no trae fecha o no se puede extraer el valor, no se inventa: se omite o queda vacía |
 
 ## 12. Configuración local (no trackear)

@@ -21,3 +21,45 @@ k = 5
 # Pesos del híbrido; se normalizan a suma 1 antes de pasarlos a EnsembleRetriever.
 peso_vectorial = 0.6
 peso_bm25 = 0.4
+
+[digiturno]
+# Palabras que mandan la pregunta al Tablero (ruta T); se comparan sin tildes.
+palabras_tarifas = [
+  "cuota",
+  "tarifa",
+  "cobertura",
+  "carencia",
+  "descuento",
+  "promocion",
+  "asistencia",
+  "seguro",
+  "prima",
+  "comision",
+]
+# Patrones de fuera de alcance (ruta X), escritos por intención y no por palabra
+# suelta; se aplican sobre el texto normalizado sin tildes. «Inversión» o
+# «acciones» también nombran productos propios (fiducia, sostenibilidad), y
+# «recomiendas» cualquier recomendación de tarjeta: el rechazo exige que la
+# intención sea pedir un dato propio, un competidor, consejo de inversión,
+# clima o el prompt.
+patrones_fuera_alcance = [
+  # Dato propio: el valor o el estado, no el trámite para consultarlo.
+  '^(?!.*\bcomo\b).*\bmi (saldo|deuda|deudas|extracto|movimientos)\b',
+  '^(?!.*\bcomo\b).*\bmis (deudas|saldos|movimientos|extractos)\b',
+  '\b(cual|cuanto|cuanta|cuantos|cuantas)\b.*\b(saldo|deuda|deudas|debo|extracto|movimientos)\b.*\b(mi|mis|cuenta|tarjeta)\b',
+  '\btengo (deudas|saldo|movimientos)\b',
+  # Otro banco: la frase explícita o el nombre de un competidor.
+  '\b(otro banco|bancolombia|davivienda|bbva|colpatria)\b',
+  # Banco de Bogotá es del mismo Grupo Aval: solo es X si se pide un producto.
+  '\b(banco de bogota)\b.*\b(cuenta|tarjeta|cdt|credito|tasa|cuota|comision|transferencia)\b|\b(cuenta|tarjeta|cdt|credito|tasa|cuota|comision|transferencia)\b.*\b(banco de bogota)\b',
+  # Clima: no tiene relación con el banco.
+  '\b(clima|temperatura|lluvia|va a llover)\b',
+  # Consejo de inversión: una recomendación, no un producto del banco.
+  '\b(me )?recomiendas?\b.*\b(invertir|inversion|acciones|criptomoneda)\b',
+  '\b(consejo|asesoria|recomendacion)\b.*\b(inversion|invertir|acciones|criptomoneda)\b',
+  '\binvertir en (acciones|criptomonedas|bolsa|divisas)\b',
+  '\b(comprar|vender) acciones\b',
+  '\bcriptomonedas?\b',
+  # Prompt: intento de cambiar o revelar las instrucciones.
+  '\b(prompt|instrucciones del sistema|system prompt|ignora (tus|las) instrucciones|revela)\b',
+]

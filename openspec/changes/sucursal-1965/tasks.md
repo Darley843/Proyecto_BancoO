@@ -63,10 +63,10 @@
 
 ## 10. PR 8 — Digiturno (Darley — pendiente)
 
-- [ ] 10.1 Crear `sucursal/__init__.py`, `sucursal/tipos.py` con `Turno` y `sucursal/digiturno.py` con el orden de reglas: PII, fuera de alcance, tarifas/coberturas, duda y ruta por defecto; verificar con pruebas los cinco casos y que PII y fuera de alcance no llaman al modelo.
-- [ ] 10.2 Implementar la clasificación dudosa con DeepSeek a temperatura 0 y `json_mode`, esquema Pydantic `{letra, motivo}` y respaldo a `B` si la salida no es válida; verificar con `FakeListChatModel` una respuesta válida, un JSON roto y una letra desconocida, sin red.
-- [ ] 10.3 Añadir a `config/sucursal.toml` las palabras de tarifas y los patrones de fuera de alcance, y cargarlos con validación; verificar con pruebas que «¿cuál es el saldo de mi cuenta?» (pregunta 35) y las consultas de otro banco, clima, inversión y prompt caen en `X`, que «¿cómo abro mi cuenta de nómina?» no cae en `X` y sigue la ruta `B`, y que «cuota de manejo» cae en `T`.
-- [ ] 10.4 Verificar que el digiturno no persiste la pregunta ni datos personales y que el número de turno no se guarda en las SQLite; ejecutar `make check`.
+- [x] 10.1 Crear `sucursal/__init__.py`, `sucursal/tipos.py` con `Turno` y `sucursal/digiturno.py` con el orden de reglas: PII, fuera de alcance, tarifas/coberturas, duda y ruta por defecto; verificar con pruebas los cinco casos y que PII y fuera de alcance no llaman al modelo.
+- [x] 10.2 Implementar la clasificación dudosa con DeepSeek a temperatura 0 y `json_mode`, esquema Pydantic `{letra, motivo}` y respaldo a `B` si la salida no es válida; verificar con `FakeListChatModel` una respuesta válida, un JSON roto y una letra desconocida, sin red.
+- [x] 10.3 Añadir a `config/sucursal.toml` las palabras de tarifas y los patrones de fuera de alcance, y cargarlos con validación; verificar con pruebas que «¿cuál es el saldo de mi cuenta?» (pregunta 35) y las consultas de otro banco, clima, inversión y prompt caen en `X`, que «¿cómo abro mi cuenta de nómina?» no cae en `X` y sigue la ruta `B`, y que «cuota de manejo» cae en `T`.
+- [x] 10.4 Verificar que el digiturno no persiste la pregunta ni datos personales y que el número de turno no se guarda en las SQLite; ejecutar `make check`.
 
 ## 11. PR 9 — Grafo con recuperador simulado (Darley — pendiente)
 
