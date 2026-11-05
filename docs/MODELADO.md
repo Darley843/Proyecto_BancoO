@@ -187,6 +187,32 @@ reformular → digiturno ─┬─ X → rechazo
 - El estado guarda datos serializables (diccionarios) y las respuestas de
   `RespuestaCitas` se propagan en `fuentes`, `uso` y `avisos`.
 
+### API local, costo y caché
+
+`app.py` monta la API antes de los estáticos y escucha **solo** en
+`127.0.0.1:8000`. Endpoints de lectura:
+
+| Endpoint | Contenido |
+|---|---|
+| `GET /api/estado` | modo demo, gasto del día, tope, índice y modelo de embeddings |
+| `GET /api/tablero?q=` | filas del CSV filtradas por concepto o categoría |
+| `GET /api/boveda/mapa?pregunta=` | puntos PCA, pregunta proyectada y top de fragmentos; `disponible: false` si falta `mapa.json` |
+| `GET /api/pipeline` | etapas de `panel.pipeline_summary` + estado de indexación |
+| `GET /api/arqueo` | contenido de `data/evaluacion/arqueo.json` o `disponible: false` |
+| `GET /api/vestibulo` | hitos de `config/vestibulo.toml` |
+
+Costo y caché (`sucursal/costo.py`):
+
+- Las tarifas se importan de `arqueo/metricas.py` (única fuente) y se elige pico
+  de lunes a viernes entre 01:00–04:00 y 06:00–10:00 UTC; el resto es valle.
+- `GastoDiario` suma costo, llamadas y tokens del día en
+  `data/asistente/gasto.sqlite`; el tope sale de `[sucursal]` y
+  `SUCURSAL_TOPE_USD` lo sobrescribe.
+- `CacheRespuestas` guarda la respuesta completa con clave
+  `sha256(pregunta normalizada|ruta|versión)` y TTL de `[sucursal]`.
+- Con `SUCURSAL_DEMO=1` no se crea cliente de DeepSeek, el costo es cero y no se
+  escribe gasto.
+
 ### Cómo se compara
 
 1. Correr `make evaluar` con la estrategia actual (contexto completo).

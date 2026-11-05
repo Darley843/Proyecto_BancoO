@@ -62,9 +62,12 @@ def test_sirve_los_archivos_de_la_app(cliente: TestClient, ruta: str) -> None:
     assert cliente.get(ruta).status_code == 200
 
 
-def test_sin_api_la_app_puede_caer_a_los_datos_de_ejemplo(cliente: TestClient) -> None:
-    """Mientras no exista el PR 10, ``/api/estado`` responde 404 (y la app usa la maqueta)."""
-    assert cliente.get("/api/estado").status_code == 404
+def test_la_api_responde_estado(cliente: TestClient) -> None:
+    """Con el PR 10 la API existe y ``/api/estado`` trae los seis campos."""
+    respuesta = cliente.get("/api/estado")
+
+    assert respuesta.status_code == 200
+    assert "indice_listo" in respuesta.json()
 
 
 def test_crear_app_acepta_otra_carpeta(modulo_app: ModuleType, tmp_path: Path) -> None:

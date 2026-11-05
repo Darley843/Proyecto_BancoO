@@ -106,6 +106,9 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | `.../sucursal/tipos.py` | Turno y letras B/T/X |
 | `.../sucursal/digiturno.py` | Reglas de enrutamiento y clasificación de dudas |
 | `.../sucursal/grafo.py` | StateGraph con memoria, rutas y redacción |
+| `.../sucursal/ajustes.py` | Tope de gasto, TTL y modo demo |
+| `.../sucursal/costo.py` | Tarifas valle/pico, gasto diario y caché |
+| `.../sucursal/api.py` | Endpoints de estado, datos y trazabilidad |
 | `app/streamlit_app.py` | App Streamlit: capa delgada que delega en `asistente/` |
 | `scripts/tasks.py` | Tareas portables del Makefile |
 

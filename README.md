@@ -219,6 +219,22 @@ aísla cada sesión por `thread_id`. Un seguimiento se reformula solo si hay
 historial; el Tablero responde sin modelo cuando hay 1–3 filas y la Bóveda toma
 el relevo con 0 o 4+.
 
+### API local y variables
+
+`make app` levanta la API y la app web solo en `http://127.0.0.1:8000` (nunca
+`0.0.0.0`). Endpoints: `/api/estado`, `/api/tablero`, `/api/boveda/mapa`,
+`/api/pipeline`, `/api/arqueo` y `/api/vestibulo`.
+
+| Variable | Para qué |
+|---|---|
+| `DEEPSEEK_API_KEY` | respuestas con el modelo; sin ella, el asistente no puede redactar |
+| `OLLAMA_HOST` / `OLLAMA_BASE_URL` | respaldo de la URL de embeddings; lo normal es `config/sucursal.toml` |
+| `SUCURSAL_DEMO=1` | modo demo: sin DeepSeek, costo cero y sin escritura de gasto |
+| `SUCURSAL_TOPE_USD` | sobrescribe el tope diario de `[sucursal]` para la sesión |
+
+El gasto (`data/asistente/gasto.sqlite`) y la caché
+(`data/asistente/cache.sqlite`) no se versionan.
+
 ### Scraper de demostración
 
 Capa delgada sobre el pipeline: descubre hasta 5 URLs con el índice de sitemaps

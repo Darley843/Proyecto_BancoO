@@ -63,3 +63,9 @@ patrones_fuera_alcance = [
   # Prompt: intento de cambiar o revelar las instrucciones.
   '\b(prompt|instrucciones del sistema|system prompt|ignora (tus|las) instrucciones|revela)\b',
 ]
+
+[sucursal]
+# Tope diario de gasto del modelo en USD; SUCURSAL_TOPE_USD lo sobrescribe.
+tope_diario_usd = 0.20
+# TTL de la cache de respuestas en segundos.
+cache_ttl_segundos = 3600
