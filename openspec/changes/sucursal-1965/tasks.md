@@ -119,8 +119,8 @@
 ## 18. PR 15 — Tablero (vista) (Yoldy — pendiente)
 
 - [ ] 18.1 Implementar `app/web/vistas/tablero.js` con la tabla de filas, el filtro de texto y los enlaces a la fuente en otra pestaña; verificar con `tablero.json` y con `/api/tablero?q=cuota` que el filtro y las columnas coinciden con el CSV.
-- [ ] 18.2 Mostrar un estado vacío claro cuando no hay filas y no inventar valores; verificar con una búsqueda sin coincidencias.
-- [ ] 18.3 Verificar que la vista muestra concepto, valor, moneda, periodicidad, vigencia, origen y fuente, y que no recalcula ni compara filas en el navegador.
+- [x] 18.2 Mostrar un estado vacío claro cuando no hay filas y no inventar valores; verificar con una búsqueda sin coincidencias.
+- [x] 18.3 Verificar que la vista muestra concepto, valor, moneda, periodicidad, vigencia, origen y fuente, y que no recalcula ni compara filas en el navegador.
 
 ## 19. PR 16 — Cámara (Yoldy — pendiente)
 
