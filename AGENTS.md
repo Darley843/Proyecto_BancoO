@@ -63,9 +63,11 @@ Viven en `.opencode/skills/` y se cargan bajo demanda:
 |---|---|
 | `corpus-extraction` | Captura, regeneración y diagnóstico del pipeline (Bronze/Silver/Gold) |
 | `semantic-extraction` | Convertir Gold en entidades/hechos/relaciones con cita y validación |
+| `boveda-rag` | Operar, medir y diagnosticar la Bóveda RAG (fragmentos, Chroma y Ollama) |
 
 Úsalas antes de tocar el pipeline o la capa Knowledge; no dupliques sus reglas
-aquí. Se pueden mencionar como `@corpus-extraction` y `@semantic-extraction`.
+aquí. Se pueden mencionar como `@corpus-extraction`, `@semantic-extraction` y
+`@boveda-rag`.
 
 ## Herramientas del agente (MCP)
 
