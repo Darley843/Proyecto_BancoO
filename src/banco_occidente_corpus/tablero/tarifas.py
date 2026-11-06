@@ -1,7 +1,9 @@
 """Extracción del tarifario PDF en filas del Tablero.
 
 Las líneas del PDF siguen el patrón «concepto, valor y fecha de vigencia»
-(`Cuota de Manejo Tarjeta Débito $16.700 20-nov-25`). Una máquina de estados
+(`Cuota de Manejo Tarjeta Débito $16.700 20-nov-25`). El valor es el monto que
+acompaña a `$`/`USD` o el porcentaje, nunca el primer número del concepto: así
+`Prórroga (x 30 días) 1,5% + IVA` vale 1,5 y no 30. Una máquina de estados
 arrastra la categoría y la periodicidad desde los encabezados de sección; si una
 línea no trae fecha, la fila se conserva con vigencia vacía.
 """
@@ -28,7 +30,12 @@ MESES: dict[str, str] = {
     "nov": "11",
     "dic": "12",
 }
-#: Patrón «concepto $valor [cola con recargos y fecha]».
+#: Valor con símbolo (`$ 2.700`, `USD 70`) o porcentaje (`0,75%`).
+_VALOR = re.compile(
+    r"(?:(?P<simbolo>\$|\bUSD\b)\s*(?P<monto>\d[\d.,]*)|(?P<porcentaje>\d[\d.,]*)\s*%)",
+    re.IGNORECASE,
+)
+#: Respaldo para líneas sin símbolo ni porcentaje (por ejemplo `* 0` o `Al Costo`).
 _FILA = re.compile(
     r"^(?P<concepto>.*?)\s+\$?\s*(?P<valor>\d[\d.,]*)\s*(?P<cola>.*)$",
     re.IGNORECASE,
@@ -69,25 +76,37 @@ def extraer_tarifario(texto: str, pagina: str, fuente: str) -> list[Fila]:
     filas: list[Fila] = []
     categoria = ""
     periodicidad = ""
-    for linea in texto.splitlines():
-        limpia = linea.strip()
-        if not limpia or limpia.startswith(("#", "|", "---")):
+    concepto_previo = ""
+    lineas = [
+        recortada
+        for recortada in (linea.strip() for linea in texto.splitlines())
+        if recortada and not recortada.startswith(("#", "|", "---"))
+    ]
+    for indice, limpia in enumerate(lineas):
+        siguiente = lineas[indice + 1] if indice + 1 < len(lineas) else ""
+        if _es_concepto_de_valor_suelto(limpia, siguiente):
+            if _es_encabezado(limpia):
+                categoria = _limpiar_encabezado(limpia)
+                periodicidad = _periodicidad(limpia)
+            concepto_previo = limpia
             continue
 
-        encontrada = _interpretar_linea(limpia)
+        encontrada = _interpretar_linea(limpia, concepto_previo)
         if encontrada is None:
             if _es_encabezado(limpia):
                 categoria = _limpiar_encabezado(limpia)
                 periodicidad = _periodicidad(limpia)
+            if _es_concepto_suelto(limpia):
+                concepto_previo = limpia
             continue
 
-        concepto, valor, recargos, fecha = encontrada
+        concepto, valor, moneda, recargos, fecha = encontrada
         filas.append(
             Fila(
                 concepto=concepto,
                 categoria=categoria,
                 valor=valor,
-                moneda="COP",
+                moneda=moneda,
                 recargos=recargos,
                 periodicidad=periodicidad or _periodicidad(limpia),
                 vigente_desde=fecha,
@@ -99,26 +118,75 @@ def extraer_tarifario(texto: str, pagina: str, fuente: str) -> list[Fila]:
     return filas
 
 
-def _interpretar_linea(linea: str) -> tuple[str, str, str, str] | None:
-    """Extrae concepto, valor, recargos y fecha ISO de una línea, si aplica."""
-    coincidencia = _FILA.match(linea)
-    if not coincidencia:
+def _interpretar_linea(
+    linea: str, concepto_previo: str = ""
+) -> tuple[str, str, str, str, str] | None:
+    """Extrae concepto, valor, moneda, recargos y fecha ISO de una línea, si aplica.
+
+    El concepto es el texto anterior al símbolo del valor, con sus paréntesis
+    incluidos. Cuando el PDF deja el valor solo (`$ 225.000 + IVA`), el concepto
+    es el de la línea anterior (`Chequera Serie 30`). Una línea cortada deja un
+    concepto desbalanceado y no se publica: es preferible omitir la fila a
+    guardar un valor equivocado.
+
+    Args:
+        linea: línea ya recortada del Markdown de Gold.
+        concepto_previo: texto de la última línea que no produjo fila.
+
+    Returns:
+        `(concepto, valor, moneda, recargos, fecha)` o None si la línea no es
+        una fila del tarifario.
+    """
+    encontrado = _ultimo_valor(linea)
+    if encontrado is None:
+        coincidencia = _FILA.match(linea)
+        if not coincidencia:
+            return None
+        concepto = coincidencia.group("concepto").strip(" .;:-")
+        valor = coincidencia.group("valor").strip(".,")
+        moneda = "COP"
+        cola = coincidencia.group("cola").strip()
+    else:
+        concepto = linea[: encontrado.start()].strip(" .;:-")
+        if len(concepto) < 3:
+            concepto = concepto_previo
+        valor = (encontrado.group("monto") or encontrado.group("porcentaje") or "").strip(".,")
+        moneda = _moneda(encontrado)
+        cola = linea[encontrado.end() :].strip()
+
+    if len(concepto) < 3 or concepto.count("(") != concepto.count(")"):
         return None
-    concepto = coincidencia.group("concepto").strip(" .;:-")
-    if not concepto or len(concepto) < 3:
-        return None
-    valor = coincidencia.group("valor").strip(".,")
     if not any(caracter.isdigit() for caracter in valor):
         return None
 
-    cola = coincidencia.group("cola").strip()
     fecha = ""
     encontrada = _FECHA.search(cola)
     if encontrada:
         fecha = _fecha_iso(encontrada.group(0))
         cola = (cola[: encontrada.start()] + " " + cola[encontrada.end() :]).strip()
     recargos = " ".join(match.group(0) for match in _RECARGO.finditer(cola))
-    return concepto, valor, recargos, fecha
+    return concepto, valor, moneda, recargos, fecha
+
+
+def _ultimo_valor(linea: str) -> re.Match[str] | None:
+    """Devuelve el último monto con símbolo o porcentaje de la línea.
+
+    Se toma el último para que un rango (`De $1.000 M a $20.000 M $ 15.800`)
+    deje como valor la tarifa final y no el extremo del rango.
+    """
+    ultimo: re.Match[str] | None = None
+    for encontrado in _VALOR.finditer(linea):
+        ultimo = encontrado
+    return ultimo
+
+
+def _moneda(encontrado: re.Match[str]) -> str:
+    """Devuelve `%`, `USD` o `COP` según el símbolo que acompaña al valor."""
+    if encontrado.group("porcentaje") is not None:
+        return "%"
+    if (encontrado.group("simbolo") or "").upper() == "USD":
+        return "USD"
+    return "COP"
 
 
 def _es_encabezado(linea: str) -> bool:
@@ -128,6 +196,36 @@ def _es_encabezado(linea: str) -> bool:
     if _SUFIJO_ENCABEZADO.search(linea):
         return True
     return bool(re.fullmatch(r"[A-ZÁÉÍÓÚÑ][\wÁÉÍÓÚÑáéíóúñ /()*-]{3,70}", linea))
+
+
+def _es_concepto_de_valor_suelto(linea: str, siguiente: str) -> bool:
+    """Decide si la línea es el concepto del valor que el PDF dejó solo.
+
+    `Chequera Serie 30` seguida de `$ 225.000 + IVA` no es una fila de 30: la
+    cifra del nombre del producto no es una tarifa.
+    """
+    if not siguiente or _VALOR.match(siguiente) is None:
+        return False
+    return _VALOR.match(linea) is None and _es_concepto_suelto(linea)
+
+
+def _es_concepto_suelto(linea: str) -> bool:
+    """Decide si una línea sin valor puede ceder su texto como concepto.
+
+    El PDF corta algunas filas en dos (`Chequera Serie 30` y `$ 225.000 + IVA`);
+    la primera línea no tiene cifra y sirve de concepto para la siguiente. Se
+    descartan notas, viñetas y fragmentos que empiezan en minúscula o con cifra.
+    """
+    if not 12 <= len(linea) <= 140:
+        return False
+    if not linea[:1].isupper():
+        return False
+    if linea.startswith(("*", "-", "•")):
+        return False
+    normalizada = linea.casefold()
+    if normalizada.startswith("nota"):
+        return False
+    return not linea.startswith(("$", "USD", "Usd"))
 
 
 def _limpiar_encabezado(linea: str) -> str:
