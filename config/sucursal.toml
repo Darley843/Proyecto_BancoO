@@ -35,6 +35,11 @@ palabras_tarifas = [
   "seguro",
   "prima",
   "comision",
+  "traslado",
+  "schengen",
+  "apartamento",
+  "chequera",
+  "cheque",
 ]
 # Patrones de fuera de alcance (ruta X), escritos por intención y no por palabra
 # suelta; se aplican sobre el texto normalizado sin tildes. «Inversión» o

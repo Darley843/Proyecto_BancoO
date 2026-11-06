@@ -607,7 +607,9 @@ def test_requiere_modelo_replica_las_reglas(tmp_path: Path) -> None:
     assert requiere_modelo(PREGUNTA_BOVEDA, dependencias) is True
     assert requiere_modelo(PREGUNTA_RECHAZO, dependencias) is False
     assert requiere_modelo(PREGUNTA_TABLERO, dependencias) is False
-    assert requiere_modelo(PREGUNTA_TABLERO, dependencias, con_historial=True) is True
+    # «cuota de manejo» es autónoma: no se reformula aunque haya historial.
+    assert requiere_modelo(PREGUNTA_TABLERO, dependencias, con_historial=True) is False
+    assert requiere_modelo("¿Y cuánto cuesta?", dependencias, con_historial=True) is True
     assert requiere_modelo(PREGUNTA_TABLERO, ambiguas) is True
 
 

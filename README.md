@@ -216,8 +216,9 @@ alguna no encuentra fila. Cada fila trae `concepto`, `categoria`, `valor`,
 El grafo encadena `reformular → digiturno → Bóveda/Tablero/rechazo → redactar`,
 guarda la conversación con `SqliteSaver` en `data/asistente/memoria.sqlite` y
 aísla cada sesión por `thread_id`. Un seguimiento se reformula solo si hay
-historial; el Tablero responde sin modelo cuando hay 1–3 filas y la Bóveda toma
-el relevo con 0 o 4+.
+historial; el Tablero responde sin modelo cuando hay 1-3 filas o varias del
+mismo concepto (hasta 10), y la Bóveda toma el relevo con 0, más de 10 o
+conceptos distintos.
 
 ### API local y variables
 

@@ -8,6 +8,7 @@ pregunta con datos personales se rechaza antes de entrar al grafo.
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass, field
@@ -38,7 +39,10 @@ from ..asistente.validacion import (
     texto_de_contenido,
 )
 from ..boveda.tipos import Fragmento, Recuperador
-from ..tablero.consultas import buscar_filas
+from ..tablero.consultas import (
+    concepto_sin_franquicia,
+    filas_para_plantilla,
+)
 from ..tablero.tipos import Fila
 from ..texto import normalizar
 from .digiturno import (
@@ -50,14 +54,41 @@ from .digiturno import (
 
 #: Tokens de historial que se conservan antes de llamar al modelo.
 HISTORIAL_MAX_TOKENS = 1200
+#: Filas que la plantilla del Tablero puede listar sin volverse una tabla enorme.
+MAX_FILAS_TABLERO = 10
 #: Instrucción para convertir un seguimiento en pregunta autónoma.
 INSTRUCCION_REFORMULAR = (
     "Reescribe la última pregunta como una pregunta autónoma en español, usando "
     "el historial solo para resolver a qué se refiere. No respondas la pregunta, "
     "no añadas datos y devuelve únicamente la pregunta reformulada."
 )
-#: Prefijos que delatan un seguimiento conversacional.
-PREFIJOS_SEGUIMIENTO = ("¿y ", "y ", "cuanto", "cual", "como")
+#: Signos que abren una pregunta y no deben romper la detección de seguimiento.
+_PUNTUACION_INICIAL = re.compile(r"^[\s¿¡\"'«»]+")
+#: Prefijos que delatan un seguimiento conversacional (texto ya normalizado).
+PREFIJOS_SEGUIMIENTO = ("cuanto", "cuanta", "cuantos", "cuantas", "cual", "cuales")
+#: Palabras que remiten a algo dicho antes en la conversación.
+_ANAFORAS = frozenset(
+    {
+        "anterior",
+        "dicha",
+        "dicho",
+        "esa",
+        "ese",
+        "eso",
+        "esta",
+        "estas",
+        "este",
+        "esto",
+        "estos",
+        "misma",
+        "mismo",
+        "su",
+        "sus",
+        "tambien",
+        "usarla",
+        "usarlo",
+    }
+)
 
 
 class EstadoSucursal(TypedDict, total=False):
@@ -99,16 +130,26 @@ class DependenciasGrafo:
 def es_seguimiento(pregunta: str) -> bool:
     """Decide si la pregunta depende del turno anterior.
 
+    Limpia los signos de apertura para que «¿Cuánto…?» y «Cuánto…» se traten
+    igual. Es seguimiento si empieza por «y », o por una palabra de pregunta
+    cuando además es corta o contiene una anáfora («su», «usarla», «esa»).
+    Una pregunta autónoma corta como «¿Qué es un CDT?» no lo es.
+
     Args:
         pregunta: texto del cliente.
 
     Returns:
-        True si empieza con un prefijo de seguimiento o tiene menos de seis palabras.
+        True si la pregunta necesita el historial para interpretarse.
     """
-    normalizada = normalizar(pregunta).strip()
-    if normalizada.startswith(PREFIJOS_SEGUIMIENTO):
+    normalizada = _PUNTUACION_INICIAL.sub("", normalizar(pregunta)).strip()
+    palabras = normalizada.split()
+    if normalizada.startswith("y "):
         return True
-    return len(normalizada.split()) < 6
+    if normalizada == "como" or normalizada.startswith("como "):
+        return len(palabras) <= 3
+    if re.match(rf"^({'|'.join(PREFIJOS_SEGUIMIENTO)})\b", normalizada):
+        return len(palabras) <= 4 or any(palabra in _ANAFORAS for palabra in palabras)
+    return False
 
 
 def recortar_historial(mensajes: Sequence[BaseMessage], max_tokens: int) -> list[BaseMessage]:
@@ -306,9 +347,14 @@ def _nodo_tablero(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal],
 
     def tablero(estado: EstadoSucursal) -> dict[str, Any]:
         consulta = estado.get("reformulada") or estado.get("pregunta", "")
-        filas = buscar_filas(dependencias.filas, consulta)
+        filas = filas_para_plantilla(dependencias.filas, consulta)
         guardadas = [asdict(fila) for fila in filas]
-        if 1 <= len(filas) <= 3:
+        if filas and _es_consulta_generica(consulta):
+            turno = dict(estado.get("turno", {}))
+            turno["letra"] = "B"
+            turno["motivo"] = "tablero_generico"
+            return {"filas": guardadas, "turno": turno}
+        if _puede_responder_tabla(filas):
             respuesta, fuentes = _plantilla_tablero(filas)
             return {
                 "filas": guardadas,
@@ -403,6 +449,65 @@ def _ruta_boveda(estado: EstadoSucursal) -> str:
 def _ruta_tablero(estado: EstadoSucursal) -> str:
     """Decide entre la plantilla del Tablero o seguir a la Bóveda."""
     return "redactar" if estado.get("respuesta") else "boveda"
+
+
+#: Productos de tarjeta que hacen específica una pregunta de cuota.
+_PRODUCTOS_TARJETA = (
+    "credencial",
+    "gold",
+    "black",
+    "clasica",
+    "joven",
+    "business",
+    "viajera",
+)
+
+
+def tablero_responde_sin_modelo(filas: Sequence[Fila], consulta: str) -> bool:
+    """Indica si el Tablero puede responder la consulta con plantilla.
+
+    Replica la decisión del nodo `tablero` para que la API estime el gasto y el
+    tope con las mismas reglas: filas específicas, una a tres o del mismo
+    concepto, y que no sea una cuota genérica de «las tarjetas de crédito».
+    """
+    encontradas = filas_para_plantilla(filas, consulta)
+    if not encontradas or _es_consulta_generica(consulta):
+        return False
+    return _puede_responder_tabla(encontradas)
+
+
+def _es_consulta_generica(consulta: str) -> bool:
+    """Detecta una cuota pedida para «las tarjetas de crédito» en general.
+
+    Si el cliente pregunta por la cuota de manejo de la categoría completa, no
+    hay una fila única que responder: el Tablero debe pasar a la Bóveda para que
+    pregunte por la tarjeta concreta. Una cobertura de viaje sí puede listar las
+    dos franquicias, por eso la regla solo aplica a cuota, costo o manejo.
+    """
+    texto = normalizar(consulta)
+    if re.search(r"\btarjetas\s+de\s+credito\b", texto) is None:
+        return False
+    if any(producto in texto for producto in _PRODUCTOS_TARJETA):
+        return False
+    return any(palabra in texto for palabra in ("cuota", "manejo", "cuesta", "vale"))
+
+
+def _puede_responder_tabla(filas: Sequence[Fila]) -> bool:
+    """Decide si las filas se pueden responder con la plantilla del Tablero.
+
+    Una a tres filas siempre se responden. Con más, solo si todas comparten el
+    mismo concepto base (por ejemplo, los topes de la misma asistencia para Visa
+    y Mastercard) y no superan ``MAX_FILAS_TABLERO``; si hay conceptos distintos,
+    la consulta es ambigua y debe responder la Bóveda.
+    """
+    if not filas:
+        return False
+    if len(filas) <= 3:
+        return True
+    if len(filas) > MAX_FILAS_TABLERO:
+        return False
+    bases = {concepto_sin_franquicia(fila.concepto) for fila in filas}
+    return len(bases) == 1
 
 
 def _plantilla_tablero(filas: Sequence[Fila]) -> tuple[str, tuple[str, ...]]:

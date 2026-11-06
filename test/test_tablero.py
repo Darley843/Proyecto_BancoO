@@ -10,7 +10,13 @@ from typing import Any
 import pytest
 
 from banco_occidente_corpus.config import Config, Paths
-from banco_occidente_corpus.tablero import Fila, buscar_filas, comparar_filas
+from banco_occidente_corpus.tablero import (
+    Fila,
+    buscar_filas,
+    comparar_filas,
+    concepto_sin_franquicia,
+    filas_para_plantilla,
+)
 from banco_occidente_corpus.tablero.__main__ import main
 from banco_occidente_corpus.tablero.construir import (
     Falla,
@@ -282,6 +288,87 @@ def test_buscar_filas_sin_palabras_significativas_no_devuelve_todo() -> None:
 
     assert buscar_filas(filas, "de la") == []
     assert buscar_filas(filas, "") == filas
+
+
+def test_buscar_filas_encuentra_por_el_valor() -> None:
+    """El buscador también compara el valor de la fila."""
+    filas = [fila("Cuota de manejo", "16.700"), fila("Apertura", "0")]
+
+    assert [f.concepto for f in buscar_filas(filas, "16.700")] == ["Cuota de manejo"]
+
+
+def test_buscar_filas_no_mezcla_credito_y_debito() -> None:
+    """Una pregunta de tarjeta de crédito no se responde con la de débito."""
+    filas = [
+        fila("Cuota de Manejo Tarjeta Débito", "16.700"),
+        fila("Tarjeta Crédito Joven", "19.700"),
+    ]
+
+    encontradas = buscar_filas(filas, "cuota de manejo de la tarjeta de crédito")
+
+    assert [f.concepto for f in encontradas] == ["Tarjeta Crédito Joven"]
+
+
+def test_buscar_filas_entiende_europa_como_schengen() -> None:
+    """«Europa» encuentra la cobertura de los países Schengen."""
+    filas = [fila("Gastos médicos países Schengen (Visa)", "20.000", moneda="EUR")]
+
+    assert [f.concepto for f in buscar_filas(filas, "¿Cuánto cubren en Europa?")] == [
+        "Gastos médicos países Schengen (Visa)"
+    ]
+
+
+def test_filas_para_plantilla_prefiere_el_concepto_mas_corto() -> None:
+    """«Cheque de Gerencia» gana sobre sus variantes más largas."""
+    filas = [
+        fila("Cheque de Gerencia", "34.400"),
+        fila("Anulación o no utilización de Cheques de Gerencia", "5.500"),
+        fila("Con Cheque de Gerencia", "29.000"),
+    ]
+
+    encontradas = filas_para_plantilla(filas, "¿Cuánto cuesta un cheque de gerencia?")
+
+    assert [f.concepto for f in encontradas] == ["Cheque de Gerencia"]
+
+
+def test_filas_para_plantilla_no_confunde_schengen_con_no_schengen() -> None:
+    """La frase completa descarta la variante que niega la cobertura."""
+    filas = [
+        fila("Gastos médicos países Schengen (Visa)", "20.000", moneda="EUR"),
+        fila("Gastos médicos países NO Schengen (Visa)", "20.000", moneda="USD"),
+    ]
+
+    encontradas = filas_para_plantilla(
+        filas, "¿Cuánto cubre la tarjeta por gastos médicos en países Schengen?"
+    )
+
+    assert [f.concepto for f in encontradas] == ["Gastos médicos países Schengen (Visa)"]
+
+
+def test_concepto_sin_franquicia_quita_el_sufijo() -> None:
+    """El concepto base sirve para reconocer filas del mismo producto."""
+    assert concepto_sin_franquicia("Gastos médicos (Mastercard)") == "gastos medicos"
+    assert concepto_sin_franquicia("Cuota de manejo") == "cuota de manejo"
+
+
+def test_viajes_nacionales_lee_la_tabla_internacional() -> None:
+    """La tabla con columna de numeración toma el concepto correcto."""
+    texto = (
+        "| Asistencias |  | Visa | Mastercard |\n"
+        "| --- | --- | --- | --- |\n"
+        "| 1 | Gastos médicos países NO Schengen | USD 20.000 | USD 20.000 |\n"
+        "| 2 | Gastos médicos países Schengen | EUR 20.000 | EUR 20.000 |\n"
+    )
+
+    filas = viajes_nacionales(texto, PAGINA, URL_TARJETAS)
+
+    schengen = [fila for fila in filas if "Schengen" in fila.concepto and "NO" not in fila.concepto]
+    assert {fila.concepto for fila in schengen} == {
+        "Gastos médicos países Schengen (Visa)",
+        "Gastos médicos países Schengen (Mastercard)",
+    }
+    assert all(fila.categoria == "asistencia de viajes al exterior" for fila in filas)
+    assert {fila.moneda for fila in schengen} == {"EUR"}
 
 
 def test_las_preguntas_de_tabla_encuentran_al_menos_una_fila() -> None:
