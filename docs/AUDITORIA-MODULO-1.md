@@ -22,8 +22,12 @@ automatizadas, respeto de `robots.txt`). Lo que falta no es pipeline: es
 | 1. Investigación y alcance | **Cumple** con una salvedad | Redes sociales identificadas pero no capturadas (decisión documentada) |
 | 2. Base de conocimiento (scraping, limpieza, chunking) | **Cumple** | 181 páginas + 190 PDF + 32 videos; 1 388 chunks web; contexto consolidado |
 | 3. Aplicativo (modelo, LangChain, prompt) | **Cumple** con una decisión por confirmar | DeepSeek Flash por API en lugar de Ollama/OpenAI literal |
-| 4. Interfaz de prueba | **Cumple** | Streamlit con 4 pestañas y las tres tareas |
+| 4. Interfaz de prueba | **Cumple** | Streamlit con 4 pestañas (histórico; se retiró en la fase 2) |
 | 5. Pruebas y documentación | **Parcial** | 20 preguntas hechas; **no existe el informe consolidado ni el guion de la demo** |
+
+> **Nota de fase 2:** la interfaz Streamlit del Módulo 1 se retiró en la tarea
+> 23.1 y la reemplaza la app web de `app/web/`. Este documento conserva el estado
+> histórico del Módulo 1.
 
 ## 2. Checklist punto por punto de la actividad
 
@@ -63,7 +67,7 @@ automatizadas, respeto de `robots.txt`). Lo que falta no es pipeline: es
 | 3.6 | Instrucciones para evitar alucinaciones | Cumple | Frase fija si no hay dato, cita obligatoria, y validación posterior (`asistente/validacion.py`) que reemplaza respuestas sin URL, con cifras inventadas o con PII | — |
 | 3.7 | Experimentación con prompts (zero-shot, formato) | Cumple | `qa_v0` (línea base sin reglas) vs `qa_v1`; `docs/EXPERIMENTOS_PROMPTS.md` con pruebas reales y métricas de tokens/caché | — |
 | 3.8 | Prompt versionado | Cumple | `config/prompts/*.md` con frontmatter (`version`, `tarea`, `fecha`) | — |
-| 3.9 | Streamlit/Gradio con campo de pregunta y área de respuesta | Cumple | `app.py` → `app/streamlit_app.py`, 4 pestañas | — |
+| 3.9 | Streamlit/Gradio con campo de pregunta y área de respuesta | Cumple (histórico) | `app/streamlit_app.py`, 4 pestañas; retirado en la tarea 23.1 | - |
 | 3.10 | Las tres funcionalidades visibles en la app | Cumple | Pestañas Preguntas, Preguntas frecuentes (10) y Resumen ejecutivo, más Scraping | — |
 | 3.11 | App funcional sin clave de API | Parcial | Hay captura `docs/capturas/app-sin-clave.png` y degradación controlada | Verificarlo en el ensayo de la demo |
 | 3.12 | Código limpio y bien organizado | Cumple | 309 pruebas, `ruff` y `ty` en verde, CI, módulos con responsabilidad única, `make check` | — |

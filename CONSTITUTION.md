@@ -98,7 +98,7 @@ descarga masiva de PDF, transcripción de vídeo.
 | **API** | `fastapi` + `uvicorn[standard]`, solo en `127.0.0.1:8000` |
 | **Mapa del corpus** | `scikit-learn` (`PCA(n_components=2)`, solo exploratorio) |
 | **Datos estructurados** | `data/estructurados/tablero.csv` (tarifario + tablas web, determinista y versionado) |
-| **App del asistente** | `streamlit` — capa delgada en `app/streamlit_app.py`; la lógica vive en `asistente/`. Se retira al final de la fase 2 y la reemplaza la app web de `app/web/` |
+| **App del asistente** | `app/web/` (HTML, CSS y JavaScript) servida por FastAPI en `127.0.0.1:8000`; la lógica vive en `asistente/` y `sucursal/` |
 | **Testing** | `pytest` (patrón AAA) |
 | **Lint / formato** | `ruff` (línea 100, comillas dobles) |
 | **Tipado** | `ty` (target `make typecheck`) |
@@ -124,15 +124,12 @@ descarga masiva de PDF, transcripción de vídeo.
 > no bloquee `make indice`. El plano de embeddings no usa clave y no aparece en
 > el consumo de DeepSeek; solo el chat se factura.
 
-> **App del asistente:** `app/streamlit_app.py` es una **capa delgada**. Solo
-> pinta, cachea y delega en `asistente/servicio.py`, `asistente/manifest.py` y
-> `asistente/modelo.py`; no contiene reglas de negocio ni accede a la red por su
-> cuenta. El modelo se invoca **solo** al pulsar un botón: `st.cache_resource`
-> guarda el contexto y un modelo por tarea, y `st.cache_data` guarda respuestas
-> por pregunta y versión. Los resultados con errores de validación no se
-> cachean, y una pregunta con datos personales se responde sin llamar al modelo
-> y sin entrar en la caché. La versión de prompt `v0` solo aplica a la pestaña
-> «Preguntas»; FAQ y resumen usan siempre `v1`.
+> **App del asistente:** `app/web/` es una app estática (HTML, CSS y
+> JavaScript) que consume la API de `sucursal/api.py` y delega toda la lógica en
+> `asistente/` y `sucursal/`; no contiene reglas de negocio ni accede a la red por
+> su cuenta. El modelo se invoca solo cuando el grafo lo decide, y las respuestas
+> de la Bóveda se validan antes de mostrarse. La interfaz no guarda preguntas en
+> `localStorage`; el hilo de la Ventanilla vive en `sessionStorage`.
 
 ### Herramientas del agente (MCP)
 
@@ -224,7 +221,7 @@ ProyectoAvance1/
 │   ├── demo_offline.py   # pipeline completo con un fixture, sin red
 │   └── scrape_empresa.py # demo: sitemap -> pipeline -> .demo/
 ├── app/
-│   └── streamlit_app.py  # APP: capa delgada sobre asistente/ (make app-streamlit)
+│   └── web/              # APP: HTML/CSS/JS de la Sucursal 1965 (make app)
 ├── docs/ESTANDAR.md      # trazabilidad regla de la clase → implementación
 ├── .opencode/skills/corpus-extraction/    # skill operativa del pipeline
 ├── .opencode/skills/semantic-extraction/  # skill de conocimiento semántico
@@ -548,7 +545,6 @@ make all             # discover -> fetch -> extract -> gold -> stats
 make noticias        # hechos oficiales y prensa curada
 make contexto        # prompt del asistente desde Gold (data/contexto/)
 make app             # Sucursal 1965: FastAPI + app web en 127.0.0.1:8000
-make app-streamlit   # app Streamlit de la fase 1 (solo lee contexto y prompts)
 
 # 4. Commit (los hooks corren solos)
 git add -A
@@ -649,6 +645,7 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 | 2026-11-04 | Digiturno: el clasificador de dudas pide 512 tokens y el respaldo distingue `defecto` de `defecto:modelo_sin_respuesta` | Con `max_tokens=80` DeepSeek Flash agotaba el tope en el razonamiento (52–60 tokens), `response_format` fallaba con `LengthFinishReasonError` y 2 de cada 5 dudas caían al respaldo sin avisar. El motivo nuevo deja auditar si el modelo decidió o si el turno salió por defecto |
 | 2026-11-04 | Grafo con memoria `SqliteSaver`, reformulación condicionada y plantilla del Tablero | El estado guarda datos serializables y se aísla por `thread_id`; el historial se recorta antes de cada llamada. La PII se rechaza antes de invocar el grafo, así no entra al checkpointer. Con 1–3 filas del Tablero responde sin modelo (costo cero); con 0 o 4+ pasa a la Bóveda |
 | 2026-11-06 | Tablero: plantilla también con más de tres filas del mismo concepto (hasta diez) y `B` para cuotas genéricas | Las 12 preguntas de tabla del set incluyen topes repetidos por franquicia (gastos médicos, Schengen) que antes caían a la Bóveda; se listan sin modelo. Si hay más de diez filas o varios conceptos, la consulta sigue siendo ambigua. La reformulación solo se dispara con historial y una anáfora real, no por tener menos de seis palabras |
+| 2026-11-06 | Retiro de Streamlit: se eliminan `app/streamlit_app.py`, `app/scraping_ui.py` y la dependencia `streamlit` | La app web de `app/web/` ya cubre la interfaz y `make app` sirve la API con FastAPI. Se retiran también el target `make app-streamlit` y las referencias activas en README, AGENTS y esta constitución; el historial de decisiones se conserva |
 | 2026-11-05 | API local de solo lectura, costo diario y caché SQLite | La API escucha solo en `127.0.0.1:8000` y sirve estado, Tablero, Bóveda, pipeline, Arqueo y Vestíbulo; el endpoint de preguntas va en el PR 10b. Las tarifas se importan de `arqueo/metricas.py` y se elige valle/pico por hora UTC; el gasto y la caché viven en `data/asistente/`, fuera de Git |
 | 2026-11-04 | Tablero: tarifario PDF y tablas web a `data/estructurados/tablero.csv` con diez columnas, versionado y determinista | Las cifras de tasas y coberturas no se pueden dejar al modelo: el CSV es la evidencia de las 8 preguntas de tabla. Se conserva el formato original del valor, la moneda o unidad de la fuente y la trazabilidad `pagina`+`fuente`; si una línea no trae fecha o no se puede extraer el valor, no se inventa: se omite o queda vacía |
 
