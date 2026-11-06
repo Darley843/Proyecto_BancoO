@@ -171,6 +171,8 @@ Alternativa descartada: memoria en un diccionario del proceso. Se pierde al rein
 
 Con `SUCURSAL_DEMO=1` el servicio no crea cliente de DeepSeek, responde con plantillas y filas de ejemplo, informa `modo_demo: true` y no escribe gasto. El modo demo también sirve para el frontend sin clave.
 
+El gasto cuenta solo los tokens de `redactar`: `_nodo_reformular` y el clasificador de dudas también llaman al modelo y descartan `usage_metadata`. Para contarlos, `DependenciasGrafo` debería recibir un `registrar_uso` que esos nodos invocaran con `extraer_metricas`; hasta entonces, el costo y el tope subestiman esas dos llamadas.
+
 Alternativa descartada: estimar el costo a partir de caracteres. El uso real viene en `usage_metadata`; `asistente.metricas.leer_uso` ya normaliza tokens y caché.
 
 ### 14. Prompt v2 y validación de citas por número

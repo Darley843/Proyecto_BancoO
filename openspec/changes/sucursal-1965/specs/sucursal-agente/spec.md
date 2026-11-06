@@ -99,7 +99,7 @@ Cuando la ruta es `T` y hay de una a tres filas, el sistema SHALL responder con 
 
 ### Requirement: Tope diario de gasto
 
-El sistema SHALL leer el tope diario de `config/sucursal.toml`, permitir que `SUCURSAL_TOPE_USD` lo sobrescriba para una sesión y acumular el gasto del día en `data/asistente/gasto.sqlite`. Cuando el gasto alcance el tope MUST responder `X` sin llamar al modelo.
+El sistema SHALL leer el tope diario de `config/sucursal.toml`, permitir que `SUCURSAL_TOPE_USD` lo sobrescriba para una sesión y acumular el gasto en `data/asistente/gasto.sqlite`. Al alcanzar el tope, las preguntas que requieren el modelo MUST responder 429 `tope_alcanzado` sin llamar a DeepSeek; las de ruta `X` y las del Tablero con plantilla MUST seguir en 200 sin gastar.
 
 #### Scenario: Gasto por debajo del tope
 
@@ -108,8 +108,13 @@ El sistema SHALL leer el tope diario de `config/sucursal.toml`, permitir que `SU
 
 #### Scenario: Tope alcanzado
 
-- **WHEN** el gasto acumulado iguala o supera el tope
-- **THEN** la respuesta es `X` con motivo de tope y no hay llamada a DeepSeek
+- **WHEN** el gasto acumulado iguala o supera el tope y la pregunta requiere el modelo
+- **THEN** responde HTTP 429 con `{"error": {"codigo": "tope_alcanzado", "mensaje": ...}}` y no hay llamada a DeepSeek
+
+#### Scenario: Rutas sin modelo con el tope agotado
+
+- **WHEN** el gasto ya alcanzó el tope y la pregunta es de ruta `X` o el Tablero la responde con plantilla
+- **THEN** responde HTTP 200 sin llamar al modelo y sin sumar gasto
 
 #### Scenario: Tope sobrescrito por entorno
 

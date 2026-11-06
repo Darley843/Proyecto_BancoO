@@ -1,19 +1,22 @@
 """API local de la Sucursal: estado, Tablero, Bóveda, pipeline, Arqueo y Vestíbulo.
 
-La API solo lee artefactos ya construidos (`tablero.csv`, `indice.json`,
-`mapa.json`, `arqueo.json`, `config/vestibulo.toml`). No llama al modelo ni hace
-red: el endpoint de preguntas llega en el PR 10b.
+Los endpoints de datos solo leen artefactos ya construidos (`tablero.csv`,
+`indice.json`, `mapa.json`, `arqueo.json`, `config/vestibulo.toml`).
+`POST /api/preguntar` delega en `sucursal.preguntar`, que construye el grafo y sus
+dependencias la primera vez que se pregunta y no al importar este módulo.
 """
 
 from __future__ import annotations
 
 import json
 import tomllib
+from collections.abc import Callable
 from dataclasses import asdict
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 from ..config import Config
@@ -21,10 +24,9 @@ from ..panel import pipeline_summary
 from ..tablero.consultas import buscar_filas
 from ..tablero.tipos import Fila, leer_filas, ruta_tablero
 from .ajustes import ConfiguracionSucursal, tope_efectivo
-from .costo import GastoDiario
+from .costo import CacheRespuestas, GastoDiario
+from .preguntar import ErrorSucursal, PiezasGrafo, ServicioPreguntas, leer_indice
 
-#: Ruta del índice de la Bóveda dentro de `data/boveda/`.
-RUTA_INDICE = "data/boveda/indice.json"
 #: Ruta del mapa PCA.
 RUTA_MAPA = "data/boveda/mapa.json"
 #: Ruta del reporte del Arqueo.
@@ -143,18 +145,71 @@ class VestibuloRespuesta(BaseModel):
     hitos: list[HitoRespuesta] = Field(default_factory=list)
 
 
+class FuenteRespuesta(BaseModel):
+    """Fuente numerada de una respuesta, con el número que usa la cita `[n]`."""
+
+    n: int
+    titulo: str = ""
+    url: str
+    seccion: str = ""
+    tipo: str = ""
+    similitud: float | None = None
+
+
+class PreguntarRequest(BaseModel):
+    """Pregunta que envía la Ventanilla junto con su hilo de conversación."""
+
+    pregunta: str = ""
+    thread_id: str = ""
+
+
+class PreguntarRespuesta(BaseModel):
+    """Turno atendido: ticket, ruta, respuesta, fuentes y costo."""
+
+    turno: Literal["B", "T", "X"]
+    turno_numero: int
+    ruta: Literal["boveda", "tablero", "rechazo"]
+    motivo: str
+    uso_modelo: bool
+    reformulada: str | None = None
+    respuesta: str
+    fuentes: list[FuenteRespuesta] = Field(default_factory=list)
+    tokens_entrada: int = 0
+    tokens_salida: int = 0
+    tokens_cache: int = 0
+    costo_usd: float = 0.0
+    tiempo_s: float = 0.0
+    cache: bool = False
+
+
 def crear_router(
     config: Config,
     ajustes: ConfiguracionSucursal,
     gasto: GastoDiario,
+    *,
+    cache: CacheRespuestas | None = None,
+    piezas: Callable[[], PiezasGrafo] | None = None,
 ) -> APIRouter:
-    """Crea el router `/api` con las dependencias inyectadas."""
+    """Crea el router `/api` con las dependencias inyectadas.
+
+    Args:
+        config: configuración con las rutas del corpus.
+        ajustes: tope, TTL de caché y modo demo.
+        gasto: acumulado diario del gasto del modelo.
+        cache: caché alternativa para las pruebas; por defecto `data/asistente/`.
+        piezas: fábrica alternativa del grafo para las pruebas; por defecto se
+            construye de forma perezosa en la primera pregunta.
+
+    Returns:
+        El router con los siete endpoints de la Sucursal.
+    """
     router = APIRouter(prefix="/api")
+    servicio = ServicioPreguntas(config, ajustes, gasto, cache=cache, piezas=piezas)
 
     @router.get("/estado", response_model=EstadoRespuesta)
     def estado() -> EstadoRespuesta:
         """Devuelve el estado operativo y el gasto del día."""
-        indice = _leer_json(config.paths.root / RUTA_INDICE)
+        indice = leer_indice(config)
         costo, _, _ = gasto.hoy()
         return EstadoRespuesta(
             modo_demo=ajustes.demo,
@@ -234,7 +289,35 @@ def crear_router(
             datos = tomllib.load(fh)
         return VestibuloRespuesta(hitos=[HitoRespuesta(**hito) for hito in datos.get("hito", [])])
 
+    @router.post("/preguntar", response_model=PreguntarRespuesta)
+    def preguntar(
+        datos: PreguntarRequest | None = None,
+    ) -> PreguntarRespuesta | JSONResponse:
+        """Atiende una pregunta con el grafo y devuelve el turno completo.
+
+        Args:
+            datos: pregunta y `thread_id`; si falta el cuerpo se responde 422 con
+                el mismo formato de error que el resto de los rechazos.
+
+        Returns:
+            La respuesta del contrato o `{"error": {"codigo", "mensaje"}}`.
+        """
+        peticion = datos or PreguntarRequest()
+        try:
+            respuesta = servicio.preguntar(peticion.pregunta, peticion.thread_id)
+        except ErrorSucursal as error:
+            return _error(error)
+        return PreguntarRespuesta.model_validate(respuesta)
+
     return router
+
+
+def _error(error: ErrorSucursal) -> JSONResponse:
+    """Devuelve `{"error": {"codigo", "mensaje"}}` con el estado HTTP del error."""
+    return JSONResponse(
+        status_code=error.estado_http,
+        content={"error": {"codigo": error.codigo, "mensaje": error.mensaje}},
+    )
 
 
 def _leer_json(ruta: Path) -> dict[str, Any] | None:
@@ -260,7 +343,7 @@ def _pregunta_mapa(datos: Any) -> PreguntaMapa | None:
 
 def _indexacion(config: Config) -> IndexacionRespuesta:
     """Lee el estado de indexación de `indice.json`."""
-    indice = _leer_json(config.paths.root / RUTA_INDICE)
+    indice = leer_indice(config)
     if indice is None:
         return IndexacionRespuesta(indice_listo=False)
     return IndexacionRespuesta(

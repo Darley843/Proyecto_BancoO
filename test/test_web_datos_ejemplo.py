@@ -15,6 +15,8 @@ from typing import Any
 
 import pytest
 
+from banco_occidente_corpus.sucursal.api import PreguntarRequest, PreguntarRespuesta
+
 RAIZ = Path(__file__).resolve().parents[1]
 WEB = RAIZ / "app" / "web"
 DATOS = WEB / "datos-ejemplo"
@@ -242,5 +244,48 @@ def test_ventanilla_estilos_usan_variables() -> None:
 def test_preguntar_similitud_entre_0_y_1() -> None:
     """La similitud de cada fuente de ejemplo está en el rango del contrato."""
     for fuente in leer("preguntar")["fuentes"]:
-        if "similitud" in fuente:
+        if fuente.get("similitud") is not None:
             assert 0 <= fuente["similitud"] <= 1
+
+
+def test_preguntar_coincide_con_el_modelo_pydantic() -> None:
+    """El ejemplo de la Ventanilla tiene los campos y tipos del modelo de la API."""
+    datos = leer("preguntar")
+
+    assert set(datos) == set(PreguntarRespuesta.model_fields)
+    assert PreguntarRespuesta.model_validate(datos).model_dump() == datos
+
+
+def test_preguntar_ejemplo_usa_los_valores_de_la_api() -> None:
+    """El motivo es el del digiturno y el Tablero no aporta similitud."""
+    datos = leer("preguntar")
+
+    assert datos["motivo"] == "tarifas"
+    assert all(fuente["similitud"] is None for fuente in datos["fuentes"])
+
+
+def seccion_readme(titulo: str) -> str:
+    """Devuelve el Markdown de una sección de nivel tres del README."""
+    texto = (RAIZ / "README.md").read_text(encoding="utf-8")
+    inicio = texto.index(f"### {titulo}")
+    resto = texto[inicio + len(titulo) + 4 :]
+    siguiente = resto.find("\n### ")
+    return resto if siguiente == -1 else resto[:siguiente]
+
+
+def bloques_json(seccion: str) -> list[Any]:
+    """Extrae y parsea los bloques ```json de una sección del README."""
+    return [json.loads(bloque) for bloque in re.findall(r"```json\n(.*?)\n```", seccion, re.DOTALL)]
+
+
+def test_readme_documenta_preguntar_con_el_contrato() -> None:
+    """El request y el response del README validan contra los modelos Pydantic."""
+    bloques = bloques_json(seccion_readme("Preguntar"))
+
+    assert len(bloques) == 2
+    peticion, respuesta = bloques
+    assert set(peticion) == set(PreguntarRequest.model_fields)
+    PreguntarRequest.model_validate(peticion)
+    assert set(respuesta) == set(PreguntarRespuesta.model_fields)
+    assert set(respuesta) == set(leer("preguntar"))
+    PreguntarRespuesta.model_validate(respuesta)

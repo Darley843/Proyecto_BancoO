@@ -222,8 +222,8 @@ el relevo con 0 o 4+.
 ### API local y variables
 
 `make app` levanta la API y la app web solo en `http://127.0.0.1:8000` (nunca
-`0.0.0.0`). Endpoints: `/api/estado`, `/api/tablero`, `/api/boveda/mapa`,
-`/api/pipeline`, `/api/arqueo` y `/api/vestibulo`.
+`0.0.0.0`). Endpoints: `/api/estado`, `POST /api/preguntar`, `/api/tablero`,
+`/api/boveda/mapa`, `/api/pipeline`, `/api/arqueo` y `/api/vestibulo`.
 
 | Variable | Para qué |
 |---|---|
@@ -234,6 +234,80 @@ el relevo con 0 o 4+.
 
 El gasto (`data/asistente/gasto.sqlite`) y la caché
 (`data/asistente/cache.sqlite`) no se versionan.
+
+### Preguntar
+
+`POST /api/preguntar` recibe la pregunta y el hilo de la Ventanilla. El grafo, el
+recuperador y el modelo se construyen en la primera pregunta del proceso, no al
+importar `app.py`. El Digiturno decide la ruta: `B` (Bóveda), `T` (Tablero con
+plantilla) o `X` (rechazo).
+
+```bash
+curl -s http://127.0.0.1:8000/api/preguntar \
+  -H "Content-Type: application/json" \
+  -d '{"pregunta": "¿Cuál es la cuota de manejo de la tarjeta débito?", "thread_id": "ses-abc"}'
+```
+
+Request:
+
+```json
+{
+  "pregunta": "¿Cuál es la cuota de manejo de la tarjeta débito?",
+  "thread_id": "ses-abc"
+}
+```
+
+Response 200, con la misma forma que `app/web/datos-ejemplo/preguntar.json`:
+
+```json
+{
+  "turno": "T",
+  "turno_numero": 12,
+  "ruta": "tablero",
+  "motivo": "tarifas",
+  "uso_modelo": false,
+  "reformulada": null,
+  "respuesta": "Según el Tablero de tarifas:\n- Cuota de manejo tarjeta débito: 16.700 COP (mensual), vigente desde 2025-11-20\n\nFuentes:\n- https://www.bancodeoccidente.com.co/documents/d/guest/tarifas-persona-1",
+  "fuentes": [
+    {
+      "n": 1,
+      "titulo": "Cuota de manejo tarjeta débito",
+      "url": "https://www.bancodeoccidente.com.co/documents/d/guest/tarifas-persona-1",
+      "seccion": "otros",
+      "tipo": "pdf",
+      "similitud": null
+    }
+  ],
+  "tokens_entrada": 0,
+  "tokens_salida": 0,
+  "tokens_cache": 0,
+  "costo_usd": 0.0,
+  "tiempo_s": 0.03,
+  "cache": false
+}
+```
+
+- `reformulada` es `null` cuando el grafo no reformuló; en un seguimiento trae la
+  pregunta autónoma.
+- `fuentes` solo trae objetos en `B` y `T` (en `X` va vacía); `similitud` es `null`
+  cuando la fuente viene del Tablero, que no tiene puntaje.
+- Un acierto de caché devuelve `cache: true` con tokens y costo en cero, y aun así
+  deja el turno en el hilo para el seguimiento siguiente.
+- El gasto cuenta solo la redacción: la reformulación y la clasificación de dudas
+  todavía no se suman al acumulado.
+
+Errores, siempre como `{"error": {"codigo", "mensaje"}}`:
+
+| HTTP | `codigo` | Cuándo |
+|---|---|---|
+| 422 | `pregunta_vacia` | la pregunta llega vacía |
+| 422 | `thread_id_ausente` | falta el hilo de la conversación |
+| 429 | `tope_alcanzado` | el gasto del día llegó al tope y la ruta necesita modelo |
+| 503 | `indice_no_listo` | falta `data/boveda/indice.json`; ejecuta `make indice` |
+| 503 | `sin_clave` | falta `DEEPSEEK_API_KEY` fuera de demo; usa `SUCURSAL_DEMO=1` |
+
+Con `SUCURSAL_DEMO=1` la Bóveda responde con el fragmento principal y su fuente,
+marcado como demo, sin crear el modelo ni escribir gasto.
 
 ### Scraper de demostración
 
