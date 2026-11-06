@@ -135,6 +135,48 @@ def test_tarifario_conserva_recargos() -> None:
     assert filas[1].recargos == "+ Seguro2"
 
 
+def test_tarifario_toma_el_valor_despues_del_simbolo() -> None:
+    """El valor sale del símbolo o del porcentaje, no del primer número.
+
+    Son líneas reales del tarifario: antes la consulta valía 5 (por «últimos 5
+    movimientos») y la prórroga 30 (por «x 30 días»).
+    """
+    texto = (
+        "Consulta en cajeros electrónicos de la Red Aval (Consulta últimos 5 movimientos)"
+        " $ 2.700 20-nov-25\n"
+        "Prórroga (x 30 días) 1,5% + IVA 20-nov-25\n"
+        "Aviso (primeros 90 días) USD 70 + IVA 20-nov-25\n"
+        "De $1.000 M a $20.000 M $ 15.800 + IVA 20-nov-25\n"
+    )
+
+    filas = extraer_tarifario(texto, PAGINA, "https://tarifas")
+
+    assert [(f.concepto, f.valor, f.moneda) for f in filas] == [
+        (
+            "Consulta en cajeros electrónicos de la Red Aval (Consulta últimos 5 movimientos)",
+            "2.700",
+            "COP",
+        ),
+        ("Prórroga (x 30 días)", "1,5", "%"),
+        ("Aviso (primeros 90 días)", "70", "USD"),
+        ("De $1.000 M a $20.000 M", "15.800", "COP"),
+    ]
+    assert filas[0].vigente_desde == "2025-11-20"
+    assert filas[1].recargos == "+ IVA"
+
+
+def test_tarifario_no_publica_parentesis_sin_cerrar() -> None:
+    """Una línea cortada por el PDF se omite en vez de publicarse incompleta."""
+    texto = (
+        "Comisión de confirmación de Avales emitidos por Bancos del Exterior"
+        " (Cobro anticipado x cada 30\n"
+        "días o fracción) 0,125% + IVA 20-nov-25\n"
+        "Comisión (0.85% * 10.000) +IVA 20-nov-25\n"
+    )
+
+    assert extraer_tarifario(texto, PAGINA, "https://tarifas") == []
+
+
 def test_tarifario_sin_fecha_no_inventa_vigencia() -> None:
     """Una línea sin fecha queda con vigencia vacía."""
     filas = extraer_tarifario("Retiro en cajero $28.400\n", PAGINA, "https://tarifas")
