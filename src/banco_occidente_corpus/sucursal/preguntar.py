@@ -4,8 +4,10 @@ El grafo y sus dependencias (recuperador, filas del Tablero, modelo, clasificado
 canal) se construyen la primera vez que se pregunta, nunca al importar `app.py`.
 La caché se consulta antes de clasificar y solo para preguntas que no son de
 seguimiento, de modo que un acierto no gasta una reformulación. El gasto se suma
-únicamente cuando hubo modelo. En modo demo no se crea el chat model, no se escribe
-gasto y no se cachea nada.
+cuando el modelo informó tokens, aunque la respuesta termine en la frase fija; en
+ese caso el turno también cuenta como uso de modelo y no se guarda en la caché
+para no tapar una mejora del índice. En modo demo no se crea el chat model, no se
+escribe gasto y no se cachea nada.
 
 Limitación conocida: el gasto cuenta solo los tokens de `redactar`. La reformulación
 y la clasificación de dudas también llaman al modelo y el grafo todavía no expone su
@@ -29,7 +31,7 @@ from langchain_core.language_models import BaseChatModel
 from ..asistente.contexto_prompt import CanalOficial, ContextoAusente, cargar_contexto
 from ..asistente.metricas import leer_uso
 from ..asistente.modelo import FaltaApiKey, crear_modelo_para
-from ..asistente.validacion import sanear_pregunta
+from ..asistente.validacion import es_sin_datos, sanear_pregunta
 from ..boveda.recuperador import crear_recuperador
 from ..boveda.tipos import Recuperador
 from ..config import Config
@@ -494,12 +496,20 @@ class ServicioPreguntas:
         version: str,
         inicio: float,
     ) -> dict[str, Any]:
-        """Convierte el estado del grafo en el cuerpo JSON del contrato."""
+        """Convierte el estado del grafo en el cuerpo JSON del contrato.
+
+        El modelo puede gastar tokens y aun así terminar en la frase fija: si
+        `leer_uso` informa tokens de entrada o de salida, el turno cuenta como
+        uso de modelo, se cobra y no se guarda en la caché.
+        """
         turno = estado.get("turno") or {}
         letra = str(turno.get("letra", "B"))
         ruta = ruta_de_letra(letra)
         uso = estado.get("uso") or {}
-        uso_modelo = bool(uso.get("uso_modelo", False))
+        detalle = leer_uso(uso)
+        tokens_entrada = detalle.entrada or 0
+        tokens_salida = detalle.salida or 0
+        uso_modelo = bool(uso.get("uso_modelo", False)) or tokens_entrada > 0 or tokens_salida > 0
         reformulada = str(estado.get("reformulada") or "")
         fragmentos = list(estado.get("fragmentos") or [])
         respuesta = str(estado.get("respuesta", ""))
@@ -515,7 +525,6 @@ class ServicioPreguntas:
         else:
             fuentes = fuentes_de_boveda(fragmentos, list(estado.get("fuentes") or []))
 
-        detalle = leer_uso(uso)
         payload: dict[str, Any] = {
             "turno": letra,
             "ruta": ruta,
@@ -524,8 +533,8 @@ class ServicioPreguntas:
             "reformulada": reformulada if reformulada != pregunta else None,
             "respuesta": respuesta,
             "fuentes": fuentes,
-            "tokens_entrada": detalle.entrada or 0,
-            "tokens_salida": detalle.salida or 0,
+            "tokens_entrada": tokens_entrada,
+            "tokens_salida": tokens_salida,
             "tokens_cache": detalle.cache or 0,
             "costo_usd": 0.0,
         }
@@ -533,7 +542,7 @@ class ServicioPreguntas:
             costo, tokens = costo_de_uso(uso, tarifas_para(datetime.now(UTC)))
             payload["costo_usd"] = round(costo, 6)
             self._gasto.sumar(costo, tokens)
-            if letra != "X":
+            if letra != "X" and not es_sin_datos(respuesta):
                 clave = CacheRespuestas.clave(reformulada or pregunta, ruta, version)
                 self._guardar_en_cache(clave, payload)
 

@@ -51,6 +51,7 @@ const estado = {
   /** Última respuesta de `/api/estado` (o de `estado.json`). */
   resumen: null,
   pedir,
+  refrescarEstado,
   formatearUsd,
 };
 
@@ -167,6 +168,27 @@ function pintarEncabezado(resumen) {
   const enMaqueta = estado.modo === "ejemplo";
   sello.hidden = !(enMaqueta || resumen?.modo_demo);
   sello.textContent = enMaqueta ? "Datos de ejemplo" : "Modo demo";
+}
+
+/**
+ * Vuelve a leer `/api/estado` y repinta el saldo del día en el encabezado.
+ *
+ * La Ventanilla la llama después de cada turno respondido. Si la petición
+ * falla, conserva el último resumen y no interrumpe la conversación.
+ *
+ * @returns {Promise<object | null>} El resumen actualizado o el último válido.
+ */
+async function refrescarEstado() {
+  try {
+    estado.resumen =
+      estado.modo === "ejemplo"
+        ? await pedir("estado")
+        : await leerJson(ENDPOINTS.estado, { cache: "no-store" });
+    pintarEncabezado(estado.resumen);
+  } catch {
+    // El saldo es informativo: se conserva el último resumen disponible.
+  }
+  return estado.resumen;
 }
 
 /**
