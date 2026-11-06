@@ -8,12 +8,22 @@ Preparar fragmentos verificables del corpus, indexarlos con embeddings locales y
 
 ### Requirement: Fragmentos desde los chunks de Gold
 
-La Bóveda SHALL construir fragmentos desde los chunks de `make chunks`: fusiona chunks consecutivos de la misma página mientras el acumulado tenga menos de 80 tokens, de modo que el resultado tenga al menos 80 tokens salvo el último de la página, y descarta el ruido de navegación con las reglas de `dedupe.py`. Cada fragmento MUST conservar id estable, texto, URL, título, sección, encabezado, tipo y tokens.
+La Bóveda SHALL construir fragmentos desde los chunks de `make chunks`. Los encabezados repetidos del menú MUST NOT usarse como encabezado del fragmento ni anteponerse a su texto. Los chunks cortos SHALL fusionarse preferentemente con sus hermanos de sección (mismo padre, mismo nivel y misma familia de encabezado normalizada) y el tope de 400 tokens MUST aplicarse al agrupar. Cada fragmento MUST conservar id estable, texto, URL, título, sección, encabezado, tipo y tokens.
 
-#### Scenario: Fragmentos cortos de la misma página
+#### Scenario: Encabezado de menú repetido
 
-- **WHEN** dos chunks consecutivos de una página suman menos de 80 tokens
-- **THEN** la Bóveda los fusiona hasta que el fragmento acumulado tenga al menos 80 tokens o se acabe la página
+- **WHEN** el `heading` de un chunk se repite en el menú de varias páginas
+- **THEN** no se usa como `encabezado` del fragmento ni se antepone a su texto, y se resuelve con el encabezado no repetido más cercano de su ruta
+
+#### Scenario: Fragmento corto con hermanos de sección
+
+- **WHEN** un chunk queda por debajo de 80 tokens y tiene un hermano de sección
+- **THEN** se fusiona primero con ese hermano, entendiendo por hermano el chunk con el mismo padre, el mismo nivel y la misma familia de encabezado (su primera palabra significativa, normalizada sin tildes ni mayúsculas)
+
+#### Scenario: Tope de 400 tokens al agrupar
+
+- **WHEN** la fusión de un chunk corto con sus hermanos supera 400 tokens
+- **THEN** el grupo no se forma: el fragmento se cierra antes del límite y el chunk sobrante abre el siguiente
 
 #### Scenario: Último fragmento corto
 
