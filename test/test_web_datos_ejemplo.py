@@ -91,6 +91,14 @@ def leer_ventanilla() -> str:
     return (WEB / "vistas" / "ventanilla.js").read_text(encoding="utf-8")
 
 
+def bloque_funcion_ventanilla(nombre: str) -> str:
+    """Devuelve el bloque de una función de nivel superior de la Ventanilla."""
+    codigo = leer_ventanilla()
+    inicio = codigo.index(f"function {nombre}(")
+    fin = codigo.index("\n}\n", inicio) + 3
+    return codigo[inicio:fin]
+
+
 def bloque_ventanilla() -> str:
     """Devuelve el bloque CSS de la Ventanilla, entre sus marcadores."""
     css = (WEB / "estilos.css").read_text(encoding="utf-8")
@@ -183,6 +191,29 @@ def test_ventanilla_usa_el_contrato_y_el_hilo() -> None:
     assert "localStorage" not in codigo
     assert "fetch(" not in codigo
     assert "innerHTML" not in codigo
+
+
+def test_ventanilla_refresca_el_saldo_despues_de_responder() -> None:
+    """Todo turno respondido refresca el saldo una sola vez, en `pedirTurno`."""
+    codigo = leer_ventanilla()
+    pedir = bloque_funcion_ventanilla("pedirTurno")
+    enviar = bloque_funcion_ventanilla("enviarSecuencia")
+
+    assert "await refrescarSaldo(app);" in pedir
+    assert "await pedirTurno(" in enviar
+    assert "refrescarSaldo" not in enviar
+    assert codigo.count("await refrescarSaldo(") == 1
+    for origen in (
+        "void enviarSecuencia(preguntas);",
+        "void enviarSecuencia([pregunta]);",
+        "void enviarSecuencia([vista.preguntaParaReintentar]);",
+    ):
+        assert origen in codigo
+
+    app = (WEB / "app.js").read_text(encoding="utf-8")
+    assert "refrescarEstado," in app
+    assert 'pedir("estado")' in app
+    assert 'cache: "no-store"' in app
 
 
 def test_ventanilla_tiene_los_ejemplos_y_los_estados() -> None:
