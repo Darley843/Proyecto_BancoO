@@ -10,6 +10,7 @@ from langchain_core.language_models.fake_chat_models import FakeListChatModel
 
 from banco_occidente_corpus.asistente import modelo as modulo_modelo
 from banco_occidente_corpus.sucursal.digiturno import (
+    INSTRUCCION_DUDA,
     MAX_TOKENS_CLASIFICADOR,
     Clasificacion,
     ConfiguracionDigiturno,
@@ -110,6 +111,38 @@ def test_las_44_preguntas_del_set_respetan_la_ruta_x() -> None:
             errores.append(f"{numero}: esperada {esperada}, salió X :: {pregunta['pregunta']}")
 
     assert not errores, "El digiturno rompe la ruta del Arqueo:\n" + "\n".join(errores)
+
+
+def test_historia_e_identidad_van_a_boveda() -> None:
+    """Las preguntas 6 a 9 del set no dependen del criterio del modelo."""
+    preguntas = tomllib.loads(ARCHIVO_PREGUNTAS.read_text(encoding="utf-8"))["pregunta"]
+    por_id = {int(pregunta["id"]): pregunta for pregunta in preguntas}
+
+    for numero in (6, 7, 8, 9):
+        turno = clasificar(str(por_id[numero]["pregunta"]))
+        assert turno.letra == "B", f"la pregunta {numero} salió {turno.letra}"
+        assert turno.motivo == "identidad"
+
+
+def test_historia_no_llama_al_clasificador() -> None:
+    """Aunque el modelo respondiera X, la regla de identidad gana."""
+    llamadas: list[str] = []
+
+    def clasificador(pregunta: str) -> Clasificacion | None:
+        llamadas.append(pregunta)
+        return Clasificacion(letra="X", motivo="fuera de alcance")
+
+    turno = clasificar("¿Cuándo y dónde se fundó el banco?", clasificador=clasificador)
+
+    assert turno.letra == "B"
+    assert turno.motivo == "identidad"
+    assert llamadas == []
+
+
+def test_instruccion_del_clasificador_incluye_historia_e_identidad() -> None:
+    """El prompt de DeepSeek no deja la historia del banco fuera de alcance."""
+    for palabra in ("historia", "identidad", "gobierno", "fundación", "presidente"):
+        assert palabra in INSTRUCCION_DUDA
 
 
 def test_cuota_de_manejo_cae_en_tarifas() -> None:
