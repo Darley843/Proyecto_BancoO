@@ -147,11 +147,11 @@
 - [ ] 22.5 Escribir `data/evaluacion/arqueo.json` y `docs/ARQUEO.md` sin fecha ni rutas absolutas, con recuperación, evaluación, McNemar, costo y conteo por tipo; verificar que dos ejecuciones con los mismos datos son idénticas y que las cifras del Markdown coinciden con el JSON.
 - [ ] 22.6 Añadir `make arqueo` y verificar que funciona sin `DEEPSEEK_API_KEY`, que no está encadenado a `all`, `gold` ni `deliver`, y que `make help` lo lista; documentar el comando y la interpretación del reporte en `docs/ARQUEO.md`.
 
-## 23. Retiro de Streamlit (Darley — pendiente)
+## 23. Retiro de Streamlit (Darley — hecho)
 
-- [ ] 23.1 Eliminar `app/streamlit_app.py`, `app/scraping_ui.py` y la dependencia `streamlit` con `uv remove streamlit`; verificar que `make check` y `make demo` pasan sin Streamlit instalado y que `make app` sigue levantando uvicorn.
-- [ ] 23.2 Actualizar `CONSTITUTION.md` §3 y §4, `AGENTS.md` (mapa del código y comandos), `README.md` y `docs/ESTANDAR.md` para quitar Streamlit y describir la app web; verificar que no quedan referencias activas con una búsqueda de «streamlit» en código, `pyproject.toml`, Makefile y documentación.
-- [ ] 23.3 Verificar que el retiro no borra `app/web/`, `app.py`, los datos de ejemplo ni la API, y que `git status` no incluye `data/asistente/` ni `data/boveda/`.
+- [x] 23.1 Eliminar `app/streamlit_app.py`, `app/scraping_ui.py` y la dependencia `streamlit` con `uv remove streamlit`; verificar que `make check` y `make demo` pasan sin Streamlit instalado y que `make app` sigue levantando uvicorn.
+- [x] 23.2 Actualizar `CONSTITUTION.md` §3 y §4, `AGENTS.md` (mapa del código y comandos), `README.md` y `docs/ESTANDAR.md` para quitar Streamlit y describir la app web; verificar que no quedan referencias activas con una búsqueda de «streamlit» en código, `pyproject.toml`, Makefile y documentación.
+- [x] 23.3 Verificar que el retiro no borra `app/web/`, `app.py`, los datos de ejemplo ni la API, y que `git status` no incluye `data/asistente/` ni `data/boveda/`.
 
 ## 24. Skill boveda-rag (Nayla — pendiente)
 

@@ -48,7 +48,7 @@ DEFAULT_SAMPLE = 3
 #: Variables con las que ``config.Paths`` resuelve las capas del corpus.
 TEMP_ENV: tuple[str, ...] = ("CORPUS_RAW_DIR", "CORPUS_PROCESSED_DIR", "CORPUS_GOLD_DIR")
 
-#: Serializa la mutación del entorno: Streamlit comparte proceso entre sesiones.
+#: Serializa la mutación del entorno: la app comparte proceso entre sesiones.
 _LOCK = threading.Lock()
 
 #: Mensaje de parada ante un bloqueo o una caída de red. Sin recomendaciones.
@@ -258,8 +258,8 @@ def run_capture(
 ) -> LiveCapture:
     """Ejecuta Bronze -> Silver -> deduplicación -> Gold sobre unas pocas URLs.
 
-    ``on_stage`` recibe cada etapa terminada para que la app actualice su
-    ``st.status`` sin que este módulo dependa de Streamlit.
+    ``on_stage`` recibe cada etapa terminada para que la interfaz actualice su
+    estado sin que este módulo dependa de una UI concreta.
     """
     target = Path(workdir).expanduser().resolve() if workdir else new_workdir()
     target.mkdir(parents=True, exist_ok=True)
