@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "73f5126f-8a60-4ada-98ac-ecc43e434934",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\arquitectura.json",
+  "output": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\arquitectura.html",
+  "specification": {
+    "sha256": "a8a3782fab811330fb5f48a0205721919af87bac04c1ec692228b1aa89fcf34d",
+    "bytes": 5344
+  },
+  "artifact": {
+    "sha256": "a9d273d167e13c2435cfd9e1456d5e6b3993e3a12e55bb90587d20465ce7f159",
+    "bytes": 851295
+  }
+}

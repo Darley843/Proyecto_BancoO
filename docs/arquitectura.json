@@ -1,0 +1,164 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Sucursal 1965: del navegador al dato",
+    "locale": "es",
+    "output": "docs/arquitectura.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Darley843/Proyecto_BancoO",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "e152f5315683d8d5cfe8ce3a56991be2c5e7580f"
+    }
+  },
+  "components": [
+    {
+      "id": "navegador",
+      "type": "frontend",
+      "label": "Navegador",
+      "sublabel": "app web · HTML/CSS/JS",
+      "pos": [40, 280],
+      "size": [150, 66],
+      "sources": [{ "path": "app/web/app.js", "line": 22, "end_line": 32, "label": "mapa de endpoints" }]
+    },
+    {
+      "id": "fastapi",
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": "uvicorn · 127.0.0.1:8000",
+      "pos": [276, 280],
+      "size": [150, 66],
+      "sources": [{ "path": "app.py", "line": 32, "end_line": 47, "label": "crear_app" }]
+    },
+    {
+      "id": "grafo",
+      "type": "backend",
+      "label": "Grafo LangGraph",
+      "sublabel": "reformular → digiturno",
+      "pos": [538, 280],
+      "size": [160, 66],
+      "sources": [
+        { "path": "src/banco_occidente_corpus/sucursal/grafo.py", "line": 128, "end_line": 173, "label": "nodos y rutas" }
+      ]
+    },
+    {
+      "id": "boveda",
+      "type": "backend",
+      "label": "Bóveda",
+      "sublabel": "recuperador híbrido",
+      "pos": [770, 280],
+      "size": [150, 66],
+      "sources": [
+        { "path": "src/banco_occidente_corpus/boveda/recuperador.py", "line": 62, "end_line": 97, "label": "vectorial + BM25" }
+      ]
+    },
+    {
+      "id": "chroma",
+      "type": "database",
+      "label": "Chroma",
+      "sublabel": "data/boveda · coseno",
+      "pos": [980, 280],
+      "size": [150, 66],
+      "sources": [
+        { "path": "src/banco_occidente_corpus/boveda/almacen.py", "line": 100, "end_line": 109, "label": "PersistentClient" }
+      ]
+    },
+    {
+      "id": "deepseek",
+      "type": "external",
+      "label": "DeepSeek API",
+      "sublabel": "deepseek-flash",
+      "pos": [543, 105],
+      "size": [150, 66],
+      "sources": [
+        { "path": "src/banco_occidente_corpus/asistente/modelo.py", "line": 85, "end_line": 98, "label": "ChatDeepSeek" }
+      ]
+    },
+    {
+      "id": "ollama",
+      "type": "external",
+      "label": "Ollama",
+      "sublabel": "nomic-embed-text-v2-moe",
+      "pos": [765, 105],
+      "size": [160, 66],
+      "sources": [
+        { "path": "src/banco_occidente_corpus/boveda/embeddings.py", "line": 55, "end_line": 96, "label": "OllamaEmbeddings" }
+      ]
+    },
+    {
+      "id": "sqlite",
+      "type": "database",
+      "label": "SQLite",
+      "sublabel": "memoria.sqlite",
+      "pos": [548, 455],
+      "size": [140, 66],
+      "sources": [
+        { "path": "src/banco_occidente_corpus/sucursal/grafo.py", "line": 135, "end_line": 143, "label": "SqliteSaver" }
+      ]
+    },
+    {
+      "id": "tablero",
+      "type": "backend",
+      "label": "Tablero",
+      "sublabel": "CSV + plantilla",
+      "pos": [748, 455],
+      "size": [140, 66],
+      "sources": [
+        { "path": "src/banco_occidente_corpus/tablero/consultas.py", "line": 33, "end_line": 55, "label": "buscar_filas" }
+      ]
+    },
+    {
+      "id": "tablero_csv",
+      "type": "database",
+      "label": "tablero.csv",
+      "sublabel": "data/estructurados",
+      "pos": [946, 455],
+      "size": [150, 66],
+      "sources": [
+        { "path": "src/banco_occidente_corpus/tablero/tipos.py", "line": 49, "end_line": 63, "label": "ruta y escritura" }
+      ]
+    }
+  ],
+  "connections": [
+    { "from": "navegador", "to": "fastapi", "label": "HTTP :8000", "variant": "emphasis" },
+    { "from": "fastapi", "to": "grafo", "label": "/api/preguntar", "variant": "emphasis" },
+    { "from": "grafo", "to": "boveda", "label": "B · k=5", "variant": "emphasis" },
+    { "from": "grafo", "to": "tablero", "label": "T · filas", "variant": "default" },
+    { "from": "boveda", "to": "chroma", "label": "top-k", "variant": "default" },
+    { "from": "boveda", "to": "ollama", "label": "embeddings", "variant": "dashed" },
+    { "from": "grafo", "to": "deepseek", "label": "chat model", "variant": "dashed" },
+    { "from": "grafo", "to": "sqlite", "label": "checkpoint", "variant": "default" },
+    { "from": "tablero", "to": "tablero_csv", "label": "filas", "variant": "default" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Rutas del Digiturno",
+      "items": [
+        "B → Bóveda: RAG sobre los fragmentos de Gold",
+        "T → Tablero: 1–3 filas, respuesta con plantilla",
+        "X → rechazo: si el dato no está, no se inventa"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Todo local salvo el modelo",
+      "items": [
+        "FastAPI, Chroma, el CSV y SQLite viven en el equipo",
+        "Ollama en 127.0.0.1:11434 calcula los embeddings",
+        "DeepSeek solo recibe la pregunta y los fragmentos elegidos"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Memoria y respuesta",
+      "items": [
+        "SqliteSaver aísla cada sesión por thread_id",
+        "El grafo recorta el historial antes de redactar",
+        "La respuesta cita la fuente Gold o la fila del Tablero"
+      ]
+    }
+  ]
+}

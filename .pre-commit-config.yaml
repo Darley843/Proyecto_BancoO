@@ -13,10 +13,11 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
+      # el HTML de Archify se genera (docs/arquitectura.json) y no se edita a mano
       - id: trailing-whitespace
-        exclude: ^data/
+        exclude: ^data/|^docs/arquitectura\.html$
       - id: end-of-file-fixer
-        exclude: ^data/
+        exclude: ^data/|^docs/arquitectura\.html$
       - id: check-yaml
       - id: check-toml
       - id: check-merge-conflict
