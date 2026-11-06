@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import csv
+import tomllib
 from pathlib import Path
 from typing import Any
 
@@ -40,6 +41,9 @@ URL_VEHICULAR = "https://www.bancodeoccidente.com.co/asistencia-vehicular"
 URL_PROMOS = "https://www.bancodeoccidente.com.co/tarjetas-credito/promociones"
 URL_VIVIENDA = "https://www.bancodeoccidente.com.co/proyectos-de-vivienda"
 PAGINA = "data/gold/pages/pagina.md"
+RAIZ = Path(__file__).resolve().parents[1]
+ARCHIVO_PREGUNTAS = RAIZ / "config" / "evaluacion" / "preguntas_fase2.toml"
+ARCHIVO_TABLERO = RAIZ / "data" / "estructurados" / "tablero.csv"
 
 
 def make_config(tmp_path: Path) -> Config:
@@ -251,6 +255,56 @@ def test_buscar_filas_ignora_tildes_y_mayusculas() -> None:
         "Cuota de Manejo Tarjeta Débito"
     ]
     assert buscar_filas(filas, "inexistente") == []
+
+
+def test_buscar_filas_atiende_pregunta_natural() -> None:
+    """Una pregunta con muletillas encuentra la fila por sus palabras clave."""
+    filas = [
+        fila("Cuota de Manejo Tarjeta Débito", "16.700"),
+        fila("Cuota de Manejo Visa", "31.800"),
+    ]
+
+    encontradas = buscar_filas(filas, "¿Cuánto cuesta la cuota de manejo de la tarjeta débito?")
+
+    assert [f.concepto for f in encontradas] == ["Cuota de Manejo Tarjeta Débito"]
+
+
+def test_buscar_filas_compara_plurales_y_flexiones() -> None:
+    """«desempleado» encuentra «Desempleo» y no arrastra filas de otra carencia."""
+    filas = [fila("Desempleo", "30"), fila("Enfermedades Graves", "90")]
+
+    assert [f.concepto for f in buscar_filas(filas, "¿Y si quedo desempleado?")] == ["Desempleo"]
+
+
+def test_buscar_filas_sin_palabras_significativas_no_devuelve_todo() -> None:
+    """Una consulta de solo artículos no se interpreta como «cualquier fila»."""
+    filas = [fila("Apertura", "0")]
+
+    assert buscar_filas(filas, "de la") == []
+    assert buscar_filas(filas, "") == filas
+
+
+def test_las_preguntas_de_tabla_encuentran_al_menos_una_fila() -> None:
+    """Las 14 preguntas T del set dejan de caer en «tablero_sin_filas»."""
+    preguntas = tomllib.loads(ARCHIVO_PREGUNTAS.read_text(encoding="utf-8"))["pregunta"]
+    de_tabla = [pregunta for pregunta in preguntas if pregunta["ruta_esperada"] == "T"]
+    filas = leer_filas(ARCHIVO_TABLERO)
+
+    assert len(de_tabla) == 14
+    for pregunta in de_tabla:
+        encontradas = buscar_filas(filas, str(pregunta["pregunta"]))
+        assert encontradas, f"la pregunta {pregunta['id']} no encontró filas"
+
+
+def test_la_pregunta_41_encuentra_la_cuota_de_manejo() -> None:
+    """La pregunta 41 devuelve la cuota de la tarjeta débito con su valor."""
+    filas = leer_filas(ARCHIVO_TABLERO)
+
+    encontradas = buscar_filas(filas, "¿Cuánto cuesta la cuota de manejo de la tarjeta débito?")
+
+    assert [(f.concepto, f.valor) for f in encontradas] == [
+        ("Cuota de Manejo Tarjeta Débito", "16.700")
+    ]
 
 
 def test_comparar_filas_visa_mastercard() -> None:
