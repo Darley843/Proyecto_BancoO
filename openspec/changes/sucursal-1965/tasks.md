@@ -86,10 +86,10 @@
 
 ## 13. PR 10b — Endpoint `preguntar` (Nayla — pendiente)
 
-- [ ] 13.1 Conectar `POST /api/preguntar` al grafo: validar `{pregunta, thread_id}`, invocar el grafo, mapear `Turno` y la respuesta al JSON del contrato y devolver los errores como `{error: {codigo, mensaje}}`; verificar con `TestClient` y un grafo simulado los casos 200, pregunta vacía, índice ausente y falta de clave fuera de demo.
-- [ ] 13.2 Integrar caché, gasto y métricas: devolver `cache: true` con costo cero en un acierto, sumar el gasto solo cuando hubo modelo y no cachear turnos `X`; verificar con pruebas que el segundo request de la misma pregunta no gasta y que un rechazo no escribe caché.
-- [ ] 13.3 Verificar que el endpoint no registra la pregunta ni datos personales en logs y que el `thread_id` no se usa como dato personal; ejecutar `make check` y una prueba de humo con `TestClient`.
-- [ ] 13.4 Actualizar el ejemplo de request/response en `README.md` y verificar que coincide con los modelos Pydantic y con `app/web/datos-ejemplo/preguntar.json`.
+- [x] 13.1 Conectar `POST /api/preguntar` al grafo: validar `{pregunta, thread_id}`, invocar el grafo, mapear `Turno` y la respuesta al JSON del contrato y devolver los errores como `{error: {codigo, mensaje}}`; verificar con `TestClient` y un grafo simulado los casos 200, pregunta vacía, índice ausente y falta de clave fuera de demo.
+- [x] 13.2 Integrar caché, gasto y métricas: devolver `cache: true` con costo cero en un acierto, sumar el gasto solo cuando hubo modelo y no cachear turnos `X`; verificar con pruebas que el segundo request de la misma pregunta no gasta y que un rechazo no escribe caché.
+- [x] 13.3 Verificar que el endpoint no registra la pregunta ni datos personales en logs y que el `thread_id` no se usa como dato personal; ejecutar `make check` y una prueba de humo con `TestClient`.
+- [x] 13.4 Actualizar el ejemplo de request/response en `README.md` y verificar que coincide con los modelos Pydantic y con `app/web/datos-ejemplo/preguntar.json`.
 
 ## 14. PR 11 — Mapa PCA (Yoldy — pendiente)
 

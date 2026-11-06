@@ -7,8 +7,9 @@ host público.
 
 La API (``/api/...``) se registra en :func:`crear_app` **antes** de montar los
 estáticos, porque el montaje en ``/`` atiende todo lo que no haya reclamado una
-ruta anterior. Expone estado, Tablero, Bóveda, pipeline, Arqueo y Vestíbulo; el
-endpoint de preguntas llega en el PR 10b.
+ruta anterior. Expone estado, Tablero, Bóveda, pipeline, Arqueo, Vestíbulo y
+``POST /api/preguntar``: el grafo y sus dependencias se construyen en la primera
+pregunta, nunca al importar este módulo.
 
 La app Streamlit de la fase 1 sigue disponible con ``make app-streamlit`` hasta
 el PR de retiro (tarea 23.1).
@@ -16,6 +17,7 @@ el PR de retiro (tarea 23.1).
 
 from __future__ import annotations
 
+from collections.abc import Callable
 from pathlib import Path
 
 import uvicorn
@@ -28,7 +30,8 @@ from banco_occidente_corpus.sucursal.ajustes import (
     cargar_configuracion_sucursal,
 )
 from banco_occidente_corpus.sucursal.api import crear_router
-from banco_occidente_corpus.sucursal.costo import GastoDiario
+from banco_occidente_corpus.sucursal.costo import CacheRespuestas, GastoDiario
+from banco_occidente_corpus.sucursal.preguntar import PiezasGrafo
 
 HOST = "127.0.0.1"
 PUERTO = 8000
@@ -41,11 +44,14 @@ def crear_app(
     *,
     config: Config | None = None,
     ajustes: ConfiguracionSucursal | None = None,
+    cache: CacheRespuestas | None = None,
+    piezas: Callable[[], PiezasGrafo] | None = None,
 ) -> FastAPI:
     """Crea la app FastAPI de la sucursal y monta la app web en ``/``.
 
     ``carpeta_web`` se puede cambiar en las pruebas para servir otra carpeta;
-    ``config`` y ``ajustes`` permiten inyectar rutas y topes temporales.
+    ``config``, ``ajustes``, ``cache`` y ``piezas`` permiten inyectar rutas, topes
+    y un grafo simulado sin tocar la red.
     """
     configuracion = config or load_config()
     parametros = ajustes or cargar_configuracion_sucursal()
@@ -54,7 +60,7 @@ def crear_app(
         title="Sucursal 1965",
         description="Asistente de conocimiento sobre Banco de Occidente (proyecto TAAML, UAO).",
     )
-    app.include_router(crear_router(configuracion, parametros, gasto))
+    app.include_router(crear_router(configuracion, parametros, gasto, cache=cache, piezas=piezas))
     app.mount("/", StaticFiles(directory=carpeta_web, html=True), name="web")
     return app
 

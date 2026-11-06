@@ -224,6 +224,30 @@ def responder_turno(
     )
 
 
+def registrar_turno(grafo: Any, pregunta: str, respuesta: str, thread_id: str) -> None:
+    """Añade a la memoria del hilo un turno que no pasó por el grafo.
+
+    Lo usa la API cuando la respuesta viene de la caché: el turno no ejecuta
+    nodos, pero la siguiente pregunta de seguimiento necesita el par
+    pregunta/respuesta en el `checkpointer` para reformularse.
+
+    Args:
+        grafo: aplicación compilada con `crear_grafo`.
+        pregunta: pregunta saneada que envió el cliente.
+        respuesta: texto que se devolvió al cliente.
+        thread_id: identificador de la conversación.
+
+    Raises:
+        Exception: cualquier fallo del `checkpointer` se propaga al llamador, que
+            decide si puede seguir sin historial.
+    """
+    grafo.update_state(
+        {"configurable": {"thread_id": thread_id}},
+        {"messages": [HumanMessage(content=pregunta), AIMessage(content=respuesta)]},
+        as_node="redactar",
+    )
+
+
 def _nodo_reformular(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal], dict[str, Any]]:
     """Crea el nodo que reformula un seguimiento cuando hace falta."""
 

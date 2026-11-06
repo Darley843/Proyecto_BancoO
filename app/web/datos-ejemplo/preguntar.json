@@ -2,7 +2,7 @@
   "turno": "T",
   "turno_numero": 12,
   "ruta": "tablero",
-  "motivo": "tarifas y coberturas",
+  "motivo": "tarifas",
   "uso_modelo": false,
   "reformulada": "¿Cuánto cuesta la cuota de manejo de la tarjeta débito?",
   "respuesta": "La cuota de manejo de la tarjeta débito es de $16.700, vigente desde el 20 de noviembre de 2025 [1].",
@@ -13,7 +13,7 @@
       "url": "https://www.bancodeoccidente.com.co/documents/d/guest/tarifas-persona-1",
       "seccion": "otros",
       "tipo": "pdf",
-      "similitud": 0.82
+      "similitud": null
     }
   ],
   "tokens_entrada": 0,
