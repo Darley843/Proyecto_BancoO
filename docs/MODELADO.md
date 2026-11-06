@@ -222,6 +222,14 @@ Costo y caché (`sucursal/costo.py`):
 - Con `SUCURSAL_DEMO=1` no se crea cliente de DeepSeek, el costo es cero y no se
   escribe gasto.
 
+### Diagramas
+
+- Arquitectura: [`arquitectura.html`](./arquitectura.html), con fuente tipada en `arquitectura.json`.
+- Flujo de datos: [`datos.html`](./datos.html), con fuente en `datos.json`; muestra el camino RAG citado y el camino determinista del Tablero.
+
+Ambos se generan con Archify y no se editan a mano. La verificación de sus gates
+queda en los recibos `arquitectura.*.json` y `datos.*.json`.
+
 ### Cómo se compara
 
 1. Correr `make evaluar` con la estrategia actual (contexto completo).
