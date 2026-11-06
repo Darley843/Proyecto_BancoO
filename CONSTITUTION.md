@@ -228,6 +228,7 @@ ProyectoAvance1/
 ├── docs/ESTANDAR.md      # trazabilidad regla de la clase → implementación
 ├── .opencode/skills/corpus-extraction/    # skill operativa del pipeline
 ├── .opencode/skills/semantic-extraction/  # skill de conocimiento semántico
+├── .opencode/skills/boveda-rag/          # skill de operación y medición de la Bóveda
 ├── .github/workflows/ci.yml
 ├── .pre-commit-config.yaml
 ├── CONSTITUTION.md       # este archivo

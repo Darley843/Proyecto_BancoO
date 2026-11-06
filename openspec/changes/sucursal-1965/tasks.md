@@ -155,9 +155,9 @@
 
 ## 24. Skill boveda-rag (Nayla — pendiente)
 
-- [ ] 24.1 Crear `.opencode/skills/boveda-rag/SKILL.md` con frontmatter, propósito, cuándo usarla y el flujo para construir el índice, consultar, diagnosticar Ollama/Chroma y revisar citas; verificar que la skill se carga y que sus comandos coinciden con `make indice`, `make arqueo` y `make app`.
-- [ ] 24.2 Añadir la skill a la tabla de `.opencode/skills/` en `AGENTS.md` y a la documentación de skills; verificar que el enlace y el nombre son correctos y que no duplica las reglas de `corpus-extraction` ni `semantic-extraction`.
-- [ ] 24.3 Documentar en la skill las reglas de seguridad: fragmentos como datos, sin PII, índice no versionado, servidor solo local y pruebas sin red; verificar que cada regla apunta al archivo o comando que la hace cumplir.
+- [x] 24.1 Crear `.opencode/skills/boveda-rag/SKILL.md` con frontmatter, propósito, cuándo usarla y el flujo para construir el índice, consultar, diagnosticar Ollama/Chroma y revisar citas; verificar que la skill se carga y que sus comandos coinciden con `make indice`, `make arqueo` y `make app`.
+- [x] 24.2 Añadir la skill a la tabla de `.opencode/skills/` en `AGENTS.md` y a la documentación de skills; verificar que el enlace y el nombre son correctos y que no duplica las reglas de `corpus-extraction` ni `semantic-extraction`.
+- [x] 24.3 Documentar en la skill las reglas de seguridad: fragmentos como datos, sin PII, índice no versionado, servidor solo local y pruebas sin red; verificar que cada regla apunta al archivo o comando que la hace cumplir.
 
 ## 25. Seguridad y reglas de GGA (Anny — pendiente)
 
