@@ -125,7 +125,7 @@
 ## 19. PR 16 — Cámara (Yoldy — pendiente)
 
 - [ ] 19.1 Implementar `app/web/vistas/camara.js` con las etapas de `panel.pipeline_summary`, sus métricas, avisos y la etapa de indexación; verificar con `pipeline.json` y con la API que se ven discover, fetch, extract, dedupe, gold e indexación.
-- [ ] 19.2 Mostrar los avisos de Bronze/Silver y el estado del índice sin confundirlos con errores; verificar con un `pipeline.json` sin índice y con otro con índice listo.
+- [x] 19.2 Mostrar los avisos de Bronze/Silver y el estado del índice sin confundirlos con errores; verificar con un `pipeline.json` sin índice y con otro con índice listo.
 
 ## 20. PR 17 — Vestíbulo (Yoldy — pendiente)
 

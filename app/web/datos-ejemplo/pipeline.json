@@ -3,50 +3,90 @@
     {
       "key": "discover",
       "title": "Descubrir",
-      "hint": "Encuentra las URL públicas del sitio",
+      "hint": "Lee robots.txt y el índice de sitemaps, normaliza las URLs /w/ y descarta rutas fuera de alcance.",
       "metrics": [
         {
           "label": "URLs en cola",
-          "value": "1.234"
+          "value": "0"
+        },
+        {
+          "label": "Documentos en cola",
+          "value": "0"
+        },
+        {
+          "label": "Patrones de exclusión",
+          "value": "15"
+        },
+        {
+          "label": "Pausa de cortesía",
+          "value": "1.5 s"
         }
       ],
-      "note": "",
-      "warning": ""
+      "note": "Los descartes por robots.txt o por patrones no se persisten en disco: se obtienen con el chequeo de robots de la cola y, completo, con la auditoría opcional.",
+      "warning": "No hay cola de URLs en data/raw/urls.jsonl: ejecuta make discover."
     },
     {
       "key": "fetch",
-      "title": "Descargar",
-      "hint": "Guarda el HTML crudo en Bronze",
+      "title": "Extraer (Bronze)",
+      "hint": "Descarga el HTML crudo una sola vez y lo guarda con su hash; la captura es reanudable (no repite lo ya bajado).",
       "metrics": [
         {
-          "label": "Páginas descargadas",
-          "value": "181"
+          "label": "Capturas OK",
+          "value": "0"
+        },
+        {
+          "label": "Fallidas",
+          "value": "0"
+        },
+        {
+          "label": "Tamaño Bronze",
+          "value": "0.0 B"
+        },
+        {
+          "label": "HTML en disco",
+          "value": "0"
         }
       ],
-      "note": "",
-      "warning": ""
+      "note": "Bronze no se versiona: son las capturas del equipo que ejecutó el pipeline. En un clon solo existe lo que quedó en data/raw/.",
+      "warning": "Sin capturas en disco: ejecuta make fetch."
     },
     {
       "key": "extract",
-      "title": "Extraer",
-      "hint": "Convierte el HTML en texto limpio (Silver)",
+      "title": "Limpiar (Silver)",
+      "hint": "trafilatura con respaldo BeautifulSoup: quita menús, cookies y formularios, y aplica el boilerplate repetido antes de escribir.",
       "metrics": [
         {
-          "label": "Páginas extraídas",
-          "value": "181"
+          "label": "Páginas Silver",
+          "value": "0"
+        },
+        {
+          "label": "Caracteres útiles",
+          "value": "0"
         }
       ],
-      "note": "",
-      "warning": ""
+      "note": "Silver tampoco se versiona: se reconstruye desde Bronze con make extract, sin volver a la web.",
+      "warning": "Silver no está en este clon: make extract lo reconstruye."
     },
     {
       "key": "dedupe",
       "title": "Deduplicar",
-      "hint": "Mide los bloques repetidos entre páginas",
+      "hint": "Cuenta líneas de menú/pie y bloques de 1 a 3 líneas repetidos entre páginas. La deduplicación de Gold es solo de medición: no borra líneas del corpus (CONSTITUTION §7.6).",
       "metrics": [
         {
-          "label": "Líneas repetidas en 5 o más páginas",
-          "value": "22,3 %"
+          "label": "Páginas analizadas",
+          "value": "181"
+        },
+        {
+          "label": "Líneas de contenido",
+          "value": "8,094"
+        },
+        {
+          "label": "Repetido >= 5 / 10 / 20",
+          "value": "22.3 % / 16.7 % / 9.1 %"
+        },
+        {
+          "label": "Bloques en el top",
+          "value": "20"
         }
       ],
       "note": "",
@@ -54,25 +94,113 @@
     },
     {
       "key": "gold",
-      "title": "Publicar en Gold",
-      "hint": "Markdown con frontmatter listo para RAG",
+      "title": "Enriquecer (Gold)",
+      "hint": "Añade frontmatter (fuente, sección, tokens, hash, keywords), escribe corpus.jsonl y segmenta el cuerpo por ## en chunks.",
       "metrics": [
         {
-          "label": "Páginas en Gold",
-          "value": "181"
+          "label": "Documentos Gold",
+          "value": "241"
+        },
+        {
+          "label": "Tokens",
+          "value": "196,139"
+        },
+        {
+          "label": "Secciones",
+          "value": "7"
+        },
+        {
+          "label": "Chunks web",
+          "value": "1,388"
         }
       ],
-      "note": "",
+      "note": "Gold sí está versionado y proviene de la captura completa: 241 documentos (181 páginas web + 60 fichas de hechos y noticias). Por eso ver 0 capturas en Bronze junto a 241 documentos en Gold no es un error: son capas con distinta cobertura histórica.",
       "warning": ""
     }
   ],
   "fuentes": [
-    "data/raw/urls.jsonl"
+    "data/raw/urls.jsonl",
+    "data/raw/capture.jsonl",
+    "data/processed/silver.jsonl",
+    "data/gold/_REPETIDOS.md",
+    "data/gold/corpus.jsonl",
+    "data/knowledge/chunks_web.jsonl"
   ],
-  "repeticiones": null,
+  "repeticiones": {
+    "pages": 181,
+    "content_lines": 8094,
+    "thresholds": [
+      {
+        "threshold": 5,
+        "covered": 1804,
+        "total": 8094,
+        "percentage": 22.3
+      },
+      {
+        "threshold": 10,
+        "covered": 1350,
+        "total": 8094,
+        "percentage": 16.7
+      },
+      {
+        "threshold": 20,
+        "covered": 739,
+        "total": 8094,
+        "percentage": 9.1
+      }
+    ],
+    "blocks": [
+      {
+        "size": 1,
+        "pages": 62,
+        "text": "Financia tu próximo vehículo con cuotas cómodas y excelentes tasas.",
+        "examples": "app-movil-banco-de-occidente-ae3601, asistencia-total-hogar-vial-y-medica-en-un-solo-lugar-a62f06, clientes-segmento-elite-plus-banco-de-occidente-70f9fa"
+      },
+      {
+        "size": 1,
+        "pages": 58,
+        "text": "Compra lo que necesitas y accede a promociones exclusivas.",
+        "examples": "app-movil-banco-de-occidente-ae3601, asistencia-total-hogar-vial-y-medica-en-un-solo-lugar-a62f06, clientes-segmento-elite-plus-banco-de-occidente-70f9fa"
+      },
+      {
+        "size": 1,
+        "pages": 51,
+        "text": "Protege tu dinero, hazlo crecer y úsalo cuando lo necesites.",
+        "examples": "app-movil-banco-de-occidente-ae3601, asistencia-total-hogar-vial-y-medica-en-un-solo-lugar-a62f06, clientes-segmento-elite-plus-banco-de-occidente-70f9fa"
+      },
+      {
+        "size": 1,
+        "pages": 49,
+        "text": "Obtén tu crédito y haz realidad tus planes con plazos flexibles.",
+        "examples": "app-movil-banco-de-occidente-ae3601, asistencia-total-hogar-vial-y-medica-en-un-solo-lugar-a62f06, clientes-segmento-elite-plus-banco-de-occidente-70f9fa"
+      },
+      {
+        "size": 1,
+        "pages": 42,
+        "text": "Solicitud de vinculación",
+        "examples": "abre-tu-cuenta-de-nomina-online-en-el-banco-de-occidente-841f9c, asistencia-total-hogar-vial-y-medica-en-un-solo-lugar-a62f06, asistencias-tarjetas-de-credit..."
+      }
+    ],
+    "unique_global": 54.1,
+    "unique_average": 93.0,
+    "lowest": [
+      [
+        "asistencias-tarjetas-de-credito-banco-de-occidente-0dabe9",
+        22.8
+      ],
+      [
+        "asistencias-tarjetas-de-credito-banco-de-occidente-5e4948",
+        27.3
+      ],
+      [
+        "asistencias-tarjetas-de-credito-banco-de-occidente-f64e0b",
+        34.9
+      ]
+    ]
+  },
   "indexacion": {
     "indice_listo": true,
-    "fragmentos_indexados": 1520,
+    "fragmentos_indexados": 952,
     "modelo_embeddings": "nomic-embed-text-v2-moe",
     "alcance": "base"
   }
