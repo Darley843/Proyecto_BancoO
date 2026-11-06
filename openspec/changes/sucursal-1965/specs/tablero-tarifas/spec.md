@@ -79,12 +79,17 @@ El Tablero SHALL cubrir las ocho preguntas de tipo `tabla` de `config/evaluacion
 
 ### Requirement: Búsqueda y comparación deterministas
 
-`tablero` SHALL exponer las funciones fijas `buscar_filas` y `comparar_filas`. `buscar_filas` filtra por concepto y categoría sin distinguir mayúsculas ni tildes; `comparar_filas` compara dos grupos de filas y devuelve sus diferencias. Ninguna MUST llamar al modelo ni a la red.
+`tablero` SHALL exponer las funciones fijas `buscar_filas` y `comparar_filas`. `buscar_filas` filtra por concepto y categoría sin distinguir mayúsculas ni tildes y con coincidencia parcial: descarta palabras vacías y de pregunta, compara raíces para aceptar plurales y flexiones, y devuelve las filas con más coincidencias en vez de exigir todos los términos. `comparar_filas` compara dos grupos de filas y devuelve sus diferencias. Ninguna MUST llamar al modelo ni a la red.
 
 #### Scenario: Búsqueda por concepto
 
 - **WHEN** se busca «cuota de manejo»
 - **THEN** devuelve las filas cuyo concepto contiene esos términos, sin distinguir tildes
+
+#### Scenario: Pregunta natural
+
+- **WHEN** se pregunta «¿Cuánto cuesta la cuota de manejo de la tarjeta débito?»
+- **THEN** devuelve la cuota de manejo de la tarjeta débito, sin exigir que aparezcan «cuánto», «cuesta», «la» ni «de»
 
 #### Scenario: Comparación de dos tarjetas
 

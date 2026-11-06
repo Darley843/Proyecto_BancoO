@@ -159,7 +159,11 @@ Reglas:
 `buscar_filas` y `comparar_filas` son funciones puras: filtran por concepto y
 categoría sin tildes ni mayúsculas, y comparan dos grupos (por ejemplo Visa y
 Mastercard) devolviendo las filas que solo existen en un lado y las que difieren
-en valor.
+en valor. `buscar_filas` parte la consulta en palabras significativas (descarta
+artículos y muletillas como «cuánto», «cuesta» o «de»), compara raíces para
+aceptar plurales y flexiones, y devuelve las filas con más coincidencias en vez
+de exigir todos los términos; si la consulta no trae palabras significativas no
+devuelve filas.
 
 Estado actual: 622 filas únicas en el CSV y 8 de 8 preguntas de tabla cubiertas.
 
