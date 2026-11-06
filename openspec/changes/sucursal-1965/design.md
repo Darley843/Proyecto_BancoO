@@ -153,7 +153,7 @@ Nodos:
 1. `reformular`: solo si hay historial y `es_seguimiento(pregunta)` (empieza por «¿Y», «y », «cuánto», «cuál», «cómo» o tiene menos de 6 palabras y depende del turno anterior). Usa los últimos mensajes y devuelve la pregunta reformulada; si el modelo falla, conserva la original.
 2. `digiturno`: reglas y, si hace falta, modelo; escribe `turno`.
 3. `boveda`: recupera `k` fragmentos; si no hay, va a rechazo.
-4. `tablero`: `buscar_filas`; 0 filas → `B` (Bóveda), 1–3 → plantilla y confirma `T`, 4+ → `B` para que responda la Bóveda.
+4. `tablero`: `filas_para_plantilla`; 0 filas → `B` (Bóveda), 1–3 → plantilla y confirma `T`, más de 3 del mismo concepto (hasta 10) → plantilla y `T`, más de 10 o conceptos distintos → `B`. Una cuota genérica de «las tarjetas de crédito» → `B`.
 5. `rechazo`: frase fija y canal oficial, sin modelo.
 6. `redactar`: si ya hay plantilla, no llama al modelo; si no, usa `qa_v2` con los fragmentos y valida citas.
 

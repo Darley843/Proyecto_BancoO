@@ -58,16 +58,25 @@ def leer_tablas(texto: str) -> list[Tabla]:
 
 
 def viajes_nacionales(texto: str, pagina: str, fuente: str) -> list[Fila]:
-    """Asistencias de viajes nacionales, con una fila por franquicia."""
+    """Asistencias de viajes (nacionales o al exterior), una fila por franquicia.
+
+    La tabla internacional trae una columna extra de numeración
+    (`| Asistencias | | Visa | Mastercard |`), así que el concepto es la celda
+    inmediatamente anterior a la columna de la franquicia.
+    """
+    categoria = (
+        "asistencia de viajes nacionales"
+        if "nacional" in fuente
+        else "asistencia de viajes al exterior"
+    )
     filas: list[Fila] = []
     for tabla in leer_tablas(texto):
         columnas = [encabezado.casefold() for encabezado in tabla.encabezados]
         if "visa" not in columnas:
             continue
-        indice_concepto = next(
-            (indice for indice, columna in enumerate(columnas) if columna.startswith("asistencia")),
-            1,
-        )
+        indice_concepto = columnas.index("visa") - 1
+        if indice_concepto < 0:
+            continue
         for franquicia in ("visa", "mastercard"):
             if franquicia not in columnas:
                 continue
@@ -85,7 +94,7 @@ def viajes_nacionales(texto: str, pagina: str, fuente: str) -> list[Fila]:
                 filas.append(
                     Fila(
                         concepto=f"{concepto} ({franquicia.title()})",
-                        categoria="asistencia de viajes nacionales",
+                        categoria=categoria,
                         valor=encontrado.group("valor").strip(".,"),
                         moneda=(encontrado.group("moneda") or "USD").upper().replace("$", "COP"),
                         recargos="",

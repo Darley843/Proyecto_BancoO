@@ -80,12 +80,17 @@ El sistema SHALL reformular la pregunta únicamente cuando existe historial en e
 
 ### Requirement: Tablero responde con plantilla sin modelo
 
-Cuando la ruta es `T` y hay de una a tres filas, el sistema SHALL responder con una plantilla determinista, sin llamar al modelo. Con cero filas la consulta no se responde con una tabla: la ruta MUST pasar a `B` y responder con la Bóveda. Con cuatro o más filas la consulta es demasiado amplia para el Tablero: la ruta MUST pasar a `B` y responder con la Bóveda.
+Cuando la ruta es `T` y hay de una a tres filas, el sistema SHALL responder con una plantilla determinista, sin llamar al modelo. Si hay más de tres filas, la plantilla MUST usarse solo cuando todas comparten el mismo concepto base (por ejemplo, los topes de la misma asistencia para Visa y Mastercard) y no superan diez filas. Con cero filas la consulta no se responde con una tabla: la ruta MUST pasar a `B` y responder con la Bóveda. Con más de diez filas o con varios conceptos distintos la consulta es demasiado amplia para el Tablero: la ruta MUST pasar a `B`. Una cuota genérica de «las tarjetas de crédito», sin un producto concreto, también MUST pasar a `B`.
 
 #### Scenario: Una a tres filas
 
 - **WHEN** la consulta al Tablero devuelve dos filas
 - **THEN** la respuesta se arma con plantilla, cita la fuente y no consume tokens de DeepSeek
+
+#### Scenario: Varias filas del mismo concepto
+
+- **WHEN** la consulta devuelve nueve topes de la misma asistencia para Visa y Mastercard
+- **THEN** la respuesta lista las nueve filas con plantilla, sin llamar al modelo
 
 #### Scenario: Sin filas
 
@@ -94,8 +99,13 @@ Cuando la ruta es `T` y hay de una a tres filas, el sistema SHALL responder con 
 
 #### Scenario: Muchas filas
 
-- **WHEN** la consulta devuelve cuatro o más filas
+- **WHEN** la consulta devuelve once o más filas, o filas de varios productos
 - **THEN** el turno final es `B` y la respuesta sale de los fragmentos de la Bóveda
+
+#### Scenario: Cuota genérica
+
+- **WHEN** se pregunta por la cuota de manejo de «las tarjetas de crédito» sin nombrar una
+- **THEN** el turno final es `B` para que la Bóveda pregunte por la tarjeta concreta
 
 ### Requirement: Tope diario de gasto
 

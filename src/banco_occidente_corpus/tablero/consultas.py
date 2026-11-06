@@ -16,6 +16,21 @@ from .tipos import Fila
 _FRANQUICIA = re.compile(r"\s*\((visa|mastercard)\)\s*$", re.IGNORECASE)
 #: Palabra de la consulta o de una fila del Tablero.
 _PALABRA = re.compile(r"\w+")
+#: Equivalencias del dominio que no aparecen literalmente en las filas.
+_SINONIMOS: dict[str, str] = {
+    "europa": "schengen",
+    "europea": "schengen",
+    "europeo": "schengen",
+    "extranjera": "exterior",
+    "extranjero": "exterior",
+}
+#: Pares que no pueden describir la misma fila: si la consulta pide uno, la
+#: fila que solo menciona el otro no es una respuesta válida.
+_CONTRARIOS: tuple[tuple[str, str], ...] = (
+    ("credito", "debito"),
+    ("nacional", "exterior"),
+    ("visa", "mastercard"),
+)
 #: Palabras que no distinguen una tarifa: artículos, preposiciones y muletillas.
 _VACIAS = frozenset(
     [
@@ -194,19 +209,19 @@ class Comparacion:
 
 
 def buscar_filas(filas: Sequence[Fila], consulta: str, categoria: str | None = None) -> list[Fila]:
-    """Filtra por concepto y, opcionalmente, por categoría.
+    """Filtra por concepto, categoría, valor y moneda.
 
     La consulta se parte en palabras significativas: se descartan artículos,
     preposiciones y muletillas («cuánto», «cuesta», «la», «de»). Una fila
     coincide cuando contiene alguna de esas palabras; se conservan las que
     alcanzan el mayor número de coincidencias, para no exigirlas todas ni
     arrastrar filas que comparten una sola palabra. Si hay empate se devuelven
-    todas las empatadas, de modo que el grafo pueda detectar una consulta
-    ambigua (4 o más filas).
+    todas las empatadas; ``filas_para_plantilla`` aplica el desempate por
+    especificidad cuando la respuesta va al usuario.
 
     Args:
         filas: filas del Tablero.
-        consulta: pregunta o términos a buscar en concepto y categoría.
+        consulta: pregunta o términos a buscar.
         categoria: texto que debe aparecer en la categoría, si se indica.
 
     Returns:
@@ -219,12 +234,16 @@ def buscar_filas(filas: Sequence[Fila], consulta: str, categoria: str | None = N
         return [] if consulta.strip() else elegibles
 
     puntuadas: list[tuple[int, Fila]] = []
-    raices = list(dict.fromkeys(_raiz(termino) for termino in terminos))
+    raices = list(dict.fromkeys(_raiz(_SINONIMOS.get(termino, termino)) for termino in terminos))
     for fila in elegibles:
         palabras = {
             _raiz(palabra)
-            for palabra in _PALABRA.findall(normalizar(f"{fila.concepto} {fila.categoria}"))
+            for palabra in _PALABRA.findall(
+                normalizar(f"{fila.concepto} {fila.categoria} {fila.valor} {fila.moneda}")
+            )
         }
+        if _contradice(raices, palabras):
+            continue
         puntaje = sum(1 for raiz in raices if raiz in palabras)
         if puntaje:
             puntuadas.append((puntaje, fila))
@@ -233,6 +252,52 @@ def buscar_filas(filas: Sequence[Fila], consulta: str, categoria: str | None = N
         return []
     maximo = max(puntaje for puntaje, _ in puntuadas)
     return [fila for puntaje, fila in puntuadas if puntaje == maximo]
+
+
+def filas_para_plantilla(
+    filas: Sequence[Fila], consulta: str, categoria: str | None = None
+) -> list[Fila]:
+    """Elige las filas que mejor responden una pregunta del Tablero.
+
+    Parte de ``buscar_filas`` y desempata por especificidad: primero conserva
+    las filas con la frase más larga de la consulta en el mismo orden (así
+    «países Schengen» no empata con «países NO Schengen») y después prefiere el
+    concepto más corto (así «Cheque de Gerencia» gana sobre «Anulación ... de
+    Cheques de Gerencia»). No llama al modelo ni a la red.
+
+    Args:
+        filas: filas del Tablero.
+        consulta: pregunta o términos del cliente.
+        categoria: texto que debe aparecer en la categoría, si se indica.
+
+    Returns:
+        Las filas más específicas entre las que empatan en coincidencias.
+    """
+    candidatas = buscar_filas(filas, consulta, categoria)
+    if len(candidatas) <= 1:
+        return candidatas
+
+    raices_consulta = [_raiz(_SINONIMOS.get(termino, termino)) for termino in _terminos(consulta)]
+    rachas = [
+        _racha(
+            [_raiz(palabra) for palabra in _PALABRA.findall(normalizar(fila.concepto))],
+            raices_consulta,
+        )
+        for fila in candidatas
+    ]
+    maxima = max(rachas)
+    candidatas = [fila for fila, racha in zip(candidatas, rachas, strict=True) if racha == maxima]
+
+    longitudes = [len(normalizar(fila.concepto).split()) for fila in candidatas]
+    minima = min(longitudes)
+    return [
+        fila for fila, longitud in zip(candidatas, longitudes, strict=True) if longitud == minima
+    ]
+
+
+def concepto_sin_franquicia(concepto: str) -> str:
+    """Quita el sufijo «(Visa)» o «(Mastercard)» y normaliza los espacios."""
+    return " ".join(_FRANQUICIA.sub("", normalizar(concepto)).split())
 
 
 def _terminos(consulta: str) -> list[str]:
@@ -254,6 +319,46 @@ def _raiz(palabra: str) -> str:
         if palabra.endswith(sufijo) and len(palabra) - len(sufijo) >= 4:
             return palabra[: -len(sufijo)]
     return palabra
+
+
+def _contradice(raices_consulta: Sequence[str], raices_fila: set[str]) -> bool:
+    """Indica si la fila solo menciona el opuesto de lo que pide la consulta.
+
+    Evita responder «cuota de manejo de la tarjeta de crédito» con la fila de
+    la tarjeta débito, o «viajes nacionales» con una asistencia al exterior.
+    """
+    for uno, otro in _CONTRARIOS:
+        raiz_uno, raiz_otro = _raiz(uno), _raiz(otro)
+        if raiz_uno in raices_consulta and raiz_otro in raices_fila and raiz_uno not in raices_fila:
+            return True
+        if (
+            raiz_otro in raices_consulta
+            and raiz_uno in raices_fila
+            and raiz_otro not in raices_fila
+        ):
+            return True
+    return False
+
+
+def _racha(raices_fila: Sequence[str], raices_consulta: Sequence[str]) -> int:
+    """Longitud de la mayor subsecuencia contigua de la consulta en la fila."""
+    mejor = 0
+    for inicio in range(len(raices_consulta)):
+        for fin in range(inicio + 1, len(raices_consulta) + 1):
+            trozo = list(raices_consulta[inicio:fin])
+            if _contiene_contiguo(raices_fila, trozo):
+                mejor = max(mejor, len(trozo))
+    return mejor
+
+
+def _contiene_contiguo(raices_fila: Sequence[str], trozo: Sequence[str]) -> bool:
+    """Indica si `trozo` aparece como bloque contiguo dentro de la fila."""
+    if not trozo:
+        return False
+    for inicio in range(len(raices_fila) - len(trozo) + 1):
+        if list(raices_fila[inicio : inicio + len(trozo)]) == list(trozo):
+            return True
+    return False
 
 
 def comparar_filas(izquierda: Sequence[Fila], derecha: Sequence[Fila]) -> Comparacion:

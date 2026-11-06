@@ -120,6 +120,29 @@ def test_cuota_de_manejo_cae_en_tarifas() -> None:
     assert turno.motivo == "tarifas"
 
 
+@pytest.mark.parametrize(
+    "pregunta",
+    [
+        "¿Cuál es el tope para traslados médicos de emergencia en viajes nacionales?",
+        "¿Cuánto cubre la tarjeta de crédito por gastos médicos en países Schengen?",
+        "¿Desde cuánto cuestan los apartamentos del proyecto en Calasanz, Medellín?",
+        "¿Cuánto vale una chequera de 30 cheques?",
+        "¿Cuánto cuesta un cheque de gerencia?",
+    ],
+)
+def test_palabras_nuevas_del_set_caen_en_tarifas(pregunta: str) -> None:
+    """Las cinco preguntas T que faltaban ya proponen la ruta T."""
+    assert clasificar(pregunta).letra == "T"
+
+
+def test_config_incluye_las_palabras_nuevas() -> None:
+    """El TOML de la sucursal no se queda atrás respecto a los valores por defecto."""
+    ajustes = cargar_configuracion_digiturno()
+
+    for palabra in ("traslado", "schengen", "apartamento", "chequera", "cheque"):
+        assert palabra in ajustes.palabras_tarifas
+
+
 def test_abrir_cuenta_de_nomina_sigue_en_boveda() -> None:
     """«mi cuenta de nómina» no es un saldo propio: no debe caer en X."""
     turno = clasificar("¿cómo abro mi cuenta de nómina?")

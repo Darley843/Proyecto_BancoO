@@ -40,6 +40,11 @@ PALABRAS_TARIFAS: tuple[str, ...] = (
     "seguro",
     "prima",
     "comision",
+    "traslado",
+    "schengen",
+    "apartamento",
+    "chequera",
+    "cheque",
 )
 #: Patrones de fuera de alcance (ruta X), sin tildes ni mayúsculas.
 #: Se escriben por intención y no por palabra suelta: «inversión» o «acciones»

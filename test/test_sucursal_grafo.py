@@ -20,10 +20,11 @@ from banco_occidente_corpus.sucursal.grafo import (
     recortar_historial,
     responder_turno,
 )
-from banco_occidente_corpus.tablero.tipos import Fila
+from banco_occidente_corpus.tablero.tipos import Fila, leer_filas
 
 URL = "https://www.bancodeoccidente.com.co/tarifas"
 URL_CANAL = "https://www.bancodeoccidente.com.co/ayuda/linea-servicio-cliente"
+ARCHIVO_TABLERO = Path(__file__).resolve().parents[1] / "data/estructurados/tablero.csv"
 
 
 class RecuperadorFalso:
@@ -74,19 +75,27 @@ def fragmento(texto: str = "La cuota de manejo es de $16.700.") -> Fragmento:
     )
 
 
-def fila(concepto: str, valor: str = "16.700") -> Fila:
+def fila(
+    concepto: str,
+    valor: str = "16.700",
+    *,
+    moneda: str = "COP",
+    periodicidad: str = "mensual",
+    fuente: str = URL,
+    categoria: str = "tarifas",
+) -> Fila:
     """Fila del Tablero para las pruebas."""
     return Fila(
         concepto=concepto,
-        categoria="tarifas",
+        categoria=categoria,
         valor=valor,
-        moneda="COP",
+        moneda=moneda,
         recargos="",
-        periodicidad="mensual",
+        periodicidad=periodicidad,
         vigente_desde="2025-11-20",
         origen="tarifario",
         pagina="data/gold/documents/tarifas.md",
-        fuente=URL,
+        fuente=fuente,
     )
 
 
@@ -177,6 +186,89 @@ def test_tablero_con_muchas_filas_pasa_a_boveda(tmp_path: Path) -> None:
     assert estado["turno"]["motivo"] == "tablero_ambigua"
 
 
+def test_tablero_con_cuatro_filas_del_mismo_concepto_no_usa_modelo(tmp_path: Path) -> None:
+    """Varias filas del mismo producto se responden con una tabla, sin modelo."""
+    modelo = ModeloEspia([])
+    filas = [
+        fila("Gastos médicos (Mastercard)", "2.000"),
+        fila("Gastos médicos (Mastercard)", "2.500"),
+        fila("Gastos médicos (Visa)", "2.000"),
+        fila("Gastos médicos (Visa)", "2.500"),
+    ]
+    grafo, dependencias = deps(tmp_path, modelo=modelo, filas=filas)
+
+    estado = responder_turno(grafo, dependencias, "cobertura de gastos médicos", "t1")
+
+    assert estado["turno"]["letra"] == "T"
+    assert "2.000" in estado["respuesta"]
+    assert estado["uso"] == {"uso_modelo": False, "costo_usd": 0.0}
+    assert modelo.llamadas == []
+
+
+def test_tablero_limita_las_filas_del_mismo_concepto(tmp_path: Path) -> None:
+    """Más de diez filas del mismo producto ya no se vuelcan en una tabla."""
+    modelo = ModeloEspia([respuesta_valida()])
+    filas = [fila("Gastos médicos (Visa)", str(1_000 + indice)) for indice in range(11)]
+    grafo, dependencias = deps(tmp_path, modelo=modelo, filas=filas, fragmentos=[fragmento()])
+
+    estado = responder_turno(grafo, dependencias, "cobertura de gastos médicos", "t1")
+
+    assert estado["turno"]["letra"] == "B"
+    assert estado["turno"]["motivo"] == "tablero_ambigua"
+
+
+def test_cuota_generica_de_tarjetas_pasa_a_boveda(tmp_path: Path) -> None:
+    """La cuota de «las tarjetas de crédito» no se responde con una sola tarjeta."""
+    modelo = ModeloEspia([respuesta_valida()])
+    filas = [
+        fila("Tarjeta Crédito Joven", "19.700"),
+        fila("Cuota de Manejo Tarjeta Débito", "16.700"),
+    ]
+    grafo, dependencias = deps(tmp_path, modelo=modelo, filas=filas, fragmentos=[fragmento()])
+
+    estado = responder_turno(
+        grafo,
+        dependencias,
+        "¿Cuál es la cuota de manejo de las tarjetas de crédito?",
+        "t1",
+    )
+
+    assert estado["turno"]["letra"] == "B"
+    assert estado["turno"]["motivo"] == "tablero_generico"
+
+
+def test_pregunta_21_responde_por_tablero(tmp_path: Path) -> None:
+    """Los nueve topes de gastos médicos se listan en una sola tabla."""
+    grafo, dependencias = deps(tmp_path, modelo=ModeloEspia([]), filas=leer_filas(ARCHIVO_TABLERO))
+
+    estado = responder_turno(
+        grafo,
+        dependencias,
+        "¿Cuánto cubre la asistencia en viajes nacionales por gastos médicos "
+        "por accidente o enfermedad?",
+        "t1",
+    )
+
+    assert estado["turno"]["letra"] == "T"
+    assert "2.000" in estado["respuesta"]
+
+
+def test_pregunta_23_responde_por_tablero(tmp_path: Path) -> None:
+    """Schengen se responde con sus topes en EUR, no con la tabla nacional."""
+    grafo, dependencias = deps(tmp_path, modelo=ModeloEspia([]), filas=leer_filas(ARCHIVO_TABLERO))
+
+    estado = responder_turno(
+        grafo,
+        dependencias,
+        "¿Cuánto cubre la tarjeta de crédito por gastos médicos en países Schengen?",
+        "t1",
+    )
+
+    assert estado["turno"]["letra"] == "T"
+    assert "20.000" in estado["respuesta"]
+    assert "EUR" in estado["respuesta"]
+
+
 def test_rechazo_por_regla_no_llama_al_modelo(tmp_path: Path) -> None:
     """El saldo propio se rechaza con la frase fija, sin modelo."""
     modelo = ModeloEspia([])
@@ -222,6 +314,32 @@ def test_seguimiento_reformula_con_el_historial(tmp_path: Path) -> None:
     # La reformulación lleva el historial recortado y la pregunta original.
     contenidos = [str(mensaje.content) for mensaje in modelo.llamadas[1]]
     assert any("¿Qué es la cuenta de ahorros?" in contenido for contenido in contenidos)
+
+
+def test_seguimiento_32_reformula_y_confirma_tablero(tmp_path: Path) -> None:
+    """«¿Cuánto … usarla …?» se reconoce como seguimiento y confirma T."""
+    modelo = ModeloEspia(
+        ["¿Cuánto debo esperar para usar la Cuota Protegida si quedo desempleado?"]
+    )
+    filas = [
+        fila("Desempleo", "30", categoria="cuota protegida"),
+        fila("Enfermedades Graves", "90", categoria="cuota protegida"),
+    ]
+    grafo, dependencias = deps(tmp_path, modelo=modelo, filas=filas, fragmentos=[fragmento()])
+
+    responder_turno(grafo, dependencias, "¿Qué es Cuota Protegida?", "t1")
+    estado = responder_turno(
+        grafo,
+        dependencias,
+        "¿Cuánto debo esperar para usarla si quedo desempleado?",
+        "t1",
+    )
+
+    assert estado["turno"]["letra"] == "T"
+    assert estado["reformulada"] == (
+        "¿Cuánto debo esperar para usar la Cuota Protegida si quedo desempleado?"
+    )
+    assert "30" in estado["respuesta"]
 
 
 def test_primer_turno_no_reformula(tmp_path: Path) -> None:
@@ -290,6 +408,10 @@ def test_recortar_historial_respeta_el_presupuesto() -> None:
         ("y la tasa?", True),
         ("¿cuánto vale?", True),
         ("¿qué necesito para abrir una cuenta de nómina?", False),
+        ("¿Cuánto debo esperar para usarla si quedo desempleado?", True),
+        ("¿Qué es un CDT?", False),
+        ("¿Cuál es la tasa del CDT?", False),
+        ("¿Cómo abro una cuenta?", False),
     ],
 )
 def test_es_seguimiento(pregunta: str, esperado: bool) -> None:

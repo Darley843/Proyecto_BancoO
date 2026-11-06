@@ -2,7 +2,21 @@
 
 from __future__ import annotations
 
-from .consultas import Comparacion, buscar_filas, comparar_filas
+from .consultas import (
+    Comparacion,
+    buscar_filas,
+    comparar_filas,
+    concepto_sin_franquicia,
+    filas_para_plantilla,
+)
 from .tipos import COLUMNAS, Fila
 
-__all__ = ["COLUMNAS", "Comparacion", "Fila", "buscar_filas", "comparar_filas"]
+__all__ = [
+    "COLUMNAS",
+    "Comparacion",
+    "Fila",
+    "buscar_filas",
+    "comparar_filas",
+    "concepto_sin_franquicia",
+    "filas_para_plantilla",
+]

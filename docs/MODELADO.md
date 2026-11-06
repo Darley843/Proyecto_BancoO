@@ -122,8 +122,9 @@ primera coincidencia:
 
 `numero` es un consecutivo por proceso (empieza en 1) y **no se persiste**; la
 pregunta tampoco se guarda. `T` es provisional: el grafo confirmará la ruta solo
-si el Tablero devuelve de una a tres filas; con cero o más de tres, la pregunta
-pasa a `B`.
+si el Tablero puede responder con plantilla: de una a tres filas, o más filas del
+mismo concepto (hasta diez). Con cero, más de diez o varios conceptos, la
+pregunta pasa a `B`.
 
 ### Tablero de tasas (datos estructurados)
 
@@ -153,19 +154,23 @@ Reglas:
 4. `pagina` es la ruta relativa del Gold y `fuente` la URL pública exacta.
 5. El CSV se ordena de forma determinista y dos ejecuciones producen el mismo
    archivo; `data/boveda/` sigue fuera de Git, pero este CSV sí se versiona.
-6. `make tablero` cruza las 8 preguntas de tipo `tabla` del set de fase 2 y
+6. `make tablero` cruza las 12 preguntas de tipo `tabla` del set de fase 2 y
    termina con error si alguna no encuentra fila o valor, con el detalle de cuál.
 
-`buscar_filas` y `comparar_filas` son funciones puras: filtran por concepto y
-categoría sin tildes ni mayúsculas, y comparan dos grupos (por ejemplo Visa y
-Mastercard) devolviendo las filas que solo existen en un lado y las que difieren
-en valor. `buscar_filas` parte la consulta en palabras significativas (descarta
-artículos y muletillas como «cuánto», «cuesta» o «de»), compara raíces para
-aceptar plurales y flexiones, y devuelve las filas con más coincidencias en vez
-de exigir todos los términos; si la consulta no trae palabras significativas no
-devuelve filas.
+`buscar_filas` y `comparar_filas` son funciones puras: filtran sin tildes ni
+mayúsculas y comparan dos grupos (por ejemplo Visa y Mastercard) devolviendo las
+filas que solo existen en un lado y las que difieren en valor. `buscar_filas`
+parte la consulta en palabras significativas (descarta artículos y muletillas
+como «cuánto», «cuesta» o «de»), compara raíces para aceptar plurales y
+flexiones, entiende «Europa» como Schengen y descarta filas que solo mencionan
+el opuesto (crédito/débito, nacional/exterior, Visa/Mastercard). Devuelve las
+filas con más coincidencias; `filas_para_plantilla` desempata por la frase más
+larga y el concepto más corto, para que «Cheque de Gerencia» gane sobre
+«Anulación … de Cheques de Gerencia».
 
-Estado actual: 622 filas únicas en el CSV y 8 de 8 preguntas de tabla cubiertas.
+Estado actual: el CSV se regenera con `make tablero`; las 12 preguntas de tabla
+se cruzan en cada corrida y la 43 (chequera) queda pendiente del arreglo del
+tarifario del PR #75.
 
 ### Grafo con memoria
 
@@ -174,15 +179,15 @@ Estado actual: 622 filas únicas en el CSV y 8 de 8 preguntas de tabla cubiertas
 
 ```text
 reformular → digiturno ─┬─ X → rechazo
-                        ├─ T → tablero ─┬─ 1–3 filas → plantilla → redactar
-                        │               └─ 0 o 4+ → boveda
+                        ├─ T → tablero ─┬─ 1–3 o mismo concepto (≤10) → plantilla → redactar
+                        │               └─ 0, 10+ o conceptos distintos → boveda
                         └─ B → boveda ──┬─ hay fragmentos → redactar
                                         └─ sin fragmentos → rechazo
 ```
 
 - `reformular` solo actúa si hay historial y la pregunta es un seguimiento
-  («¿Y…», «y…», «cuánto», «cuál», «cómo» o menos de seis palabras); el historial
-  se recorta con `trim_messages` y `count_tokens_approximately`.
+  («¿Y…», «y…», o una palabra de pregunta con una anáfora como «su» o «usarla»);
+  el historial se recorta con `trim_messages` y `count_tokens_approximately`.
 - `redactar` usa la plantilla si el Tablero ya respondió (costo cero) o
   `ContextoRag` con `qa_v2`; si el modelo falla, cae en la frase fija sin romper
   el hilo.
@@ -199,7 +204,7 @@ reformular → digiturno ─┬─ X → rechazo
 | Endpoint | Contenido |
 |---|---|
 | `GET /api/estado` | modo demo, gasto del día, tope, índice y modelo de embeddings |
-| `GET /api/tablero?q=` | filas del CSV filtradas por concepto o categoría |
+| `GET /api/tablero?q=` | filas del CSV filtradas por concepto, categoría, valor o moneda |
 | `GET /api/boveda/mapa?pregunta=` | puntos PCA, pregunta proyectada y top de fragmentos; `disponible: false` si falta `mapa.json` |
 | `GET /api/pipeline` | etapas de `panel.pipeline_summary` + estado de indexación |
 | `GET /api/arqueo` | contenido de `data/evaluacion/arqueo.json` o `disponible: false` |

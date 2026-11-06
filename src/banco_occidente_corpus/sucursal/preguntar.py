@@ -34,7 +34,6 @@ from ..boveda.recuperador import crear_recuperador
 from ..boveda.tipos import Recuperador
 from ..config import Config
 from ..contexto import RutasContexto
-from ..tablero.consultas import buscar_filas
 from ..tablero.tipos import leer_filas, ruta_tablero
 from .ajustes import ConfiguracionSucursal, tope_efectivo
 from .costo import CacheRespuestas, GastoDiario, costo_de_uso, tarifas_para
@@ -50,6 +49,7 @@ from .grafo import (
     es_seguimiento,
     registrar_turno,
     responder_turno,
+    tablero_responde_sin_modelo,
 )
 
 #: Logger del servicio; nunca recibe la pregunta, la respuesta ni el `thread_id`.
@@ -151,10 +151,11 @@ def requiere_modelo(
 
     Es una réplica deliberada de las reglas del grafo: solo hay reformulación con
     historial y pregunta de seguimiento (`es_seguimiento`), el digiturno se
-    evalúa sin clasificador y el Tablero responde sin modelo cuando devuelve de
-    una a tres filas. Si esas reglas cambian en `grafo.py` o en `digiturno.py`,
-    esta función debe actualizarse con ellas; si no, el tope podría bloquear
-    preguntas que el grafo responde gratis o dejar pasar preguntas que sí gastan.
+    evalúa sin clasificador y el Tablero responde sin modelo cuando la plantilla
+    puede cubrir las filas (1–3 o del mismo concepto, hasta 10). Si esas reglas
+    cambian en `grafo.py` o en `digiturno.py`, esta función debe actualizarse con
+    ellas; si no, el tope podría bloquear preguntas que el grafo responde gratis
+    o dejar pasar preguntas que sí gastan.
 
     Args:
         pregunta: pregunta saneada del cliente.
@@ -177,8 +178,7 @@ def requiere_modelo(
     if turno.letra == "X":
         return False
     if turno.letra == "T":
-        filas = buscar_filas(dependencias.filas, pregunta)
-        return not 1 <= len(filas) <= 3
+        return not tablero_responde_sin_modelo(dependencias.filas, pregunta)
     return True
 
 
