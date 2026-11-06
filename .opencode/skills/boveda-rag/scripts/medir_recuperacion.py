@@ -3,10 +3,16 @@
 Uso:
     uv run python .opencode/skills/boveda-rag/scripts/medir_recuperacion.py
     uv run python .opencode/skills/boveda-rag/scripts/medir_recuperacion.py --hibrido
+    uv run python .opencode/skills/boveda-rag/scripts/medir_recuperacion.py --con-marca
+    uv run python .opencode/skills/boveda-rag/scripts/medir_recuperacion.py --con-marca --sin-marca
 
 Por defecto mide solo el componente vectorial; con `--hibrido` usa el
-`crear_recuperador` de la Bóveda y los pesos de `config/sucursal.toml`. Evalúa
-solo las preguntas con `fuentes_esperadas` y escribe el detalle por pregunta en
+`crear_recuperador` de la Bóveda y los pesos de `config/sucursal.toml`. Con
+`--con-marca` inyecta la marca en la consulta para probar robustez y con
+`--sin-marca` retira sus menciones antes de buscar, porque el nombre aparece en
+casi todos los fragmentos y desvía el vector. Los filtros se aplican en ese
+orden, de modo que se pueden combinar. Evalúa solo las preguntas con
+`fuentes_esperadas` y escribe el detalle por pregunta en
 `data/boveda/mediciones/`, que no se versiona. No usa red salvo la llamada local
 a Ollama para calcular embeddings.
 """
@@ -16,6 +22,7 @@ from __future__ import annotations
 import argparse
 import json
 import math
+import re
 import sys
 import tomllib
 from collections.abc import Callable, Sequence
@@ -49,6 +56,16 @@ CARPETA_MEDICIONES: Path = PROJECT_ROOT / "data" / "boveda" / "mediciones"
 K_POR_DEFECTO: int = 5
 #: Nivel de confianza del intervalo de Wilson.
 Z_95: float = 1.96
+
+#: Patrones de las menciones de la marca que usan `--con-marca` y `--sin-marca`.
+PATRONES_MARCA: tuple[str, ...] = (
+    r"banco\s+de\s+occidente",
+    r"banco\s+occidente",
+)
+#: Conectores que quedan colgando al retirar la marca y se van con ella.
+CONECTORES: str = r"(?:el|la|los|las|un|una|de|del|al)"
+#: Texto que se añade cuando la consulta no menciona el banco.
+MENCION_MARCA: str = " del Banco de Occidente"
 
 #: Función que devuelve hasta `k` URL para una consulta.
 Recuperar = Callable[[str, int], Sequence[str]]
@@ -128,6 +145,55 @@ def consulta_de(pregunta: Pregunta) -> str:
     return pregunta.pregunta
 
 
+def poner_marca(consulta: str) -> str:
+    """Inyecta la marca del banco en la consulta para probar robustez.
+
+    Reemplaza «el banco», «del banco» y «al banco» por la marca conservando el
+    artículo y su caja. Si la consulta menciona el banco de otra forma, la deja
+    intacta; si no lo menciona, añade « del Banco de Occidente» antes del signo
+    de cierre.
+    """
+    if _menciona_marca(consulta):
+        return consulta
+    texto, reemplazos = re.subn(
+        r"\b(el|del|al)\s+banco\b",
+        _marca_con_articulo,
+        consulta,
+        flags=re.IGNORECASE,
+    )
+    if reemplazos:
+        return texto
+    if _menciona_banco(consulta):
+        return consulta
+    return _antes_del_cierre(consulta, MENCION_MARCA)
+
+
+def limpiar_marca(consulta: str) -> str:
+    """Retira de la consulta las menciones de la marca del banco.
+
+    Quita «Banco de Occidente» y «Banco Occidente» sin distinguir mayúsculas,
+    arrastra el conector que queda colgando, normaliza los espacios y pega los
+    signos a la palabra vecina. Si la consulta no menciona la marca o si al
+    limpiarla se queda sin contenido, devuelve la consulta original.
+    """
+    texto = consulta
+    encontrada = False
+    for patron in PATRONES_MARCA:
+        texto, reemplazos = re.subn(rf"\b{patron}\b", " ", texto, flags=re.IGNORECASE)
+        encontrada = encontrada or reemplazos > 0
+    if not encontrada:
+        return consulta
+
+    texto = re.sub(r"\s+", " ", texto).strip()
+    texto = re.sub(r"([¿¡])\s+", r"\1", texto)
+    texto = re.sub(r"\s+([,.;:!?])", r"\1", texto)
+    texto = re.sub(rf"\s*\b{CONECTORES}\s*([,.;:!?])", r"\1", texto, flags=re.IGNORECASE)
+    texto = re.sub(rf"\s*\b{CONECTORES}\s*$", "", texto, flags=re.IGNORECASE).strip()
+    if not re.search(r"\w", texto):
+        return consulta
+    return texto
+
+
 def urls_distintas(urls: Sequence[str], limite: int = K_POR_DEFECTO) -> tuple[str, ...]:
     """Conserva hasta `limite` URL no repetidas, en el orden de recuperación."""
     vistas: set[str] = set()
@@ -165,11 +231,21 @@ def evaluar(
     preguntas: Sequence[Pregunta],
     recuperar: Recuperar,
     k: int = K_POR_DEFECTO,
+    con_marca: bool = False,
+    sin_marca: bool = False,
 ) -> list[Resultado]:
-    """Recupera y puntúa cada pregunta con `hit_at_k` y `mrr` del Arqueo."""
+    """Recupera y puntúa cada pregunta con `hit_at_k` y `mrr` del Arqueo.
+
+    Con `con_marca`, inyecta la marca antes de buscar; con `sin_marca`, la
+    limpia. Si se activan ambos, primero se inyecta y después se retira.
+    """
     resultados: list[Resultado] = []
     for pregunta in preguntas:
         consulta = consulta_de(pregunta)
+        if con_marca:
+            consulta = poner_marca(consulta)
+        if sin_marca:
+            consulta = limpiar_marca(consulta)
         recuperadas = tuple(recuperar(consulta, k))
         distintas = urls_distintas(recuperadas, k)
         esperadas = [pregunta.fuentes_esperadas]
@@ -259,6 +335,8 @@ def guardar_salida(
     alcance: Alcance,
     resumen: dict[str, Any],
     resultados: Sequence[Resultado],
+    con_marca: bool = False,
+    sin_marca: bool = False,
 ) -> None:
     """Escribe el resumen y el detalle por pregunta en un JSON determinista."""
     detalle = [
@@ -279,6 +357,8 @@ def guardar_salida(
     contenido = {
         "modo": modo,
         "alcance": alcance,
+        "con_marca": con_marca,
+        "sin_marca": sin_marca,
         "resumen": resumen,
         "preguntas": detalle,
     }
@@ -344,10 +424,41 @@ def _texto(valor: float | None) -> str:
     return "—" if valor is None else f"{valor:.3f}"
 
 
-def _ruta_salida(ruta: Path | None, modo: str) -> Path:
+def _menciona_marca(texto: str) -> bool:
+    """Indica si el texto ya nombra la marca del banco."""
+    return any(re.search(rf"\b{patron}\b", texto, flags=re.IGNORECASE) for patron in PATRONES_MARCA)
+
+
+def _menciona_banco(texto: str) -> bool:
+    """Indica si el texto menciona el banco sin nombrar la marca."""
+    return re.search(r"\bbancos?\b", texto, flags=re.IGNORECASE) is not None
+
+
+def _marca_con_articulo(coincidencia: re.Match[str]) -> str:
+    """Devuelve la marca conservando el artículo y su caja original."""
+    return f"{coincidencia.group(1)} Banco de Occidente"
+
+
+def _antes_del_cierre(texto: str, añadido: str) -> str:
+    """Inserta un texto antes del signo de cierre final, si lo hay."""
+    limpio = texto.rstrip()
+    if not limpio:
+        return añadido.strip()
+    if limpio[-1] in "?!.":
+        return f"{limpio[:-1].rstrip()}{añadido}{limpio[-1]}"
+    return f"{limpio}{añadido}"
+
+
+def _ruta_salida(
+    ruta: Path | None,
+    modo: str,
+    con_marca: bool = False,
+    sin_marca: bool = False,
+) -> Path:
     """Resuelve la ruta de salida y usa `data/boveda/mediciones` por defecto."""
     if ruta is None:
-        return CARPETA_MEDICIONES / f"recuperacion_{modo}.json"
+        sufijos = ("_con_marca" if con_marca else "") + ("_sin_marca" if sin_marca else "")
+        return CARPETA_MEDICIONES / f"recuperacion_{modo}{sufijos}.json"
     return ruta if ruta.is_absolute() else PROJECT_ROOT / ruta
 
 
@@ -365,6 +476,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         description="Mide hit@k y MRR de la Bóveda sobre las preguntas de fase 2.",
     )
     parser.add_argument("--hibrido", action="store_true", help="usa el recuperador híbrido")
+    parser.add_argument(
+        "--con-marca",
+        action="store_true",
+        help="inyecta la marca del banco en la consulta antes de buscar",
+    )
+    parser.add_argument(
+        "--sin-marca",
+        action="store_true",
+        help="retira las menciones de la marca de la consulta antes de buscar",
+    )
     parser.add_argument("--k", type=int, default=K_POR_DEFECTO, help="fragmentos a recuperar")
     parser.add_argument(
         "--alcance",
@@ -377,7 +498,10 @@ def main(argv: Sequence[str] | None = None) -> int:
         "--salida",
         type=Path,
         default=None,
-        help="JSON de resultados; por defecto data/boveda/mediciones/recuperacion_<modo>.json",
+        help=(
+            "JSON de resultados; por defecto "
+            "data/boveda/mediciones/recuperacion_<modo><filtros>.json"
+        ),
     )
     args = parser.parse_args(argv)
 
@@ -388,6 +512,16 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"Error: no existe el set de preguntas {args.preguntas}", file=sys.stderr)
         return 1
 
+    if args.con_marca or args.sin_marca:
+        filtros = [
+            nombre
+            for activo, nombre in (
+                (args.con_marca, "con marca"),
+                (args.sin_marca, "sin marca"),
+            )
+            if activo
+        ]
+        print(f"Filtros: {', '.join(filtros)}", flush=True)
     modo = "hibrido" if args.hibrido else "vectorial"
     if modo == "hibrido":
         ajustes = cargar_configuracion_recuperacion()
@@ -406,15 +540,29 @@ def main(argv: Sequence[str] | None = None) -> int:
             return 1
         config = load_config()
         recuperar = construir_recuperador(config, modo, args.alcance, args.k)
-        resultados = evaluar(preguntas, recuperar, args.k)
+        resultados = evaluar(
+            preguntas,
+            recuperar,
+            args.k,
+            con_marca=args.con_marca,
+            sin_marca=args.sin_marca,
+        )
     except (FileNotFoundError, ValueError, RuntimeError, httpx.HTTPError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
 
     resumen = resumir(resultados, args.k)
     print(formatear(resumen))
-    destino = _ruta_salida(args.salida, modo)
-    guardar_salida(destino, modo, args.alcance, resumen, resultados)
+    destino = _ruta_salida(args.salida, modo, args.con_marca, args.sin_marca)
+    guardar_salida(
+        destino,
+        modo,
+        args.alcance,
+        resumen,
+        resultados,
+        args.con_marca,
+        args.sin_marca,
+    )
     print(f"\nDetalle guardado en {destino}")
     return 0
 

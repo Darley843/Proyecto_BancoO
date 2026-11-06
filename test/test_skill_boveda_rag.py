@@ -133,3 +133,46 @@ def test_consulta_de_une_previa_y_pregunta(medir: ModuleType) -> None:
         == "¿Qué tarjetas de crédito ofrece? ¿Y cuál es su cuota de manejo?"
     )
     assert medir.consulta_de(autonoma) == autonoma.pregunta
+
+
+@pytest.mark.parametrize(
+    ("consulta", "esperado"),
+    [
+        ("¿En qué año se fundó el Banco de Occidente?", "¿En qué año se fundó?"),
+        ("¿Cuándo y dónde se fundó el banco?", "¿Cuándo y dónde se fundó el banco?"),
+        ("¿Qué productos ofrece Banco Occidente?", "¿Qué productos ofrece?"),
+        ("¿Banco de Occidente?", "¿Banco de Occidente?"),
+    ],
+    ids=["marca-completa", "banco-generico", "marca-sin-de", "solo-marca"],
+)
+def test_limpiar_marca_retira_la_marca(
+    medir: ModuleType,
+    consulta: str,
+    esperado: str,
+) -> None:
+    """La limpieza quita la marca, cierra los huecos y conserva la original si vacía."""
+    assert medir.limpiar_marca(consulta) == esperado
+
+
+@pytest.mark.parametrize(
+    ("consulta", "esperado"),
+    [
+        (
+            "¿Cuándo y dónde se fundó el banco?",
+            "¿Cuándo y dónde se fundó el Banco de Occidente?",
+        ),
+        ("El banco abre los sábados.", "El Banco de Occidente abre los sábados."),
+        (
+            "¿Cuál es la línea de atención telefónica?",
+            "¿Cuál es la línea de atención telefónica del Banco de Occidente?",
+        ),
+    ],
+    ids=["reemplaza-el-banco", "conserva-mayuscula", "agrega-antes-del-cierre"],
+)
+def test_poner_marca_menciona_el_banco(
+    medir: ModuleType,
+    consulta: str,
+    esperado: str,
+) -> None:
+    """La inyección reemplaza «el banco» o añade la marca antes del cierre."""
+    assert medir.poner_marca(consulta) == esperado
