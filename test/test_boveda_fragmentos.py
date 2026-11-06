@@ -16,6 +16,9 @@ from banco_occidente_corpus.boveda.fragmentos import (
     TOKENS_MINIMOS,
     LineaRepetida,
     ResumenFragmentos,
+    _familia_encabezado,
+    _hermanos,
+    _mapa_secciones,
     cargar_chunks,
     construir_fragmentos,
     escribir_fragmentos,
@@ -27,6 +30,34 @@ from banco_occidente_corpus.utils import sha256_text, stable_tokens, write_jsonl
 URL = "https://www.bancodeoccidente.com.co/productos"
 OTRA_URL = "https://www.bancodeoccidente.com.co/otra"
 MENU_REPETIDO = "Tu carro nuevo te espera, ¡maneja tu futuro!"
+PAGINA_HISTORIA = "pagina-historia"
+TEXTO_60S = (
+    "1965 - Nacemos el 3 de mayo de este año en la ciudad de Cali bajo la "
+    "administración del Doctor Alfonso Díaz Viana, bajo el slogan el banco que lo "
+    "conoce a usted"
+)
+TEXTO_70S = (
+    "1970 - Abrimos nuestras primeras oficinas fuera de Cali, en Palmira, Pereira y "
+    "Armenia, contando con una red de quince oficinas. 1973 - Iniciamos una nueva "
+    "etapa bajo la orientación del Grupo Económico Sarmiento Angulo, fortaleciendo al "
+    "Banco con recursos de capital y nuevas experiencias. 1976 - Lanzamos nuestro "
+    "propio sistema de tarjeta de crédito Credencial. 1977 - Nace la filial Ventas y "
+    "Servicios que presta servicios de outsourcing en las áreas administrativas, "
+    "operativa, cartera y telemercadeo."
+)
+TEXTO_80S = (
+    "1981 - Nace la filial Leasing de Occidente, creada para dar una respuesta "
+    "oportuna a las necesidades de financiación del país. 1984 - Abrimos la "
+    "Fiduciaria de Occidente y ampliamos la red de oficinas en las principales "
+    "ciudades. 1988 - Impulsamos la modernización tecnológica del Banco y la "
+    "formación de nuestros colaboradores en todo el territorio nacional."
+)
+TEXTO_90S = (
+    "1991 - Nace la filial Fiduciaria de Occidente. 1993 - El Banco propone la "
+    "creación de un concurso para apoyar el talento de los jóvenes. 1996 - "
+    "Consolidamos la presencia nacional con nuevas oficinas y canales de atención. "
+    "1999 - Fortalecemos la banca de personas y empresas con productos especializados."
+)
 
 
 def make_config(tmp_path: Path) -> Config:
@@ -118,6 +149,66 @@ def hecho(
         "confidence": 0.9,
         "review": review,
     }
+
+
+def chunks_historia() -> list[dict[str, Any]]:
+    """Chunks sintéticos con valores, promociones y cronología por décadas."""
+    return [
+        chunk(
+            PAGINA_HISTORIA,
+            "Hacer realidad el desarrollo de las personas y las empresas. " * 3,
+            heading="Banco de Occidente",
+            level=2,
+        ),
+        chunk(
+            PAGINA_HISTORIA,
+            "Generamos confianza con coherencia entre lo que pensamos y hacemos.",
+            heading="Honestidad",
+            level=3,
+        ),
+        chunk(
+            PAGINA_HISTORIA,
+            "Reconocemos y valoramos a las personas en su integridad.",
+            heading="Respeto",
+            level=3,
+        ),
+        chunk(
+            PAGINA_HISTORIA,
+            "Creemos en nuestra capacidad y talento para hacer que las cosas pasen.",
+            heading="Determinación",
+            level=3,
+        ),
+        chunk(
+            PAGINA_HISTORIA,
+            "Trabajamos juntos para hacer que las cosas sucedan.",
+            heading="Cooperación",
+            level=3,
+        ),
+        chunk(
+            PAGINA_HISTORIA,
+            "Obtén tu crédito y haz realidad tus planes con plazos flexibles.",
+            heading="Dinero para lo que quieras, sin explicaciones",
+            level=3,
+        ),
+        chunk(
+            PAGINA_HISTORIA,
+            "Compra lo que necesitas y accede a promociones exclusivas de tu tarjeta.",
+            heading="Tu tarjeta, tu mundo de posibilidades",
+            level=3,
+        ),
+        chunk(PAGINA_HISTORIA, TEXTO_60S, heading="Década de los 60s", level=3),
+        chunk(PAGINA_HISTORIA, TEXTO_70S, heading="Década de los 70s", level=3),
+        chunk(PAGINA_HISTORIA, TEXTO_80S, heading="Década de los 80s", level=3),
+        chunk(PAGINA_HISTORIA, TEXTO_90S, heading="Década de los 90s", level=3),
+    ]
+
+
+def config_historia(tmp_path: Path) -> Config:
+    """Prepara una configuración aislada con la página de historia sintética."""
+    config = make_config(tmp_path)
+    write_indices(config, paginas=[{"id": PAGINA_HISTORIA, "titulo": "Página historia"}])
+    write_chunks(config, chunks_historia())
+    return config
 
 
 def test_contrato_fragmento_y_recuperador() -> None:
@@ -814,3 +905,209 @@ def test_fragmentos_con_id_repetido_se_descartan(tmp_path: Path) -> None:
     assert len(resultado.fragmentos) == 1
     assert resultado.resumen.total == 1
     assert resultado.resumen.duplicados == 1
+
+
+def test_cronologia_no_arrastra_valores_ni_promociones(tmp_path: Path) -> None:
+    """La fundación queda en un fragmento de cronología, no con valores ni promociones."""
+    config = config_historia(tmp_path)
+
+    resultado = construir_fragmentos(config, "base")
+
+    vias = [f for f in resultado.fragmentos if "1965 - Nacemos" in f.texto]
+    assert len(vias) == 1
+    fragmento = vias[0]
+    assert fragmento.encabezado == "Década de los 60s"
+    assert fragmento.texto.startswith("Década de los 60s")
+    assert "1970" in fragmento.texto
+    assert fragmento.texto.index("1965 - Nacemos") < fragmento.texto.index("1970")
+    assert "Reconocemos y valoramos" not in fragmento.texto
+    assert "Cooperación" not in fragmento.texto
+    assert "Obtén tu crédito" not in fragmento.texto
+    assert TOKENS_MINIMOS <= fragmento.tokens <= TOKENS_MAXIMOS
+
+
+def test_cronologia_se_une_a_su_hermana_siguiente(tmp_path: Path) -> None:
+    """Una década corta se une con la siguiente aunque esa hermana ya supere 80 tokens."""
+    config = make_config(tmp_path)
+    write_indices(config, paginas=[{"id": PAGINA_HISTORIA, "titulo": "Página historia"}])
+    write_chunks(
+        config,
+        [
+            chunk(PAGINA_HISTORIA, TEXTO_60S, heading="Década de los 60s", level=3),
+            chunk(PAGINA_HISTORIA, TEXTO_70S, heading="Década de los 70s", level=3),
+            chunk(PAGINA_HISTORIA, TEXTO_80S, heading="Década de los 80s", level=3),
+        ],
+    )
+
+    resultado = construir_fragmentos(config, "base")
+
+    decadas = [f for f in resultado.fragmentos if "1965 - Nacemos" in f.texto]
+    assert len(decadas) == 1
+    assert decadas[0].encabezado == "Década de los 60s"
+    assert "1970" in decadas[0].texto
+    assert "1981" not in decadas[0].texto
+    assert decadas[0].tokens >= TOKENS_MINIMOS
+    assert len(resultado.fragmentos) == 2
+
+
+def test_fusion_de_hermanos_respeta_400(tmp_path: Path) -> None:
+    """Dos hermanas no se unen si el total supera 400 tokens y la corta se conserva."""
+    config = make_config(tmp_path)
+    write_indices(config, paginas=[{"id": PAGINA_HISTORIA, "titulo": "Página historia"}])
+    write_chunks(
+        config,
+        [
+            chunk(PAGINA_HISTORIA, TEXTO_60S, heading="Década de los 60s", level=3),
+            chunk(
+                PAGINA_HISTORIA,
+                "1970 - " + "Contenido de la década " * 68,
+                heading="Década de los 70s",
+                level=3,
+            ),
+            chunk(
+                PAGINA_HISTORIA,
+                "1981 - " + "Contenido de otra década " * 55,
+                heading="Década de los 80s",
+                level=3,
+            ),
+        ],
+    )
+
+    resultado = construir_fragmentos(config, "base")
+
+    assert len(resultado.fragmentos) == 3
+    assert all(fragmento.tokens <= TOKENS_MAXIMOS for fragmento in resultado.fragmentos)
+    assert resultado.fragmentos[0].tokens < TOKENS_MINIMOS
+    assert "1965 - Nacemos" in resultado.fragmentos[0].texto
+
+
+def test_seccion_sin_hermanos_conserva_la_fusion_actual(tmp_path: Path) -> None:
+    """Tres encabezados sin familia común siguen fusionándose como antes."""
+    config = make_config(tmp_path)
+    write_indices(config, paginas=[{"id": "pagina-valores", "titulo": "Página valores"}])
+    write_chunks(
+        config,
+        [
+            chunk(
+                "pagina-valores",
+                "Generamos confianza con coherencia entre lo que pensamos y hacemos.",
+                heading="Honestidad",
+                level=2,
+            ),
+            chunk(
+                "pagina-valores",
+                "Reconocemos y valoramos a las personas en su integridad.",
+                heading="Respeto",
+                level=2,
+            ),
+            chunk(
+                "pagina-valores",
+                "Trabajamos juntos para hacer que las cosas sucedan.",
+                heading="Cooperación",
+                level=2,
+            ),
+        ],
+    )
+
+    resultado = construir_fragmentos(config, "base")
+
+    assert len(resultado.fragmentos) == 1
+    fragmento = resultado.fragmentos[0]
+    assert fragmento.encabezado == "Honestidad"
+    assert "Reconocemos y valoramos" in fragmento.texto
+    assert "Trabajamos juntos" in fragmento.texto
+
+
+def test_hermanos_exigen_el_mismo_padre() -> None:
+    """Dos encabezados de la misma familia bajo padres distintos no son hermanos."""
+    filas = [
+        chunk(PAGINA_HISTORIA, "Historia del banco.", heading="Historia", level=2),
+        chunk(PAGINA_HISTORIA, TEXTO_60S, heading="Década de los 60s", level=3),
+        chunk(PAGINA_HISTORIA, "Otros contenidos.", heading="Otros", level=2),
+        chunk(PAGINA_HISTORIA, TEXTO_70S, heading="Década de los 70s", level=3),
+    ]
+
+    secciones = _mapa_secciones(filas, set())
+
+    primera = secciones[str(filas[1]["chunk_id"])]
+    segunda = secciones[str(filas[3]["chunk_id"])]
+    assert primera.familia == segunda.familia == "decada"
+    assert not _hermanos(primera, segunda)
+
+    filas[2] = chunk(PAGINA_HISTORIA, "Más historia.", heading="Historia", level=2)
+    secciones = _mapa_secciones(filas, set())
+    assert _hermanos(secciones[str(filas[1]["chunk_id"])], secciones[str(filas[3]["chunk_id"])])
+
+
+def test_reparacion_no_reintroduce_la_seccion_anterior(tmp_path: Path) -> None:
+    """La cola corta de promociones se une hacia atrás y no al fragmento de 1965."""
+    config = config_historia(tmp_path)
+
+    resultado = construir_fragmentos(config, "base")
+
+    promociones = [f for f in resultado.fragmentos if "Obtén tu crédito" in f.texto]
+    assert len(promociones) == 1
+    assert "1965 - Nacemos" not in promociones[0].texto
+    assert promociones[0].tokens >= TOKENS_MINIMOS
+
+
+def test_reparacion_no_supera_400(tmp_path: Path) -> None:
+    """Un grupo corto no se une al anterior si el total superaría 400 tokens."""
+    config = make_config(tmp_path)
+    write_indices(config, paginas=[{"id": "pagina-larga", "titulo": "Página larga"}])
+    write_chunks(
+        config,
+        [
+            chunk(
+                "pagina-larga",
+                "Contenido institucional " * 64,
+                heading="Historia",
+                level=2,
+            ),
+            chunk(
+                "pagina-larga",
+                "Respeto y trato digno. " * 7,
+                heading="Respeto",
+                level=3,
+            ),
+            chunk(
+                "pagina-larga",
+                "Historia ampliada " * 85,
+                heading="Década de los 60s",
+                level=3,
+            ),
+            chunk(
+                "pagina-larga",
+                "1970 - Abrimos oficinas. " * 6,
+                heading="Década de los 70s",
+                level=3,
+            ),
+        ],
+    )
+
+    resultado = construir_fragmentos(config, "base")
+
+    corto = [f for f in resultado.fragmentos if "Respeto y trato digno" in f.texto]
+    assert len(corto) == 1
+    assert corto[0].tokens < TOKENS_MINIMOS
+    assert "Contenido institucional" not in corto[0].texto
+    assert all(fragmento.tokens <= TOKENS_MAXIMOS for fragmento in resultado.fragmentos)
+
+
+def test_ids_estables_con_la_nueva_fusion(tmp_path: Path) -> None:
+    """Dos construcciones seguidas sobre la cronología producen los mismos ids."""
+    config = config_historia(tmp_path)
+
+    primero = construir_fragmentos(config, "base")
+    segundo = construir_fragmentos(config, "base")
+
+    assert [f.id for f in primero.fragmentos] == [f.id for f in segundo.fragmentos]
+
+
+def test_familia_de_encabezado_normaliza_tildes_y_mayusculas() -> None:
+    """La familia compara la primera palabra sin tildes ni mayúsculas."""
+    assert _familia_encabezado("DÉCADA de los 60s") == "decada"
+    assert _familia_encabezado("Década de los 70s") == "decada"
+    assert _familia_encabezado("### Cuenta Oro") == "cuenta"
+    assert _familia_encabezado("1965") == ""
+    assert _familia_encabezado("") == ""

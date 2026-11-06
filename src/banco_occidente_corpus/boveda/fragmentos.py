@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from statistics import median
@@ -18,6 +18,7 @@ from typing import Any, Literal
 from ..asistente.validacion import detectar_pii
 from ..config import Config
 from ..dedupe import find_boilerplate, is_noise, normalize_line
+from ..texto import normalizar
 from ..utils import CHARS_PER_TOKEN, read_jsonl, sha256_text, stable_tokens, write_jsonl
 from .tipos import Fragmento, TipoFragmento
 
@@ -38,6 +39,29 @@ MIN_DOCS_REPETIDAS: int = 5
 ALCANCES: tuple[Alcance, ...] = ("base", "completo")
 #: Nombre por defecto cuando un hecho no declara una entidad conocida.
 ENTIDAD_POR_DEFECTO: str = "Banco de Occidente"
+#: Palabras que no identifican la familia de un encabezado.
+PALABRAS_SIN_FAMILIA: frozenset[str] = frozenset(
+    {
+        "a",
+        "al",
+        "con",
+        "de",
+        "del",
+        "el",
+        "en",
+        "la",
+        "las",
+        "lo",
+        "los",
+        "o",
+        "para",
+        "por",
+        "su",
+        "un",
+        "una",
+        "y",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,6 +113,15 @@ class _Origen:
     tipo: TipoFragmento
     titulo: str
     categoria: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class _Seccion:
+    """Ubicación de un chunk en el árbol de encabezados de su página."""
+
+    padre: tuple[str, ...]
+    nivel: int
+    familia: str
 
 
 def ruta_fragmentos(config: Config, alcance: Alcance = "base") -> Path:
@@ -159,6 +192,7 @@ def construir_fragmentos(config: Config, alcance: Alcance = "base") -> Resultado
         if not _incluido(origen, alcance):
             continue
         efectivos = _encabezados_efectivos(filas, encabezados_descartados)
+        secciones = _mapa_secciones(filas, encabezados_descartados)
         limpios: list[tuple[dict[str, Any], str]] = []
         for fila in filas:
             texto = _limpiar_chunk(
@@ -169,7 +203,7 @@ def construir_fragmentos(config: Config, alcance: Alcance = "base") -> Resultado
             )
             if texto:
                 limpios.append((fila, texto))
-        for grupo in _agrupar(limpios):
+        for grupo in _agrupar(limpios, secciones):
             texto_grupo = "\n".join(texto for _, texto in grupo)
             encabezado = _encabezado_del_grupo(grupo, efectivos, encabezados_descartados)
             if encabezado != str(grupo[0][0].get("heading", "")).strip():
@@ -460,6 +494,40 @@ def _nivel(fila: dict[str, Any]) -> int:
         return 0
 
 
+def _familia_encabezado(heading: str) -> str:
+    """Devuelve la primera palabra significativa del encabezado, sin tildes ni mayúsculas."""
+    for palabra in re.findall(r"\w+", normalizar(heading)):
+        if palabra in PALABRAS_SIN_FAMILIA or palabra.isdigit():
+            continue
+        return palabra
+    return ""
+
+
+def _mapa_secciones(
+    filas: Sequence[dict[str, Any]], encabezados_repetidos: set[str]
+) -> dict[str, _Seccion]:
+    """Asigna a cada chunk su padre, nivel y familia, ignorando los encabezados repetidos."""
+    pila: list[tuple[int, str]] = []
+    secciones: dict[str, _Seccion] = {}
+    for fila in filas:
+        heading = str(fila.get("heading", "")).strip()
+        nivel = _nivel(fila)
+        descartado = bool(heading) and normalize_line(heading) in encabezados_repetidos
+        familia = ""
+        if heading and not descartado:
+            while pila and pila[-1][0] >= nivel:
+                pila.pop()
+            padre = tuple(texto for _, texto in pila)
+            pila.append((nivel, normalize_line(heading)))
+            familia = _familia_encabezado(heading)
+        else:
+            padre = tuple(texto for _, texto in pila)
+        chunk_id = str(fila.get("chunk_id", "")).strip()
+        if chunk_id:
+            secciones[chunk_id] = _Seccion(padre=padre, nivel=nivel, familia=familia)
+    return secciones
+
+
 def _encabezados_efectivos(
     filas: Sequence[dict[str, Any]], encabezados_repetidos: set[str]
 ) -> dict[str, str]:
@@ -513,24 +581,78 @@ def _encabezado_del_grupo(
     return ""
 
 
+def _hermanos(primera: _Seccion, segunda: _Seccion) -> bool:
+    """Indica si dos chunks son hermanos de la misma familia de sección."""
+    return (
+        bool(primera.familia)
+        and primera.familia == segunda.familia
+        and primera.nivel == segunda.nivel
+        and primera.padre == segunda.padre
+    )
+
+
+def _inicia_runa(secciones: Sequence[_Seccion], indice: int) -> bool:
+    """Indica si el chunk abre una runa de dos o más hermanos consecutivos."""
+    return indice + 1 < len(secciones) and _hermanos(secciones[indice], secciones[indice + 1])
+
+
+def _tokens_grupo(grupo: Sequence[tuple[dict[str, Any], str]]) -> int:
+    """Cuenta los tokens del texto que produciría un grupo de chunks."""
+    return stable_tokens("\n".join(texto for _, texto in grupo))
+
+
 def _agrupar(
     limpios: Sequence[tuple[dict[str, Any], str]],
+    secciones: Mapping[str, _Seccion],
 ) -> list[list[tuple[dict[str, Any], str]]]:
-    """Agrupa chunks consecutivos mientras el texto acumulado no llegue a 80 tokens."""
+    """Agrupa chunks cortos con sus hermanos de sección y respeta el máximo de 400 tokens."""
+    ubicaciones = [
+        secciones.get(str(fila.get("chunk_id", "")).strip(), _Seccion((), 0, ""))
+        for fila, _ in limpios
+    ]
     grupos: list[list[tuple[dict[str, Any], str]]] = []
+    reparables: list[bool] = []
     actual: list[tuple[dict[str, Any], str]] = []
-    for item in limpios:
+    for indice, item in enumerate(limpios):
         if not actual:
             actual = [item]
             continue
-        acumulado = "\n".join(texto for _, texto in actual)
-        if stable_tokens(acumulado) < TOKENS_MINIMOS:
+        if _inicia_runa(ubicaciones, indice) and not _hermanos(
+            ubicaciones[indice - 1], ubicaciones[indice]
+        ):
+            grupos.append(actual)
+            reparables.append(True)
+            actual = [item]
+            continue
+        tokens_actuales = _tokens_grupo(actual)
+        if tokens_actuales < TOKENS_MINIMOS and _tokens_grupo([*actual, item]) <= TOKENS_MAXIMOS:
             actual.append(item)
         else:
             grupos.append(actual)
+            reparables.append(tokens_actuales < TOKENS_MINIMOS)
             actual = [item]
     if actual:
         grupos.append(actual)
+        reparables.append(False)
+
+    indice = 0
+    while indice < len(grupos):
+        if not reparables[indice] or _tokens_grupo(grupos[indice]) >= TOKENS_MINIMOS:
+            indice += 1
+            continue
+        if indice > 0 and _tokens_grupo([*grupos[indice - 1], *grupos[indice]]) <= TOKENS_MAXIMOS:
+            grupos[indice - 1 : indice + 1] = [[*grupos[indice - 1], *grupos[indice]]]
+            reparables[indice - 1 : indice + 1] = [reparables[indice - 1]]
+            indice = max(0, indice - 1)
+        elif (
+            indice == 0
+            and len(grupos) > 1
+            and _tokens_grupo([*grupos[0], *grupos[1]]) <= TOKENS_MAXIMOS
+        ):
+            grupos[0:2] = [[*grupos[0], *grupos[1]]]
+            reparables[0:2] = [False]
+        else:
+            indice += 1
     return grupos
 
 
