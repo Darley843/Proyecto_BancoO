@@ -26,6 +26,7 @@ from banco_occidente_corpus.utils import sha256_text, stable_tokens, write_jsonl
 
 URL = "https://www.bancodeoccidente.com.co/productos"
 OTRA_URL = "https://www.bancodeoccidente.com.co/otra"
+MENU_REPETIDO = "Tu carro nuevo te espera, ¡maneja tu futuro!"
 
 
 def make_config(tmp_path: Path) -> Config:
@@ -48,6 +49,7 @@ def chunk(
     heading: str = "",
     url: str = URL,
     section: str = "oferta",
+    level: int = 1,
 ) -> dict[str, Any]:
     """Construye una fila de chunk con la misma forma que produce knowledge.py."""
     digest = sha256_text(f"{page_id}|{heading}|{texto}")
@@ -57,7 +59,7 @@ def chunk(
         "url": url,
         "section": section,
         "heading": heading,
-        "level": 1,
+        "level": level,
         "text": texto,
         "tokens": stable_tokens(texto),
         "hash": digest,
@@ -466,6 +468,152 @@ def test_quita_lineas_repetidas_entre_paginas(tmp_path: Path) -> None:
     assert frecuente.paginas == 6
 
 
+def test_encabezado_de_menu_repetido_no_aparece_en_texto_ni_encabezado(
+    tmp_path: Path,
+) -> None:
+    """Un encabezado de menú repetido entre páginas no contamina el fragmento."""
+    config = make_config(tmp_path)
+    paginas = [{"id": f"pagina-{indice}", "titulo": f"Página {indice}"} for indice in range(6)]
+    filas = [
+        chunk(
+            pagina["id"],
+            f"Contenido propio de la pagina {indice} con detalle suficiente para el fragmento. "
+            * 6,
+            heading=MENU_REPETIDO,
+        )
+        for indice, pagina in enumerate(paginas)
+    ]
+    write_indices(config, paginas=paginas)
+    write_chunks(config, filas)
+
+    resultado = construir_fragmentos(config, "base")
+
+    assert len(resultado.fragmentos) == 6
+    assert all(MENU_REPETIDO not in fragmento.texto for fragmento in resultado.fragmentos)
+    assert all(fragmento.encabezado == "" for fragmento in resultado.fragmentos)
+    assert resultado.resumen.fragmentos_reencabezados == 6
+    assert resultado.resumen.encabezados_descartados == (
+        LineaRepetida(texto=MENU_REPETIDO, paginas=6),
+    )
+
+
+def test_encabezado_propio_de_una_pagina_se_conserva(tmp_path: Path) -> None:
+    """Un encabezado que solo aparece en una página se conserva en texto y campo."""
+    config = make_config(tmp_path)
+    paginas = [{"id": f"pagina-{indice}", "titulo": f"Página {indice}"} for indice in range(6)]
+    filas = [
+        chunk(
+            pagina["id"],
+            f"Contenido propio de la pagina {indice} con detalle suficiente para el fragmento. "
+            * 6,
+            heading=MENU_REPETIDO,
+        )
+        for indice, pagina in enumerate(paginas)
+    ]
+    filas.append(
+        chunk(
+            "pagina-propia",
+            "Contenido exclusivo de la pagina propia con detalle suficiente. " * 6,
+            heading="Historia del banco",
+        )
+    )
+    write_indices(config, paginas=[*paginas, {"id": "pagina-propia", "titulo": "Página propia"}])
+    write_chunks(config, filas)
+
+    resultado = construir_fragmentos(config, "base")
+
+    propias = [
+        fragmento for fragmento in resultado.fragmentos if "Historia del banco" in fragmento.texto
+    ]
+    assert len(propias) == 1
+    assert propias[0].encabezado == "Historia del banco"
+    assert propias[0].texto.startswith("Historia del banco")
+    assert all(MENU_REPETIDO not in fragmento.texto for fragmento in resultado.fragmentos)
+    assert resultado.resumen.fragmentos_reencabezados == 6
+
+
+def test_encabezado_repetido_usa_el_encabezado_anterior_no_repetido(tmp_path: Path) -> None:
+    """Un encabezado repetido usa el encabezado padre no repetido de la ruta."""
+    config = make_config(tmp_path)
+    paginas = [{"id": f"pagina-{indice}", "titulo": f"Página {indice}"} for indice in range(5)]
+    filas = [
+        chunk(
+            pagina["id"],
+            f"Contenido propio de la pagina {indice} con detalle suficiente para el fragmento. "
+            * 6,
+            heading=MENU_REPETIDO,
+        )
+        for indice, pagina in enumerate(paginas)
+    ]
+    filas.append(
+        chunk(
+            "pagina-demo",
+            "Contenido institucional del banco con detalle suficiente para el fragmento. " * 10,
+            heading="Banco de Occidente",
+            level=1,
+        )
+    )
+    filas.append(
+        chunk(
+            "pagina-demo",
+            "Historia propia del banco con detalle suficiente para el fragmento. " * 10,
+            heading=MENU_REPETIDO,
+            level=3,
+        )
+    )
+    write_indices(config, paginas=[*paginas, {"id": "pagina-demo", "titulo": "Página demo"}])
+    write_chunks(config, filas)
+
+    resultado = construir_fragmentos(config, "base")
+
+    historia = [
+        fragmento
+        for fragmento in resultado.fragmentos
+        if "Historia propia del banco" in fragmento.texto
+    ]
+    assert len(historia) == 1
+    assert historia[0].encabezado == "Banco de Occidente"
+    assert MENU_REPETIDO not in historia[0].texto
+    assert resultado.resumen.fragmentos_reencabezados == 6
+
+
+def test_encabezado_repetido_sin_padre_usa_el_primero_del_grupo(tmp_path: Path) -> None:
+    """Sin encabezado padre, el repetido cede al primer encabezado propio del grupo."""
+    config = make_config(tmp_path)
+    paginas = [{"id": f"pagina-{indice}", "titulo": f"Página {indice}"} for indice in range(5)]
+    filas = [
+        chunk(
+            pagina["id"],
+            f"Contenido propio de la pagina {indice} con detalle suficiente para el fragmento. "
+            * 6,
+            heading=MENU_REPETIDO,
+        )
+        for indice, pagina in enumerate(paginas)
+    ]
+    filas.append(
+        chunk("pagina-demo", "Banner promocional de la pagina demo.", heading=MENU_REPETIDO)
+    )
+    filas.append(
+        chunk(
+            "pagina-demo",
+            "1965 - Nacemos el 3 de mayo en la ciudad de Cali con detalle suficiente. " * 8,
+            heading="Década de los 60s",
+        )
+    )
+    write_indices(config, paginas=[*paginas, {"id": "pagina-demo", "titulo": "Página demo"}])
+    write_chunks(config, filas)
+
+    resultado = construir_fragmentos(config, "base")
+
+    decada = [
+        fragmento for fragmento in resultado.fragmentos if "1965 - Nacemos" in fragmento.texto
+    ]
+    assert len(decada) == 1
+    assert decada[0].encabezado == "Década de los 60s"
+    assert MENU_REPETIDO not in decada[0].texto
+    assert resultado.resumen.fragmentos_reencabezados == 6
+
+
 def test_escribir_fragmentos_solo_en_boveda(tmp_path: Path) -> None:
     """La escritura crea el JSONL en data/boveda y no modifica Gold ni Knowledge."""
     config = make_config(tmp_path)
@@ -529,6 +677,8 @@ def test_formatear_resumen(tmp_path: Path) -> None:
         hechos_por_revision={"pending": 1},
         omitidos_sin_evidencia=1,
         omitidos_pii=2,
+        fragmentos_reencabezados=2,
+        encabezados_descartados=(LineaRepetida(texto=MENU_REPETIDO, paginas=28),),
     )
 
     texto = formatear_resumen(resumen, tmp_path / "fragmentos_base.jsonl")
@@ -536,6 +686,8 @@ def test_formatear_resumen(tmp_path: Path) -> None:
     assert "Fragmentos escritos: 3" in texto
     assert "Fragmentos PDF: 0" in texto
     assert "lineas_repetidas: 1" in texto
+    assert "Fragmentos con encabezado repetido descartado: 2" in texto
+    assert f"28 páginas: {MENU_REPETIDO}" in texto
     assert "Fragmentos con más de 400 tokens: 0" in texto
     assert "Tablas enteras: 2" in texto
     assert "Tablas partidas por filas: 1 en 3 partes" in texto
