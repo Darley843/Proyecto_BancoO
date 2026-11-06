@@ -167,7 +167,7 @@
 
 ## 26. Diagramas con Archify (Darley — pendiente)
 
-- [ ] 26.1 Generar con Archify el diagrama de arquitectura: navegador → FastAPI → grafo → Bóveda/Tablero → SQLite, con Ollama local y DeepSeek como servicio externo; verificar que el diagrama se renderiza y que el comando queda documentado en `README.md`.
+- [x] 26.1 Generar con Archify el diagrama de arquitectura: navegador → FastAPI → grafo → Bóveda/Tablero → SQLite, con Ollama local y DeepSeek como servicio externo; verificar que el diagrama se renderiza y que el comando queda documentado en `README.md`.
 - [ ] 26.2 Generar con Archify el diagrama de datos: Gold → chunks → fragmentos → embeddings → Chroma → recuperación → respuesta citada, y Tablero PDF/tablas → CSV → respuesta con plantilla; verificar que las rutas y los sentidos de las flechas coinciden con el diseño.
 - [ ] 26.3 Añadir los diagramas al `README.md` y a `docs/MODELADO.md`, y verificar que no prometen componentes fuera de alcance (Extracto, time travel, EmbeddingGemma, Matryoshka).
 

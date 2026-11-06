@@ -64,6 +64,27 @@ Bronze y Silver no se versionan: son capturas reproducibles que se reconstruyen
 con el pipeline sin volver a la web. El repositorio versiona Gold y el contexto.
 Fuente: `data/gold/_INDICE.md`, `corpus.jsonl` y `data/contexto/manifest.json`.
 
+### Diagrama interactivo de la fase 2 (Archify)
+
+El recorrido **navegador → FastAPI → grafo → Bóveda/Tablero → SQLite**, con
+Ollama local y DeepSeek como servicio externo, vive en
+[`docs/arquitectura.html`](./docs/arquitectura.html). Su fuente tipada es
+`docs/arquitectura.json`; el HTML se genera, nunca se edita a mano.
+
+```bash
+# una vez: instala la skill de Archify (Node >= 18)
+npx -y skills@latest add https://archify.si --skill archify --agent opencode --global --copy --yes
+
+# cada vez que cambie el diagrama
+node ~/.agents/skills/archify/bin/archify.mjs finalize architecture \
+  docs/arquitectura.json docs/arquitectura.html --repo-root . --quality showcase --json
+```
+
+En PowerShell el CLI queda en `$HOME\.agents\skills\archify\bin\archify.mjs`. La
+corrida deja los recibos `docs/arquitectura.finalize*.json` y
+`docs/arquitectura.browser-check.json`; si algún gate falla, se corrige el JSON y
+se repite el comando completo.
+
 ## Requisitos e instalación
 
 - Python 3.13 (uv lo instala si falta) y [uv](https://docs.astral.sh/uv/)
