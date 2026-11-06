@@ -604,6 +604,373 @@ main:focus {
 
 /* --- fin vestibulo --- */
 
+/* --- boveda (PR 14) --- */
+
+.boveda {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+}
+
+.boveda__buscador {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 10px;
+  padding: 20px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  box-shadow: var(--sombra);
+}
+
+.boveda__etiqueta {
+  font-weight: 600;
+}
+
+.boveda__fila-busqueda {
+  display: flex;
+  gap: 8px;
+}
+
+.boveda__campo {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--fondo);
+  color: var(--texto);
+  font: inherit;
+}
+
+.boveda__boton,
+.boveda__sugerencia,
+.boveda__seccion {
+  padding: 8px 14px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  color: var(--azul);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.boveda__boton--primario {
+  border-color: var(--azul);
+  background: var(--azul);
+  color: var(--texto-sobre-azul);
+}
+
+.boveda__sugerencias {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.boveda__sugerencias-titulo {
+  color: var(--texto-suave);
+  font-size: 13px;
+}
+
+.boveda__sugerencia {
+  padding: 4px 12px;
+  border-radius: 999px;
+  background: var(--azul-suave);
+  font-size: 13px;
+}
+
+.boveda__boton:hover,
+.boveda__sugerencia:hover,
+.boveda__seccion:hover {
+  border-color: var(--azul);
+}
+
+.boveda__resultados[aria-busy="true"] {
+  opacity: 0.6;
+}
+
+.boveda__cargando {
+  margin: 0 0 8px;
+}
+
+.boveda__contenido {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.boveda__panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.boveda__resumen,
+.boveda__titulo-panel {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--azul);
+}
+
+.boveda__leyenda {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.boveda__seccion {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.boveda__seccion[aria-pressed="true"] {
+  border-color: var(--azul);
+  background: var(--azul);
+  color: var(--texto-sobre-azul);
+}
+
+.boveda__seccion-cantidad {
+  font-family: var(--fuente-cifras);
+  font-weight: 400;
+  opacity: 0.8;
+}
+
+.boveda__clave-pregunta {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  margin-left: 4px;
+  color: var(--texto-suave);
+  font-size: 13px;
+}
+
+.boveda__clave-marca {
+  width: 12px;
+  height: 12px;
+  border: 3px solid var(--dorado);
+  border-radius: 50%;
+  background: var(--superficie);
+}
+
+.boveda__dibujo {
+  display: block;
+  width: 100%;
+  height: auto;
+  aspect-ratio: 1 / 1;
+  max-height: 560px;
+}
+
+.boveda__marco {
+  fill: var(--fondo);
+  stroke: var(--borde);
+  stroke-width: 0.3;
+  rx: 2;
+}
+
+.boveda__punto {
+  fill: var(--texto-suave);
+  fill-opacity: 0.45;
+  stroke: var(--superficie);
+  stroke-width: 0.2;
+  cursor: pointer;
+}
+
+.boveda__punto:hover {
+  fill: var(--azul);
+  fill-opacity: 1;
+}
+
+.boveda__dibujo--filtrado .boveda__punto {
+  fill-opacity: 0.15;
+}
+
+.boveda__dibujo--filtrado .boveda__punto--resaltado {
+  fill: var(--azul);
+  fill-opacity: 0.9;
+}
+
+.boveda__pregunta {
+  pointer-events: none;
+}
+
+.boveda__pregunta-anillo {
+  fill: none;
+  stroke: var(--dorado);
+  stroke-width: 0.8;
+}
+
+.boveda__pregunta-centro {
+  fill: var(--dorado);
+  stroke: var(--superficie);
+  stroke-width: 0.4;
+}
+
+.boveda__info {
+  min-height: 1.5em;
+  margin: 0;
+  color: var(--texto);
+  font-size: 14px;
+}
+
+.boveda__nota,
+.boveda__vacio {
+  margin: 0;
+  color: var(--texto-suave);
+  font-size: 13px;
+}
+
+.boveda__top {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: fragmento;
+}
+
+.boveda__fragmento {
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+  border: 1px solid var(--borde);
+  border-left: 4px solid var(--dorado);
+  border-radius: var(--radio);
+  background: var(--fondo);
+  counter-increment: fragmento;
+}
+
+.boveda__fragmento-cabeza {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  justify-content: space-between;
+}
+
+.boveda__fragmento-titulo {
+  min-width: 0;
+  color: var(--azul);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.boveda__fragmento-titulo::before {
+  content: counter(fragmento) ". ";
+  color: var(--texto-suave);
+}
+
+.boveda__similitud {
+  display: inline-flex;
+  gap: 6px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.boveda__similitud-etiqueta {
+  color: var(--texto-suave);
+}
+
+.boveda__barra {
+  width: 56px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--borde);
+  overflow: hidden;
+}
+
+.boveda__barra-relleno {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--dorado);
+}
+
+.boveda__fragmento-datos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  font-size: 13px;
+}
+
+.boveda__dato {
+  color: var(--texto-suave);
+}
+
+.boveda__fragmento-encabezado {
+  margin: 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.boveda__fragmento-texto {
+  margin: 0;
+  color: var(--texto-suave);
+  font-size: 14px;
+  overflow-wrap: anywhere;
+}
+
+.boveda__fragmento-texto p {
+  color: var(--texto);
+  white-space: pre-line;
+}
+
+.boveda__fragmento-texto summary {
+  cursor: pointer;
+}
+
+.boveda__fragmento-texto p {
+  margin: 8px 0 0;
+}
+
+.boveda__no-listo {
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+
+.boveda__no-listo p {
+  margin: 0;
+}
+
+.boveda__comando {
+  padding: 4px 10px;
+  border-radius: 6px;
+  background: var(--superficie);
+  font-family: var(--fuente-cifras);
+}
+
+.boveda__error {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+@media (max-width: 900px) {
+  .boveda__contenido {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 600px) {
+  .boveda__fila-busqueda {
+    flex-direction: column;
+  }
+}
+
+/* --- fin boveda --- */
+
 /* -------------------------------------------------------------- celular */
 
 @media (max-width: 600px) {

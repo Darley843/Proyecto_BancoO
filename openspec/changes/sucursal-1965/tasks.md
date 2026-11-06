@@ -114,7 +114,7 @@
 
 - [ ] 17.1 Implementar `app/web/vistas/boveda.js` con el mapa de puntos, la posición de la pregunta y la lista del top de fragmentos con título, sección, tipo y similitud; verificar con `mapa.json` y con la API una consulta real.
 - [ ] 17.2 Mostrar el estado «índice no listo» cuando la API lo informe y no dibujar un mapa vacío como si hubiera datos; verificar deteniendo el índice o apuntando a un directorio sin `data/boveda/`.
-- [ ] 17.3 Verificar que la vista no usa librerías externas ni hace peticiones distintas de `/api/boveda/mapa`; revisar el archivo y la red del navegador.
+- [x] 17.3 Verificar que la vista no usa librerías externas ni hace peticiones distintas de `/api/boveda/mapa`; revisar el archivo y la red del navegador.
 
 ## 18. PR 15 — Tablero (vista) (Yoldy — pendiente)
 
