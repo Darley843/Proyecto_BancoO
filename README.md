@@ -64,26 +64,33 @@ Bronze y Silver no se versionan: son capturas reproducibles que se reconstruyen
 con el pipeline sin volver a la web. El repositorio versiona Gold y el contexto.
 Fuente: `data/gold/_INDICE.md`, `corpus.jsonl` y `data/contexto/manifest.json`.
 
-### Diagrama interactivo de la fase 2 (Archify)
+### Diagramas interactivos de la fase 2 (Archify)
 
 El recorrido **navegador → FastAPI → grafo → Bóveda/Tablero → SQLite**, con
 Ollama local y DeepSeek como servicio externo, vive en
 [`docs/arquitectura.html`](./docs/arquitectura.html). Su fuente tipada es
 `docs/arquitectura.json`; el HTML se genera, nunca se edita a mano.
 
+El flujo de datos — **Gold → chunks → fragmentos → Ollama → Chroma →
+recuperación → respuesta citada**, y **PDF/tablas → CSV → plantilla** — vive en
+[`docs/datos.html`](./docs/datos.html). Su fuente es `docs/datos.json` y también
+se genera con Archify.
+
 ```bash
 # una vez: instala la skill de Archify (Node >= 18)
 npx -y skills@latest add https://archify.si --skill archify --agent opencode --global --copy --yes
 
-# cada vez que cambie el diagrama
+# cada vez que cambie un diagrama
 node ~/.agents/skills/archify/bin/archify.mjs finalize architecture \
   docs/arquitectura.json docs/arquitectura.html --repo-root . --quality showcase --json
+node ~/.agents/skills/archify/bin/archify.mjs finalize dataflow \
+  docs/datos.json docs/datos.html --repo-root . --quality showcase --json
 ```
 
 En PowerShell el CLI queda en `$HOME\.agents\skills\archify\bin\archify.mjs`. La
-corrida deja los recibos `docs/arquitectura.finalize*.json` y
-`docs/arquitectura.browser-check.json`; si algún gate falla, se corrige el JSON y
-se repite el comando completo.
+corrida deja los recibos `docs/arquitectura.finalize*.json`,
+`docs/arquitectura.browser-check.json` y los equivalentes `docs/datos.*.json`; si
+algún gate falla, se corrige el JSON y se repite el comando completo.
 
 ## Requisitos e instalación
 
