@@ -101,6 +101,7 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | `.../boveda/almacen.py` | Chroma persistente en `data/boveda/` con distancia coseno |
 | `.../boveda/indice.py` | Índice por alcance (`base`/`completo`) y `indice.json` |
 | `.../boveda/recuperador.py` | Recuperación híbrida vectorial + BM25 con pesos |
+| `.../boveda/mapa.py` | Mapa PCA 2D de 0 a 100 y proyección de la pregunta |
 | `.../tablero/tarifas.py` | Tarifario PDF → filas «concepto, valor y fecha» |
 | `.../tablero/tablas_web.py` | Lector de tablas Markdown y adaptadores por página |
 | `.../tablero/construir.py` | Une fuentes, escribe el CSV y cruza las 12 preguntas |

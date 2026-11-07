@@ -55,6 +55,20 @@ ruido no compite por similitud en el índice.
 | Alcance base | Páginas web, PDF con `categoria_documento: producto` y hechos verificados | `make indice` |
 | Alcance completo | Añade el resto de PDF y los videos transcritos | `make indice-completo` |
 | Recuperación | Híbrida: vectorial + BM25 con pesos configurables y `puntaje` = 1 − coseno | `boveda/recuperador.py` |
+| Mapa | PCA de 2 componentes sobre los vectores en norma 1, normalizado de 0 a 100; guarda la transformación para ubicar la pregunta | `boveda/mapa.py`, `make indice` |
+
+### Mapa PCA: solo exploratorio
+
+El mapa de la Bóveda (`data/boveda/mapa.json`) se calcula en `make indice` con los
+mismos vectores que se insertan en Chroma, sin volver a llamar a Ollama. Guarda
+la media, los componentes, el mínimo y el rango de PCA para ubicar después cada
+pregunta en el mismo plano. Es **solo una vista**: no recupera, no decide rutas y
+no interviene en el Arqueo. El top que acompaña a la pregunta lo da el
+recuperador híbrido real, y el Arqueo mide con ese recuperador, no con el mapa.
+Dos puntos cercanos en 2D suelen hablar de temas parecidos, pero al reducir 768
+dimensiones a 2 se pierde información: dos puntos lejanos en el mapa pueden estar
+cerca en el espacio original. Se descartaron UMAP y t-SNE porque no son
+deterministas ni proyectan puntos nuevos con una transformación fija.
 
 ### Modelo de embeddings
 

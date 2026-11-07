@@ -187,6 +187,7 @@ make indice-completo                     # añade el resto de PDF y los videos
 | Embeddings | `boveda/embeddings.py` | `nomic-embed-text-v2-moe` con `base_url` explícito y prefijos de tarea |
 | Índice | `boveda/almacen.py` | Chroma persistente en `data/boveda/chroma`, distancia coseno |
 | Recuperación | `boveda/recuperador.py` | Híbrido vectorial + BM25 con pesos de `config/sucursal.toml` |
+| Mapa | `boveda/mapa.py` | PCA 2D de los vectores, normalizado de 0 a 100; se regenera en `make indice` |
 
 El índice **no se versiona**: se regenera con `make indice`. La configuración
 vive en `config/sucursal.toml` (`[embeddings]` y `[recuperacion]`); los
