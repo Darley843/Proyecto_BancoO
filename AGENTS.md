@@ -130,7 +130,7 @@ del checklist no bajó.
 
 ## Reglas de revisión (GGA)
 
-Instrucciones para quien revisa (GGA): el código a revisar ya viene completo en este mensaje. No ejecutes comandos ni leas otros archivos; revisa solo el contenido recibido. Escribe la línea `STATUS: PASSED` o `STATUS: FAILED` al comienzo de tu respuesta y después la lista de violaciones.
+Instrucciones para quien revisa (GGA): el código a revisar ya viene completo en este mensaje. No ejecutes comandos ni leas otros archivos; revisa solo el contenido recibido. Escribe la línea `STATUS: PASSED` o `STATUS: FAILED` al comienzo de tu respuesta y después la lista de violaciones. El modelo de amenazas y las mitigaciones viven en `docs/SEGURIDAD.md`.
 
 REJECT if:
 - Se usa `pip`, se crea `requirements.txt` o se edita `uv.lock` a mano.
@@ -143,6 +143,40 @@ REJECT if:
 - Se usa cualquier técnica para evadir protecciones anti-bot o captchas.
 - `extract.py` hace peticiones de red: debe recibir HTML ya descargado.
 - Hay secretos, tokens o claves en el código, o se lee un archivo `.env`.
+- Se versiona el índice vectorial o una base SQLite del asistente: `data/boveda/`
+  (Chroma, `indice.json`, `mapa.json`, fragmentos) o `data/asistente/`
+  (`memoria.sqlite`, `cache.sqlite`, `gasto.sqlite`). Se regeneran con
+  `make indice` o se crean al preguntar; `.gitignore` los excluye y
+  `test/test_seguridad.py::test_indice_y_sqlite_fuera_de_git` lo comprueba.
+- El servidor de la Sucursal se publica en `0.0.0.0`, `::` o cualquier host
+  distinto de `127.0.0.1` (uvicorn, `app.py`, `make app` o un comando manual).
+  `app.py` fija `HOST = "127.0.0.1"` y `main()` lo pasa a `uvicorn.run`;
+  `test/test_app_web.py::test_escucha_solo_en_localhost` y
+  `test/test_seguridad.py::test_uvicorn_recibe_solo_loopback` lo comprueban.
+- Se repiten los precios de DeepSeek (`0.15/0.003/0.60` valle,
+  `0.30/0.006/1.20` pico) en código de producción (`src/` fuera de
+  `arqueo/metricas.py`, `app.py`, `scripts/` o `config/`). La única fuente es
+  `arqueo/metricas.py`; `test/test_arqueo_metricas.py` puede fijarlos como
+  guardián y `test/test_seguridad.py::test_precios_deepseek_solo_en_metricas`
+  detecta la duplicación.
+- Se trata un fragmento de la Bóveda como instrucción: se concatena antes de
+  las reglas del sistema, se pasa a un `SystemMessage` propio, se omite
+  `_neutralizar` o se usa su texto para elegir ruta. Los fragmentos son datos:
+  van dentro de `<fragmentos>` antes de `prompt.sistema` (`asistente/rag.py`) y
+  la regla 2 de `config/prompts/qa_v2.md` lo exige;
+  `test/test_asistente_rag.py::test_formatear_fragmentos_neutraliza_cierre` y
+  `test/test_seguridad.py::test_fragmento_malicioso_no_cambia_el_sistema` lo
+  comprueban.
+- Se guarda en `data/asistente/cache.sqlite` una respuesta de un turno `X` o
+  con datos personales. `sucursal/preguntar.py` solo cachea si la letra no es
+  `X` y la respuesta no es la frase fija;
+  `test/test_sucursal_preguntar.py::test_pii_no_entra_en_cache_ni_en_logs` y
+  `::test_rechazo_no_escribe_cache` lo comprueban.
+- Una prueba invoca un cliente real de DeepSeek u Ollama, o depende de que el
+  servicio esté encendido, en lugar de usar un doble (`FakeListChatModel`,
+  `DeterministicFakeEmbedding`, recuperador simulado). `test/conftest.py`
+  bloquea cualquier `connect`/`connect_ex` fuera de loopback y `make check`
+  debe pasar sin `DEEPSEEK_API_KEY` y con Ollama apagado.
 - Cambia el formato de Gold sin actualizar `CONSTITUTION.md` §7 en el mismo commit.
 - Hay código nuevo en `src/` sin su prueba en `test/`.
 - Una función pública no tiene anotaciones de tipo o docstring.

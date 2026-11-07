@@ -424,7 +424,9 @@ no forma parte de `make all`, `make gold`, `make deliver`, `make docs`, `make do
 
 [`CONSTITUTION.md`](./CONSTITUTION.md) (verdad central) · [`docs/ESTANDAR.md`](./docs/ESTANDAR.md)
 (trazabilidad) · [`docs/FUENTES.md`](./docs/FUENTES.md) (fuentes y `robots.txt`) ·
-[`docs/ALCANCE.md`](./docs/ALCANCE.md) (20 preguntas) · [`AGENTS.md`](./AGENTS.md).
+[`docs/ALCANCE.md`](./docs/ALCANCE.md) (20 preguntas) ·
+[`docs/SEGURIDAD.md`](./docs/SEGURIDAD.md) (modelo de amenazas) ·
+[`AGENTS.md`](./AGENTS.md).
 
 ## Ética y legalidad
 

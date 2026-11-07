@@ -667,6 +667,9 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 - Sin martilleo: 1.5 s entre peticiones y pausas periódicas.
 - El corpus se usa con fines académicos y se cita la fuente en cada documento
   (`fuente` en el frontmatter).
+- El modelo de amenazas y las mitigaciones de la Sucursal viven en
+  [`docs/SEGURIDAD.md`](./docs/SEGURIDAD.md); este capítulo fija la regla y ese
+  documento la detalla.
 
 ## 14. Pendientes
 
