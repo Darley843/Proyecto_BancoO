@@ -7,8 +7,9 @@ verificación con una consulta real queda para cuando existan ``boveda/mapa.py``
 (PR 11) y la API (PR 10).
 
 La maqueta ``datos-ejemplo/mapa.json`` se genera con ``scripts/mapa_ejemplo.py``
-a partir de los fragmentos reales del alcance ``base``; las pruebas confirman
-que el archivo sigue al día con ese script.
+a partir de los fragmentos reales del alcance ``base`` construidos solo con los
+datos versionados: las pruebas confirman que el archivo sigue al día con ese
+script, con o sin ``data/knowledge/chunks.jsonl`` en la máquina.
 """
 
 from __future__ import annotations
@@ -24,7 +25,6 @@ from typing import Any
 
 from banco_occidente_corpus.boveda.fragmentos import construir_fragmentos
 from banco_occidente_corpus.boveda.tipos import Fragmento
-from banco_occidente_corpus.config import load_config
 
 RAIZ = Path(__file__).resolve().parents[1]
 WEB = RAIZ / "app" / "web"
@@ -47,8 +47,12 @@ def leer_vista() -> str:
 
 @cache
 def fragmentos_base() -> tuple[Fragmento, ...]:
-    """Construye una vez los fragmentos reales del alcance ``base``."""
-    return tuple(construir_fragmentos(load_config(), "base").fragmentos)
+    """Construye una vez los fragmentos versionados del alcance ``base``.
+
+    Usa la configuración del script, que ignora ``data/knowledge/chunks.jsonl``
+    aunque exista: la maqueta no puede depender de un archivo sin versionar.
+    """
+    return tuple(construir_fragmentos(cargar_script().config_versionada(), "base").fragmentos)
 
 
 def cargar_script() -> ModuleType:

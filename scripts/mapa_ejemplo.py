@@ -3,11 +3,13 @@
     uv run python scripts/mapa_ejemplo.py
 
 La maqueta de la Bóveda (``?ejemplo=1``) necesita un mapa sin Ollama ni Chroma.
-Este script usa los fragmentos reales del alcance ``base`` (los mismos que
-indexa ``make indice``) y los ubica en 2D con una **aproximación**: TF-IDF en
-lugar de los embeddings ``nomic-embed-text-v2-moe`` y PCA de dos componentes,
-con ``x`` e ``y`` normalizados de 0 a 100 como hace el servidor. El top de la
-pregunta se ordena por similitud coseno sobre esos mismos vectores TF-IDF.
+Este script usa los fragmentos del alcance ``base`` construidos **solo con los
+datos versionados**: ignora ``data/knowledge/chunks.jsonl`` aunque exista, porque
+ese archivo (con PDF y videos) no se versiona y haría que la maqueta dependiera
+de la máquina. Los ubica en 2D con una **aproximación**: TF-IDF en lugar de los
+embeddings ``nomic-embed-text-v2-moe`` y PCA de dos componentes, con ``x`` e
+``y`` normalizados de 0 a 100 como hace el servidor. El top de la pregunta se
+ordena por similitud coseno sobre esos mismos vectores TF-IDF.
 
 Es determinista: dos ejecuciones dan el mismo archivo. El mapa real lo calcula
 ``boveda/mapa.py`` (PR 11) con los vectores del índice.
@@ -17,6 +19,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
+from dataclasses import replace
 from pathlib import Path
 from typing import Any
 
@@ -26,7 +29,7 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 from banco_occidente_corpus.boveda.fragmentos import construir_fragmentos
 from banco_occidente_corpus.boveda.tipos import Fragmento
-from banco_occidente_corpus.config import PROJECT_ROOT, load_config
+from banco_occidente_corpus.config import PROJECT_ROOT, Config, Paths, load_config
 
 SALIDA = PROJECT_ROOT / "app" / "web" / "datos-ejemplo" / "mapa.json"
 
@@ -35,6 +38,40 @@ PREGUNTA = "¿Qué beneficios tiene la cuenta de nómina?"
 
 TOP_K = 5
 """Fragmentos que devuelve el top, igual que la Bóveda real."""
+
+
+class _RutasSoloVersionadas(Paths):
+    """Rutas en las que ``chunks.jsonl`` no existe, aunque el archivo esté en disco.
+
+    ``chunks.jsonl`` incluye PDF y videos y no se versiona, así que apuntar su
+    ruta a un archivo inexistente deja fuera ese contenido sin tocar ``make
+    fragmentos`` ni ``make indice``, que siguen usando ``Paths`` completo.
+    """
+
+    @property
+    def knowledge_chunks(self) -> Path:
+        """Ruta inexistente: ``construir_fragmentos`` solo lee ``chunks_web.jsonl``."""
+        return self.knowledge / "chunks.jsonl.no-versionado"
+
+
+def config_versionada() -> Config:
+    """Configuración del proyecto que usa solo los datos versionados.
+
+    Mantiene las rutas que resuelve ``load_config`` (incluidas las variables de
+    entorno) salvo la de ``chunks.jsonl``, que apunta a un archivo inexistente.
+
+    Returns:
+        Configuración lista para ``construir_fragmentos``.
+    """
+    config = load_config()
+    rutas = _RutasSoloVersionadas(
+        root=config.paths.root,
+        raw=config.paths.raw,
+        processed=config.paths.processed,
+        gold=config.paths.gold,
+        knowledge=config.paths.knowledge,
+    )
+    return replace(config, paths=rutas)
 
 
 def generar(fragmentos: Sequence[Fragmento], pregunta: str = PREGUNTA) -> dict[str, Any]:
@@ -110,8 +147,8 @@ def escribir(datos: dict[str, Any], ruta: Path = SALIDA) -> None:
 
 
 def main() -> None:
-    """Construye los fragmentos del alcance ``base`` y escribe la maqueta."""
-    resultado = construir_fragmentos(load_config(), "base")
+    """Construye los fragmentos versionados del alcance ``base`` y escribe la maqueta."""
+    resultado = construir_fragmentos(config_versionada(), "base")
     datos = generar(resultado.fragmentos)
     escribir(datos)
     destino = SALIDA.relative_to(PROJECT_ROOT)
