@@ -290,6 +290,15 @@ def test_guardia_de_red_bloquea_conexion_externa() -> None:
             conexion.connect(("203.0.113.1", 80))
 
 
+@pytest.mark.parametrize("metodo", ["connect", "connect_ex"])
+def test_guardia_de_red_bloquea_ollama_local(metodo: str) -> None:
+    """El puerto 11434 queda bloqueado aunque sea loopback: se usa el doble de embeddings."""
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as conexion:
+        conexion.settimeout(0.5)
+        with pytest.raises(AssertionError, match="DeterministicFakeEmbedding"):
+            getattr(conexion, metodo)(("127.0.0.1", 11434))
+
+
 def test_fragmento_malicioso_no_cambia_el_sistema() -> None:
     """Un fragmento con instrucciones queda dentro del bloque y no altera el sistema."""
     prompt = cargar_prompt("qa", "v2")

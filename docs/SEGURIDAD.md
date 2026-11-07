@@ -377,14 +377,14 @@ No se activan en CI ni en la suite.
 | **El gasto no cuenta la reformulación ni el clasificador de dudas.** `GastoDiario.sumar` solo se llama en `_mapear` con el uso de `redactar`; `_nodo_reformular` usa el modelo `qa` con `max_tokens=2000` y el clasificador 512. | El tope bloquea la redacción y las rutas `T`/`X`/caché siguen gratis, así que el exceso está acotado por esas dos llamadas por turno, no es ilimitado. | Añadir `registrar_uso` a `DependenciasGrafo` y que `_nodo_reformular`/`_nodo_digiturno` llamen con `extraer_metricas`; bajar el `max_tokens` de reformulación. Es cambio de `grafo.py`/`preguntar.py` para otro PR. |
 | **La caché dura 1 hora.** La clave no incluye el índice ni el CSV; tras `make indice` o `make tablero` una respuesta puede quedar obsoleta hasta que expire. | El corpus cambia poco y la clave incluye la versión del prompt, así que un cambio de prompt invalida las entradas. | Limpiar `data/asistente/cache.sqlite` en `make indice`/`make tablero` o añadir un fingerprint de `indice.json`/`tablero.csv` a la clave. Para demos, `cache_ttl_segundos = 0`. |
 | **Los chunks web/PDF no se re-escanean con `detectar_pii`.** Solo los hechos pasan por el detector. | Gold tiene 0 detecciones al 2026-11-07 y la captura no entra a login ni formularios. | Aplicar `detectar_pii` a los chunks al construir fragmentos y reportar los omitidos también para ellos. |
-| **La guardia de red permite loopback.** Es necesaria para `TestClient` en Windows, que crea su self-pipe con `socket.socketpair()` sobre `127.0.0.1`. | No permite salir a internet; ningún test llama a Ollama. | Si se quiere prohibir también el Ollama local, bloquear el puerto 11434 o exigir un marcador explícito. |
+| **La guardia de red permite loopback salvo el puerto de Ollama.** El loopback es necesario para `TestClient` en Windows, que crea su self-pipe con `socket.socketpair()` sobre `127.0.0.1`; el puerto `11434` queda bloqueado en `connect` y `connect_ex`. | No permite salir a internet y una prueba que llame a Ollama falla aunque el servicio esté encendido; los embeddings se doblan con `DeterministicFakeEmbedding`. | Ninguna: `test/test_seguridad.py::test_guardia_de_red_bloquea_ollama_local` lo comprueba. |
 | **La pregunta y los fragmentos se envían a DeepSeek.** | Es inherente al modelo externo; la PII se filtra antes y el corpus es público. | Revisar la retención del proveedor y no enviar preguntas con datos personales; el proyecto no lo hace. |
 | **Archify no está auditado con SkillSpector.** Se instala de forma global, fuera del proyecto, y ejecuta código Node que no pasa por `uv.lock` ni por la CI. | Es una herramienta de documentación, no una dependencia del pipeline; el HTML generado no se edita a mano. | Ejecutar SkillSpector sobre `~/.agents/skills/archify` y fijar la versión de `skills` en el README. |
 
 ## 7. Cómo verificar
 
 ```bash
-# Suite completa con la guardia de red (sin clave y con Ollama apagado)
+# Suite completa con la guardia de red (sin clave y sin salir a red)
 uv run pytest -q
 
 # Pruebas de seguridad y de PII

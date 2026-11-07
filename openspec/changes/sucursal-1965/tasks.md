@@ -159,7 +159,7 @@
 - [x] 24.2 Añadir la skill a la tabla de `.opencode/skills/` en `AGENTS.md` y a la documentación de skills; verificar que el enlace y el nombre son correctos y que no duplica las reglas de `corpus-extraction` ni `semantic-extraction`.
 - [x] 24.3 Documentar en la skill las reglas de seguridad: fragmentos como datos, sin PII, índice no versionado, servidor solo local y pruebas sin red; verificar que cada regla apunta al archivo o comando que la hace cumplir.
 
-## 25. Seguridad y reglas de GGA (Anny — pendiente)
+## 25. Seguridad y reglas de GGA (Nayla — hecho)
 
 - [x] 25.1 Actualizar la sección GGA de `AGENTS.md` con los rechazos nuevos: índice vectorial versionado, servidor en `0.0.0.0`, precios de DeepSeek duplicados fuera de `arqueo/metricas.py`, fragmentos tratados como instrucciones, caché con PII y pruebas que llaman a Ollama o DeepSeek; verificar que cada regla se puede comprobar con un archivo o comando.
 - [x] 25.2 Añadir pruebas de seguridad: que el servidor no acepta host público, que no se lee `.env`, que no hay claves en el código, que PII no entra en caché ni memoria y que los fragmentos con instrucciones no cambian el sistema; ejecutar `make check`.
