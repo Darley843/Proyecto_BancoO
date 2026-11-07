@@ -67,6 +67,8 @@ class ResumenFragmentos:
     hechos_por_revision: dict[str, int]
     omitidos_sin_evidencia: int
     omitidos_pii: int
+    pdf: int = 0
+    avisos: tuple[str, ...] = ()
     duplicados: int = 0
 
 
@@ -114,10 +116,22 @@ def cargar_chunks(config: Config) -> list[dict[str, Any]]:
     return filas
 
 
+def _avisos(config: Config, alcance: Alcance) -> tuple[str, ...]:
+    """Devuelve los avisos de una construcción con la capa Knowledge incompleta."""
+    if not config.paths.knowledge_chunks.exists():
+        return (
+            "Falta data/knowledge/chunks.jsonl: el alcance "
+            f"{alcance} queda sin los fragmentos de PDF ni de video. "
+            "Corre make chunks antes de make fragmentos o make indice.",
+        )
+    return ()
+
+
 def construir_fragmentos(config: Config, alcance: Alcance = "base") -> ResultadoFragmentos:
     """Construye los fragmentos del alcance pedido a partir de chunks y hechos."""
     _validar_alcance(alcance)
     chunks = cargar_chunks(config)
+    avisos = _avisos(config, alcance)
     origenes = _mapa_origen(config)
     repetidas, frecuentes = _detectar_lineas_repetidas(chunks, origenes)
 
@@ -168,6 +182,7 @@ def construir_fragmentos(config: Config, alcance: Alcance = "base") -> Resultado
         revisiones=revisiones,
         omitidos_sin_evidencia=omitidos_sin_evidencia,
         omitidos_pii=omitidos_pii,
+        avisos=avisos,
         duplicados=duplicados,
     )
     return ResultadoFragmentos(fragmentos=tuple(fragmentos), resumen=resumen)
@@ -186,23 +201,29 @@ def escribir_fragmentos(
 def formatear_resumen(resumen: ResumenFragmentos, ruta: Path) -> str:
     """Devuelve el texto legible con el resumen de los fragmentos escritos."""
     tipos = ", ".join(f"{tipo}={cantidad}" for tipo, cantidad in sorted(resumen.por_tipo.items()))
-    lineas = [
-        f"Fragmentos escritos: {resumen.total} en {ruta}",
-        f"Por tipo: {tipos or 'sin fragmentos'}",
-        (
-            f"Tokens: min={resumen.tokens_min}, mediana={resumen.tokens_mediana:.1f}, "
-            f"max={resumen.tokens_max}"
-        ),
-        f"Fragmentos con menos de {TOKENS_MINIMOS} tokens: {resumen.cortos}",
-        f"Fragmentos con más de {TOKENS_MAXIMOS} tokens: {resumen.fragmentos_largos}",
-        f"Tablas enteras: {resumen.tablas_enteras}",
-        (
-            f"Tablas partidas por filas: {resumen.tablas_partidas} "
-            f"en {resumen.partes_tablas_partidas} partes"
-        ),
-        f"lineas_repetidas: {resumen.lineas_repetidas} (líneas distintas marcadas)",
-        f"Duplicados descartados: {resumen.duplicados}",
-    ]
+    lineas = [f"AVISO: {aviso}" for aviso in resumen.avisos]
+    if lineas:
+        lineas.append("")
+    lineas.extend(
+        [
+            f"Fragmentos escritos: {resumen.total} en {ruta}",
+            f"Por tipo: {tipos or 'sin fragmentos'}",
+            f"Fragmentos PDF: {resumen.pdf}",
+            (
+                f"Tokens: min={resumen.tokens_min}, mediana={resumen.tokens_mediana:.1f}, "
+                f"max={resumen.tokens_max}"
+            ),
+            f"Fragmentos con menos de {TOKENS_MINIMOS} tokens: {resumen.cortos}",
+            f"Fragmentos con más de {TOKENS_MAXIMOS} tokens: {resumen.fragmentos_largos}",
+            f"Tablas enteras: {resumen.tablas_enteras}",
+            (
+                f"Tablas partidas por filas: {resumen.tablas_partidas} "
+                f"en {resumen.partes_tablas_partidas} partes"
+            ),
+            f"lineas_repetidas: {resumen.lineas_repetidas} (líneas distintas marcadas)",
+            f"Duplicados descartados: {resumen.duplicados}",
+        ]
+    )
     if resumen.lineas_frecuentes:
         lineas.append("Líneas repetidas más frecuentes:")
         lineas.extend(
@@ -664,6 +685,7 @@ def _resumir(
     revisiones: dict[str, int],
     omitidos_sin_evidencia: int,
     omitidos_pii: int,
+    avisos: tuple[str, ...] = (),
     duplicados: int = 0,
 ) -> ResumenFragmentos:
     """Calcula las métricas del resumen a partir de los fragmentos construidos."""
@@ -686,6 +708,8 @@ def _resumir(
         hechos_por_revision=dict(sorted(revisiones.items())),
         omitidos_sin_evidencia=omitidos_sin_evidencia,
         omitidos_pii=omitidos_pii,
+        pdf=por_tipo.get("pdf", 0),
+        avisos=avisos,
         duplicados=duplicados,
     )
 

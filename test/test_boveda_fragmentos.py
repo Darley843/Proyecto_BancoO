@@ -534,6 +534,7 @@ def test_formatear_resumen(tmp_path: Path) -> None:
     texto = formatear_resumen(resumen, tmp_path / "fragmentos_base.jsonl")
 
     assert "Fragmentos escritos: 3" in texto
+    assert "Fragmentos PDF: 0" in texto
     assert "lineas_repetidas: 1" in texto
     assert "Fragmentos con más de 400 tokens: 0" in texto
     assert "Tablas enteras: 2" in texto
@@ -557,6 +558,85 @@ def test_main_escribe_archivo(
     salida = capsys.readouterr().out
     assert "Fragmentos escritos:" in salida
     assert "lineas_repetidas:" in salida
+    assert (tmp_path / "data/boveda/fragmentos_base.jsonl").exists()
+
+
+@pytest.mark.parametrize("alcance", ["base", "completo"])
+def test_sin_chunks_completos_avisa_y_cuenta_cero_pdf(tmp_path: Path, alcance: str) -> None:
+    """Sin chunks.jsonl el resumen avisa, no falla y declara cero fragmentos pdf."""
+    config = make_config(tmp_path)
+    write_indices(config, paginas=[{"id": "pagina-demo", "titulo": "Página demo"}])
+    write_chunks(
+        config,
+        [chunk("pagina-demo", "Contenido de la pagina " * 20)],
+        nombre="chunks_web.jsonl",
+    )
+
+    resultado = construir_fragmentos(config, alcance)  # type: ignore[arg-type]
+
+    aviso = (
+        "Falta data/knowledge/chunks.jsonl: el alcance "
+        f"{alcance} queda sin los fragmentos de PDF ni de video. "
+        "Corre make chunks antes de make fragmentos o make indice."
+    )
+    assert resultado.resumen.avisos == (aviso,)
+    assert resultado.resumen.pdf == 0
+    assert resultado.fragmentos
+    texto = formatear_resumen(resultado.resumen, tmp_path / "fragmentos_base.jsonl")
+    assert texto.splitlines()[0] == f"AVISO: {aviso}"
+
+
+def test_con_chunks_completos_no_avisa_y_cuenta_los_pdf(tmp_path: Path) -> None:
+    """Con chunks.jsonl el resumen no avisa y cuenta los fragmentos de tipo pdf."""
+    config = make_config(tmp_path)
+    write_indices(
+        config,
+        paginas=[{"id": "pagina-demo", "titulo": "Página demo"}],
+        documentos=[
+            {
+                "id": "producto-demo",
+                "titulo": "Documento de producto",
+                "categoria_documento": "producto",
+            }
+        ],
+    )
+    write_chunks(
+        config,
+        [
+            chunk("pagina-demo", "Contenido de la pagina " * 20),
+            chunk("producto-demo", "Contenido del producto " * 20),
+        ],
+    )
+
+    resultado = construir_fragmentos(config, "base")
+
+    assert resultado.resumen.avisos == ()
+    assert resultado.resumen.pdf == 1
+    assert resultado.resumen.por_tipo.get("pdf") == 1
+    texto = formatear_resumen(resultado.resumen, tmp_path / "fragmentos_base.jsonl")
+    assert "AVISO" not in texto
+    assert "Fragmentos PDF: 1" in texto
+
+
+def test_main_avisa_sin_chunks_completos(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """El comando fragmentos imprime el aviso al inicio y termina con éxito."""
+    config = make_config(tmp_path)
+    write_indices(config, paginas=[{"id": "pagina-demo", "titulo": "Página demo"}])
+    write_chunks(
+        config,
+        [chunk("pagina-demo", "Contenido de la pagina " * 20)],
+        nombre="chunks_web.jsonl",
+    )
+    monkeypatch.setattr("banco_occidente_corpus.boveda.__main__.load_config", lambda: config)
+
+    codigo = main(["fragmentos", "--alcance", "base"])
+
+    assert codigo == 0
+    salida = capsys.readouterr().out
+    assert salida.startswith("AVISO: Falta data/knowledge/chunks.jsonl")
+    assert "Fragmentos PDF: 0" in salida
     assert (tmp_path / "data/boveda/fragmentos_base.jsonl").exists()
 
 
