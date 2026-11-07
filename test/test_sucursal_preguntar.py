@@ -35,10 +35,11 @@ from banco_occidente_corpus.sucursal.grafo import (
 )
 from banco_occidente_corpus.sucursal.preguntar import (
     PiezasGrafo,
+    ServicioPreguntas,
     construir_piezas,
     requiere_modelo,
 )
-from banco_occidente_corpus.tablero.tipos import Fila, escribir_filas
+from banco_occidente_corpus.tablero.tipos import Fila, escribir_filas, ruta_tablero
 
 RAIZ = Path(__file__).resolve().parents[1]
 URL = "https://www.bancodeoccidente.com.co/documents/d/guest/tarifas-persona-1"
@@ -697,3 +698,80 @@ def test_registrar_turno_en_hilo_nuevo(tmp_path: Path) -> None:
         PREGUNTA_BOVEDA,
         RESPUESTA_BOVEDA,
     ]
+
+
+class CacheEspia:
+    """Caché que falla si el servicio la consulta o la escribe."""
+
+    def __init__(self) -> None:
+        """Deja constancia de cualquier acceso inesperado."""
+        self.llamadas: list[str] = []
+
+    def obtener(self, clave: str) -> dict[str, Any] | None:
+        """Falla: con `usar_cache=False` no debe consultarse."""
+        self.llamadas.append(f"obtener:{clave}")
+        raise AssertionError("no debía consultar la caché")
+
+    def guardar(self, clave: str, respuesta: Any) -> None:
+        """Falla: con `usar_cache=False` no debe guardarse nada."""
+        self.llamadas.append(f"guardar:{clave}")
+        raise AssertionError("no debía guardar en la caché")
+
+
+def test_servicio_sin_cache_no_consulta_ni_guarda(tmp_path: Path) -> None:
+    """Con `usar_cache=False` el servicio ni lee ni escribe la caché."""
+    config = make_config(tmp_path)
+    indice = tmp_path / "data/boveda/indice.json"
+    indice.parent.mkdir(parents=True)
+    indice.write_text(
+        json.dumps(
+            {
+                "modelo": "nomic-embed-text-v2-moe",
+                "prefijos": True,
+                "alcance": "base",
+                "fragmentos": 10,
+                "dimension": 768,
+            }
+        ),
+        encoding="utf-8",
+    )
+    dependencias = DependenciasGrafo(
+        recuperador=RecuperadorFalso([fragmento()]),
+        filas=[],
+        modelo=ModeloGuion([RESPUESTA_BOVEDA]),
+        canal=canal(),
+        contador=ContadorTurnos(),
+    )
+    grafo = crear_grafo(dependencias, tmp_path / "data/asistente/memoria.sqlite")
+    cache = CacheEspia()
+    servicio = ServicioPreguntas(
+        config,
+        ConfiguracionSucursal(tope_diario_usd=0.2, cache_ttl_segundos=60, demo=False),
+        GastoDiario(tmp_path / "data/asistente/gasto.sqlite"),
+        cache=cache,  # type: ignore[arg-type]
+        piezas=lambda: PiezasGrafo(dependencias, grafo),
+        usar_cache=False,
+    )
+
+    respuesta = servicio.preguntar(PREGUNTA_BOVEDA, "hilo-sin-cache")
+
+    assert respuesta["cache"] is False
+    assert cache.llamadas == []
+
+
+def test_construir_piezas_respeta_la_ruta_de_memoria(tmp_path: Path) -> None:
+    """`construir_piezas` compila el checkpointer en la ruta indicada."""
+    config = make_config(tmp_path)
+    escribir_filas(ruta_tablero(config), [fila()])
+    ruta = tmp_path / "data/asistente/memoria_evaluacion.sqlite"
+
+    construir_piezas(
+        config,
+        ConfiguracionSucursal(),
+        crear_modelo_chat=lambda: ModeloGuion([]),
+        crear_recuperador_boveda=lambda: RecuperadorFalso([]),
+        ruta_memoria=ruta,
+    )
+
+    assert ruta.exists()
+    assert not (tmp_path / "data/asistente/memoria.sqlite").exists()

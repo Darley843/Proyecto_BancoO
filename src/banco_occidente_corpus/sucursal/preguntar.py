@@ -24,6 +24,7 @@ import time
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
@@ -254,6 +255,7 @@ def construir_piezas(
     *,
     crear_modelo_chat: Callable[[], BaseChatModel] | None = None,
     crear_recuperador_boveda: Callable[[], Recuperador] | None = None,
+    ruta_memoria: Path | None = None,
 ) -> PiezasGrafo:
     """Construye dependencias y grafo una sola vez, sin red si se inyectan dobles.
 
@@ -267,6 +269,9 @@ def construir_piezas(
             `crear_modelo_para("qa")`.
         crear_recuperador_boveda: fábrica alternativa del recuperador; por
             defecto el híbrido real sobre el índice `base`.
+        ruta_memoria: archivo SQLite del `checkpointer`; por defecto el de la
+            Ventanilla (`data/asistente/memoria.sqlite`). La evaluación v2 usa
+            uno propio para no mezclar sus hilos con la conversación real.
 
     Returns:
         Las piezas listas para atender preguntas.
@@ -291,7 +296,7 @@ def construir_piezas(
         configuracion_digiturno=cargar_configuracion_digiturno(),
         contador=ContadorTurnos(),
     )
-    grafo = crear_grafo(dependencias, config.paths.root / RUTA_MEMORIA)
+    grafo = crear_grafo(dependencias, ruta_memoria or config.paths.root / RUTA_MEMORIA)
     return PiezasGrafo(dependencias=dependencias, grafo=grafo)
 
 
@@ -306,6 +311,7 @@ class ServicioPreguntas:
         *,
         cache: CacheRespuestas | None = None,
         piezas: Callable[[], PiezasGrafo] | None = None,
+        usar_cache: bool = True,
     ) -> None:
         """Guarda las dependencias y deja la construcción para la primera pregunta.
 
@@ -316,12 +322,16 @@ class ServicioPreguntas:
             cache: caché alternativa; por defecto la de `data/asistente/`.
             piezas: fábrica alternativa para las pruebas; por defecto
                 `construir_piezas`.
+            usar_cache: False desactiva la caché por completo (ni consulta ni
+                guarda). La evaluación v2 lo usa para no reutilizar respuestas
+                de una corrida anterior.
         """
         self._config = config
         self._ajustes = ajustes
         self._gasto = gasto
         self._cache = cache
         self._fabrica = piezas
+        self._usar_cache = usar_cache
         self._construidas: PiezasGrafo | None = None
         self._candado = threading.Lock()
 
@@ -380,7 +390,7 @@ class ServicioPreguntas:
         piezas = self._piezas_o_error()
         version = piezas.dependencias.prompt.nombre
 
-        if not self._ajustes.demo and not es_seguimiento(limpia):
+        if self._usar_cache and not self._ajustes.demo and not es_seguimiento(limpia):
             guardado = self._buscar_en_cache(limpia, version)
             if guardado is not None:
                 return self._desde_cache(guardado, piezas, limpia, hilo, inicio)
@@ -542,7 +552,7 @@ class ServicioPreguntas:
             costo, tokens = costo_de_uso(uso, tarifas_para(datetime.now(UTC)))
             payload["costo_usd"] = round(costo, 6)
             self._gasto.sumar(costo, tokens)
-            if letra != "X" and not es_sin_datos(respuesta):
+            if self._usar_cache and letra != "X" and not es_sin_datos(respuesta):
                 clave = CacheRespuestas.clave(reformulada or pregunta, ruta, version)
                 self._guardar_en_cache(clave, payload)
 

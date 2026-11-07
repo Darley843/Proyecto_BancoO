@@ -4,7 +4,7 @@ Reporte reproducible de recuperacion, evaluacion y costo de la fase 2. Se genera
 
 ## Ficha de corrida
 
-- Commit: `1652b9e`.
+- Commit: `978e317`.
 - Alcance del indice: `base`.
 - Indice con prefijos: `data/boveda/indice.json` con modelo `nomic-embed-text-v2-moe`, prefijos si, 869 fragmentos y dimension 768.
 - Indice sin prefijos: `data/boveda/experimentos/sin_prefijos/indice.json` con 869 fragmentos y dimension 768.
@@ -146,11 +146,13 @@ Posicion 1 a 5 de la primera URL esperada en el top 5; `—` significa que no ap
 | Version | Aciertos | Total | Exactitud | Citas correctas | Revisadas |
 |---|---:|---:|---:|---:|---:|
 | v1 | 16 | 20 | 0.8000 | 0.9444 | 20 |
-| v2 | — | — | — | — | — |
+| v2 | 11 | 20 | 0.5500 | 0.5000 | 20 |
 
 ## McNemar v1 frente a v2 (20 preguntas de alcance)
 
-Pendiente: no existe `config/evaluacion/revision_humana_v2.toml` con veredictos, asi que los 20 pares quedan excluidos y no se declara mejora. Cuando exista la revision v2, `make arqueo` la incorpora sin tocar codigo.
+| b | c | n | p exacta | Excluidos |
+|---:|---:|---:|---:|---:|
+| 5 | 0 | 5 | 0.062500 | 0 |
 
 ## Costo y uso
 
@@ -158,7 +160,7 @@ Pendiente: no existe `config/evaluacion/revision_humana_v2.toml` con veredictos,
 |---|---:|
 | Costo del Arqueo (DeepSeek) | 0.000000 |
 | Costo historico de v1 | 0.027624 |
-| Costo historico de v2 | pendiente |
+| Costo historico de v2 | 0.015728 |
 | Preguntas del banco | 44 |
 
 El Arqueo no llama a DeepSeek: su costo es cero. `v1_usd` y `v2_usd` son el costo historico de las evaluaciones, calculado con las tarifas de `arqueo/metricas.py`.
@@ -176,8 +178,6 @@ Diferencias por normalizacion de URL y por deduplicacion de texto se reportan co
 
 ## Limites
 
-- revision_humana_v2.toml no existe o no tiene revisiones: el McNemar v1 vs v2 queda pendiente y se excluyen los 20 pares.
-- resultados_v2.jsonl no existe: la evaluacion v2 queda pendiente (tarea 22.3).
 - El indice sin prefijos se reutiliza si coinciden modelo, alcance, numero de fragmentos y huella del contenido; si no, se reconstruye.
 - El acierto se mide por URL, no por fragmento: una pregunta cuenta como acierto si aparece la pagina esperada aunque el fragmento con el dato no este en el top 5 (por ejemplo, la pregunta 7 y el fragmento de la fundacion en 1965).
 - El set no nombra el banco en sus preguntas. La prueba de robustez del #85 (indice de 893 fragmentos) mostro que agregar la marca a la consulta baja el hit@5 de 0.75 a 0.53 (McNemar p de 0.02).
