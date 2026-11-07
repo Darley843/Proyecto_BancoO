@@ -15,10 +15,13 @@ from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import APIRouter
+import httpx
+from fastapi import APIRouter, Query
 from fastapi.responses import JSONResponse
+from ollama import ResponseError
 from pydantic import BaseModel, Field
 
+from ..boveda.mapa import ServicioMapa
 from ..config import Config
 from ..panel import pipeline_summary
 from ..tablero.consultas import buscar_filas
@@ -27,8 +30,8 @@ from .ajustes import ConfiguracionSucursal, tope_efectivo
 from .costo import CacheRespuestas, GastoDiario
 from .preguntar import ErrorSucursal, PiezasGrafo, ServicioPreguntas, leer_indice
 
-#: Ruta del mapa PCA.
-RUTA_MAPA = "data/boveda/mapa.json"
+#: Largo máximo de la pregunta que se ubica en el mapa.
+LARGO_PREGUNTA_MAPA = 500
 #: Ruta del reporte del Arqueo.
 RUTA_ARQUEO = "data/evaluacion/arqueo.json"
 #: Ruta de los hitos del Vestíbulo.
@@ -189,6 +192,7 @@ def crear_router(
     *,
     cache: CacheRespuestas | None = None,
     piezas: Callable[[], PiezasGrafo] | None = None,
+    mapa_boveda: ServicioMapa | None = None,
 ) -> APIRouter:
     """Crea el router `/api` con las dependencias inyectadas.
 
@@ -199,12 +203,15 @@ def crear_router(
         cache: caché alternativa para las pruebas; por defecto `data/asistente/`.
         piezas: fábrica alternativa del grafo para las pruebas; por defecto se
             construye de forma perezosa en la primera pregunta.
+        mapa_boveda: servicio alternativo del mapa para las pruebas; por defecto
+            lee `data/boveda/mapa.json` y usa Ollama y el recuperador real.
 
     Returns:
         El router con los siete endpoints de la Sucursal.
     """
     router = APIRouter(prefix="/api")
     servicio = ServicioPreguntas(config, ajustes, gasto, cache=cache, piezas=piezas)
+    servicio_mapa = mapa_boveda or ServicioMapa(config)
 
     @router.get("/estado", response_model=EstadoRespuesta)
     def estado() -> EstadoRespuesta:
@@ -231,18 +238,38 @@ def crear_router(
         )
 
     @router.get("/boveda/mapa", response_model=MapaRespuesta)
-    def mapa(pregunta: str | None = None) -> MapaRespuesta:
-        """Devuelve el mapa de la Bóveda o un estado explicable si falta."""
-        datos = _leer_json(config.paths.root / RUTA_MAPA)
+    def mapa(
+        pregunta: str | None = Query(default=None, max_length=LARGO_PREGUNTA_MAPA),
+    ) -> MapaRespuesta:
+        """Devuelve el mapa de la Bóveda y, si hay pregunta, su posición y el top.
+
+        Sin pregunta, `pregunta` es null y `top` está vacío. Si el índice falta,
+        responde un estado explicable. Si Ollama no responde al ubicar la
+        pregunta, devuelve igual los puntos y explica el problema en `error`.
+        """
+        datos = servicio_mapa.mapa()
         if datos is None:
             return MapaRespuesta(
                 disponible=False,
                 error="El mapa aún no está generado: ejecuta `make indice`.",
             )
+        puntos = [PuntoMapa(**punto) for punto in datos.get("puntos", [])]
+        texto = (pregunta or "").strip()
+        if not texto:
+            return MapaRespuesta(puntos=puntos, disponible=True)
+        try:
+            ubicada = servicio_mapa.ubicar(datos, texto)
+            top = servicio_mapa.top(texto)
+        except (ValueError, RuntimeError, OSError, httpx.HTTPError, ResponseError) as error:
+            return MapaRespuesta(
+                puntos=puntos,
+                disponible=True,
+                error=f"No se pudo ubicar la pregunta: {error}",
+            )
         return MapaRespuesta(
-            puntos=[PuntoMapa(**punto) for punto in datos.get("puntos", [])],
-            pregunta=_pregunta_mapa(datos.get("pregunta")),
-            top=list(datos.get("top", [])),
+            puntos=puntos,
+            pregunta=PreguntaMapa(**ubicada),
+            top=top,
             disponible=True,
         )
 
@@ -329,16 +356,6 @@ def _leer_json(ruta: Path) -> dict[str, Any] | None:
     except (OSError, json.JSONDecodeError):
         return None
     return datos if isinstance(datos, dict) else None
-
-
-def _pregunta_mapa(datos: Any) -> PreguntaMapa | None:
-    """Convierte la pregunta proyectada del mapa, si existe."""
-    if not isinstance(datos, dict):
-        return None
-    try:
-        return PreguntaMapa(x=float(datos["x"]), y=float(datos["y"]))
-    except (KeyError, TypeError, ValueError):
-        return None
 
 
 def _indexacion(config: Config) -> IndexacionRespuesta:

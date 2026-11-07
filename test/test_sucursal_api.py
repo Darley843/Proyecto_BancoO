@@ -9,7 +9,10 @@ from pathlib import Path
 from types import ModuleType
 
 from fastapi.testclient import TestClient
+from langchain_core.embeddings import DeterministicFakeEmbedding
 
+from banco_occidente_corpus.boveda.mapa import ServicioMapa
+from banco_occidente_corpus.boveda.tipos import Fragmento
 from banco_occidente_corpus.config import Config, Paths
 from banco_occidente_corpus.sucursal.ajustes import ConfiguracionSucursal
 from banco_occidente_corpus.sucursal.costo import GastoDiario
@@ -155,8 +158,8 @@ def test_mapa_ausente_es_explicable(tmp_path: Path) -> None:
     assert "make indice" in cuerpo["error"]
 
 
-def test_mapa_presente(tmp_path: Path) -> None:
-    """Con mapa.json devuelve puntos, pregunta y top."""
+def test_mapa_presente_sin_pregunta(tmp_path: Path) -> None:
+    """Con mapa.json y sin pregunta devuelve los puntos, `pregunta` null y `top` vacío."""
     cliente, config = preparar(tmp_path)
     mapa = config.paths.root / "data/boveda/mapa.json"
     mapa.write_text(
@@ -174,8 +177,102 @@ def test_mapa_presente(tmp_path: Path) -> None:
 
     assert cuerpo["disponible"] is True
     assert cuerpo["puntos"][0]["x"] == 10.0
-    assert cuerpo["pregunta"] == {"x": 1.0, "y": 2.0}
-    assert cuerpo["top"] == [{"id": "frag:1"}]
+    assert cuerpo["pregunta"] is None
+    assert cuerpo["top"] == []
+
+
+def preparar_con_mapa(
+    tmp_path: Path, *, falla: Exception | None = None
+) -> tuple[TestClient, RecuperadorFalso]:
+    """Crea la app con un mapa real calculado de vectores deterministas."""
+    fragmentos = [
+        Fragmento(
+            id=f"frag:{numero}",
+            texto=texto,
+            url=URL,
+            titulo=f"Página {numero}",
+            seccion="oferta",
+            encabezado="",
+            tipo="pagina",
+            tokens=8,
+            puntaje=0.8,
+        )
+        for numero, texto in enumerate(
+            ["Cuota de manejo", "Cuenta de ahorros", "Crédito", "Oficinas"]
+        )
+    ]
+    embeddings = DeterministicFakeEmbedding(size=8)
+    vectores = embeddings.embed_documents([f.texto for f in fragmentos])
+    recuperador = RecuperadorFalso(fragmentos, falla=falla)
+    config = make_config(tmp_path)
+    servicio = ServicioMapa(
+        config,
+        embeddings=lambda: embeddings,
+        recuperador=lambda: recuperador,
+        vectores=lambda: (fragmentos, vectores),
+    )
+    web = tmp_path / "web"
+    web.mkdir(parents=True)
+    (web / "index.html").write_text("<!doctype html><title>Sucursal</title>", encoding="utf-8")
+    ajustes = ConfiguracionSucursal(tope_diario_usd=0.2, cache_ttl_segundos=60, demo=True)
+    app = cargar_app().crear_app(web, config=config, ajustes=ajustes, mapa_boveda=servicio)
+    return TestClient(app), recuperador
+
+
+class RecuperadorFalso:
+    """Recuperador de pruebas: devuelve los dos primeros fragmentos o falla."""
+
+    def __init__(self, fragmentos: list[Fragmento], *, falla: Exception | None = None) -> None:
+        """Guarda los fragmentos y, si se indica, el error que lanzará."""
+        self.fragmentos = fragmentos
+        self.falla = falla
+
+    def buscar(self, consulta: str, k: int = 5) -> list[Fragmento]:
+        """Lanza el error configurado o devuelve hasta dos fragmentos."""
+        if self.falla is not None:
+            raise self.falla
+        return self.fragmentos[: min(k, 2)]
+
+
+def test_mapa_con_pregunta_la_ubica_y_trae_el_top(tmp_path: Path) -> None:
+    """Con pregunta, la respuesta trae su coordenada de 0 a 100 y el top del recuperador."""
+    cliente, _ = preparar_con_mapa(tmp_path)
+
+    cuerpo = cliente.get("/api/boveda/mapa", params={"pregunta": "cuota de manejo"}).json()
+
+    assert cuerpo["disponible"] is True
+    assert len(cuerpo["puntos"]) == 4
+    for punto in [*cuerpo["puntos"], cuerpo["pregunta"]]:
+        assert 0 <= punto["x"] <= 100
+        assert 0 <= punto["y"] <= 100
+    assert [item["id"] for item in cuerpo["top"]] == ["frag:0", "frag:1"]
+    assert cuerpo["top"][0]["puntaje"] == 0.8
+    assert cuerpo["error"] is None
+
+
+def test_mapa_sin_ollama_explica_y_conserva_los_puntos(tmp_path: Path) -> None:
+    """Si el recuperador u Ollama fallan, se ven los puntos y el error, no un 500."""
+    cliente, _ = preparar_con_mapa(tmp_path, falla=ConnectionError("Ollama no responde"))
+
+    respuesta = cliente.get("/api/boveda/mapa", params={"pregunta": "cuota"})
+    cuerpo = respuesta.json()
+
+    assert respuesta.status_code == 200
+    assert len(cuerpo["puntos"]) == 4
+    assert cuerpo["pregunta"] is None
+    assert cuerpo["top"] == []
+    assert "Ollama no responde" in cuerpo["error"]
+
+
+def test_mapa_pregunta_vacia_es_como_sin_pregunta(tmp_path: Path) -> None:
+    """Una pregunta en blanco no llama al recuperador."""
+    cliente, recuperador = preparar_con_mapa(tmp_path, falla=RuntimeError("no debía llamarse"))
+
+    cuerpo = cliente.get("/api/boveda/mapa", params={"pregunta": "   "}).json()
+
+    assert cuerpo["pregunta"] is None
+    assert cuerpo["error"] is None
+    assert recuperador.falla is not None
 
 
 def test_pipeline_incluye_indexacion(tmp_path: Path) -> None:

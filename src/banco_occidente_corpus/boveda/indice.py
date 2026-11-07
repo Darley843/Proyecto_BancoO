@@ -3,7 +3,8 @@
 `make indice` es el único que escribe el índice: reinicia la colección y vuelve a
 insertar todos los fragmentos del alcance para no dejar vectores huérfanos. El
 archivo `data/boveda/indice.json` declara modelo, prefijos, alcance, fragmentos y
-dimensión, para detectar cuándo el índice dejó de ser compatible.
+dimensión, para detectar cuándo el índice dejó de ser compatible. Con los mismos
+vectores se regenera `data/boveda/mapa.json` (PCA, ver `mapa.py`).
 """
 
 from __future__ import annotations
@@ -22,6 +23,7 @@ from .almacen import AlmacenVectorial, ChromaAlmacen
 from .configuracion import ConfiguracionEmbeddings, cargar_configuracion_embeddings
 from .embeddings import crear_embeddings
 from .fragmentos import ALCANCES, Alcance, ruta_fragmentos
+from .mapa import construir_mapa, escribir_mapa
 from .tipos import Fragmento
 
 #: Fragmentos que se envían a Ollama en cada lote.
@@ -176,6 +178,9 @@ def construir_indice(
         ruta_almacen=ruta_almacen(config),
     )
     _escribir_metadatos(resumen)
+    if len(fragmentos) >= 2:
+        # El mapa usa los mismos vectores recién insertados: no vuelve a llamar a Ollama.
+        escribir_mapa(config, construir_mapa(fragmentos, vectores, alcance=alcance))
     return resumen
 
 

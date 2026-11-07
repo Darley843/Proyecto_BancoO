@@ -93,9 +93,9 @@
 
 ## 14. PR 11 — Mapa PCA (Yoldy — pendiente)
 
-- [ ] 14.1 Implementar `boveda/mapa.py` con `PCA(n_components=2)` sobre los vectores del índice, escritura de `data/boveda/mapa.json`, proyección de la pregunta con la misma transformación y normalización en el servidor de `x` e `y` a 0–100; verificar con `DeterministicFakeEmbedding` que hay un punto por fragmento, que todas las coordenadas están entre 0 y 100, que son finitas y que dos ejecuciones con los mismos vectores dan el mismo resultado.
-- [ ] 14.2 Integrar el mapa en `/api/boveda/mapa` y en `make indice`: regenerar `mapa.json` al indexar y calcularlo una vez si falta; verificar con `TestClient` que la respuesta trae puntos y pregunta normalizados entre 0 y 100, el top de fragmentos, y que sin pregunta `pregunta` es `null`.
-- [ ] 14.3 Verificar que el mapa es solo exploratorio y no interviene en la recuperación ni en el Arqueo; documentar esa limitación en `docs/MODELADO.md` y comprobar que ninguna prueba de recuperación depende de PCA.
+- [x] 14.1 Implementar `boveda/mapa.py` con `PCA(n_components=2)` sobre los vectores del índice, escritura de `data/boveda/mapa.json`, proyección de la pregunta con la misma transformación y normalización en el servidor de `x` e `y` a 0–100; verificar con `DeterministicFakeEmbedding` que hay un punto por fragmento, que todas las coordenadas están entre 0 y 100, que son finitas y que dos ejecuciones con los mismos vectores dan el mismo resultado.
+- [x] 14.2 Integrar el mapa en `/api/boveda/mapa` y en `make indice`: regenerar `mapa.json` al indexar y calcularlo una vez si falta; verificar con `TestClient` que la respuesta trae puntos y pregunta normalizados entre 0 y 100, el top de fragmentos, y que sin pregunta `pregunta` es `null`.
+- [x] 14.3 Verificar que el mapa es solo exploratorio y no interviene en la recuperación ni en el Arqueo; documentar esa limitación en `docs/MODELADO.md` y comprobar que ninguna prueba de recuperación depende de PCA.
 
 ## 15. PR 12 — Base del frontend (Yoldy — pendiente)
 

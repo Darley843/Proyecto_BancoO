@@ -24,6 +24,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
+from banco_occidente_corpus.boveda.mapa import ServicioMapa
 from banco_occidente_corpus.config import Config, load_config
 from banco_occidente_corpus.sucursal.ajustes import (
     ConfiguracionSucursal,
@@ -46,12 +47,13 @@ def crear_app(
     ajustes: ConfiguracionSucursal | None = None,
     cache: CacheRespuestas | None = None,
     piezas: Callable[[], PiezasGrafo] | None = None,
+    mapa_boveda: ServicioMapa | None = None,
 ) -> FastAPI:
     """Crea la app FastAPI de la sucursal y monta la app web en ``/``.
 
     ``carpeta_web`` se puede cambiar en las pruebas para servir otra carpeta;
-    ``config``, ``ajustes``, ``cache`` y ``piezas`` permiten inyectar rutas, topes
-    y un grafo simulado sin tocar la red.
+    ``config``, ``ajustes``, ``cache``, ``piezas`` y ``mapa_boveda`` permiten
+    inyectar rutas, topes, un grafo simulado y un mapa sin tocar la red.
     """
     configuracion = config or load_config()
     parametros = ajustes or cargar_configuracion_sucursal()
@@ -60,7 +62,16 @@ def crear_app(
         title="Sucursal 1965",
         description="Asistente de conocimiento sobre Banco de Occidente (proyecto TAAML, UAO).",
     )
-    app.include_router(crear_router(configuracion, parametros, gasto, cache=cache, piezas=piezas))
+    app.include_router(
+        crear_router(
+            configuracion,
+            parametros,
+            gasto,
+            cache=cache,
+            piezas=piezas,
+            mapa_boveda=mapa_boveda,
+        )
+    )
     app.mount("/", StaticFiles(directory=carpeta_web, html=True), name="web")
     return app
 

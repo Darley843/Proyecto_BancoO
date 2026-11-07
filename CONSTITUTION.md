@@ -188,7 +188,8 @@ ProyectoAvance1/
 │   │   ├── embeddings.py # Ollama local con prefijos de tarea
 │   │   ├── almacen.py    # Chroma persistente con métrica coseno
 │   │   ├── indice.py     # índice por alcance + indice.json
-│   │   └── recuperador.py # híbrido vectorial + BM25 con puntaje coseno
+│   │   ├── recuperador.py # híbrido vectorial + BM25 con puntaje coseno
+│   │   └── mapa.py       # PCA 2D (0–100) del índice y proyección de la pregunta
 │   ├── tablero/          # TABLERO: tarifario y tablas de Gold → CSV
 │   │   ├── tarifas.py    # líneas «concepto, valor y fecha» del tarifario
 │   │   ├── tablas_web.py # lector de tablas Markdown y adaptadores
