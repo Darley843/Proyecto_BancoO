@@ -8,7 +8,7 @@ Preparar fragmentos verificables del corpus, indexarlos con embeddings locales y
 
 ### Requirement: Fragmentos desde los chunks de Gold
 
-La Bóveda SHALL construir fragmentos desde los chunks de `make chunks`. Los encabezados repetidos del menú MUST NOT usarse como encabezado del fragmento ni anteponerse a su texto. Los chunks cortos SHALL fusionarse preferentemente con sus hermanos de sección (mismo padre, mismo nivel y misma familia de encabezado normalizada) y el tope de 400 tokens MUST aplicarse al agrupar. Cada fragmento MUST conservar id estable, texto, URL, título, sección, encabezado, tipo y tokens.
+La Bóveda SHALL construir fragmentos desde los chunks de `make chunks`. Los encabezados repetidos del menú MUST NOT usarse como encabezado del fragmento ni anteponerse a su texto. Los chunks cortos SHALL fusionarse preferentemente con sus hermanos de sección (mismo padre, mismo nivel y misma familia de encabezado normalizada) y el tope de 400 tokens MUST aplicarse al agrupar. Después de descartar los ids repetidos, cuando dos o más fragmentos tienen el mismo texto con los espacios normalizados, la Bóveda MUST conservar uno solo: la primera aparición en el orden del corpus. Cada fragmento MUST conservar id estable, texto, URL, título, sección, encabezado, tipo y tokens.
 
 #### Scenario: Encabezado de menú repetido
 
@@ -39,6 +39,11 @@ La Bóveda SHALL construir fragmentos desde los chunks de `make chunks`. Los enc
 
 - **WHEN** se reconstruye el índice dos veces con el mismo Gold
 - **THEN** cada fragmento conserva el mismo id
+
+#### Scenario: Textos idénticos
+
+- **WHEN** dos fragmentos con id distinto tienen el mismo texto con los espacios normalizados
+- **THEN** se conserva solo el primero en el orden del corpus y los demás se descartan
 
 ### Requirement: Límite de 400 tokens
 

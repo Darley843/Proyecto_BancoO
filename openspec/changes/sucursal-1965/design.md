@@ -53,7 +53,8 @@ Alternativa descartada: empezar por el frontend y la API con datos falsos. Habr�
 4. Ningún fragmento supera 400 tokens. Un bloque que no es tabla y supera 400 se parte por líneas; una línea que supera 400 se parte por oraciones (punto seguido de espacio) y, como último recurso, en ventanas de 400 tokens. Una tabla Markdown que supera 400 se parte por filas repitiendo en cada parte la fila de encabezado y el separador; las líneas que empiezan por `|` se conservan como unidad mientras quepan en el límite. El resumen distingue las tablas enteras de las tablas partidas por filas.
 5. Descarta líneas de ruido con `dedupe.is_noise` y `dedupe.normalize_line`; no reimplementa la detección.
 6. El id es `frag:<sha256(page_id|encabezado|texto)[:12]>`, igual que el patrón de `knowledge.split_page`, para que dos corridas produzcan el mismo id.
-7. `tipo` se deriva de la carpeta de origen: `pagina` para `pages/`, `pdf` para `documents/`, `video` para `videos/`.
+7. Descarta primero los fragmentos con id repetido y después los textos idénticos: colapsa los espacios con `" ".join(texto.split())` y, cuando dos o más fragmentos comparten ese texto, conserva uno solo, la primera aparición en el orden del corpus. El resumen reporta los textos repetidos, los fragmentos descartados y cuántos venían de una página distinta de la conservada.
+8. `tipo` se deriva de la carpeta de origen: `pagina` para `pages/`, `pdf` para `documents/`, `video` para `videos/`.
 
 Alternativa descartada: reutilizar `knowledge.split_page` directamente. No aplica los umbrales de 80/400 tokens ni protege tablas, y obligaría a reabrir todo Gold en cada indexación.
 
