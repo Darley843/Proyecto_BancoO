@@ -487,10 +487,30 @@ url = "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
     "v2": { "aciertos": 17, "total": 20, "exactitud": 0.85, "citas_correctas": 0.9 }
   },
   "mcnemar": { "b": 1, "c": 4, "n": 5, "p": 0.375, "excluidos": 0 },
-  "costo": { "v1_usd": 0.0, "v2_usd": 0.0, "preguntas": 40 },
-  "preguntas_por_tipo": { "alcance": 20, "tabla": 8, "seguimiento": 6, "fuera": 6 }
+  "costo": { "v1_usd": 0.0, "v2_usd": 0.0, "preguntas": 44 },
+  "preguntas_por_tipo": { "alcance": 20, "tabla": 12, "seguimiento": 6, "fuera": 6 }
 }
 ```
+
+Las cinco claves anteriores conservan su significado. El reporte agrega, sin
+reemplazarlas:
+
+- `uso`: tokens y tiempos de v1 y v2, con la forma de `ResumenUso`.
+- `mcnemar_pesos`: comparación principal, fijada de antemano, de los pesos por
+  defecto frente a `1/0` sobre las preguntas de ruta `B` (las de la Bóveda).
+- `mcnemar_pesos_todas`: análisis secundario de la misma comparación sobre todas
+  las preguntas evaluables, incluidas las de ruta `T`.
+  Las tres comparaciones conservan `b`, `c`, `n`, `p` y `excluidos`, y agregan
+  `preguntas` con el total comparado.
+- `detalle`: matriz pregunta × configuración con la posición en el top 5.
+- `conteos`: totales del banco, evaluables por ruta y preguntas con fuente no
+  indexada.
+- `referencia_anexo_a`: valores esperados y medidos para verificar la corrida.
+- `avisos`: notas legibles (revisión v2 pendiente, diferencias por normalización
+  de URL, deduplicación de texto en el recuperador).
+- En cada entrada de `recuperacion`: `etiqueta`, `por_defecto`, `aciertos`,
+  `intervalo95`, `por_tipo` y `sin_tablero`.
+- En `costo`: `arqueo_usd`, siempre cero porque el Arqueo no llama a DeepSeek.
 
 Sin fecha ni rutas absolutas: el archivo es determinista para los mismos datos y revisiones.
 

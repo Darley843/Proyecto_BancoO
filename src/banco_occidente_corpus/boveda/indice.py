@@ -146,10 +146,57 @@ def construir_indice(
         raise ValueError(f"No hay fragmentos para indexar en el alcance {alcance!r}")
     proveedor = embeddings or crear_embeddings(ajustes)
     destino = almacen or ChromaAlmacen(ruta_almacen(config))
+    return construir_indice_en(
+        carpeta_boveda(config),
+        fragmentos,
+        alcance=alcance,
+        ajustes=ajustes,
+        embeddings=proveedor,
+        almacen=destino,
+        config_mapa=config,
+        progreso=progreso,
+    )
 
-    # Vectorizar primero: si Ollama falla, el índice anterior queda intacto.
+
+def construir_indice_en(
+    carpeta: Path,
+    fragmentos: Sequence[Fragmento],
+    *,
+    alcance: Alcance = "base",
+    ajustes: ConfiguracionEmbeddings,
+    embeddings: Embeddings,
+    config_mapa: Config | None = None,
+    almacen: AlmacenVectorial | None = None,
+    progreso: Progreso | None = None,
+) -> ResumenIndice:
+    """Construye un índice en una carpeta arbitraria y escribe sus metadatos.
+
+    Es la variante que usan los experimentos del Arqueo y las pruebas: no lee
+    `data/boveda/`, recibe la lista de fragmentos y el proveedor ya resueltos.
+    No cambia el comportamiento de `construir_indice`, que delega aquí.
+
+    Args:
+        carpeta: carpeta del índice; contendrá `chroma/` e `indice.json`.
+        fragmentos: fragmentos que se van a vectorizar e insertar.
+        alcance: alcance declarado en los metadatos.
+        ajustes: parámetros de embeddings (modelo, prefijos y timeout).
+        embeddings: proveedor que vectoriza los fragmentos.
+        config_mapa: configuracion del proyecto para escribir `mapa.json`; solo la
+            pasa el indice principal. Sin este parametro no se toca el mapa, para
+            que el indice sin prefijos no sobrescriba el mapa principal.
+        almacen: almacén alternativo; por defecto `ChromaAlmacen(carpeta/chroma)`.
+        progreso: callback opcional que recibe el avance de cada lote.
+
+    Returns:
+        El resumen del índice construido.
+    """
+    if not fragmentos:
+        raise ValueError(f"No hay fragmentos para indexar en el alcance {alcance!r}")
+    destino = almacen or ChromaAlmacen(carpeta / NOMBRE_ALMACEN)
+
+    # Vectorizar primero: si el proveedor falla, el índice anterior queda intacto.
     vectores = _vectorizar(
-        proveedor,
+        embeddings,
         fragmentos,
         timeout_segundos=ajustes.timeout,
         progreso=progreso,
@@ -174,14 +221,29 @@ def construir_indice(
         prefijos=ajustes.prefijos,
         fragmentos=len(fragmentos),
         dimension=dimension,
-        ruta_metadatos=ruta_metadatos(config),
-        ruta_almacen=ruta_almacen(config),
+        ruta_metadatos=carpeta / NOMBRE_METADATOS,
+        ruta_almacen=carpeta / NOMBRE_ALMACEN,
     )
     _escribir_metadatos(resumen)
-    if len(fragmentos) >= 2:
+    if config_mapa is not None and len(fragmentos) >= 2:
         # El mapa usa los mismos vectores recién insertados: no vuelve a llamar a Ollama.
-        escribir_mapa(config, construir_mapa(fragmentos, vectores, alcance=alcance))
+        escribir_mapa(config_mapa, construir_mapa(fragmentos, vectores, alcance=alcance))
     return resumen
+
+
+def leer_metadatos(carpeta: Path) -> dict[str, Any] | None:
+    """Lee `indice.json` de una carpeta de índice; devuelve `None` si falta.
+
+    Raises:
+        ValueError: si el archivo no contiene un objeto JSON.
+    """
+    ruta = carpeta / NOMBRE_METADATOS
+    if not ruta.exists():
+        return None
+    datos = json.loads(ruta.read_text(encoding="utf-8"))
+    if not isinstance(datos, dict):
+        raise ValueError(f"{ruta} no contiene un objeto JSON")
+    return {str(clave): valor for clave, valor in datos.items()}
 
 
 def formatear_resumen_indice(resumen: ResumenIndice) -> str:

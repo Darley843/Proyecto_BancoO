@@ -16,6 +16,7 @@ from banco_occidente_corpus.arqueo.metricas import (
     citas_correctas,
     exactitud,
     hit_at_k,
+    intervalo_wilson,
     mcnemar,
     mrr,
     resumen_uso,
@@ -503,3 +504,42 @@ def test_mcnemar_excluye_pares_con_none() -> None:
     assert resultado.n == 1
     assert resultado.excluidos == 2
     assert resultado.p == 1.0
+
+
+def test_intervalo_wilson_ejemplo_23_de_36() -> None:
+    """El intervalo del hit@5 de 23/36 coincide con la formula de Wilson."""
+    # Act
+    intervalo = intervalo_wilson(23, 36)
+
+    # Assert
+    assert intervalo is not None
+    assert intervalo[0] == pytest.approx(0.4758, abs=1e-4)
+    assert intervalo[1] == pytest.approx(0.7752, abs=1e-4)
+
+
+def test_intervalo_wilson_sin_evaluables_devuelve_none() -> None:
+    """Sin preguntas evaluables no hay intervalo."""
+    assert intervalo_wilson(0, 0) is None
+
+
+def test_intervalo_wilson_extremos_quedan_acotados() -> None:
+    """Con cero o todos los aciertos el intervalo toca 0 o 1."""
+    # Act
+    ninguno = intervalo_wilson(0, 10)
+    todos = intervalo_wilson(10, 10)
+
+    # Assert
+    assert ninguno is not None and ninguno[0] == 0.0
+    assert todos is not None and todos[1] == 1.0
+    assert ninguno[0] <= 0.0 <= ninguno[1] <= 1.0
+    assert todos[0] <= 1.0 <= todos[1]
+
+
+def test_intervalo_wilson_rechaza_conteos_invalidos() -> None:
+    """Conteos negativos o fuera de rango se rechazan."""
+    with pytest.raises(ValueError):
+        intervalo_wilson(-1, 10)
+    with pytest.raises(ValueError):
+        intervalo_wilson(11, 10)
+    with pytest.raises(ValueError):
+        intervalo_wilson(5, 10, confianza=1.5)

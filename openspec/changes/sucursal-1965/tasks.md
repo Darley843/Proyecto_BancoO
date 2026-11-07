@@ -138,14 +138,14 @@
 - [ ] 21.2 Mostrar el estado «sin arqueo» cuando `disponible` es falso y no presentar métricas vacías como resultados; verificar sin `data/evaluacion/arqueo.json`.
 - [ ] 21.3 Verificar que la vista distingue recuperación, evaluación v1/v2 y costo, y que no recalcula métricas en el navegador.
 
-## 22. Experimentos del Arqueo (Anny — pendiente)
+## 22. Experimentos del Arqueo (Anny — en curso)
 
-- [ ] 22.1 Implementar en `arqueo/experimentos.py` el cargador de las 40 preguntas con `tipo`, `ruta_esperada`, `fuentes_esperadas` y `previa`, sin romper el cargador de v1; verificar con pruebas los conteos 20/8/6/6, los campos obligatorios y una pregunta de seguimiento sin `previa` que debe fallar.
-- [ ] 22.2 Implementar el barrido de recuperación con los pesos `1/0`, `0/1`, `0.2/0.8`, `0.4/0.6`, `0.6/0.4` y `0.8/0.2`, sin reindexar al cambiar pesos, calculando `hit_at_k(k=5)` y `mrr(k=5)` con `arqueo/metricas.py`; para los prefijos, construir un único índice sin prefijos en `data/boveda/experimentos/sin_prefijos` y medirlo con los pesos por defecto. Verificar con `DeterministicFakeEmbedding` y un corpus mínimo que no hay llamadas a DeepSeek y que las dos líneas base aparecen en el reporte.
+- [x] 22.1 Implementar en `arqueo/experimentos.py` el cargador de las 44 preguntas con `tipo`, `ruta_esperada`, `fuentes_esperadas` y `previa`, sin romper el cargador de v1; verificar con pruebas los conteos 20/12/6/6, los campos obligatorios y una pregunta de seguimiento sin `previa` que debe fallar.
+- [x] 22.2 Implementar el barrido de recuperación con los pesos `1/0`, `0/1`, `0.2/0.8`, `0.4/0.6`, `0.6/0.4` y `0.8/0.2`, sin reindexar al cambiar pesos, calculando `hit_at_k(k=5)` y `mrr(k=5)` con `arqueo/metricas.py`; para los prefijos, construir un único índice sin prefijos en `data/boveda/experimentos/sin_prefijos` y medirlo con los pesos por defecto. Verificar con `DeterministicFakeEmbedding` y un corpus mínimo que no hay llamadas a DeepSeek y que las dos líneas base aparecen en el reporte.
 - [ ] 22.3 Implementar `evaluar_v2` para `make evaluar VERSION=v2`: envía la `previa` en el mismo `thread_id` antes de la pregunta de seguimiento y escribe `data/evaluacion/resultados_v2.jsonl` y `docs/RESULTADOS_FASE2.md` sin sobrescribir v1; verificar con un grafo simulado que el hilo y el orden de los mensajes son correctos.
-- [ ] 22.4 Integrar McNemar sobre las 20 preguntas de alcance con `revision_humana.toml` y `revision_humana_v2.toml`, creando esta última con la revisión de las respuestas v2; convertir veredictos a aciertos y excluir los pares sin revisión; verificar con fixtures los casos `b`, `c`, empate y revisión faltante.
-- [ ] 22.5 Escribir `data/evaluacion/arqueo.json` y `docs/ARQUEO.md` sin fecha ni rutas absolutas, con recuperación, evaluación, McNemar, costo y conteo por tipo; verificar que dos ejecuciones con los mismos datos son idénticas y que las cifras del Markdown coinciden con el JSON.
-- [ ] 22.6 Añadir `make arqueo` y verificar que funciona sin `DEEPSEEK_API_KEY`, que no está encadenado a `all`, `gold` ni `deliver`, y que `make help` lo lista; documentar el comando y la interpretación del reporte en `docs/ARQUEO.md`.
+- [ ] 22.4 Integrar McNemar sobre las 20 preguntas de alcance con `revision_humana.toml` y `revision_humana_v2.toml`, creando esta última con la revisión de las respuestas v2; convertir veredictos a aciertos y excluir los pares sin revisión; verificar con fixtures los casos `b`, `c`, empate y revisión faltante. Código y pruebas listos en el PR de la A4; falta `revision_humana_v2.toml`, que sale de la revisión de la A6.
+- [x] 22.5 Escribir `data/evaluacion/arqueo.json` y `docs/ARQUEO.md` sin fecha ni rutas absolutas, con recuperación, evaluación, McNemar, costo y conteo por tipo; verificar que dos ejecuciones con los mismos datos son idénticas y que las cifras del Markdown coinciden con el JSON.
+- [x] 22.6 Añadir `make arqueo` y verificar que funciona sin `DEEPSEEK_API_KEY`, que no está encadenado a `all`, `gold` ni `deliver`, y que `make help` lo lista; documentar el comando y la interpretación del reporte en `docs/ARQUEO.md`.
 
 ## 23. Retiro de Streamlit (Darley — hecho)
 

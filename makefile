@@ -143,6 +143,10 @@ app: ## Abre la Sucursal 1965 en http://127.0.0.1:8000 (API + app web)
 evaluar: ## Corre las 20 preguntas del alcance y escribe docs/RESULTADOS_20_PREGUNTAS.md (requiere DEEPSEEK_API_KEY)
 	$(UV) run python -m banco_occidente_corpus.asistente evaluar $(if $(SOLO),--solo $(SOLO),) $(if $(PAUSA),--pausa $(PAUSA),) $(if $(VERSION),--version $(VERSION),) $(if $(REVALIDAR),--revalidar,)
 
+.PHONY: arqueo
+arqueo: ## Escribe data/evaluacion/arqueo.json y docs/ARQUEO.md (sin red ni DeepSeek)
+	$(UV) run python -m banco_occidente_corpus.arqueo $(if $(ALCANCE),--alcance $(ALCANCE),)
+
 .PHONY: all
 all: ## Pipeline completo: discover -> fetch -> extract -> gold -> stats
 	$(CORPUS) all $(if $(LIMIT),--limit $(LIMIT),) $(if $(DELAY),--delay $(DELAY),)

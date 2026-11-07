@@ -1,0 +1,15 @@
+# Referencia del anexo A: valores medidos por el grupo con el script del anexo A
+# sobre 36 preguntas con fuente. No son un umbral: sirven para comprobar que el
+# barrido reproduce el orden del recuperador.
+#
+# Se midieron con el indice de 846 fragmentos, sin los 81 de PDF (faltaba
+# data/knowledge/chunks.jsonl, ver PR #78). Con el indice completo la medicion
+# local da las mismas cifras que este Arqueo.
+
+[referencia_anexo_a."1/0"]
+hit_at_5 = 0.64
+mrr = 0.52
+
+[referencia_anexo_a.por_defecto]
+hit_at_5 = 0.64
+mrr = 0.48

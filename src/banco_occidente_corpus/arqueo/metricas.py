@@ -10,6 +10,7 @@ from __future__ import annotations
 import math
 from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass
+from statistics import NormalDist
 from typing import Any, NamedTuple
 
 from ..asistente.metricas import leer_uso
@@ -254,6 +255,52 @@ def resumen_uso(
         costo_usd_promedio=costo_total / n,
         tiempo_promedio=tiempo_total / n,
         tiempo_maximo=tiempo_maximo,
+    )
+
+
+def intervalo_wilson(
+    aciertos: int,
+    evaluables: int,
+    confianza: float = 0.95,
+) -> tuple[float, float] | None:
+    """Intervalo de confianza de Wilson para una proporcion binomial.
+
+    Args:
+        aciertos: numero de respuestas correctas.
+        evaluables: total de preguntas que entran en el calculo.
+        confianza: nivel de confianza entre cero y uno; por defecto 0,95.
+
+    Returns:
+        La tupla ``(limite_inferior, limite_superior)`` acotada a [0, 1], o
+        ``None`` si no hay preguntas evaluables.
+
+    Raises:
+        ValueError: si los conteos son negativos, ``aciertos`` supera a
+            ``evaluables`` o ``confianza`` no esta entre cero y uno.
+    """
+    if evaluables < 0:
+        raise ValueError("evaluables no puede ser negativo")
+    if aciertos < 0 or aciertos > evaluables:
+        raise ValueError("aciertos debe estar entre cero y evaluables")
+    if not 0 < confianza < 1:
+        raise ValueError("confianza debe estar entre cero y uno")
+    if evaluables == 0:
+        return None
+
+    z = NormalDist().inv_cdf(1 - (1 - confianza) / 2)
+    proporcion = aciertos / evaluables
+    denominador = 1 + z * z / evaluables
+    centro = (proporcion + z * z / (2 * evaluables)) / denominador
+    margen = (
+        z
+        * math.sqrt(
+            proporcion * (1 - proporcion) / evaluables + z * z / (4 * evaluables * evaluables)
+        )
+        / denominador
+    )
+    return (
+        0.0 if aciertos == 0 else max(0.0, centro - margen),
+        1.0 if aciertos == evaluables else min(1.0, centro + margen),
     )
 
 
