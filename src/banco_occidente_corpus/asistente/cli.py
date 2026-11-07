@@ -9,7 +9,7 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from langchain_core.language_models import BaseChatModel
 
@@ -44,6 +44,10 @@ from .modelo import MODELO_POR_DEFECTO, FaltaApiKey, crear_modelo, parametros_de
 from .prompts import VERSION_POR_DEFECTO, Prompt, PromptNoEncontrado, cargar_prompt
 from .qa import responder
 from .resumen import ResumenInvalido, generar_resumen
+
+if TYPE_CHECKING:
+    from ..config import Config
+    from ..sucursal.preguntar import ServicioPreguntas
 
 PROG = "python -m banco_occidente_corpus.asistente"
 
@@ -183,14 +187,20 @@ def build_parser() -> argparse.ArgumentParser:
     evaluar_cmd.add_argument(
         "--salida",
         type=Path,
-        default=SALIDA_MARKDOWN,
-        help="tabla Markdown (por defecto: docs/RESULTADOS_20_PREGUNTAS.md)",
+        default=None,
+        help=(
+            "tabla Markdown (v1: docs/RESULTADOS_20_PREGUNTAS.md; "
+            "con VERSION=v2: docs/RESULTADOS_FASE2.md)"
+        ),
     )
     evaluar_cmd.add_argument(
         "--jsonl",
         type=Path,
-        default=SALIDA_JSONL,
-        help="detalle por pregunta (por defecto: data/evaluacion/resultados.jsonl)",
+        default=None,
+        help=(
+            "detalle por pregunta (v1: data/evaluacion/resultados.jsonl; "
+            "con VERSION=v2: data/evaluacion/resultados_v2.jsonl)"
+        ),
     )
 
     return parser
@@ -294,6 +304,116 @@ def _imprimir_avance(resultado: ResultadoEvaluacion) -> None:
     )
 
 
+def _rutas_de_salida(args: argparse.Namespace) -> tuple[Path, Path]:
+    """Resuelve las rutas de salida segun la version del prompt.
+
+    Con ``VERSION=v2`` las rutas por defecto son las de v2 y nunca las de v1;
+    con v1 se conservan las de siempre.
+
+    Args:
+        args: argumentos del subcomando ``evaluar``.
+
+    Returns:
+        La ruta del Markdown y la del JSONL, en ese orden.
+    """
+    if args.version_prompt == "v2":
+        from ..arqueo.experimentos import ARCHIVO_RESULTADOS_FASE2, ARCHIVO_RESULTADOS_V2
+
+        return (
+            args.salida or ARCHIVO_RESULTADOS_FASE2,
+            args.jsonl or ARCHIVO_RESULTADOS_V2,
+        )
+    return args.salida or SALIDA_MARKDOWN, args.jsonl or SALIDA_JSONL
+
+
+def _crear_servicio_evaluacion(config: Config) -> ServicioPreguntas:
+    """Crea el servicio aislado de la evaluacion v2.
+
+    Usa memoria y gasto propios, no consulta la cache de la Ventanilla y nunca
+    arranca en modo demo: la evaluacion mide el modelo real. Si
+    ``SUCURSAL_DEMO`` esta activo, lo avisa por stderr y continua sin demo.
+    """
+    from ..arqueo.experimentos import RUTA_GASTO_V2, RUTA_MEMORIA_V2, TOPE_EVALUACION_USD
+    from ..sucursal.ajustes import ConfiguracionSucursal, modo_demo
+    from ..sucursal.costo import GastoDiario
+    from ..sucursal.preguntar import ServicioPreguntas, construir_piezas
+
+    if modo_demo():
+        print(
+            "Aviso: SUCURSAL_DEMO esta activo; la evaluacion v2 lo ignora y usa el modelo.",
+            file=sys.stderr,
+        )
+    ajustes = ConfiguracionSucursal(
+        tope_diario_usd=TOPE_EVALUACION_USD,
+        cache_ttl_segundos=0,
+        demo=False,
+    )
+    gasto = GastoDiario(config.paths.root / RUTA_GASTO_V2)
+    return ServicioPreguntas(
+        config,
+        ajustes,
+        gasto,
+        usar_cache=False,
+        piezas=lambda: construir_piezas(
+            config,
+            ajustes,
+            ruta_memoria=config.paths.root / RUTA_MEMORIA_V2,
+        ),
+    )
+
+
+def _comando_evaluar_v2(args: argparse.Namespace) -> int:
+    """Corre el banco de fase 2 con el grafo y escribe ``RESULTADOS_FASE2.md``.
+
+    En un seguimiento envia la previa en el mismo hilo antes de la pregunta.
+    Con ``--solo`` reemplaza solo esas filas del JSONL v2 existente. No admite
+    ``--revalidar``: la validacion vive dentro del grafo y exige el modelo.
+    """
+    if args.revalidar:
+        print(
+            "Error: --revalidar solo aplica a v1; la evaluacion v2 necesita el grafo y el modelo.",
+            file=sys.stderr,
+        )
+        return 2
+
+    from datetime import UTC, datetime
+
+    from ..arqueo.experimentos import cargar_preguntas_fase2, evaluar_v2
+    from ..config import load_config
+
+    todas = cargar_preguntas_fase2(args.preguntas)
+    preguntas = [p for p in todas if p.id in args.solo] if args.solo else todas
+    if not preguntas:
+        print("Error: ninguna pregunta coincide con --solo.", file=sys.stderr)
+        return 2
+
+    destino_markdown, destino_jsonl = _rutas_de_salida(args)
+    servicio = _crear_servicio_evaluacion(load_config())
+    corrida = datetime.now(UTC).strftime("%Y%m%dT%H%M%SZ")
+    print(
+        f"Evaluando {len(preguntas)} preguntas con el grafo (qa_v2), corrida {corrida}...",
+        file=sys.stderr,
+    )
+    resultados = evaluar_v2(
+        servicio.preguntar,
+        preguntas,
+        corrida=corrida,
+        archivo_jsonl=destino_jsonl,
+        archivo_markdown=destino_markdown,
+        previos=cargar_resultados(destino_jsonl) if args.solo else (),
+        banco=todas,
+        pausa=args.pausa,
+        al_terminar=_imprimir_avance,
+        modelo=args.modelo,
+    )
+    conteo = resumen_clasificaciones(resultados)
+    resumen = ", ".join(f"{ETIQUETAS[c]}: {n}" for c, n in conteo.items())
+    print(f"Resumen : {resumen}", file=sys.stderr)
+    print(f"Tabla   : {destino_markdown.expanduser()}", file=sys.stderr)
+    print(f"Detalle : {destino_jsonl.expanduser()}", file=sys.stderr)
+    return 3 if conteo["error"] else 0
+
+
 def _comando_evaluar(
     args: argparse.Namespace,
     modelo: BaseChatModel | None,
@@ -311,7 +431,8 @@ def _comando_evaluar(
     if not preguntas:
         print("Error: ninguna pregunta coincide con --solo.", file=sys.stderr)
         return 2
-    destino_jsonl = args.jsonl.expanduser()
+    destino_markdown, destino_jsonl = _rutas_de_salida(args)
+    destino_jsonl = destino_jsonl.expanduser()
     previos = cargar_resultados(destino_jsonl)
 
     if modelo is None:
@@ -334,8 +455,8 @@ def _comando_evaluar(
     texto = render_evaluacion(
         resultados, modelo=args.modelo, version_prompt=args.version_prompt, revision=revision
     )
-    markdown = escribir_markdown(texto, args.salida.expanduser())
-    detalle = escribir_jsonl(resultados, args.jsonl.expanduser())
+    markdown = escribir_markdown(texto, destino_markdown.expanduser())
+    detalle = escribir_jsonl(resultados, destino_jsonl)
     conteo = resumen_clasificaciones(resultados)
     resumen = ", ".join(f"{ETIQUETAS[c]}: {n}" for c, n in conteo.items())
     print(f"Resumen : {resumen}", file=sys.stderr)
@@ -352,6 +473,8 @@ def main(argv: list[str] | None = None) -> int:
     temperatura, max_tokens = _parametros(args.comando)
 
     try:
+        if args.comando == "evaluar" and args.version_prompt == "v2":
+            return _comando_evaluar_v2(args)
         contexto = cargar_contexto(archivo=args.contexto, max_tokens=args.max_contexto)
         _diagnostico(args, contexto)
         prompt = cargar_prompt(tarea, args.version_prompt)

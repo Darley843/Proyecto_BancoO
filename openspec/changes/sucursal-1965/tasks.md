@@ -14,8 +14,8 @@
 
 ## 3. Set de preguntas de fase 2 (Anny — hecho en #44)
 
-- [x] 3.1 Verificar que `config/evaluacion/preguntas_fase2.toml` tiene 40 preguntas con `tipo` (`alcance`, `tabla`, `seguimiento`, `fuera`), `ruta_esperada` (`B`, `T`, `X`), `fuentes_esperadas` y `previa` solo en las de seguimiento; comprobar los conteos 20/8/6/6 y que cada URL esperada existe exactamente en `data/gold/corpus.jsonl`.
-- [x] 3.2 Verificar que las 8 preguntas de tipo `tabla` apuntan a las páginas de asistencias, Cuota Protegida, promociones y proyectos de vivienda, y que las 6 de tipo `fuera` incluyen saldo, cédula, consejo de inversión, otro banco, inyección de prompt y clima; ejecutar `uv run pytest test/test_preguntas_fase2.py`.
+- [x] 3.1 Verificar que `config/evaluacion/preguntas_fase2.toml` tiene 44 preguntas con `tipo` (`alcance`, `tabla`, `seguimiento`, `fuera`), `ruta_esperada` (`B`, `T`, `X`), `fuentes_esperadas` y `previa` solo en las de seguimiento; comprobar los conteos 20/12/6/6 y que cada URL esperada existe exactamente en `data/gold/corpus.jsonl`.
+- [x] 3.2 Verificar que las 12 preguntas de tipo `tabla` apuntan al tarifario (41 a 44) y a las páginas de asistencias, Cuota Protegida, promociones y proyectos de vivienda, y que las 6 de tipo `fuera` incluyen saldo, cédula, consejo de inversión, otro banco, inyección de prompt y clima; ejecutar `uv run pytest test/test_preguntas_fase2.py`.
 
 ## 4. Métricas del Arqueo (Anny — en revisión en #45)
 
@@ -183,4 +183,4 @@
 
 - Archivar el cambio cuando la revisión del proyecto esté satisfecha y los 18 PR del plan estén fusionados.
 - Verificar que las specs principales `boveda-rag`, `tablero-tarifas`, `sucursal-agente`, `sucursal-frontend` y `arqueo-evaluacion` quedaron creadas con su Purpose.
-- Confirmar que el reporte `docs/ARQUEO.md` conserva las cifras del corpus y del set de 40 preguntas revisado.
+- Confirmar que el reporte `docs/ARQUEO.md` conserva las cifras del corpus y del set de 44 preguntas revisado.

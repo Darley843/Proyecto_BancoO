@@ -8,7 +8,7 @@ Ver `proposal.md` para la motivación y `specs/*/spec.md` para los requisitos. E
 - El asistente v1 envía `data/contexto/contexto_banco.md` completo (~167 000 tokens) en cada pregunta y valida la respuesta con `asistente/validacion.py`. `asistente/evaluacion.py` ya resuelve la evaluación de 20 preguntas y la revisión humana.
 - La app es un Streamlit delgado (`app/streamlit_app.py`, `app/scraping_ui.py`) sobre `asistente/servicio.py`; no tiene router, memoria, recuperación ni datos estructurados.
 - `panel.pipeline_summary(config)` ya resume las cinco etapas del pipeline leyendo solo disco, y `panel.corpus_metrics` resume el corpus y su contexto. La vista Cámara y `/api/pipeline` deben reutilizarlos.
-- El grupo ya abrió trabajo que este cambio adopta y no reimplementa: plantilla de PR (#43, hecho), `config/evaluacion/preguntas_fase2.toml` con 40 preguntas y su prueba (#44, hecho), y `arqueo/metricas.py` con `Tarifas`, `hit_at_k`, `mrr`, `exactitud`, `citas_correctas`, `resumen_uso`, `mcnemar` y las tarifas valle/pico (#45, en revisión). Esas ramas aún no están en `main`: el PR 0 y el orden de PR del plan las integran antes de tocar código nuevo.
+- El grupo ya abrió trabajo que este cambio adopta y no reimplementa: plantilla de PR (#43, hecho), `config/evaluacion/preguntas_fase2.toml` con 44 preguntas y su prueba (#44, hecho), y `arqueo/metricas.py` con `Tarifas`, `hit_at_k`, `mrr`, `exactitud`, `citas_correctas`, `resumen_uso`, `mcnemar` y las tarifas valle/pico (#45, en revisión). Esas ramas aún no están en `main`: el PR 0 y el orden de PR del plan las integran antes de tocar código nuevo.
 - Restricciones duras: `uv` como único gestor; pruebas sin red; docstrings en español y anotaciones de tipo; Gold no se edita; `data/boveda/` y las SQLite de `data/asistente/` no se versionan; el servidor escucha solo en `127.0.0.1`; DeepSeek Flash es el único modelo que se paga y los embeddings corren con Ollama local.
 
 ## Goals / Non-Goals
@@ -204,7 +204,7 @@ Alternativa descartada: React o Vue con Vite. Añade Node, build y dependencias 
 
 `arqueo/experimentos.py`:
 
-1. Carga las 40 preguntas con `asistente.evaluacion.cargar_preguntas` adaptada a los campos nuevos (`tipo`, `ruta_esperada`, `fuentes_esperadas`, `previa`). El cargador estricto de v1 no acepta esos campos; se añade un cargador de fase 2 en `arqueo/experimentos.py` para no romper la evaluación v1.
+1. Carga las 44 preguntas con `asistente.evaluacion.cargar_preguntas` adaptada a los campos nuevos (`tipo`, `ruta_esperada`, `fuentes_esperadas`, `previa`). El cargador estricto de v1 no acepta esos campos; se añade un cargador de fase 2 en `arqueo/experimentos.py` para no romper la evaluación v1.
 2. Para cada combinación de pesos (`1/0`, `0/1`, `0.2/0.8`, `0.4/0.6`, `0.6/0.4` y `0.8/0.2`), recupera `k=5` y calcula `hit_at_k` y `mrr` con `arqueo.metricas`; `1/0` y `0/1` son las líneas base vectorial y BM25 pura. Los pesos no requieren reindexar: se aplican al recuperador sobre el mismo índice. El experimento de prefijos usa un único índice extra sin prefijos en `data/boveda/experimentos/sin_prefijos` (no `tmp_path`, que es solo para pruebas) y se mide con los pesos por defecto. No llama a DeepSeek.
 3. Compara v1 y v2 sobre las 20 preguntas `tipo="alcance"` usando `revision_humana.toml` y `revision_humana_v2.toml`: convierte cada veredicto en acierto booleano (`correcta` o `rechazo_correcto` → `True`; `parcial`/`incorrecta` → `False`; sin revisión → `None`) y aplica `mcnemar`.
 
@@ -532,7 +532,7 @@ Sin fecha ni rutas absolutas: el archivo es determinista para los mismos datos y
 ## Migration Plan
 
 1. PR 0: dependencias y `uv.lock`; verificar `make check` y `make demo`.
-2. Integrar #43, #44 y #45 si aún no están en `main`; verificar que `arqueo/metricas.py` importa y que las 40 preguntas cargan.
+2. Integrar #43, #44 y #45 si aún no están en `main`; verificar que `arqueo/metricas.py` importa y que las 44 preguntas cargan.
 3. Bóveda (fragmentos, embeddings, almacén, índice, recuperador, mapa) con sus pruebas y `make indice`.
 4. Tablero con el CSV y la cobertura de las 8 preguntas.
 5. Prompt v2, `asistente/rag.py` y sus pruebas.
