@@ -16,6 +16,7 @@ from banco_occidente_corpus.boveda.fragmentos import (
     TOKENS_MINIMOS,
     LineaRepetida,
     ResumenFragmentos,
+    TextoRepetido,
     _familia_encabezado,
     _hermanos,
     _mapa_secciones,
@@ -58,6 +59,14 @@ TEXTO_90S = (
     "Consolidamos la presencia nacional con nuevas oficinas y canales de atención. "
     "1999 - Fortalecemos la banca de personas y empresas con productos especializados."
 )
+TEXTO_REPETIDO = (
+    "¿Cómo gestionar el endoso de tu póliza? Actualmente puedes realizar el trámite por "
+    "dos canales: la página web del banco o la línea de atención al cliente, donde te "
+    "indican los documentos que debes entregar y el tiempo de respuesta. "
+) * 3
+TEXTO_DISTINTO = (
+    "Contenido exclusivo de esta página con el detalle suficiente para el fragmento. "
+) * 7
 
 
 def make_config(tmp_path: Path) -> Config:
@@ -770,6 +779,12 @@ def test_formatear_resumen(tmp_path: Path) -> None:
         omitidos_pii=2,
         fragmentos_reencabezados=2,
         encabezados_descartados=(LineaRepetida(texto=MENU_REPETIDO, paginas=28),),
+        textos_repetidos=19,
+        textos_duplicados=24,
+        textos_duplicados_entre_paginas=21,
+        textos_frecuentes=(
+            TextoRepetido(texto=f"{TEXTO_REPETIDO} Copia adicional", copias=3, paginas=3),
+        ),
     )
 
     texto = formatear_resumen(resumen, tmp_path / "fragmentos_base.jsonl")
@@ -783,6 +798,9 @@ def test_formatear_resumen(tmp_path: Path) -> None:
     assert "Tablas enteras: 2" in texto
     assert "Tablas partidas por filas: 1 en 3 partes" in texto
     assert "6 páginas: Linea del menu" in texto
+    assert "Textos repetidos: 19 (24 fragmentos descartados; 21 entre páginas distintas)" in texto
+    assert "3 copias en 3 páginas: ¿Cómo gestionar el endoso de tu póliza?" in texto
+    assert "..." in texto
     assert "hechos" in texto.lower()
 
 
@@ -905,6 +923,155 @@ def test_fragmentos_con_id_repetido_se_descartan(tmp_path: Path) -> None:
     assert len(resultado.fragmentos) == 1
     assert resultado.resumen.total == 1
     assert resultado.resumen.duplicados == 1
+    assert resultado.resumen.textos_duplicados == 0
+
+
+def test_texto_identico_en_dos_paginas_queda_uno_y_es_determinista(tmp_path: Path) -> None:
+    """Dos páginas con el mismo texto dejan un solo fragmento: el primero del corpus."""
+    config = make_config(tmp_path)
+    paginas = [
+        {"id": "pagina-a", "titulo": "Página A"},
+        {"id": "pagina-b", "titulo": "Página B"},
+    ]
+    write_indices(config, paginas=paginas)
+    write_chunks(
+        config,
+        [
+            chunk("pagina-a", TEXTO_REPETIDO, heading="Preguntas frecuentes", url=URL),
+            chunk("pagina-b", TEXTO_REPETIDO, heading="Preguntas frecuentes", url=OTRA_URL),
+        ],
+    )
+
+    primero = construir_fragmentos(config, "base")
+    segundo = construir_fragmentos(config, "base")
+
+    assert len(primero.fragmentos) == 1
+    assert primero.fragmentos[0].url == URL
+    assert [fragmento.id for fragmento in primero.fragmentos] == [
+        fragmento.id for fragmento in segundo.fragmentos
+    ]
+    resumen = primero.resumen
+    assert resumen.total == 1
+    assert resumen.duplicados == 0
+    assert resumen.textos_repetidos == 1
+    assert resumen.textos_duplicados == 1
+    assert resumen.textos_duplicados_entre_paginas == 1
+    frecuente = resumen.textos_frecuentes[0]
+    assert frecuente.copias == 2
+    assert frecuente.paginas == 2
+    assert frecuente.texto.startswith("Preguntas frecuentes")
+
+
+def test_texto_repetido_se_compara_sin_espacios_extra(tmp_path: Path) -> None:
+    """El mismo texto con dobles espacios y un salto de línea cuenta como repetido."""
+    config = make_config(tmp_path)
+    con_salto = TEXTO_DISTINTO.replace("esta página", "esta\npágina", 1)
+    texto_con_espacios = "  ".join(con_salto.split(" "))
+    write_indices(
+        config,
+        paginas=[
+            {"id": "pagina-a", "titulo": "Página A"},
+            {"id": "pagina-b", "titulo": "Página B"},
+        ],
+    )
+    write_chunks(
+        config,
+        [
+            chunk("pagina-a", TEXTO_DISTINTO, url=URL),
+            chunk("pagina-b", texto_con_espacios, url=OTRA_URL),
+        ],
+    )
+
+    resultado = construir_fragmentos(config, "base")
+
+    assert len(resultado.fragmentos) == 1
+    assert resultado.resumen.textos_repetidos == 1
+    assert resultado.resumen.textos_duplicados == 1
+    assert resultado.resumen.textos_duplicados_entre_paginas == 1
+
+
+def test_tres_copias_conservan_una_y_cuentan_dos_descartes(tmp_path: Path) -> None:
+    """Tres páginas con el mismo texto conservan una y descartan dos copias."""
+    config = make_config(tmp_path)
+    paginas = [{"id": f"pagina-{indice}", "titulo": f"Página {indice}"} for indice in range(3)]
+    write_indices(config, paginas=paginas)
+    write_chunks(
+        config,
+        [
+            chunk(
+                pagina["id"],
+                TEXTO_REPETIDO,
+                heading="Preguntas frecuentes",
+                url=f"https://www.bancodeoccidente.com.co/{pagina['id']}",
+            )
+            for pagina in paginas
+        ],
+    )
+
+    resultado = construir_fragmentos(config, "base")
+
+    assert len(resultado.fragmentos) == 1
+    assert resultado.resumen.textos_repetidos == 1
+    assert resultado.resumen.textos_duplicados == 2
+    assert resultado.resumen.textos_duplicados_entre_paginas == 2
+    frecuente = resultado.resumen.textos_frecuentes[0]
+    assert frecuente.copias == 3
+    assert frecuente.paginas == 3
+
+
+def test_textos_distintos_se_conservan(tmp_path: Path) -> None:
+    """Dos páginas con textos distintos conservan sus dos fragmentos."""
+    config = make_config(tmp_path)
+    write_indices(
+        config,
+        paginas=[
+            {"id": "pagina-a", "titulo": "Página A"},
+            {"id": "pagina-b", "titulo": "Página B"},
+        ],
+    )
+    write_chunks(
+        config,
+        [
+            chunk("pagina-a", f"{TEXTO_DISTINTO} de la pagina A.", url=URL),
+            chunk("pagina-b", f"{TEXTO_DISTINTO} de la pagina B.", url=OTRA_URL),
+        ],
+    )
+
+    resultado = construir_fragmentos(config, "base")
+
+    assert len(resultado.fragmentos) == 2
+    assert resultado.resumen.textos_repetidos == 0
+    assert resultado.resumen.textos_duplicados == 0
+    assert resultado.resumen.textos_duplicados_entre_paginas == 0
+    assert resultado.resumen.textos_frecuentes == ()
+
+
+def test_duplicado_con_la_misma_url_no_cuenta_entre_paginas(tmp_path: Path) -> None:
+    """Dos page_id con la misma URL cuentan el descarte como de la misma página."""
+    config = make_config(tmp_path)
+    write_indices(
+        config,
+        paginas=[
+            {"id": "pagina-a", "titulo": "Página A"},
+            {"id": "pagina-b", "titulo": "Página B"},
+        ],
+    )
+    write_chunks(
+        config,
+        [
+            chunk("pagina-a", TEXTO_REPETIDO, heading="Preguntas frecuentes", url=URL),
+            chunk("pagina-b", TEXTO_REPETIDO, heading="Preguntas frecuentes", url=URL),
+        ],
+    )
+
+    resultado = construir_fragmentos(config, "base")
+
+    assert len(resultado.fragmentos) == 1
+    assert resultado.resumen.textos_duplicados == 1
+    assert resultado.resumen.textos_duplicados_entre_paginas == 0
+    frecuente = resultado.resumen.textos_frecuentes[0]
+    assert frecuente.copias == 2
+    assert frecuente.paginas == 1
 
 
 def test_cronologia_no_arrastra_valores_ni_promociones(tmp_path: Path) -> None:
