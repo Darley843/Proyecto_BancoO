@@ -25,7 +25,7 @@ from .contexto import RutasContexto
 from .dedupe import is_site_page
 from .gold import corpus_stats
 from .section import section_label
-from .utils import human_size, read_jsonl
+from .utils import numero_es, read_jsonl, tamano_es
 
 #: Orden fijo de las etapas del pipeline en la pestaña.
 STAGE_KEYS: tuple[str, ...] = ("discover", "fetch", "extract", "dedupe", "gold")
@@ -357,10 +357,10 @@ def _discover_stage(config: Config, queue: int, documents: int) -> Stage:
             "descarta rutas fuera de alcance."
         ),
         metrics=(
-            Metric("URLs en cola", f"{queue:,}"),
-            Metric("Documentos en cola", f"{documents:,}"),
+            Metric("URLs en cola", numero_es(queue)),
+            Metric("Documentos en cola", numero_es(documents)),
             Metric("Patrones de exclusión", str(len(config.discovery.exclude_patterns))),
-            Metric("Pausa de cortesía", f"{config.crawl.delay_seconds:.1f} s"),
+            Metric("Pausa de cortesía", f"{numero_es(config.crawl.delay_seconds, 1)} s"),
         ),
         note=(
             "Los descartes por robots.txt o por patrones no se persisten en disco: "
@@ -381,10 +381,10 @@ def _fetch_stage(ok: int, failed: int, total_bytes: int, files: int) -> Stage:
             "captura es reanudable (no repite lo ya bajado)."
         ),
         metrics=(
-            Metric("Capturas OK", f"{ok:,}"),
-            Metric("Fallidas", f"{failed:,}"),
-            Metric("Tamaño Bronze", human_size(total_bytes)),
-            Metric("HTML en disco", f"{files:,}"),
+            Metric("Capturas OK", numero_es(ok)),
+            Metric("Fallidas", numero_es(failed)),
+            Metric("Tamaño Bronze", tamano_es(total_bytes)),
+            Metric("HTML en disco", numero_es(files)),
         ),
         note=BRONZE_NOTE,
         warning="" if ok else "Sin capturas en disco: ejecuta make fetch.",
@@ -401,8 +401,8 @@ def _extract_stage(pages: int, chars: int) -> Stage:
             "formularios, y aplica el boilerplate repetido antes de escribir."
         ),
         metrics=(
-            Metric("Páginas Silver", f"{pages:,}"),
-            Metric("Caracteres útiles", f"{chars:,}"),
+            Metric("Páginas Silver", numero_es(pages)),
+            Metric("Caracteres útiles", numero_es(chars)),
         ),
         note=SILVER_NOTE,
         warning="Silver no está en este clon: make extract lo reconstruye." if not pages else "",
@@ -423,7 +423,7 @@ def _dedupe_stage(report: Repetitions | None) -> Stage:
             warning="Falta data/gold/_REPETIDOS.md: ejecuta make repetidos.",
         )
 
-    coverage = " / ".join(f"{row.percentage:.1f} %" for row in report.thresholds)
+    coverage = " / ".join(f"{numero_es(row.percentage, 1)} %" for row in report.thresholds)
     return Stage(
         key="dedupe",
         title="Deduplicar",
@@ -433,10 +433,10 @@ def _dedupe_stage(report: Repetitions | None) -> Stage:
             "líneas del corpus (CONSTITUTION §7.6)."
         ),
         metrics=(
-            Metric("Páginas analizadas", f"{report.pages:,}"),
-            Metric("Líneas de contenido", f"{report.content_lines:,}"),
+            Metric("Páginas analizadas", numero_es(report.pages)),
+            Metric("Líneas de contenido", numero_es(report.content_lines)),
             Metric("Repetido >= 5 / 10 / 20", coverage or "n/d"),
-            Metric("Bloques en el top", f"{len(report.blocks):,}"),
+            Metric("Bloques en el top", numero_es(len(report.blocks))),
         ),
     )
 
@@ -454,10 +454,10 @@ def _gold_stage(config: Config, corpus: list[dict], bronze_pages: int, chunks_we
             "corpus.jsonl y segmenta el cuerpo por ## en chunks."
         ),
         metrics=(
-            Metric("Documentos Gold", f"{stats['documentos']:,}"),
-            Metric("Tokens", f"{stats['tokens']:,}"),
-            Metric("Secciones", f"{len(stats['secciones']):,}"),
-            Metric("Chunks web", f"{chunks_web:,}"),
+            Metric("Documentos Gold", numero_es(stats["documentos"])),
+            Metric("Tokens", numero_es(stats["tokens"])),
+            Metric("Secciones", numero_es(len(stats["secciones"]))),
+            Metric("Chunks web", numero_es(chunks_web)),
         ),
         note=GOLD_NOTE.format(
             docs=stats["documentos"], web=web, fichas=fichas, bronze=bronze_pages
@@ -564,7 +564,7 @@ def corpus_metrics(config: Config) -> CorpusMetrics:
         )
 
     sections = tuple(
-        Metric(label=section_label(section), value=f"{count:,}")
+        Metric(label=section_label(section), value=numero_es(count))
         for section, count in stats["secciones"].items()
     )
 

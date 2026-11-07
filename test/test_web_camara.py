@@ -53,6 +53,7 @@ def test_etapas_de_ejemplo_tienen_la_forma_de_stage() -> None:
         for metrica in etapa["metrics"]:
             assert set(metrica) == campos_metrica
             assert isinstance(metrica["value"], str)
+            assert re.search(r"\d,\d{3}\b|\d\.\d\b", metrica["value"]) is None, metrica
 
 
 def test_repeticiones_de_ejemplo_tienen_la_forma_de_repetitions() -> None:

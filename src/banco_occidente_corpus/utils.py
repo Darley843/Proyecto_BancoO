@@ -120,6 +120,39 @@ def human_size(num_bytes: int) -> str:
     return f"{value:.1f} GB"
 
 
+_MILES_Y_DECIMALES_ES = str.maketrans({",": ".", ".": ","})
+
+
+def numero_es(valor: float, decimales: int = 0) -> str:
+    """Formatea un número a la colombiana (es-CO) para mostrarlo en pantalla.
+
+    Usa punto para los miles y coma para los decimales: ``196139`` queda
+    ``196.139`` y ``22.3`` con un decimal queda ``22,3``.
+
+    Args:
+        valor: Número a formatear.
+        decimales: Cifras decimales que se muestran.
+
+    Returns:
+        El número como texto en formato es-CO.
+    """
+    texto = f"{valor:,.{decimales}f}"
+    return texto.translate(_MILES_Y_DECIMALES_ES)
+
+
+def tamano_es(num_bytes: int) -> str:
+    """Como :func:`human_size`, pero con coma decimal (es-CO): ``1,5 MB``.
+
+    Args:
+        num_bytes: Tamaño en bytes.
+
+    Returns:
+        El tamaño en B/KB/MB/GB con un decimal y coma decimal.
+    """
+    valor, unidad = human_size(num_bytes).split(" ")
+    return f"{numero_es(float(valor), 1)} {unidad}"
+
+
 def is_excluded_url(url: str, patterns: Iterable[str]) -> bool:
     """Indica si la URL contiene alguno de los patrones de exclusion del sitio."""
     lowered = url.lower()

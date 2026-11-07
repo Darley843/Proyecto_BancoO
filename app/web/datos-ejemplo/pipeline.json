@@ -19,7 +19,7 @@
         },
         {
           "label": "Pausa de cortesía",
-          "value": "1.5 s"
+          "value": "1,5 s"
         }
       ],
       "note": "Los descartes por robots.txt o por patrones no se persisten en disco: se obtienen con el chequeo de robots de la cola y, completo, con la auditoría opcional.",
@@ -40,7 +40,7 @@
         },
         {
           "label": "Tamaño Bronze",
-          "value": "0.0 B"
+          "value": "0,0 B"
         },
         {
           "label": "HTML en disco",
@@ -78,11 +78,11 @@
         },
         {
           "label": "Líneas de contenido",
-          "value": "8,094"
+          "value": "8.094"
         },
         {
           "label": "Repetido >= 5 / 10 / 20",
-          "value": "22.3 % / 16.7 % / 9.1 %"
+          "value": "22,3 % / 16,7 % / 9,1 %"
         },
         {
           "label": "Bloques en el top",
@@ -103,7 +103,7 @@
         },
         {
           "label": "Tokens",
-          "value": "196,139"
+          "value": "196.139"
         },
         {
           "label": "Secciones",
@@ -111,7 +111,7 @@
         },
         {
           "label": "Chunks web",
-          "value": "1,388"
+          "value": "1.388"
         }
       ],
       "note": "Gold sí está versionado y proviene de la captura completa: 241 documentos (181 páginas web + 60 fichas de hechos y noticias). Por eso ver 0 capturas en Bronze junto a 241 documentos en Gold no es un error: son capas con distinta cobertura histórica.",

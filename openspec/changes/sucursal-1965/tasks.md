@@ -113,23 +113,23 @@
 ## 17. PR 14 — Bóveda (vista) (Yoldy — pendiente)
 
 - [ ] 17.1 Implementar `app/web/vistas/boveda.js` con el mapa de puntos, la posición de la pregunta y la lista del top de fragmentos con título, sección, tipo y similitud; verificar con `mapa.json` y con la API una consulta real.
-- [ ] 17.2 Mostrar el estado «índice no listo» cuando la API lo informe y no dibujar un mapa vacío como si hubiera datos; verificar deteniendo el índice o apuntando a un directorio sin `data/boveda/`.
+- [x] 17.2 Mostrar el estado «índice no listo» cuando la API lo informe y no dibujar un mapa vacío como si hubiera datos; verificar deteniendo el índice o apuntando a un directorio sin `data/boveda/`.
 - [x] 17.3 Verificar que la vista no usa librerías externas ni hace peticiones distintas de `/api/boveda/mapa`; revisar el archivo y la red del navegador.
 
 ## 18. PR 15 — Tablero (vista) (Yoldy — pendiente)
 
-- [ ] 18.1 Implementar `app/web/vistas/tablero.js` con la tabla de filas, el filtro de texto y los enlaces a la fuente en otra pestaña; verificar con `tablero.json` y con `/api/tablero?q=cuota` que el filtro y las columnas coinciden con el CSV.
+- [x] 18.1 Implementar `app/web/vistas/tablero.js` con la tabla de filas, el filtro de texto y los enlaces a la fuente en otra pestaña; verificar con `tablero.json` y con `/api/tablero?q=cuota` que el filtro y las columnas coinciden con el CSV.
 - [x] 18.2 Mostrar un estado vacío claro cuando no hay filas y no inventar valores; verificar con una búsqueda sin coincidencias.
 - [x] 18.3 Verificar que la vista muestra concepto, valor, moneda, periodicidad, vigencia, origen y fuente, y que no recalcula ni compara filas en el navegador.
 
 ## 19. PR 16 — Cámara (Yoldy — pendiente)
 
-- [ ] 19.1 Implementar `app/web/vistas/camara.js` con las etapas de `panel.pipeline_summary`, sus métricas, avisos y la etapa de indexación; verificar con `pipeline.json` y con la API que se ven discover, fetch, extract, dedupe, gold e indexación.
+- [x] 19.1 Implementar `app/web/vistas/camara.js` con las etapas de `panel.pipeline_summary`, sus métricas, avisos y la etapa de indexación; verificar con `pipeline.json` y con la API que se ven discover, fetch, extract, dedupe, gold e indexación.
 - [x] 19.2 Mostrar los avisos de Bronze/Silver y el estado del índice sin confundirlos con errores; verificar con un `pipeline.json` sin índice y con otro con índice listo.
 
 ## 20. PR 17 — Vestíbulo (Yoldy — pendiente)
 
-- [ ] 20.1 Implementar `app/web/vistas/vestibulo.js` con los hitos de `config/vestibulo.toml` (año, texto, URL) y una entrada clara a la Ventanilla; verificar con `vestibulo.json` y con la API que los hitos coinciden con el TOML.
+- [x] 20.1 Implementar `app/web/vistas/vestibulo.js` con los hitos de `config/vestibulo.toml` (año, texto, URL) y una entrada clara a la Ventanilla; verificar con `vestibulo.json` y con la API que los hitos coinciden con el TOML.
 - [x] 20.2 Verificar que el vestíbulo funciona sin clave ni índice, porque es la pantalla de bienvenida, y que no hace llamadas al modelo.
 
 ## 21. PR 18 — Arqueo (vista) (Anny — pendiente)
