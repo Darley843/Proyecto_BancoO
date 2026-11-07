@@ -20,6 +20,7 @@ from banco_occidente_corpus.arqueo.experimentos import (
     PreguntaFase2,
     evaluar_v2,
     hilo_de,
+    render_markdown_v2,
 )
 from banco_occidente_corpus.asistente import cli as cli_mod
 from banco_occidente_corpus.asistente.contexto_prompt import CanalOficial
@@ -27,6 +28,7 @@ from banco_occidente_corpus.asistente.evaluacion import (
     SALIDA_JSONL,
     SALIDA_MARKDOWN,
     ResultadoEvaluacion,
+    Revision,
 )
 from banco_occidente_corpus.asistente.validacion import FRASE_SIN_DATOS
 from banco_occidente_corpus.boveda.tipos import Fragmento
@@ -648,3 +650,56 @@ def test_pii_no_crea_hilo_en_la_memoria_de_evaluacion(tmp_path: Path) -> None:
     assert estado.values == {}
     assert resultados[0].clasificacion == "rechazo_correcto"
     assert resultados[0].sin_datos is True
+
+
+def test_render_v2_muestra_la_segunda_firma() -> None:
+    """La revision humana muestra las dos firmas y el acuerdo."""
+    pregunta = pregunta_fase2(
+        2,
+        texto="¿Dónde hay una oficina en Cali?",
+        cobertura="parcial",
+        terminos=(("Carrera 3",),),
+    )
+    resultado = ResultadoEvaluacion(
+        id=2,
+        pregunta=pregunta.pregunta,
+        cobertura="parcial",
+        clasificacion="revisar",
+        respuesta="No encuentro.",
+        fuente="",
+        sin_datos=True,
+        fecha=HOY.isoformat(),
+    )
+    revision = {
+        2: Revision(
+            veredicto="incorrecta",
+            nota="primera",
+            revisor="Anny Valencia",
+            veredicto_2="incorrecta",
+            nota_2="segunda",
+            revisor_2="Darley843",
+        )
+    }
+
+    texto = render_markdown_v2(
+        [resultado],
+        [pregunta],
+        modelo="m",
+        corrida=CORRIDA,
+        fecha=HOY,
+        revision=revision,
+    )
+
+    assert "## Revision humana" in texto
+    assert "Con segunda firma: **1**" in texto
+    assert "Acuerdos de veredicto: **1/1**" in texto
+    assert "| 2 |" in texto
+    assert "Darley843" in texto
+    sin_revision = render_markdown_v2(
+        [resultado],
+        [pregunta],
+        modelo="m",
+        corrida=CORRIDA,
+        fecha=HOY,
+    )
+    assert "## Revision humana" not in sin_revision

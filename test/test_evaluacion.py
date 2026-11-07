@@ -272,15 +272,78 @@ def test_cargar_revision_y_propuestas(tmp_path: Path) -> None:
 
     assert revision[7].texto == "Correcta: 1965, Cali."
     assert not revision[7].es_propuesta
+    assert not revision[7].tiene_segunda_revision
+    assert revision[7].acuerdo is None
     assert revision[1].es_propuesta
     assert revision[1].texto.endswith("(propuesta)")
     assert cargar_revision(tmp_path / "no-existe.toml") == {}
+
+
+def test_cargar_revision_lee_la_segunda_firma(tmp_path: Path) -> None:
+    """La segunda firma se conserva y el acuerdo se calcula sin cambiar el veredicto final."""
+    ruta = tmp_path / "revision.toml"
+    ruta.write_text(
+        """
+[[revision]]
+id = 2
+veredicto = "incorrecta"
+nota = "primera"
+revisor = "Ana"
+veredicto_2 = "incorrecta"
+nota_2 = "segunda"
+revisor_2 = "Beto"
+
+[[revision]]
+id = 3
+veredicto = "parcial"
+nota = "primera"
+revisor = "Ana"
+veredicto_2 = "correcta"
+nota_2 = "segunda"
+revisor_2 = "Beto"
+""",
+        encoding="utf-8",
+    )
+
+    revision = cargar_revision(ruta)
+
+    assert revision[2].tiene_segunda_revision
+    assert revision[2].acuerdo is True
+    assert revision[2].veredicto == "incorrecta"
+    assert revision[2].veredicto_2 == "incorrecta"
+    assert revision[2].nota_2 == "segunda"
+    assert revision[2].revisor_2 == "Beto"
+    assert revision[2].texto == "Incorrecta: primera"
+    assert revision[3].acuerdo is False
 
 
 def test_revision_con_veredicto_invalido_falla(tmp_path: Path) -> None:
     """Un veredicto fuera de la lista es un error de formato."""
     ruta = tmp_path / "revision.toml"
     ruta.write_text('[[revision]]\nid = 1\nveredicto = "excelente"\n', encoding="utf-8")
+    with pytest.raises(RevisionInvalida):
+        cargar_revision(ruta)
+
+
+def test_revision_con_segunda_firma_incompleta_falla(tmp_path: Path) -> None:
+    """La segunda firma exige veredicto_2 y revisor_2 juntos."""
+    ruta = tmp_path / "revision.toml"
+    ruta.write_text(
+        '[[revision]]\nid = 1\nveredicto = "correcta"\nveredicto_2 = "correcta"\n',
+        encoding="utf-8",
+    )
+    with pytest.raises(RevisionInvalida):
+        cargar_revision(ruta)
+
+
+def test_revision_con_veredicto_2_invalido_falla(tmp_path: Path) -> None:
+    """Un veredicto_2 fuera de la lista es un error de formato."""
+    ruta = tmp_path / "revision.toml"
+    ruta.write_text(
+        '[[revision]]\nid = 1\nveredicto = "correcta"\n'
+        'veredicto_2 = "excelente"\nrevisor_2 = "Beto"\n',
+        encoding="utf-8",
+    )
     with pytest.raises(RevisionInvalida):
         cargar_revision(ruta)
 

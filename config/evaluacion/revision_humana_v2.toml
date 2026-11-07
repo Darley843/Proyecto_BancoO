@@ -5,6 +5,9 @@
 # revisor:   quien reviso. Las filas con "propuesta" las propuso Claude con la
 #            hoja de revision; una persona del grupo debe leerlas y poner su
 #            nombre para darlas por revisadas.
+# veredicto_2, nota_2, revisor_2: segunda firma independiente. El veredicto
+#            final es "veredicto"; la segunda firma se conserva para medir
+#            acuerdo y no cambia las metricas por si sola.
 
 [[revision]]
 id = 1
@@ -17,18 +20,27 @@ id = 2
 veredicto = "incorrecta"
 nota = "Dice que no encuentra; el corpus trae la sede de Cali en la pagina de inversionistas."
 revisor = "Anny Valencia"
+veredicto_2 = "incorrecta"
+nota_2 = "Coincide: el corpus tiene la direccion de Cali y el (602) 4851113; la respuesta no los usa."
+revisor_2 = "Darley843"
 
 [[revision]]
 id = 3
 veredicto = "parcial"
 nota = "Dice que no encuentra, pero la remision da la linea nacional; faltan las lineas por ciudad."
 revisor = "Anny Valencia"
+veredicto_2 = "parcial"
+nota_2 = "Coincide: da la nacional, pero omite las lineas por ciudad."
+revisor_2 = "Darley843"
 
 [[revision]]
 id = 4
 veredicto = "parcial"
 nota = "Explica el tramite ante el Defensor y de siniestros; no menciona el formulario PQRS ni cita Ayuda."
 revisor = "Anny Valencia"
+veredicto_2 = "parcial"
+nota_2 = "Coincide: explica al Defensor, pero no el formulario PQRS ni /ayuda."
+revisor_2 = "Darley843"
 
 [[revision]]
 id = 5
@@ -65,6 +77,9 @@ id = 10
 veredicto = "parcial"
 nota = "Mezcla ahorros, corriente y nomina; no da los tipos de cuenta de ahorro ni cita su pagina."
 revisor = "Anny Valencia"
+veredicto_2 = "parcial"
+nota_2 = "Coincide: mezcla ahorro, corriente y nomina; no lista los seis tipos."
+revisor_2 = "Darley843"
 
 [[revision]]
 id = 11
@@ -83,6 +98,9 @@ id = 13
 veredicto = "parcial"
 nota = "Lista Credencial Visa y Mastercard; verificar a que tarjeta aplica el valor de 31.800; no cita la pagina de tarjetas."
 revisor = "Anny Valencia"
+veredicto_2 = "parcial"
+nota_2 = "Coincide: el valor no se ata a una tarjeta; la fuente lo relaciona con RIGO/Clasica."
+revisor_2 = "Darley843"
 
 [[revision]]
 id = 14
@@ -101,6 +119,9 @@ id = 16
 veredicto = "correcta"
 nota = "Occiauto hasta 100 %, productivos y compra de cartera; no cita la pagina de credito de vehiculo."
 revisor = "Anny Valencia"
+veredicto_2 = "correcta"
+nota_2 = "Coincide con el criterio de contenido: la respuesta es correcta; la cita esperada falta y se mide aparte."
+revisor_2 = "Darley843"
 
 [[revision]]
 id = 17
