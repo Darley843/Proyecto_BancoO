@@ -662,7 +662,7 @@ def test_no_registra_la_pregunta_ni_el_hilo(
 def test_pii_no_entra_en_cache_ni_en_logs(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path, caplog: pytest.LogCaptureFixture
 ) -> None:
-    """Una pregunta con cédula se rechaza sin cachearse y sin aparecer en el log."""
+    """Una pregunta con cédula se rechaza sin cachearse, sin memoria y sin log."""
     escenario = preparar(monkeypatch, tmp_path, fragmentos=[fragmento()])
     caplog.set_level(logging.INFO)
     documento = "1020304050"
@@ -676,6 +676,7 @@ def test_pii_no_entra_en_cache_ni_en_logs(
     assert respuesta.json()["motivo"].startswith("pii:")
     assert respuesta.json()["fuentes"] == []
     assert contar_cache(escenario) == 0
+    assert escenario.grafo.get_state({"configurable": {"thread_id": "hilo-pii"}}).values == {}
     assert documento not in caplog.text
     assert "cédula" not in caplog.text
 

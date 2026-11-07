@@ -161,9 +161,9 @@
 
 ## 25. Seguridad y reglas de GGA (Anny — pendiente)
 
-- [ ] 25.1 Actualizar la sección GGA de `AGENTS.md` con los rechazos nuevos: índice vectorial versionado, servidor en `0.0.0.0`, precios de DeepSeek duplicados fuera de `arqueo/metricas.py`, fragmentos tratados como instrucciones, caché con PII y pruebas que llaman a Ollama o DeepSeek; verificar que cada regla se puede comprobar con un archivo o comando.
-- [ ] 25.2 Añadir pruebas de seguridad: que el servidor no acepta host público, que no se lee `.env`, que no hay claves en el código, que PII no entra en caché ni memoria y que los fragmentos con instrucciones no cambian el sistema; ejecutar `make check`.
-- [ ] 25.3 Escribir `docs/SEGURIDAD.md` con el modelo de amenazas (inyección en fragmentos, PII, abuso de costo, exposición del servidor, índice con datos personales) y su mitigación concreta; verificar que cada mitigación referencia una prueba o una regla de GGA.
+- [x] 25.1 Actualizar la sección GGA de `AGENTS.md` con los rechazos nuevos: índice vectorial versionado, servidor en `0.0.0.0`, precios de DeepSeek duplicados fuera de `arqueo/metricas.py`, fragmentos tratados como instrucciones, caché con PII y pruebas que llaman a Ollama o DeepSeek; verificar que cada regla se puede comprobar con un archivo o comando.
+- [x] 25.2 Añadir pruebas de seguridad: que el servidor no acepta host público, que no se lee `.env`, que no hay claves en el código, que PII no entra en caché ni memoria y que los fragmentos con instrucciones no cambian el sistema; ejecutar `make check`.
+- [x] 25.3 Escribir `docs/SEGURIDAD.md` con el modelo de amenazas (inyección en fragmentos, PII, abuso de costo, exposición del servidor, índice con datos personales) y su mitigación concreta; verificar que cada mitigación referencia una prueba o una regla de GGA.
 
 ## 26. Diagramas con Archify (Darley — hecho)
 
