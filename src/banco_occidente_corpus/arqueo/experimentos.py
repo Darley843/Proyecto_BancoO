@@ -29,10 +29,12 @@ from ..asistente.evaluacion import (
     ETIQUETAS,
     SALIDA_JSONL,
     SALIDA_MARKDOWN,
+    VEREDICTOS,
     PreguntaEvaluacion,
     PreguntasInvalidas,
     ResultadoEvaluacion,
     Revision,
+    cargar_revision,
     clasificar,
     escribir_jsonl,
     escribir_markdown,
@@ -934,12 +936,14 @@ def evaluar_v2(
             al_terminar(resultado)
 
     resultados = list(fusionar(previos, nuevos)) if previos else nuevos
+    revision = cargar_revision(ARCHIVO_REVISION_V2)
     texto = render_markdown_v2(
         resultados,
         banco or preguntas,
         modelo=modelo,
         corrida=corrida,
         fecha=fecha,
+        revision=revision,
     )
     escribir_resultados_v2(
         resultados,
@@ -957,12 +961,17 @@ def render_markdown_v2(
     modelo: str,
     corrida: str,
     fecha: date | None = None,
+    revision: Mapping[int, Revision] | None = None,
 ) -> str:
     """Tabla de la evaluacion v2 con rutas, citas, uso y respuestas.
 
     La ruta obtenida se informa junto a la esperada, pero no decide la
     clasificacion: en el Tablero la ruta ``T`` es provisional y una respuesta
     que baja a la Boveda puede ser correcta.
+
+    Si se pasa ``revision``, agrega la seccion de la revision humana y las
+    segundas firmas. El veredicto final sigue siendo ``Revision.veredicto``;
+    ``veredicto_2`` solo se conserva para medir acuerdo.
     """
     hoy = fecha or date.today()
     fechas = sorted({resultado.fecha for resultado in resultados if resultado.fecha})
@@ -999,6 +1008,7 @@ def render_markdown_v2(
     lineas += _resumen_uso_v2(resultados)
     lineas += _tabla_preguntas(resultados, por_id)
     lineas += _respuestas(resultados, por_id)
+    lineas += _revision_humana(revision, preguntas)
     lineas += [
         "## Como se clasifica",
         "",
@@ -1310,6 +1320,59 @@ def _celda(texto: str, limite: int = 0) -> str:
     if limite and len(limpio) > limite:
         limpio = limpio[: limite - 1].rstrip() + "…"
     return limpio
+
+
+def _revision_humana(
+    revision: Mapping[int, Revision] | None,
+    preguntas: Sequence[PreguntaFase2],
+) -> list[str]:
+    """Seccion de la revision humana y las segundas firmas."""
+    if not revision:
+        return []
+    por_id = {pregunta.id: pregunta for pregunta in preguntas}
+    dobles = [
+        (identificador, fila)
+        for identificador, fila in sorted(revision.items())
+        if fila.tiene_segunda_revision
+    ]
+    revisores = sorted({fila.revisor for fila in revision.values() if fila.revisor})
+    revisores_2 = sorted({fila.revisor_2 for _, fila in dobles})
+    acuerdos = sum(1 for _, fila in dobles if fila.acuerdo)
+    lineas = [
+        "## Revision humana",
+        "",
+        f"Revisadas: **{len(revision)}**. Con segunda firma: **{len(dobles)}**.",
+    ]
+    if revisores:
+        lineas.append(f"Primera firma: **{', '.join(revisores)}**.")
+    if revisores_2:
+        lineas.append(f"Segunda firma: **{', '.join(revisores_2)}**.")
+    if not dobles:
+        lineas += ["", "No hay segundas firmas registradas.", ""]
+        return lineas
+    lineas += [
+        f"Acuerdos de veredicto: **{acuerdos}/{len(dobles)}**.",
+        "",
+        "| # | Pregunta | Primera firma | Segunda firma | ¿Coincide? |",
+        "|---:|---|---|---|---|",
+    ]
+    for identificador, fila in dobles:
+        pregunta = por_id.get(identificador)
+        texto = _celda(pregunta.pregunta, 55) if pregunta else "n/d"
+        coincide = "Sí" if fila.acuerdo else "No"
+        lineas.append(
+            f"| {identificador} | {texto} | {VEREDICTOS[fila.veredicto]} | "
+            f"{VEREDICTOS[fila.veredicto_2]} | {coincide} |"
+        )
+    lineas += [
+        "",
+        "El veredicto final es la primera firma (`veredicto`); la segunda se conserva "
+        "para medir acuerdo. En estas seis se aplico el criterio de v1: el veredicto "
+        "mide el contenido y la cita se mide aparte. McNemar usa el veredicto final, "
+        "no la segunda firma.",
+        "",
+    ]
+    return lineas
 
 
 def _resumen_por_tipo(

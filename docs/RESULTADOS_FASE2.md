@@ -617,6 +617,24 @@ Tipo: **tabla** · Ruta: **T** (esperada T) · Clasificacion: **Correcta** · 0.
 > Fuentes:
 > - https://www.bancodeoccidente.com.co/documents/d/guest/tarifas-persona-1
 
+## Revision humana
+
+Revisadas: **20**. Con segunda firma: **6**.
+Primera firma: **Anny Valencia**.
+Segunda firma: **Darley843**.
+Acuerdos de veredicto: **6/6**.
+
+| # | Pregunta | Primera firma | Segunda firma | ¿Coincide? |
+|---:|---|---|---|---|
+| 2 | ¿Dónde hay una oficina en Cali? | Incorrecta | Incorrecta | Sí |
+| 3 | ¿Cuál es la línea de atención telefónica? | Parcial | Parcial | Sí |
+| 4 | ¿Cómo presento una petición, queja o reclamo? | Parcial | Parcial | Sí |
+| 10 | ¿Qué tipos de cuentas de ahorro ofrece? | Parcial | Parcial | Sí |
+| 13 | ¿Qué tarjetas de crédito ofrece y cuál es su cuota de… | Parcial | Parcial | Sí |
+| 16 | ¿Ofrece crédito de vehículo? | Correcta | Correcta | Sí |
+
+El veredicto final es la primera firma (`veredicto`); la segunda se conserva para medir acuerdo. En estas seis se aplico el criterio de v1: el veredicto mide el contenido y la cita se mide aparte. McNemar usa el veredicto final, no la segunda firma.
+
 ## Como se clasifica
 
 La heuristica es la de v1: si el corpus no tiene el dato, lo esperado es la frase fija con el canal oficial (*rechazo correcto*); si lo tiene, se buscan los terminos esperados y se marca *correcta*, *incompleta* o *revisar*. Una respuesta sin datos cuando el corpus si los tiene es un falso negativo. La revision humana es la que vale para el informe, y McNemar se calcula solo con las 20 preguntas de tipo `alcance`.
