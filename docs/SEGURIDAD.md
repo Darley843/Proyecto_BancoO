@@ -219,7 +219,7 @@ dependencia de Python ejecuta código no revisado o exfiltra datos.
   No es dependencia del pipeline, no entra en `uv.lock` ni en la CI, y el HTML
   generado no se edita a mano; la fuente tipada (`docs/arquitectura.json`,
   `docs/datos.json`) sí se versiona. El `pre-commit` excluye el HTML generado de
-  las correcciones de formato. Su auditoría con **SkillSpector está pendiente**.
+  las correcciones de formato. Se auditó con **SkillSpector** el 7 de noviembre de 2026 (v3.2.0, commit `a4065941`) y quedó aceptada con condiciones; ver `docs/auditoria-skills-proyecto.md`.
 - Los MCP de `opencode.json` son de solo consulta (`docs-langchain`,
   `reference-langchain`) o corren en un entorno aparte (`scrapling` con
   `uvx --from "scrapling[ai,fetchers]>=0.5"`); no escriben en Bronze, Silver ni
@@ -235,8 +235,8 @@ dependencia de Python ejecuta código no revisado o exfiltra datos.
 
 **Residual.** No hay `pip-audit`/SBOM ni verificación de firma más allá de los
 hashes de `uv.lock`. `skills@latest` y `scrapling>=0.5` son versiones flotantes;
-conviene fijarlas y repetir la auditoría. **Archify queda sin auditar con
-SkillSpector** y se instala global, fuera del proyecto, así que su código Node no
+conviene fijarlas y repetir la auditoría. **Archify** se auditó con
+SkillSpector (aceptada con condiciones), pero se instala global, fuera del proyecto, y su código Node no
 pasa por `uv.lock` ni por la CI. La recomendación de la auditoría de añadir
 permisos `deny` para `.env` y `git push` en `opencode.json` sigue pendiente y
 fuera de este cambio.
@@ -379,7 +379,7 @@ No se activan en CI ni en la suite.
 | **Los chunks web/PDF no se re-escanean con `detectar_pii`.** Solo los hechos pasan por el detector. | Gold tiene 0 detecciones al 2026-11-07 y la captura no entra a login ni formularios. | Aplicar `detectar_pii` a los chunks al construir fragmentos y reportar los omitidos también para ellos. |
 | **La guardia de red permite loopback salvo el puerto de Ollama.** El loopback es necesario para `TestClient` en Windows, que crea su self-pipe con `socket.socketpair()` sobre `127.0.0.1`; el puerto `11434` queda bloqueado en `connect` y `connect_ex`. | No permite salir a internet y una prueba que llame a Ollama falla aunque el servicio esté encendido; los embeddings se doblan con `DeterministicFakeEmbedding`. | Ninguna: `test/test_seguridad.py::test_guardia_de_red_bloquea_ollama_local` lo comprueba. |
 | **La pregunta y los fragmentos se envían a DeepSeek.** | Es inherente al modelo externo; la PII se filtra antes y el corpus es público. | Revisar la retención del proveedor y no enviar preguntas con datos personales; el proyecto no lo hace. |
-| **Archify no está auditado con SkillSpector.** Se instala de forma global, fuera del proyecto, y ejecuta código Node que no pasa por `uv.lock` ni por la CI. | Es una herramienta de documentación, no una dependencia del pipeline; el HTML generado no se edita a mano. | Ejecutar SkillSpector sobre `~/.agents/skills/archify` y fijar la versión de `skills` en el README. |
+| **Archify se usa con condiciones.** Se instala de forma global, fuera del proyecto, ejecuta código Node que no pasa por `uv.lock` ni por la CI, usa red (aviso de actualizaciones y descarga de logos) y lanza procesos. | Auditada con SkillSpector el 7 de noviembre de 2026 (v3.2.0, commit `a4065941`): la nota de 99/100 se debe a falsos positivos y a cobertura parcial. Es una herramienta de documentación, no una dependencia del pipeline, y el HTML generado no se edita a mano. | Fijar la instalación en el commit auditado en lugar de `skills@latest`, no pedirle logos del banco por URL y repetir la auditoría antes de actualizar; ver `docs/auditoria-skills-proyecto.md`. |
 
 ## 7. Cómo verificar
 
