@@ -1,8 +1,5 @@
 {
-  "avisos": [
-    "revision_humana_v2.toml no existe o no tiene revisiones: el McNemar v1 vs v2 queda pendiente y se excluyen los 20 pares.",
-    "resultados_v2.jsonl no existe: la evaluacion v2 queda pendiente (tarea 22.3)."
-  ],
+  "avisos": [],
   "conteos": {
     "con_fuente": 36,
     "evaluables_b": 22,
@@ -14,7 +11,7 @@
     "arqueo_usd": 0.0,
     "preguntas": 44,
     "v1_usd": 0.027624,
-    "v2_usd": null
+    "v2_usd": 0.015728
   },
   "detalle": {
     "configuraciones": [
@@ -697,14 +694,20 @@
       "revisadas": 20,
       "total": 20
     },
-    "v2": null
+    "v2": {
+      "aciertos": 11,
+      "citas_correctas": 0.5,
+      "exactitud": 0.55,
+      "revisadas": 20,
+      "total": 20
+    }
   },
   "mcnemar": {
-    "b": 0,
+    "b": 5,
     "c": 0,
-    "excluidos": 20,
-    "n": 0,
-    "p": 1.0,
+    "excluidos": 0,
+    "n": 5,
+    "p": 0.0625,
     "preguntas": 20
   },
   "mcnemar_pesos": {
@@ -1232,6 +1235,19 @@
       "tiempo_maximo": 6.25,
       "tiempo_promedio": 4.1815
     },
-    "v2": null
+    "v2": {
+      "cache_promedio": 116.363636,
+      "cache_total": 5120,
+      "costo_usd_promedio": 0.000357,
+      "costo_usd_total": 0.015728,
+      "entrada_promedio": 1384.75,
+      "entrada_total": 60929,
+      "errores": 0,
+      "registros": 44,
+      "salida_promedio": 278.068182,
+      "salida_total": 12235,
+      "tiempo_maximo": 16.89,
+      "tiempo_promedio": 4.150227
+    }
   }
 }
