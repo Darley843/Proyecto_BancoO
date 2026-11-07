@@ -31,6 +31,8 @@ _CONTRARIOS: tuple[tuple[str, str], ...] = (
     ("nacional", "exterior"),
     ("visa", "mastercard"),
 )
+#: Nombres de producto que deben aparecer en la fila cuando la consulta los pide.
+_DISTINTIVOS = frozenset({"black", "gold", "platinum", "clasica", "joven", "business", "viajera"})
 #: Palabras que no distinguen una tarifa: artículos, preposiciones y muletillas.
 _VACIAS = frozenset(
     [
@@ -232,6 +234,7 @@ def buscar_filas(filas: Sequence[Fila], consulta: str, categoria: str | None = N
     elegibles = [fila for fila in filas if not objetivo or objetivo in normalizar(fila.categoria)]
     if not terminos:
         return [] if consulta.strip() else elegibles
+    elegibles = _exigir_distintivos(elegibles, consulta)
 
     puntuadas: list[tuple[int, Fila]] = []
     raices = list(dict.fromkeys(_raiz(_SINONIMOS.get(termino, termino)) for termino in terminos))
@@ -319,6 +322,32 @@ def _raiz(palabra: str) -> str:
         if palabra.endswith(sufijo) and len(palabra) - len(sufijo) >= 4:
             return palabra[: -len(sufijo)]
     return palabra
+
+
+#: Raíces de los nombres de producto que se exigen en la fila.
+_DISTINTIVOS_RAIZ = frozenset(_raiz(palabra) for palabra in _DISTINTIVOS)
+
+
+def _exigir_distintivos(filas: Sequence[Fila], consulta: str) -> list[Fila]:
+    """Si la consulta nombra Black, Gold o Platinum, exige ese nombre en la fila.
+
+    Evita responder «¿cuánto cuesta la Black?» con la fila genérica de pago de
+    tarjeta, que no menciona Black. Si ninguna fila tiene el nombre, devuelve
+    una lista vacía para que la consulta pase a la Bóveda.
+    """
+    raices_consulta = {_raiz(termino) for termino in _terminos(consulta)}
+    exigidos = raices_consulta & _DISTINTIVOS_RAIZ
+    if not exigidos:
+        return list(filas)
+    resultado: list[Fila] = []
+    for fila in filas:
+        palabras = {
+            _raiz(palabra)
+            for palabra in _PALABRA.findall(normalizar(f"{fila.concepto} {fila.categoria}"))
+        }
+        if exigidos <= palabras:
+            resultado.append(fila)
+    return resultado
 
 
 def _contradice(raices_consulta: Sequence[str], raices_fila: set[str]) -> bool:

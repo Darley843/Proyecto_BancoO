@@ -387,6 +387,27 @@ def test_filas_para_plantilla_no_confunde_schengen_con_no_schengen() -> None:
     assert [f.concepto for f in encontradas] == ["Gastos médicos países Schengen (Visa)"]
 
 
+def test_buscar_filas_exige_el_producto_distintivo() -> None:
+    """Si la pregunta dice Black, no se responde con una fila sin Black."""
+    filas = [
+        fila("Credencial Black*", "52.500"),
+        fila("Pago Tarjeta de Crédito Credencial Mastercard", "3,5"),
+    ]
+
+    encontradas = buscar_filas(
+        filas, "¿Cuál es la cuota de manejo de la tarjeta Credencial Mastercard Black?"
+    )
+
+    assert [f.concepto for f in encontradas] == ["Credencial Black*"]
+
+
+def test_filas_para_plantilla_sin_producto_distintivo_no_inventa() -> None:
+    """Si no hay fila del producto pedido, el Tablero no responde otra."""
+    filas = [fila("Pago Tarjeta de Crédito Credencial Mastercard", "3,5")]
+
+    assert filas_para_plantilla(filas, "¿Cuál es la cuota de la Platinum?") == []
+
+
 def test_concepto_sin_franquicia_quita_el_sufijo() -> None:
     """El concepto base sirve para reconocer filas del mismo producto."""
     assert concepto_sin_franquicia("Gastos médicos (Mastercard)") == "gastos medicos"

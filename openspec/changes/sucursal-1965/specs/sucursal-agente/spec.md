@@ -8,7 +8,7 @@ Decidir la ruta de cada pregunta, responder con recuperación o con datos estruc
 
 ### Requirement: Digiturno por reglas
 
-El digiturno SHALL asignar primero por reglas deterministas: datos personales y preguntas fuera de alcance van a `X` sin llamar al modelo; las palabras de tarifas y coberturas proponen `T`; las dudas van a DeepSeek a temperatura 0 con salida JSON; el resto va a `B`. La letra `T` es provisional y se confirma solo si el Tablero devuelve de una a tres filas. Cada turno MUST registrar letra, número, ruta, motivo y si usó el modelo.
+El digiturno SHALL asignar primero por reglas deterministas: datos personales y preguntas fuera de alcance van a `X` sin llamar al modelo; la historia, identidad y gobierno del banco van a `B` sin llamar al modelo; las palabras de tarifas y coberturas proponen `T`; las dudas van a DeepSeek a temperatura 0 con salida JSON; el resto va a `B`. La letra `T` es provisional y se confirma solo si el Tablero puede responder con plantilla (1–3 filas o más del mismo concepto, hasta 10). Cada turno MUST registrar letra, número, ruta, motivo y si usó el modelo.
 
 #### Scenario: Dato personal
 
@@ -25,6 +25,11 @@ El digiturno SHALL asignar primero por reglas deterministas: datos personales y 
 - **WHEN** la pregunta es «¿cómo abro mi cuenta de nómina?»
 - **THEN** el turno no es `X` y sigue la ruta `B`, porque «mi cuenta» no es un patrón de rechazo
 
+#### Scenario: Historia e identidad del banco
+
+- **WHEN** la pregunta es «¿Cuándo y dónde se fundó el banco?» o «¿Quién es el presidente?»
+- **THEN** el turno es `B` antes de llamar al modelo; la historia y la identidad están dentro del alcance
+
 #### Scenario: Tema de tarifas
 
 - **WHEN** la pregunta menciona cuota de manejo, tarifa o cobertura
@@ -32,7 +37,7 @@ El digiturno SHALL asignar primero por reglas deterministas: datos personales y 
 
 #### Scenario: Tarifas demasiado amplias
 
-- **WHEN** una pregunta de tarifas devuelve más de tres filas en el Tablero
+- **WHEN** una pregunta de tarifas devuelve más de tres filas de varios conceptos o más de diez del mismo
 - **THEN** el turno final es `B` y responde la Bóveda, no una plantilla de tabla
 
 #### Scenario: Caso dudoso

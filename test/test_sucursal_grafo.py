@@ -237,6 +237,44 @@ def test_cuota_generica_de_tarjetas_pasa_a_boveda(tmp_path: Path) -> None:
     assert estado["turno"]["motivo"] == "tablero_generico"
 
 
+def test_tablero_responde_la_black_con_su_propia_fila(tmp_path: Path) -> None:
+    """«Black» se responde con la fila que menciona Black, no con la genérica."""
+    modelo = ModeloEspia([])
+    filas = [
+        fila("Credencial Black*", "52.500"),
+        fila("Pago Tarjeta de Crédito Credencial Mastercard", "3,5"),
+    ]
+    grafo, dependencias = deps(tmp_path, modelo=modelo, filas=filas)
+
+    estado = responder_turno(
+        grafo,
+        dependencias,
+        "¿Cuál es la cuota de manejo de la tarjeta Credencial Mastercard Black?",
+        "t1",
+    )
+
+    assert estado["turno"]["letra"] == "T"
+    assert "52.500" in estado["respuesta"]
+    assert "3,5" not in estado["respuesta"]
+
+
+def test_tablero_black_sin_fila_black_pasa_a_boveda(tmp_path: Path) -> None:
+    """Si ninguna fila menciona Black, el Tablero no inventa una respuesta."""
+    modelo = ModeloEspia([respuesta_valida()])
+    filas = [fila("Pago Tarjeta de Crédito Credencial Mastercard", "3,5")]
+    grafo, dependencias = deps(tmp_path, modelo=modelo, filas=filas, fragmentos=[fragmento()])
+
+    estado = responder_turno(
+        grafo,
+        dependencias,
+        "¿Cuál es la cuota de manejo de la tarjeta Credencial Mastercard Black?",
+        "t1",
+    )
+
+    assert estado["turno"]["letra"] == "B"
+    assert estado["turno"]["motivo"] == "tablero_sin_filas"
+
+
 def test_pregunta_21_responde_por_tablero(tmp_path: Path) -> None:
     """Los nueve topes de gastos médicos se listan en una sola tabla."""
     grafo, dependencias = deps(tmp_path, modelo=ModeloEspia([]), filas=leer_filas(ARCHIVO_TABLERO))

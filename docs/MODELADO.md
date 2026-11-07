@@ -112,13 +112,17 @@ primera coincidencia:
 2. **Fuera de alcance** (patrones de `[digiturno]` en `config/sucursal.toml`):
    saldo o deudas propias, otro banco, clima, consejo de inversión, intento de
    revelar instrucciones → `X`.
-3. **Tarifas y coberturas** (`cuota`, `tarifa`, `cobertura`, `carencia`,
-   `descuento`, `promoción`, `asistencia`, `seguro`…) → `T`.
-4. **Duda**: si se inyecta un clasificador, se pregunta a DeepSeek a temperatura
+3. **Historia, identidad y gobierno** del banco (`fundación`, `historia`,
+   `propósito`, `misión`, `grupo empresarial`, `presidente`, `junta directiva`,
+   `gobierno corporativo`) → `B` sin llamar al modelo.
+4. **Tarifas y coberturas** (`cuota`, `tarifa`, `cobertura`, `carencia`,
+   `descuento`, `promoción`, `asistencia`, `seguro`, `traslado`, `schengen`,
+   `apartamento`, `chequera`, `cheque`…) → `T`.
+5. **Duda**: si se inyecta un clasificador, se pregunta a DeepSeek a temperatura
    0 con salida JSON `{letra, motivo}` y hasta 512 tokens: el modelo gasta medio
    centenar solo en razonar y con topes bajos la duda caía siempre al respaldo.
    Cualquier salida inválida cae a `B` con motivo `defecto:modelo_sin_respuesta`.
-5. Por defecto, **`B`** (Bóveda), con motivo `defecto` cuando no hay clasificador.
+6. Por defecto, **`B`** (Bóveda), con motivo `defecto` cuando no hay clasificador.
 
 `numero` es un consecutivo por proceso (empieza en 1) y **no se persiste**; la
 pregunta tampoco se guarda. `T` es provisional: el grafo confirmará la ruta solo
@@ -163,10 +167,13 @@ filas que solo existen en un lado y las que difieren en valor. `buscar_filas`
 parte la consulta en palabras significativas (descarta artículos y muletillas
 como «cuánto», «cuesta» o «de»), compara raíces para aceptar plurales y
 flexiones, entiende «Europa» como Schengen y descarta filas que solo mencionan
-el opuesto (crédito/débito, nacional/exterior, Visa/Mastercard). Devuelve las
-filas con más coincidencias; `filas_para_plantilla` desempata por la frase más
-larga y el concepto más corto, para que «Cheque de Gerencia» gane sobre
-«Anulación … de Cheques de Gerencia».
+el opuesto (crédito/débito, nacional/exterior, Visa/Mastercard). Si la consulta
+nombra un producto (Black, Gold, Platinum, Clásica, Joven, Business o Viajera),
+solo se consideran las filas que mencionan ese nombre; si ninguna lo hace, el
+Tablero pasa a `B` en vez de responder otra tarjeta. Devuelve las filas con más
+coincidencias; `filas_para_plantilla` desempata por la frase más larga y el
+concepto más corto, para que «Cheque de Gerencia» gane sobre «Anulación … de
+Cheques de Gerencia».
 
 Estado actual: el CSV se regenera con `make tablero`; las 12 preguntas de tabla
 se cruzan en cada corrida y la 43 (chequera) queda pendiente del arreglo del

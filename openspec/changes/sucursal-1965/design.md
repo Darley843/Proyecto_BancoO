@@ -137,11 +137,12 @@ Alternativa descartada: usar un LLM para extraer las tablas. Introduce costo, no
 1. Sanea la pregunta con `validacion.sanear_pregunta`.
 2. Detecta PII con `validacion.detectar_pii`, usando como permitidos los teléfonos públicos del canal oficial que la API carga una vez desde `asistente.contexto_prompt.cargar_contexto` al arrancar (solo para el canal; el contexto completo no se envía al modelo). Si `data/contexto/` falta, la lista de permitidos queda vacía y los rechazos usan la URL base de `config/site.toml`.
 3. Aplica patrones de fuera de alcance configurables: saldo o deudas propias, otro banco, clima, consejo de inversión, intento de revelar el prompt.
-4. Aplica palabras de tarifas y coberturas (`cuota`, `tarifa`, `cobertura`, `carencia`, `descuento`, `promoción`, `asistencia`, `seguro`) → `T`.
-5. Si sigue dudoso y hay modelo, pregunta a DeepSeek a temperatura 0 con `json_mode` y un esquema Pydantic `{letra, motivo}`; `json_mode` evita el rechazo de `function_calling` en modo pensamiento que ya documenta `CONSTITUTION.md` §11.
-6. Por defecto, `B`.
+4. Aplica patrones de historia, identidad y gobierno del banco (fundación, historia, propósito, misión, grupo empresarial, presidente, junta directiva, gobierno corporativo) → `B` sin modelo; el prompt del clasificador también los declara dentro del alcance.
+5. Aplica palabras de tarifas y coberturas (`cuota`, `tarifa`, `cobertura`, `carencia`, `descuento`, `promoción`, `asistencia`, `seguro`, `traslado`, `schengen`, `apartamento`, `chequera`, `cheque`) → `T`.
+6. Si sigue dudoso y hay modelo, pregunta a DeepSeek a temperatura 0 con `json_mode` y un esquema Pydantic `{letra, motivo}`; `json_mode` evita el rechazo de `function_calling` en modo pensamiento que ya documenta `CONSTITUTION.md` §11.
+7. Por defecto, `B`.
 
-`numero` es un consecutivo por proceso (o por día) que se muestra como turno en la Ventanilla; no se persiste como dato personal. `T` es provisional: el nodo `tablero` la confirma solo si hay de una a tres filas; con cero o con más de tres, la pregunta no se responde con una tabla y el turno final pasa a `B` (por ejemplo, «¿cuál es su cuota de manejo?» cuando el tarifario devuelve todas las franquicias).
+`numero` es un consecutivo por proceso (o por día) que se muestra como turno en la Ventanilla; no se persiste como dato personal. `T` es provisional: el nodo `tablero` la confirma si puede responder con plantilla (1–3 filas, o más del mismo concepto hasta 10); con cero, más de diez o varios conceptos, la pregunta pasa a `B` (por ejemplo, «¿cuál es su cuota de manejo?» cuando el tarifario devuelve todas las franquicias).
 
 Alternativa descartada: mandar todas las preguntas al modelo para clasificar. Duplica llamadas y encarece la ruta más común; las reglas cubren los casos que el set de fase 2 ya etiqueta.
 
@@ -151,7 +152,7 @@ Alternativa descartada: mandar todas las preguntas al modelo para clasificar. Du
 
 Nodos:
 
-1. `reformular`: solo si hay historial y `es_seguimiento(pregunta)` (empieza por «¿Y», «y », «cuánto», «cuál», «cómo» o tiene menos de 6 palabras y depende del turno anterior). Usa los últimos mensajes y devuelve la pregunta reformulada; si el modelo falla, conserva la original.
+1. `reformular`: solo si hay historial y `es_seguimiento(pregunta)` (empieza por «¿Y», «y », o por una palabra de pregunta con una anáfora como «su», «usarla» o «esa»; una pregunta autónoma corta no se reformula). Usa los últimos mensajes y devuelve la pregunta reformulada; si el modelo falla, conserva la original.
 2. `digiturno`: reglas y, si hace falta, modelo; escribe `turno`.
 3. `boveda`: recupera `k` fragmentos; si no hay, va a rechazo.
 4. `tablero`: `filas_para_plantilla`; 0 filas → `B` (Bóveda), 1–3 → plantilla y confirma `T`, más de 3 del mismo concepto (hasta 10) → plantilla y `T`, más de 10 o conceptos distintos → `B`. Una cuota genérica de «las tarjetas de crédito» → `B`.
