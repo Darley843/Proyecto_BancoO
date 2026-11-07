@@ -1298,7 +1298,12 @@ function crearBotonDictado(entrada) {
 }
 
 /**
- * Inicia el dictado y escribe la transcripción en el campo de pregunta.
+ * Inicia el dictado, escribe la transcripción y lo cierra en cuanto llega el
+ * resultado final.
+ *
+ * Antes de empezar detiene cualquier reconocimiento anterior: nunca hay dos
+ * micrófonos activos a la vez. El botón vuelve a «Dictar» al terminar, al
+ * fallar y al cancelar.
  *
  * @param {Function} Reconocimiento Constructor del reconocimiento.
  * @param {HTMLInputElement} entrada Campo de pregunta.
@@ -1306,6 +1311,7 @@ function crearBotonDictado(entrada) {
  * @returns {void}
  */
 function iniciarDictado(Reconocimiento, entrada, boton) {
+  detenerDictado();
   try {
     const instancia = new Reconocimiento();
     instancia.lang = "es-CO";
@@ -1318,37 +1324,47 @@ function iniciarDictado(Reconocimiento, entrada, boton) {
     boton.setAttribute("aria-pressed", "true");
 
     instancia.onresult = (evento) => {
-      const texto = evento.results?.[0]?.[0]?.transcript?.trim();
-      if (!texto) {
+      const resultado = evento.results?.[0];
+      const texto = String(resultado?.[0]?.transcript ?? "").trim();
+      if (texto) {
+        entrada.value = entrada.value.trim()
+          ? `${entrada.value.trim()} ${texto}`
+          : texto;
+        entrada.focus();
+      }
+      if (reconocimiento === instancia && instancia.continuous !== true) {
+        detenerDictado();
+      }
+    };
+    instancia.onerror = (evento) => {
+      if (reconocimiento !== instancia) {
         return;
       }
-      entrada.value = entrada.value.trim()
-        ? `${entrada.value.trim()} ${texto}`
-        : texto;
-      entrada.focus();
-    };
-    instancia.onerror = () => {
+      if (evento?.error === "aborted") {
+        detenerDictado();
+        return;
+      }
+      const permisoNegado =
+        evento?.error === "not-allowed" ||
+        evento?.error === "service-not-allowed";
+      detenerDictado();
       if (vistaActual) {
         anunciar(
           vistaActual,
-          "No se pudo usar el micrófono. Revisa el permiso del navegador.",
+          permisoNegado
+            ? "Para dictar, permite el micrófono en el navegador."
+            : "No se pudo usar el micrófono. Revisa el permiso del navegador.",
         );
       }
     };
     instancia.onend = () => {
-      reconocimiento = null;
-      boton.textContent = "Dictar";
-      boton.setAttribute("aria-pressed", "false");
-      if (botonDictadoActual === boton) {
-        botonDictadoActual = null;
+      if (reconocimiento === instancia) {
+        detenerDictado();
       }
     };
     instancia.start();
   } catch {
-    reconocimiento = null;
-    botonDictadoActual = null;
-    boton.textContent = "Dictar";
-    boton.setAttribute("aria-pressed", "false");
+    detenerDictado();
     if (vistaActual) {
       anunciar(
         vistaActual,
@@ -1359,7 +1375,7 @@ function iniciarDictado(Reconocimiento, entrada, boton) {
 }
 
 /**
- * Detiene el dictado en curso y restaura el botón.
+ * Detiene el dictado en curso y devuelve el botón a «Dictar».
  *
  * @returns {void}
  */
@@ -1379,6 +1395,28 @@ function detenerDictado() {
     botonDictadoActual = null;
   }
 }
+
+/**
+ * Detiene el dictado y la lectura cuando la página se oculta o se cierra, y
+ * también cuando el hash cambia de vista.
+ *
+ * @param {Event} evento Evento `visibilitychange`, `pagehide` o `hashchange`.
+ * @returns {void}
+ */
+function alSalirDeLaVista(evento) {
+  if (
+    evento?.type === "visibilitychange" &&
+    document.visibilityState === "visible"
+  ) {
+    return;
+  }
+  detenerDictado();
+  detenerVoz();
+}
+
+window.addEventListener("pagehide", alSalirDeLaVista);
+window.addEventListener("visibilitychange", alSalirDeLaVista);
+window.addEventListener("hashchange", alSalirDeLaVista);
 
 /**
  * Pinta la vista Ventanilla dentro de su contenedor.
