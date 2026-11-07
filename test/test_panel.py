@@ -6,7 +6,10 @@ Todo se escribe en ``tmp_path``: no se tocan los datos del repositorio.
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
+
+import pytest
 
 from banco_occidente_corpus.config import (
     Config,
@@ -23,6 +26,7 @@ from banco_occidente_corpus.panel import (
     read_index,
     read_repetitions,
 )
+from banco_occidente_corpus.utils import numero_es, tamano_es
 
 FIXTURES = Path(__file__).parent / "fixtures"
 BASE = "https://www.bancodeoccidente.com.co"
@@ -178,9 +182,55 @@ def test_pipeline_summary_lee_el_reporte_de_repetidos(tmp_path: Path) -> None:
 
     # Assert
     assert _metric(dedupe.metrics, "Páginas analizadas") == "181"
-    assert _metric(dedupe.metrics, "Repetido >= 5 / 10 / 20") == "22.3 % / 16.7 % / 9.1 %"
+    assert _metric(dedupe.metrics, "Líneas de contenido") == "8.094"
+    assert _metric(dedupe.metrics, "Repetido >= 5 / 10 / 20") == "22,3 % / 16,7 % / 9,1 %"
     assert summary.repetitions is not None
     assert len(summary.repetitions.blocks) == 2
+
+
+@pytest.mark.parametrize(
+    ("valor", "decimales", "esperado"),
+    [
+        (0, 0, "0"),
+        (181, 0, "181"),
+        (8094, 0, "8.094"),
+        (196139, 0, "196.139"),
+        (1234567, 0, "1.234.567"),
+        (1.5, 1, "1,5"),
+        (22.34, 1, "22,3"),
+        (1234.5, 1, "1.234,5"),
+    ],
+)
+def test_numero_es_usa_punto_de_miles_y_coma_decimal(
+    valor: float, decimales: int, esperado: str
+) -> None:
+    """Los números de la Cámara se leen a la colombiana (es-CO)."""
+    assert numero_es(valor, decimales) == esperado
+
+
+def test_tamano_es_usa_coma_decimal() -> None:
+    """El tamaño de Bronze lleva coma decimal: ``1,5 KB``."""
+    assert tamano_es(0) == "0,0 B"
+    assert tamano_es(1536) == "1,5 KB"
+    assert tamano_es(3 * 1024 * 1024) == "3,0 MB"
+
+
+def test_pipeline_summary_no_usa_formato_en_ingles(tmp_path: Path) -> None:
+    """Ninguna métrica trae coma de miles ni punto decimal (estilo en-US)."""
+    # Arrange
+    config = _config(tmp_path)
+    config.paths.gold.mkdir(parents=True, exist_ok=True)
+    config.paths.repetitions_file.write_text(
+        (FIXTURES / "repetidos.md").read_text(encoding="utf-8"), encoding="utf-8"
+    )
+
+    # Act
+    summary = pipeline_summary(config)
+
+    # Assert
+    for stage in summary.stages:
+        for metric in stage.metrics:
+            assert re.search(r"\d,\d{3}\b|\d\.\d\b", metric.value) is None, metric
 
 
 # -------------------------------------------------------------- reportes

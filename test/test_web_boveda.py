@@ -156,6 +156,26 @@ def test_sin_indice_no_dibuja_el_mapa() -> None:
     assert "crearSinPuntos()" in codigo
 
 
+def test_mapa_no_calculado_muestra_el_mensaje_de_la_api() -> None:
+    """Con ``disponible: false`` se explica con el ``error`` de la API, sin dibujar."""
+    codigo = leer_vista()
+    rama = codigo.index("if (datos?.disponible === false) {")
+    salida = codigo[rama : codigo.index("return;", rama)]
+    assert "crearMapaNoCalculado(avisoApi)" in salida
+    assert rama < codigo.index("crearPanelMapa(puntos, marca)")
+
+
+def test_pregunta_fallida_muestra_el_aviso_y_no_dice_que_no_hubo_fragmentos() -> None:
+    """Si Ollama falla, el top explica el error en vez de «no encontró fragmentos»."""
+    codigo = leer_vista()
+    assert "crearPanelTop(pregunta, top, avisoApi)" in codigo
+    aviso = codigo.index("if (avisoApi && top.length === 0) {")
+    vacio = codigo.index("La Bóveda no encontró fragmentos para esta pregunta.")
+    assert aviso < vacio
+    assert "No se pudo buscar tu pregunta." in codigo[aviso:vacio]
+    assert 'crearTexto("p", avisoApi)' in codigo[aviso:vacio]
+
+
 def test_coordenadas_invalidas_no_se_dibujan() -> None:
     """Solo se dibujan puntos con ``x`` e ``y`` finitos entre 0 y 100."""
     codigo = leer_vista()

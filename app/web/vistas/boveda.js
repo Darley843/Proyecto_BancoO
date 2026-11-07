@@ -175,6 +175,11 @@ async function consultar(resultados, estado, texto) {
     top = [];
   }
 
+  const avisoApi = typeof datos?.error === "string" ? datos.error.trim() : "";
+  if (datos?.disponible === false) {
+    resultados.replaceChildren(crearMapaNoCalculado(avisoApi));
+    return;
+  }
   if (puntos.length === 0) {
     resultados.replaceChildren(crearSinPuntos());
     return;
@@ -182,7 +187,7 @@ async function consultar(resultados, estado, texto) {
 
   const contenido = document.createElement("div");
   contenido.className = "boveda__contenido";
-  contenido.append(crearPanelMapa(puntos, marca), crearPanelTop(pregunta, top));
+  contenido.append(crearPanelMapa(puntos, marca), crearPanelTop(pregunta, top, avisoApi));
   resultados.replaceChildren(contenido);
 }
 
@@ -425,11 +430,15 @@ function crearMarcaPregunta(marca) {
  * Crea el panel del top: la lista de fragmentos recuperados o, si no hay
  * pregunta, una invitación a escribir una.
  *
+ * Si la API trae un aviso (por ejemplo, Ollama no respondió y no se pudo
+ * ubicar la pregunta), lo muestra en lugar de decir que no hubo fragmentos.
+ *
  * @param {string} pregunta Pregunta consultada (vacía si no hay).
  * @param {object[]} top Lista `top` del contrato.
+ * @param {string} [avisoApi] Campo `error` de la respuesta, si vino.
  * @returns {HTMLElement} El panel.
  */
-function crearPanelTop(pregunta, top) {
+function crearPanelTop(pregunta, top, avisoApi = "") {
   const panel = document.createElement("section");
   panel.className = "tarjeta boveda__panel boveda__panel--top";
   panel.setAttribute("aria-label", "Fragmentos recuperados");
@@ -439,6 +448,19 @@ function crearPanelTop(pregunta, top) {
       crearTexto("h2", "Fragmentos recuperados", "boveda__titulo-panel"),
       crearTexto("p", "Escribe una pregunta y aquí verás los fragmentos más cercanos, con su similitud.", "boveda__vacio"),
     );
+    return panel;
+  }
+  if (avisoApi && top.length === 0) {
+    panel.append(crearTexto("h2", `Búsqueda de «${pregunta}»`, "boveda__titulo-panel"));
+    const aviso = document.createElement("div");
+    aviso.className = "aviso aviso--error boveda__error";
+    aviso.setAttribute("role", "alert");
+    aviso.append(
+      crearTexto("strong", "No se pudo buscar tu pregunta."),
+      crearTexto("p", avisoApi),
+      crearTexto("p", "El mapa sigue disponible. Si usas Ollama, revisa que esté abierto (ollama serve) y vuelve a buscar."),
+    );
+    panel.append(aviso);
     return panel;
   }
   panel.append(crearTexto("h2", `Top ${top.length} para «${pregunta}»`, "boveda__titulo-panel"));
@@ -565,6 +587,24 @@ function crearIndiceNoListo() {
     ),
     crearTexto("code", "make indice", "boveda__comando"),
     crearTexto("p", "Cuando termine, vuelve a abrir la Bóveda."),
+  );
+  return aviso;
+}
+
+/**
+ * Explica que el mapa todavía no se calculó (`disponible: false`) con el
+ * mensaje que manda la API. No dibuja ningún mapa.
+ *
+ * @param {string} mensaje Campo `error` de la respuesta (puede venir vacío).
+ * @returns {HTMLElement} El aviso.
+ */
+function crearMapaNoCalculado(mensaje) {
+  const aviso = document.createElement("div");
+  aviso.className = "aviso boveda__no-listo";
+  aviso.setAttribute("role", "status");
+  aviso.append(
+    crearTexto("strong", "El mapa no está calculado todavía."),
+    crearTexto("p", mensaje || "Ejecuta make indice para crear el índice y el mapa."),
   );
   return aviso;
 }
