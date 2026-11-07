@@ -1,0 +1,1237 @@
+{
+  "avisos": [
+    "revision_humana_v2.toml no existe o no tiene revisiones: el McNemar v1 vs v2 queda pendiente y se excluyen los 20 pares.",
+    "resultados_v2.jsonl no existe: la evaluacion v2 queda pendiente (tarea 22.3)."
+  ],
+  "conteos": {
+    "con_fuente": 36,
+    "evaluables_b": 22,
+    "evaluables_t": 14,
+    "no_indexadas": [],
+    "preguntas": 44
+  },
+  "costo": {
+    "arqueo_usd": 0.0,
+    "preguntas": 44,
+    "v1_usd": 0.027624,
+    "v2_usd": null
+  },
+  "detalle": {
+    "configuraciones": [
+      "1/0",
+      "0/1",
+      "0.2/0.8",
+      "0.4/0.6",
+      "0.6/0.4",
+      "0.8/0.2",
+      "0.6/0.4 sin prefijos"
+    ],
+    "preguntas": [
+      {
+        "evaluable": false,
+        "fuente_indexada": null,
+        "id": 1,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": null,
+          "1/0": null
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 2,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": null,
+          "1/0": null
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 3,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": null,
+          "1/0": null
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 4,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": null,
+          "1/0": null
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 5,
+        "posiciones": {
+          "0.2/0.8": 1,
+          "0.4/0.6": 1,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": 2,
+          "1/0": 1
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 6,
+        "posiciones": {
+          "0.2/0.8": 1,
+          "0.4/0.6": 1,
+          "0.6/0.4": 1,
+          "0.8/0.2": 3,
+          "0/1": 2,
+          "1/0": 1
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 7,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": null,
+          "1/0": 1
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 8,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": null,
+          "1/0": 1
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 9,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": null,
+          "1/0": 1
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 10,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": null,
+          "1/0": null
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 11,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": null,
+          "1/0": 1
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 12,
+        "posiciones": {
+          "0.2/0.8": 1,
+          "0.4/0.6": 1,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": 1,
+          "1/0": 4
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 13,
+        "posiciones": {
+          "0.2/0.8": 5,
+          "0.4/0.6": 5,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": 4,
+          "1/0": null
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": false,
+        "fuente_indexada": null,
+        "id": 14,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": null,
+          "1/0": null
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 15,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": 5,
+          "0.8/0.2": 5,
+          "0/1": null,
+          "1/0": 5
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 16,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": null,
+          "1/0": null
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 17,
+        "posiciones": {
+          "0.2/0.8": 3,
+          "0.4/0.6": 3,
+          "0.6/0.4": 2,
+          "0.8/0.2": 2,
+          "0/1": 3,
+          "1/0": 2
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 18,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": 2,
+          "0.8/0.2": 2,
+          "0/1": null,
+          "1/0": 1
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 19,
+        "posiciones": {
+          "0.2/0.8": 2,
+          "0.4/0.6": 2,
+          "0.6/0.4": 2,
+          "0.8/0.2": 2,
+          "0/1": 4,
+          "1/0": 2
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 20,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": null,
+          "1/0": null
+        },
+        "ruta_esperada": "B",
+        "tipo": "alcance"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 21,
+        "posiciones": {
+          "0.2/0.8": 1,
+          "0.4/0.6": 1,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": 1,
+          "1/0": 1
+        },
+        "ruta_esperada": "T",
+        "tipo": "tabla"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 22,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": 5,
+          "0.8/0.2": 5,
+          "0/1": null,
+          "1/0": 5
+        },
+        "ruta_esperada": "T",
+        "tipo": "tabla"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 23,
+        "posiciones": {
+          "0.2/0.8": 2,
+          "0.4/0.6": 2,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": 3,
+          "1/0": 1
+        },
+        "ruta_esperada": "T",
+        "tipo": "tabla"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 24,
+        "posiciones": {
+          "0.2/0.8": 1,
+          "0.4/0.6": 1,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": 1,
+          "1/0": 1
+        },
+        "ruta_esperada": "T",
+        "tipo": "tabla"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 25,
+        "posiciones": {
+          "0.2/0.8": 1,
+          "0.4/0.6": 1,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": 1,
+          "1/0": 1
+        },
+        "ruta_esperada": "T",
+        "tipo": "tabla"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 26,
+        "posiciones": {
+          "0.2/0.8": 1,
+          "0.4/0.6": 1,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": 1,
+          "1/0": 1
+        },
+        "ruta_esperada": "T",
+        "tipo": "tabla"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 27,
+        "posiciones": {
+          "0.2/0.8": 1,
+          "0.4/0.6": 1,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": 1,
+          "1/0": 1
+        },
+        "ruta_esperada": "T",
+        "tipo": "tabla"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 28,
+        "posiciones": {
+          "0.2/0.8": 1,
+          "0.4/0.6": 1,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": 1,
+          "1/0": 1
+        },
+        "ruta_esperada": "T",
+        "tipo": "tabla"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 29,
+        "posiciones": {
+          "0.2/0.8": 5,
+          "0.4/0.6": 5,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": 4,
+          "1/0": null
+        },
+        "ruta_esperada": "B",
+        "tipo": "seguimiento"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 30,
+        "posiciones": {
+          "0.2/0.8": 2,
+          "0.4/0.6": 2,
+          "0.6/0.4": 3,
+          "0.8/0.2": 3,
+          "0/1": 1,
+          "1/0": 3
+        },
+        "ruta_esperada": "B",
+        "tipo": "seguimiento"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 31,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": 3,
+          "0.8/0.2": 3,
+          "0/1": null,
+          "1/0": 1
+        },
+        "ruta_esperada": "B",
+        "tipo": "seguimiento"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 32,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": 4,
+          "0.8/0.2": 4,
+          "0/1": null,
+          "1/0": 4
+        },
+        "ruta_esperada": "T",
+        "tipo": "seguimiento"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 33,
+        "posiciones": {
+          "0.2/0.8": 1,
+          "0.4/0.6": 1,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": 2,
+          "1/0": 1
+        },
+        "ruta_esperada": "B",
+        "tipo": "seguimiento"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 34,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": null,
+          "1/0": null
+        },
+        "ruta_esperada": "T",
+        "tipo": "seguimiento"
+      },
+      {
+        "evaluable": false,
+        "fuente_indexada": null,
+        "id": 35,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": null,
+          "1/0": null
+        },
+        "ruta_esperada": "X",
+        "tipo": "fuera"
+      },
+      {
+        "evaluable": false,
+        "fuente_indexada": null,
+        "id": 36,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": null,
+          "1/0": null
+        },
+        "ruta_esperada": "X",
+        "tipo": "fuera"
+      },
+      {
+        "evaluable": false,
+        "fuente_indexada": null,
+        "id": 37,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": null,
+          "1/0": null
+        },
+        "ruta_esperada": "X",
+        "tipo": "fuera"
+      },
+      {
+        "evaluable": false,
+        "fuente_indexada": null,
+        "id": 38,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": null,
+          "1/0": null
+        },
+        "ruta_esperada": "X",
+        "tipo": "fuera"
+      },
+      {
+        "evaluable": false,
+        "fuente_indexada": null,
+        "id": 39,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": null,
+          "1/0": null
+        },
+        "ruta_esperada": "X",
+        "tipo": "fuera"
+      },
+      {
+        "evaluable": false,
+        "fuente_indexada": null,
+        "id": 40,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": null,
+          "0.8/0.2": null,
+          "0/1": null,
+          "1/0": null
+        },
+        "ruta_esperada": "X",
+        "tipo": "fuera"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 41,
+        "posiciones": {
+          "0.2/0.8": null,
+          "0.4/0.6": null,
+          "0.6/0.4": 5,
+          "0.8/0.2": 5,
+          "0/1": null,
+          "1/0": 5
+        },
+        "ruta_esperada": "T",
+        "tipo": "tabla"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 42,
+        "posiciones": {
+          "0.2/0.8": 1,
+          "0.4/0.6": 1,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": 1,
+          "1/0": 3
+        },
+        "ruta_esperada": "T",
+        "tipo": "tabla"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 43,
+        "posiciones": {
+          "0.2/0.8": 1,
+          "0.4/0.6": 1,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": 1,
+          "1/0": 1
+        },
+        "ruta_esperada": "T",
+        "tipo": "tabla"
+      },
+      {
+        "evaluable": true,
+        "fuente_indexada": true,
+        "id": 44,
+        "posiciones": {
+          "0.2/0.8": 1,
+          "0.4/0.6": 1,
+          "0.6/0.4": 1,
+          "0.8/0.2": 1,
+          "0/1": 1,
+          "1/0": 1
+        },
+        "ruta_esperada": "T",
+        "tipo": "tabla"
+      }
+    ]
+  },
+  "evaluacion": {
+    "v1": {
+      "aciertos": 16,
+      "citas_correctas": 0.9444,
+      "exactitud": 0.8,
+      "revisadas": 20,
+      "total": 20
+    },
+    "v2": null
+  },
+  "mcnemar": {
+    "b": 0,
+    "c": 0,
+    "excluidos": 20,
+    "n": 0,
+    "p": 1.0,
+    "preguntas": 20
+  },
+  "mcnemar_pesos": {
+    "b": 0,
+    "c": 0,
+    "excluidos": 0,
+    "n": 0,
+    "p": 1.0,
+    "preguntas": 22,
+    "principal": true
+  },
+  "mcnemar_pesos_todas": {
+    "b": 0,
+    "c": 0,
+    "excluidos": 0,
+    "n": 0,
+    "p": 1.0,
+    "preguntas": 36,
+    "principal": false
+  },
+  "preguntas_por_tipo": {
+    "alcance": 20,
+    "fuera": 6,
+    "seguimiento": 6,
+    "tabla": 12
+  },
+  "recuperacion": [
+    {
+      "aciertos": 27,
+      "etiqueta": "1/0",
+      "evaluables": 36,
+      "hit_at_5": 0.75,
+      "intervalo95": [
+        0.5893,
+        0.8625
+      ],
+      "mrr": 0.5769,
+      "pesos": {
+        "bm25": 0.0,
+        "vectorial": 1.0
+      },
+      "por_defecto": false,
+      "por_tipo": {
+        "alcance": {
+          "aciertos": 11,
+          "evaluables": 18,
+          "hit_at_5": 0.6111,
+          "intervalo95": [
+            0.3862,
+            0.7969
+          ],
+          "mrr": 0.4694
+        },
+        "fuera": {
+          "aciertos": 0,
+          "evaluables": 0,
+          "hit_at_5": null,
+          "intervalo95": null,
+          "mrr": null
+        },
+        "seguimiento": {
+          "aciertos": 4,
+          "evaluables": 6,
+          "hit_at_5": 0.6667,
+          "intervalo95": [
+            0.3,
+            0.9032
+          ],
+          "mrr": 0.4306
+        },
+        "tabla": {
+          "aciertos": 12,
+          "evaluables": 12,
+          "hit_at_5": 1.0,
+          "intervalo95": [
+            0.7575,
+            1.0
+          ],
+          "mrr": 0.8111
+        }
+      },
+      "prefijos": true,
+      "sin_tablero": {
+        "aciertos": 14,
+        "evaluables": 22,
+        "hit_at_5": 0.6364,
+        "intervalo95": [
+          0.4295,
+          0.8027
+        ],
+        "mrr": 0.4902
+      }
+    },
+    {
+      "aciertos": 19,
+      "etiqueta": "0/1",
+      "evaluables": 36,
+      "hit_at_5": 0.5278,
+      "intervalo95": [
+        0.3701,
+        0.6801
+      ],
+      "mrr": 0.3866,
+      "pesos": {
+        "bm25": 1.0,
+        "vectorial": 0.0
+      },
+      "por_defecto": false,
+      "por_tipo": {
+        "alcance": {
+          "aciertos": 6,
+          "evaluables": 18,
+          "hit_at_5": 0.3333,
+          "intervalo95": [
+            0.1628,
+            0.5625
+          ],
+          "mrr": 0.1574
+        },
+        "fuera": {
+          "aciertos": 0,
+          "evaluables": 0,
+          "hit_at_5": null,
+          "intervalo95": null,
+          "mrr": null
+        },
+        "seguimiento": {
+          "aciertos": 3,
+          "evaluables": 6,
+          "hit_at_5": 0.5,
+          "intervalo95": [
+            0.1876,
+            0.8124
+          ],
+          "mrr": 0.2917
+        },
+        "tabla": {
+          "aciertos": 10,
+          "evaluables": 12,
+          "hit_at_5": 0.8333,
+          "intervalo95": [
+            0.552,
+            0.953
+          ],
+          "mrr": 0.7778
+        }
+      },
+      "prefijos": true,
+      "sin_tablero": {
+        "aciertos": 9,
+        "evaluables": 22,
+        "hit_at_5": 0.4091,
+        "intervalo95": [
+          0.2326,
+          0.6127
+        ],
+        "mrr": 0.2083
+      }
+    },
+    {
+      "aciertos": 19,
+      "etiqueta": "0.2/0.8",
+      "evaluables": 36,
+      "hit_at_5": 0.5278,
+      "intervalo95": [
+        0.3701,
+        0.6801
+      ],
+      "mrr": 0.4231,
+      "pesos": {
+        "bm25": 0.8,
+        "vectorial": 0.2
+      },
+      "por_defecto": false,
+      "por_tipo": {
+        "alcance": {
+          "aciertos": 6,
+          "evaluables": 18,
+          "hit_at_5": 0.3333,
+          "intervalo95": [
+            0.1628,
+            0.5625
+          ],
+          "mrr": 0.2241
+        },
+        "fuera": {
+          "aciertos": 0,
+          "evaluables": 0,
+          "hit_at_5": null,
+          "intervalo95": null,
+          "mrr": null
+        },
+        "seguimiento": {
+          "aciertos": 3,
+          "evaluables": 6,
+          "hit_at_5": 0.5,
+          "intervalo95": [
+            0.1876,
+            0.8124
+          ],
+          "mrr": 0.2833
+        },
+        "tabla": {
+          "aciertos": 10,
+          "evaluables": 12,
+          "hit_at_5": 0.8333,
+          "intervalo95": [
+            0.552,
+            0.953
+          ],
+          "mrr": 0.7917
+        }
+      },
+      "prefijos": true,
+      "sin_tablero": {
+        "aciertos": 9,
+        "evaluables": 22,
+        "hit_at_5": 0.4091,
+        "intervalo95": [
+          0.2326,
+          0.6127
+        ],
+        "mrr": 0.2606
+      }
+    },
+    {
+      "aciertos": 19,
+      "etiqueta": "0.4/0.6",
+      "evaluables": 36,
+      "hit_at_5": 0.5278,
+      "intervalo95": [
+        0.3701,
+        0.6801
+      ],
+      "mrr": 0.4231,
+      "pesos": {
+        "bm25": 0.6,
+        "vectorial": 0.4
+      },
+      "por_defecto": false,
+      "por_tipo": {
+        "alcance": {
+          "aciertos": 6,
+          "evaluables": 18,
+          "hit_at_5": 0.3333,
+          "intervalo95": [
+            0.1628,
+            0.5625
+          ],
+          "mrr": 0.2241
+        },
+        "fuera": {
+          "aciertos": 0,
+          "evaluables": 0,
+          "hit_at_5": null,
+          "intervalo95": null,
+          "mrr": null
+        },
+        "seguimiento": {
+          "aciertos": 3,
+          "evaluables": 6,
+          "hit_at_5": 0.5,
+          "intervalo95": [
+            0.1876,
+            0.8124
+          ],
+          "mrr": 0.2833
+        },
+        "tabla": {
+          "aciertos": 10,
+          "evaluables": 12,
+          "hit_at_5": 0.8333,
+          "intervalo95": [
+            0.552,
+            0.953
+          ],
+          "mrr": 0.7917
+        }
+      },
+      "prefijos": true,
+      "sin_tablero": {
+        "aciertos": 9,
+        "evaluables": 22,
+        "hit_at_5": 0.4091,
+        "intervalo95": [
+          0.2326,
+          0.6127
+        ],
+        "mrr": 0.2606
+      }
+    },
+    {
+      "aciertos": 27,
+      "etiqueta": "0.6/0.4",
+      "evaluables": 36,
+      "hit_at_5": 0.75,
+      "intervalo95": [
+        0.5893,
+        0.8625
+      ],
+      "mrr": 0.5838,
+      "pesos": {
+        "bm25": 0.4,
+        "vectorial": 0.6
+      },
+      "por_defecto": true,
+      "por_tipo": {
+        "alcance": {
+          "aciertos": 11,
+          "evaluables": 18,
+          "hit_at_5": 0.6111,
+          "intervalo95": [
+            0.3862,
+            0.7969
+          ],
+          "mrr": 0.4833
+        },
+        "fuera": {
+          "aciertos": 0,
+          "evaluables": 0,
+          "hit_at_5": null,
+          "intervalo95": null,
+          "mrr": null
+        },
+        "seguimiento": {
+          "aciertos": 4,
+          "evaluables": 6,
+          "hit_at_5": 0.6667,
+          "intervalo95": [
+            0.3,
+            0.9032
+          ],
+          "mrr": 0.3194
+        },
+        "tabla": {
+          "aciertos": 12,
+          "evaluables": 12,
+          "hit_at_5": 1.0,
+          "intervalo95": [
+            0.7575,
+            1.0
+          ],
+          "mrr": 0.8667
+        }
+      },
+      "prefijos": true,
+      "sin_tablero": {
+        "aciertos": 14,
+        "evaluables": 22,
+        "hit_at_5": 0.6364,
+        "intervalo95": [
+          0.4295,
+          0.8027
+        ],
+        "mrr": 0.4712
+      }
+    },
+    {
+      "aciertos": 27,
+      "etiqueta": "0.8/0.2",
+      "evaluables": 36,
+      "hit_at_5": 0.75,
+      "intervalo95": [
+        0.5893,
+        0.8625
+      ],
+      "mrr": 0.5653,
+      "pesos": {
+        "bm25": 0.2,
+        "vectorial": 0.8
+      },
+      "por_defecto": false,
+      "por_tipo": {
+        "alcance": {
+          "aciertos": 11,
+          "evaluables": 18,
+          "hit_at_5": 0.6111,
+          "intervalo95": [
+            0.3862,
+            0.7969
+          ],
+          "mrr": 0.4463
+        },
+        "fuera": {
+          "aciertos": 0,
+          "evaluables": 0,
+          "hit_at_5": null,
+          "intervalo95": null,
+          "mrr": null
+        },
+        "seguimiento": {
+          "aciertos": 4,
+          "evaluables": 6,
+          "hit_at_5": 0.6667,
+          "intervalo95": [
+            0.3,
+            0.9032
+          ],
+          "mrr": 0.3194
+        },
+        "tabla": {
+          "aciertos": 12,
+          "evaluables": 12,
+          "hit_at_5": 1.0,
+          "intervalo95": [
+            0.7575,
+            1.0
+          ],
+          "mrr": 0.8667
+        }
+      },
+      "prefijos": true,
+      "sin_tablero": {
+        "aciertos": 14,
+        "evaluables": 22,
+        "hit_at_5": 0.6364,
+        "intervalo95": [
+          0.4295,
+          0.8027
+        ],
+        "mrr": 0.4409
+      }
+    },
+    {
+      "aciertos": 27,
+      "etiqueta": "0.6/0.4 sin prefijos",
+      "evaluables": 36,
+      "hit_at_5": 0.75,
+      "intervalo95": [
+        0.5893,
+        0.8625
+      ],
+      "mrr": 0.6176,
+      "pesos": {
+        "bm25": 0.4,
+        "vectorial": 0.6
+      },
+      "por_defecto": false,
+      "por_tipo": {
+        "alcance": {
+          "aciertos": 11,
+          "evaluables": 18,
+          "hit_at_5": 0.6111,
+          "intervalo95": [
+            0.3862,
+            0.7969
+          ],
+          "mrr": 0.4389
+        },
+        "fuera": {
+          "aciertos": 0,
+          "evaluables": 0,
+          "hit_at_5": null,
+          "intervalo95": null,
+          "mrr": null
+        },
+        "seguimiento": {
+          "aciertos": 4,
+          "evaluables": 6,
+          "hit_at_5": 0.6667,
+          "intervalo95": [
+            0.3,
+            0.9032
+          ],
+          "mrr": 0.5833
+        },
+        "tabla": {
+          "aciertos": 12,
+          "evaluables": 12,
+          "hit_at_5": 1.0,
+          "intervalo95": [
+            0.7575,
+            1.0
+          ],
+          "mrr": 0.9028
+        }
+      },
+      "prefijos": false,
+      "sin_tablero": {
+        "aciertos": 14,
+        "evaluables": 22,
+        "hit_at_5": 0.6364,
+        "intervalo95": [
+          0.4295,
+          0.8027
+        ],
+        "mrr": 0.4955
+      }
+    }
+  ],
+  "referencia_anexo_a": {
+    "esperado": {
+      "1/0": {
+        "hit_at_5": 0.64,
+        "mrr": 0.52
+      },
+      "por_defecto": {
+        "hit_at_5": 0.64,
+        "mrr": 0.48
+      }
+    },
+    "medido": {
+      "1/0": {
+        "hit_at_5": 0.75,
+        "mrr": 0.5769
+      },
+      "por_defecto": {
+        "hit_at_5": 0.75,
+        "mrr": 0.5838
+      }
+    }
+  },
+  "uso": {
+    "v1": {
+      "cache_promedio": 183040.0,
+      "cache_total": 3660800,
+      "costo_usd_promedio": 0.001381,
+      "costo_usd_total": 0.027624,
+      "entrada_promedio": 186632.85,
+      "entrada_total": 3732657,
+      "errores": 0,
+      "registros": 20,
+      "salida_promedio": 488.6,
+      "salida_total": 9772,
+      "tiempo_maximo": 6.25,
+      "tiempo_promedio": 4.1815
+    },
+    "v2": null
+  }
+}

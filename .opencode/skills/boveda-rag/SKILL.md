@@ -117,7 +117,7 @@ uv run python .opencode/skills/boveda-rag/scripts/medir_recuperacion.py --hibrid
 # Guardar el detalle por pregunta (por defecto ya escribe en data/boveda/mediciones/).
 uv run python .opencode/skills/boveda-rag/scripts/medir_recuperacion.py --salida data/boveda/mediciones/vectorial.json
 
-# make arqueo   # cuando exista (tarea 22.6); hoy no está en el Makefile
+make arqueo   # tarea 22.6: barrido de pesos, sin prefijos y anexo A
 ```
 
 El script usa `config/evaluacion/preguntas_fase2.toml` y evalúa solo las
