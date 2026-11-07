@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 import pytest
-from langchain_core.embeddings import DeterministicFakeEmbedding
+from langchain_core.embeddings import DeterministicFakeEmbedding, Embeddings
 
 from banco_occidente_corpus.boveda.almacen import Coincidencia
 from banco_occidente_corpus.boveda.configuracion import (
@@ -30,10 +30,20 @@ URL = "https://www.bancodeoccidente.com.co/tarifas"
 
 
 class AlmacenFalso:
-    """Almacén vectorial que devuelve un orden fijo y registra la consulta."""
+    """Almacén vectorial que devuelve un orden fijo y guarda los vectores."""
 
-    def __init__(self, coincidencias: Sequence[Coincidencia]) -> None:
+    def __init__(
+        self,
+        coincidencias: Sequence[Coincidencia],
+        fragmentos: Sequence[Fragmento] = (),
+    ) -> None:
+        """Guarda el orden fijo y los vectores de los fragmentos."""
         self._coincidencias = list(coincidencias)
+        self._proveedor = DeterministicFakeEmbedding(size=8)
+        self._vectores = {
+            fragmento.id: self._proveedor.embed_documents([fragmento.texto])[0]
+            for fragmento in fragmentos
+        }
         self.k: int | None = None
 
     def crear(self) -> None:
@@ -52,6 +62,14 @@ class AlmacenFalso:
         """Devuelve el orden fijo recortado a k."""
         self.k = k
         return self._coincidencias[:k]
+
+    def vectores(self, ids: Sequence[str]) -> dict[str, list[float]]:
+        """Devuelve los vectores guardados de los ids que existan."""
+        return {
+            identificador: self._vectores[identificador]
+            for identificador in ids
+            if identificador in self._vectores
+        }
 
     def contar(self) -> int:
         """Devuelve el número de coincidencias del doble."""
@@ -109,7 +127,7 @@ def crear(
 ) -> RecuperadorHibrido:
     """Crea el recuperador con dobles y la configuración pedida."""
     return RecuperadorHibrido(
-        AlmacenFalso(coincidencias),
+        AlmacenFalso(coincidencias, fragmentos),
         DeterministicFakeEmbedding(size=8),
         fragmentos,
         ConfiguracionRecuperacion(k=k, peso_vectorial=peso_vectorial, peso_bm25=peso_bm25),
@@ -162,6 +180,67 @@ def test_puntaje_es_coseno_para_todos_los_candidatos() -> None:
     esperado = _similitud_coseno(
         embeddings.embed_query("cuota cuota"), embeddings.embed_documents([cerca.texto])[0]
     )
+    assert resultados[0].puntaje == pytest.approx(esperado)
+
+
+class EmbeddingsContador(Embeddings):
+    """Proveedor que cuenta cuántas veces vectoriza consultas y documentos."""
+
+    def __init__(self, size: int = 8) -> None:
+        """Prepara el proveedor determinista y los contadores en cero."""
+        self._base = DeterministicFakeEmbedding(size=size)
+        self.consultas = 0
+        self.documentos = 0
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Cuenta la llamada y delega en el proveedor determinista."""
+        self.documentos += 1
+        return self._base.embed_documents(texts)
+
+    def embed_query(self, text: str) -> list[float]:
+        """Cuenta la llamada y delega en el proveedor determinista."""
+        self.consultas += 1
+        return self._base.embed_query(text)
+
+
+def test_buscar_vectoriza_la_consulta_una_sola_vez() -> None:
+    """La búsqueda pide un embedding de consulta y ninguno de documento."""
+    fragmentos = [
+        fragmento("A", "cuota de manejo de la tarjeta de credito"),
+        fragmento("B", "linea de atencion al cliente"),
+    ]
+    embeddings = EmbeddingsContador()
+    recuperador = RecuperadorHibrido(
+        AlmacenFalso([coincidencia(item, 0.1) for item in fragmentos], fragmentos),
+        embeddings,
+        fragmentos,
+        ConfiguracionRecuperacion(k=5, peso_vectorial=0.6, peso_bm25=0.4),
+    )
+
+    resultados = recuperador.buscar("cuota de manejo", k=2)
+
+    assert resultados
+    assert embeddings.consultas == 1
+    assert embeddings.documentos == 0
+
+
+def test_puntaje_recalcula_si_el_indice_no_guarda_el_vector() -> None:
+    """Con Gold más nuevo que Chroma, el texto ausente se vectoriza al vuelo."""
+    cercano = fragmento("A", "cuota de manejo")
+    recuperador = RecuperadorHibrido(
+        AlmacenFalso([coincidencia(cercano, 0.1)]),
+        DeterministicFakeEmbedding(size=8),
+        [cercano],
+        ConfiguracionRecuperacion(k=5, peso_vectorial=1.0, peso_bm25=0.0),
+    )
+
+    resultados = recuperador.buscar("cuota", k=1)
+
+    proveedor = DeterministicFakeEmbedding(size=8)
+    esperado = _similitud_coseno(
+        proveedor.embed_query("cuota"), proveedor.embed_documents([cercano.texto])[0]
+    )
+    assert len(resultados) == 1
     assert resultados[0].puntaje == pytest.approx(esperado)
 
 
