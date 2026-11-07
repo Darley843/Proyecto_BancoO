@@ -1,0 +1,127 @@
+# Revision humana de las 20 preguntas de alcance de v2 (docs/RESULTADOS_FASE2.md).
+#
+# veredicto: "correcta" | "parcial" | "incorrecta" | "rechazo_correcto"
+# nota:      una linea corta con el motivo
+# revisor:   quien reviso. Las filas con "propuesta" las propuso Claude con la
+#            hoja de revision; una persona del grupo debe leerlas y poner su
+#            nombre para darlas por revisadas.
+
+[[revision]]
+id = 1
+veredicto = "rechazo_correcto"
+nota = "El corpus no tiene horarios; remite a la linea de servicio."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 2
+veredicto = "incorrecta"
+nota = "Dice que no encuentra; el corpus trae la sede de Cali en la pagina de inversionistas."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 3
+veredicto = "parcial"
+nota = "Dice que no encuentra, pero la remision da la linea nacional; faltan las lineas por ciudad."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 4
+veredicto = "parcial"
+nota = "Explica el tramite ante el Defensor y de siniestros; no menciona el formulario PQRS ni cita Ayuda."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 5
+veredicto = "incorrecta"
+nota = "Dice que no encuentra; el corpus tiene la pagina del Defensor (v2 la cita en la pregunta 4)."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 6
+veredicto = "correcta"
+nota = "Proposito literal y compromisos; aclara que la mision esta en otro enlace."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 7
+veredicto = "correcta"
+nota = "3 de mayo de 1965, Cali."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 8
+veredicto = "correcta"
+nota = "Grupo Aval."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 9
+veredicto = "incorrecta"
+nota = "Dice que no encuentra; el corpus nombra a Gerardo Silva en la pagina de inversionistas."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 10
+veredicto = "parcial"
+nota = "Mezcla ahorros, corriente y nomina; no da los tipos de cuenta de ahorro ni cita su pagina."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 11
+veredicto = "correcta"
+nota = "Documentos de persona natural; aclara que varian por producto."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 12
+veredicto = "correcta"
+nota = "Apertura digital por varios canales."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 13
+veredicto = "parcial"
+nota = "Lista Credencial Visa y Mastercard; verificar a que tarjeta aplica el valor de 31.800; no cita la pagina de tarjetas."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 14
+veredicto = "incorrecta"
+nota = "Repite el error de v1: 500.000 con plazo minimo de 30 dias; la fuente dice 500.000 desde 90 dias y 1.000.000 desde 30."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 15
+veredicto = "correcta"
+nota = "Hipotecario, leasing habitacional y mejora de vivienda."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 16
+veredicto = "correcta"
+nota = "Occiauto hasta 100 %, productivos y compra de cartera; no cita la pagina de credito de vehiculo."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 17
+veredicto = "correcta"
+nota = "Bloqueo por app o linea 24/7 y reemplazo de emergencia."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 18
+veredicto = "correcta"
+nota = "Funciones de la app y seguridad."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 19
+veredicto = "correcta"
+nota = "Estrategia, Pacto Global, GHG y GRI; la respuesta se corta al final."
+revisor = "Anny Valencia"
+
+[[revision]]
+id = 20
+veredicto = "incorrecta"
+nota = "Dice que no encuentra; el corpus tiene 8 noticias (fallo conocido de la recuperacion)."
+revisor = "Anny Valencia"
