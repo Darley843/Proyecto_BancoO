@@ -135,12 +135,21 @@ con McNemar.
 |---|---|---|
 | `TiempoAgotadoEmbeddings` en CPU | Un lote de 64 tarda más que `timeout_segundos`, u Ollama está colgado | `ollama ps`; subir `[embeddings] timeout_segundos`; repetir `make indice` |
 | Menú de navegación repetido en los fragmentos | `RATIO_REPETIDAS = 0.07` no está marcando las líneas, o el corpus cambió | Revisar `lineas_repetidas` y `Líneas repetidas más frecuentes` en la salida de `make fragmentos`; las líneas objetivo son `- Canales digitales`, `- Segmentos` y `- Mesa de dinero` |
+| Encabezado de menú o de cross-sell repetido en `encabezado` y al inicio del texto | `_limpiar_chunk` anteponía el `heading` del chunk aunque ese encabezado se repitiera en decenas de páginas, y `_crear_fragmento` lo copiaba al campo `encabezado`; el vector de `/quienes-somos/nuestro-banco` quedaba dominado por «Tu carro nuevo te espera, ¡maneja tu futuro!» | Ya corregido: `fragmentos.py` calcula `encabezados_repetidos` con `find_boilerplate` y los mismos `MIN_DOCS_REPETIDAS`/`RATIO_REPETIDAS`, no los antepone al texto y resuelve el encabezado con `_encabezados_efectivos`. Revisar `Fragmentos con encabezado repetido descartado` y `Encabezados repetidos descartados` en `make fragmentos` |
+| «¿En qué año se fundó el Banco de Occidente?» no trae el fragmento de 1965 ni entre los 20 primeros, pero «¿Cuándo y dónde se fundó el banco?» lo trae en el 2.º puesto | El nombre de la marca aparece en casi todos los fragmentos (la página de inversionistas tiene 153) y, cuando va en la pregunta, desvía el vector | Reproducir las dos consultas con `--k 20 --salida`; resolver en la consulta o en los pesos (quitar la marca o subir BM25), nunca cambiando los fragmentos |
+| El `hit@5` por URL cuenta la pregunta 7 como acierto aunque el fragmento con la respuesta no esté entre los 5 | La métrica compara solo la URL esperada, no el pasaje | Complementar con una medida de pasaje: los términos esperados en el texto recuperado, reportada junto al `hit@5` por URL |
 | BM25 no encuentra por tildes o espacios | El preprocesador viejo partía por espacios y conservaba signos | Ya corregido: `boveda/recuperador.py::_tokenizar` usa `texto.normalizar` y `re.findall(r"\w+")` |
 | Mediciones incoherentes | Se midió durante `make indice` o con fragmentos distintos del índice | Esperar a que termine, ejecutar `scripts/validar_indice.py` y medir con ese mismo índice |
 | Índice con unos 846 fragmentos y sin PDF, cifras de hit@5 menores | Faltaba `data/knowledge/chunks.jsonl` al construir los fragmentos: el alcance quedó solo con la web | `make chunks` y luego `make indice`; el resumen de `make fragmentos` lo avisa y muestra `Fragmentos PDF` en cero |
 | Fuente esperada discutible | Preguntas 2 y 16: la 2 depende de la página de inversionistas; la 16 tiene tres URL alternativas. La 20 no es un fallo de cobertura: sus 8 noticias están en `chunks_web.jsonl`; falla porque la pregunta es genérica («noticias recientes») y la búsqueda por vectores no capta qué es reciente | Revisar `fuentes_esperadas` o reformular la pregunta; no cambiar el índice por la 20 |
 | Fragmentos con muchos temas | Preguntas 3 y 4: la fuente de la 4 es la página de Ayuda, un solo fragmento de unos 350 tokens que mezcla varios temas; la 3 tiene su propia página (`/ayuda/linea-servicio-cliente`) y no entra al top 5, causa no confirmada | Inspeccionar el top 5 con `--salida` antes de cambiar nada |
 | Seguimiento sin reformular | Se consultó solo «¿Y cuánto cuesta?» | Unir `previa` y `pregunta`; en producción lo hará el nodo `reformular` de `sucursal/grafo.py` |
+
+El caso de 1965 se midió con el índice `base` y `k = 5`: la marca en la pregunta
+desvía el vector, así que la misma respuesta entra en el 2.º puesto cuando la
+consulta no repite «Banco de Occidente». El `hit@5` por URL no distingue si el
+pasaje con la respuesta entró al top 5; al reportar una corrida da las dos
+cifras (URL y pasaje) y no declares una mejora solo por el `hit@5` por URL.
 
 ## Protocolo de experimentos
 

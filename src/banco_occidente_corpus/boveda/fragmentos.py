@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import re
 from collections import Counter
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from statistics import median
@@ -18,6 +18,7 @@ from typing import Any, Literal
 from ..asistente.validacion import detectar_pii
 from ..config import Config
 from ..dedupe import find_boilerplate, is_noise, normalize_line
+from ..texto import normalizar
 from ..utils import CHARS_PER_TOKEN, read_jsonl, sha256_text, stable_tokens, write_jsonl
 from .tipos import Fragmento, TipoFragmento
 
@@ -38,6 +39,29 @@ MIN_DOCS_REPETIDAS: int = 5
 ALCANCES: tuple[Alcance, ...] = ("base", "completo")
 #: Nombre por defecto cuando un hecho no declara una entidad conocida.
 ENTIDAD_POR_DEFECTO: str = "Banco de Occidente"
+#: Palabras que no identifican la familia de un encabezado.
+PALABRAS_SIN_FAMILIA: frozenset[str] = frozenset(
+    {
+        "a",
+        "al",
+        "con",
+        "de",
+        "del",
+        "el",
+        "en",
+        "la",
+        "las",
+        "lo",
+        "los",
+        "o",
+        "para",
+        "por",
+        "su",
+        "un",
+        "una",
+        "y",
+    }
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -70,6 +94,8 @@ class ResumenFragmentos:
     pdf: int = 0
     avisos: tuple[str, ...] = ()
     duplicados: int = 0
+    fragmentos_reencabezados: int = 0
+    encabezados_descartados: tuple[LineaRepetida, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -87,6 +113,15 @@ class _Origen:
     tipo: TipoFragmento
     titulo: str
     categoria: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class _Seccion:
+    """Ubicación de un chunk en el árbol de encabezados de su página."""
+
+    padre: tuple[str, ...]
+    nivel: int
+    familia: str
 
 
 def ruta_fragmentos(config: Config, alcance: Alcance = "base") -> Path:
@@ -134,11 +169,17 @@ def construir_fragmentos(config: Config, alcance: Alcance = "base") -> Resultado
     avisos = _avisos(config, alcance)
     origenes = _mapa_origen(config)
     repetidas, frecuentes = _detectar_lineas_repetidas(chunks, origenes)
+    encabezados_repetidos, encabezados_frecuentes = _detectar_encabezados_repetidos(
+        chunks, origenes
+    )
+    # Un encabezado que también aparece como línea de menú repetida se descarta igual.
+    encabezados_descartados = encabezados_repetidos | repetidas
 
     fragmentos: list[Fragmento] = []
     tablas_enteras = 0
     tablas_partidas = 0
     partes_tablas_partidas = 0
+    reencabezados = 0
     paginas: dict[str, list[dict[str, Any]]] = {}
     for fila in chunks:
         page_id = str(fila.get("page_id", "")).strip()
@@ -150,23 +191,29 @@ def construir_fragmentos(config: Config, alcance: Alcance = "base") -> Resultado
         origen = origenes.get(page_id, _Origen(tipo="pagina", titulo=page_id))
         if not _incluido(origen, alcance):
             continue
+        efectivos = _encabezados_efectivos(filas, encabezados_descartados)
+        secciones = _mapa_secciones(filas, encabezados_descartados)
         limpios: list[tuple[dict[str, Any], str]] = []
         for fila in filas:
             texto = _limpiar_chunk(
                 str(fila.get("text", "")),
                 str(fila.get("heading", "")),
                 repetidas,
+                encabezados_descartados,
             )
             if texto:
                 limpios.append((fila, texto))
-        for grupo in _agrupar(limpios):
+        for grupo in _agrupar(limpios, secciones):
             texto_grupo = "\n".join(texto for _, texto in grupo)
+            encabezado = _encabezado_del_grupo(grupo, efectivos, encabezados_descartados)
+            if encabezado != str(grupo[0][0].get("heading", "")).strip():
+                reencabezados += 1
             enteras, partidas, partes = _estadisticas_tablas(texto_grupo)
             tablas_enteras += enteras
             tablas_partidas += partidas
             partes_tablas_partidas += partes
             for pieza in _partir_texto(texto_grupo):
-                fragmentos.append(_crear_fragmento(page_id, origen, grupo, pieza))
+                fragmentos.append(_crear_fragmento(page_id, origen, grupo, pieza, encabezado))
 
     hechos, revisiones, omitidos_sin_evidencia, omitidos_pii = _fragmentos_de_hechos(config)
     fragmentos.extend(hechos)
@@ -179,6 +226,8 @@ def construir_fragmentos(config: Config, alcance: Alcance = "base") -> Resultado
         partes_tablas_partidas=partes_tablas_partidas,
         repetidas=repetidas,
         frecuentes=frecuentes,
+        encabezados_descartados=encabezados_frecuentes,
+        reencabezados=reencabezados,
         revisiones=revisiones,
         omitidos_sin_evidencia=omitidos_sin_evidencia,
         omitidos_pii=omitidos_pii,
@@ -221,6 +270,7 @@ def formatear_resumen(resumen: ResumenFragmentos, ruta: Path) -> str:
                 f"en {resumen.partes_tablas_partidas} partes"
             ),
             f"lineas_repetidas: {resumen.lineas_repetidas} (líneas distintas marcadas)",
+            f"Fragmentos con encabezado repetido descartado: {resumen.fragmentos_reencabezados}",
             f"Duplicados descartados: {resumen.duplicados}",
         ]
     )
@@ -231,6 +281,13 @@ def formatear_resumen(resumen: ResumenFragmentos, ruta: Path) -> str:
         )
     else:
         lineas.append("Líneas repetidas más frecuentes: ninguna")
+    if resumen.encabezados_descartados:
+        lineas.append("Encabezados repetidos descartados:")
+        lineas.extend(
+            f"  - {item.paginas} páginas: {item.texto}" for item in resumen.encabezados_descartados
+        )
+    else:
+        lineas.append("Encabezados repetidos descartados: ninguno")
     omitidos = resumen.omitidos_sin_evidencia + resumen.omitidos_pii
     lineas.append(
         f"Hechos omitidos: {omitidos} "
@@ -296,6 +353,32 @@ def _detectar_lineas_repetidas(
     chunks: Sequence[dict[str, Any]], origenes: dict[str, _Origen]
 ) -> tuple[set[str], tuple[LineaRepetida, ...]]:
     """Detecta el ruido repetido entre páginas web y las cinco líneas más frecuentes."""
+    documentos = _documentos_web(chunks, origenes, "text")
+    repetidas = find_boilerplate(
+        documentos,
+        min_docs=MIN_DOCS_REPETIDAS,
+        ratio=RATIO_REPETIDAS,
+    )
+    return repetidas, _cinco_mas_frecuentes(documentos, repetidas)
+
+
+def _detectar_encabezados_repetidos(
+    chunks: Sequence[dict[str, Any]], origenes: dict[str, _Origen]
+) -> tuple[set[str], tuple[LineaRepetida, ...]]:
+    """Detecta encabezados de menú repetidos entre páginas web y los cinco más frecuentes."""
+    documentos = _documentos_web(chunks, origenes, "heading")
+    repetidos = find_boilerplate(
+        documentos,
+        min_docs=MIN_DOCS_REPETIDAS,
+        ratio=RATIO_REPETIDAS,
+    )
+    return repetidos, _cinco_mas_frecuentes(documentos, repetidos)
+
+
+def _documentos_web(
+    chunks: Sequence[dict[str, Any]], origenes: dict[str, _Origen], campo: str
+) -> list[list[str]]:
+    """Agrupa por página web las líneas o los encabezados que indica el campo."""
     paginas: dict[str, list[str]] = {}
     for fila in chunks:
         page_id = str(fila.get("page_id", "")).strip()
@@ -304,16 +387,16 @@ def _detectar_lineas_repetidas(
         origen = origenes.get(page_id, _Origen(tipo="pagina", titulo=page_id))
         if origen.tipo != "pagina":
             continue
-        paginas.setdefault(page_id, []).extend(str(fila.get("text", "")).splitlines())
+        paginas.setdefault(page_id, []).extend(str(fila.get(campo, "")).splitlines())
+    return list(paginas.values())
 
-    documentos = list(paginas.values())
-    repetidas = find_boilerplate(
-        documentos,
-        min_docs=MIN_DOCS_REPETIDAS,
-        ratio=RATIO_REPETIDAS,
-    )
+
+def _cinco_mas_frecuentes(
+    documentos: Sequence[Sequence[str]], repetidas: set[str]
+) -> tuple[LineaRepetida, ...]:
+    """Cuenta en cuántas páginas aparece cada línea repetida y devuelve las cinco primeras."""
     if not repetidas:
-        return repetidas, ()
+        return ()
 
     originales: dict[str, str] = {}
     conteo: Counter[str] = Counter()
@@ -328,13 +411,12 @@ def _detectar_lineas_repetidas(
                 presentes.add(normal)
         conteo.update(presentes)
 
-    frecuentes = tuple(
+    return tuple(
         LineaRepetida(texto=originales[normal], paginas=paginas_count)
         for normal, paginas_count in sorted(
             conteo.items(), key=lambda item: (-item[1], originales[item[0]])
         )[:5]
     )
-    return repetidas, frecuentes
 
 
 def _bloques(texto: str) -> list[tuple[str, tuple[str, ...]]]:
@@ -370,8 +452,13 @@ def _bloques(texto: str) -> list[tuple[str, tuple[str, ...]]]:
     return bloques
 
 
-def _limpiar_chunk(texto: str, heading: str, repetidas: set[str]) -> str:
-    """Quita ruido y líneas repetidas de un chunk y antepone su encabezado."""
+def _limpiar_chunk(
+    texto: str,
+    heading: str,
+    repetidas: set[str],
+    encabezados_repetidos: set[str],
+) -> str:
+    """Quita ruido y líneas repetidas y antepone el encabezado solo si no es repetido."""
     partes: list[str] = []
     vistos: set[str] = set()
     for tipo, lineas in _bloques(texto):
@@ -392,31 +479,180 @@ def _limpiar_chunk(texto: str, heading: str, repetidas: set[str]) -> str:
 
     limpio = "\n\n".join(partes).strip()
     encabezado = heading.strip()
-    if encabezado:
+    if encabezado and normalize_line(encabezado) not in encabezados_repetidos:
         primera = limpio.splitlines()[0].strip() if limpio else ""
         if primera != encabezado:
             limpio = f"{encabezado}\n{limpio}" if limpio else encabezado
     return limpio
 
 
+def _nivel(fila: dict[str, Any]) -> int:
+    """Devuelve el nivel del encabezado del chunk y cero si no es un entero válido."""
+    try:
+        return int(fila.get("level") or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
+def _familia_encabezado(heading: str) -> str:
+    """Devuelve la primera palabra significativa del encabezado, sin tildes ni mayúsculas."""
+    for palabra in re.findall(r"\w+", normalizar(heading)):
+        if palabra in PALABRAS_SIN_FAMILIA or palabra.isdigit():
+            continue
+        return palabra
+    return ""
+
+
+def _mapa_secciones(
+    filas: Sequence[dict[str, Any]], encabezados_repetidos: set[str]
+) -> dict[str, _Seccion]:
+    """Asigna a cada chunk su padre, nivel y familia, ignorando los encabezados repetidos."""
+    pila: list[tuple[int, str]] = []
+    secciones: dict[str, _Seccion] = {}
+    for fila in filas:
+        heading = str(fila.get("heading", "")).strip()
+        nivel = _nivel(fila)
+        descartado = bool(heading) and normalize_line(heading) in encabezados_repetidos
+        familia = ""
+        if heading and not descartado:
+            while pila and pila[-1][0] >= nivel:
+                pila.pop()
+            padre = tuple(texto for _, texto in pila)
+            pila.append((nivel, normalize_line(heading)))
+            familia = _familia_encabezado(heading)
+        else:
+            padre = tuple(texto for _, texto in pila)
+        chunk_id = str(fila.get("chunk_id", "")).strip()
+        if chunk_id:
+            secciones[chunk_id] = _Seccion(padre=padre, nivel=nivel, familia=familia)
+    return secciones
+
+
+def _encabezados_efectivos(
+    filas: Sequence[dict[str, Any]], encabezados_repetidos: set[str]
+) -> dict[str, str]:
+    """Asigna a cada chunk el encabezado no repetido más cercano de su ruta."""
+
+    def es_repetido(heading: str) -> bool:
+        """Indica si el encabezado está marcado como repetido."""
+        return bool(heading) and normalize_line(heading) in encabezados_repetidos
+
+    efectivos: dict[str, str] = {}
+    pila: list[tuple[int, str]] = []
+    for fila in filas:
+        heading = str(fila.get("heading", "")).strip()
+        nivel = _nivel(fila)
+        if heading:
+            while pila and pila[-1][0] >= nivel:
+                pila.pop()
+            pila.append((nivel, heading))
+        chunk_id = str(fila.get("chunk_id", "")).strip()
+        if not heading or not es_repetido(heading):
+            efectivos[chunk_id] = heading
+            continue
+        efectivos[chunk_id] = next(
+            (
+                texto
+                for nivel_pila, texto in reversed(pila[:-1])
+                if nivel_pila < nivel and not es_repetido(texto)
+            ),
+            "",
+        )
+    return efectivos
+
+
+def _encabezado_del_grupo(
+    grupo: Sequence[tuple[dict[str, Any], str]],
+    efectivos: dict[str, str],
+    encabezados_repetidos: set[str],
+) -> str:
+    """Devuelve el encabezado del fragmento: el de su ruta o el primero no repetido del grupo."""
+    primero = grupo[0][0]
+    inicial = str(primero.get("heading", "")).strip()
+    if not inicial or normalize_line(inicial) not in encabezados_repetidos:
+        return inicial
+    efectivo = efectivos.get(str(primero.get("chunk_id", "")).strip(), "")
+    if efectivo:
+        return efectivo
+    for fila, _ in grupo:
+        heading = str(fila.get("heading", "")).strip()
+        if heading and normalize_line(heading) not in encabezados_repetidos:
+            return heading
+    return ""
+
+
+def _hermanos(primera: _Seccion, segunda: _Seccion) -> bool:
+    """Indica si dos chunks son hermanos de la misma familia de sección."""
+    return (
+        bool(primera.familia)
+        and primera.familia == segunda.familia
+        and primera.nivel == segunda.nivel
+        and primera.padre == segunda.padre
+    )
+
+
+def _inicia_runa(secciones: Sequence[_Seccion], indice: int) -> bool:
+    """Indica si el chunk abre una runa de dos o más hermanos consecutivos."""
+    return indice + 1 < len(secciones) and _hermanos(secciones[indice], secciones[indice + 1])
+
+
+def _tokens_grupo(grupo: Sequence[tuple[dict[str, Any], str]]) -> int:
+    """Cuenta los tokens del texto que produciría un grupo de chunks."""
+    return stable_tokens("\n".join(texto for _, texto in grupo))
+
+
 def _agrupar(
     limpios: Sequence[tuple[dict[str, Any], str]],
+    secciones: Mapping[str, _Seccion],
 ) -> list[list[tuple[dict[str, Any], str]]]:
-    """Agrupa chunks consecutivos mientras el texto acumulado no llegue a 80 tokens."""
+    """Agrupa chunks cortos con sus hermanos de sección y respeta el máximo de 400 tokens."""
+    ubicaciones = [
+        secciones.get(str(fila.get("chunk_id", "")).strip(), _Seccion((), 0, ""))
+        for fila, _ in limpios
+    ]
     grupos: list[list[tuple[dict[str, Any], str]]] = []
+    reparables: list[bool] = []
     actual: list[tuple[dict[str, Any], str]] = []
-    for item in limpios:
+    for indice, item in enumerate(limpios):
         if not actual:
             actual = [item]
             continue
-        acumulado = "\n".join(texto for _, texto in actual)
-        if stable_tokens(acumulado) < TOKENS_MINIMOS:
+        if _inicia_runa(ubicaciones, indice) and not _hermanos(
+            ubicaciones[indice - 1], ubicaciones[indice]
+        ):
+            grupos.append(actual)
+            reparables.append(True)
+            actual = [item]
+            continue
+        tokens_actuales = _tokens_grupo(actual)
+        if tokens_actuales < TOKENS_MINIMOS and _tokens_grupo([*actual, item]) <= TOKENS_MAXIMOS:
             actual.append(item)
         else:
             grupos.append(actual)
+            reparables.append(tokens_actuales < TOKENS_MINIMOS)
             actual = [item]
     if actual:
         grupos.append(actual)
+        reparables.append(False)
+
+    indice = 0
+    while indice < len(grupos):
+        if not reparables[indice] or _tokens_grupo(grupos[indice]) >= TOKENS_MINIMOS:
+            indice += 1
+            continue
+        if indice > 0 and _tokens_grupo([*grupos[indice - 1], *grupos[indice]]) <= TOKENS_MAXIMOS:
+            grupos[indice - 1 : indice + 1] = [[*grupos[indice - 1], *grupos[indice]]]
+            reparables[indice - 1 : indice + 1] = [reparables[indice - 1]]
+            indice = max(0, indice - 1)
+        elif (
+            indice == 0
+            and len(grupos) > 1
+            and _tokens_grupo([*grupos[0], *grupos[1]]) <= TOKENS_MAXIMOS
+        ):
+            grupos[0:2] = [[*grupos[0], *grupos[1]]]
+            reparables[0:2] = [False]
+        else:
+            indice += 1
     return grupos
 
 
@@ -588,10 +824,10 @@ def _crear_fragmento(
     origen: _Origen,
     grupo: Sequence[tuple[dict[str, Any], str]],
     texto: str,
+    encabezado: str,
 ) -> Fragmento:
-    """Crea un fragmento con id estable a partir de un grupo y su texto final."""
+    """Crea un fragmento con id estable a partir de un grupo, su texto y su encabezado."""
     primero = grupo[0][0]
-    encabezado = str(primero.get("heading", "")).strip()
     url = str(primero.get("url", "")).strip()
     seccion = str(primero.get("section", "")).strip() or "otros"
     digest = sha256_text(f"{page_id}|{encabezado}|{texto}")
@@ -682,6 +918,8 @@ def _resumir(
     partes_tablas_partidas: int,
     repetidas: set[str],
     frecuentes: tuple[LineaRepetida, ...],
+    encabezados_descartados: tuple[LineaRepetida, ...],
+    reencabezados: int,
     revisiones: dict[str, int],
     omitidos_sin_evidencia: int,
     omitidos_pii: int,
@@ -711,6 +949,8 @@ def _resumir(
         pdf=por_tipo.get("pdf", 0),
         avisos=avisos,
         duplicados=duplicados,
+        fragmentos_reencabezados=reencabezados,
+        encabezados_descartados=encabezados_descartados,
     )
 
 
