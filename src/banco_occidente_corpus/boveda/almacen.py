@@ -53,6 +53,10 @@ class AlmacenVectorial(Protocol):
         """Devuelve las k coincidencias más cercanas por distancia coseno."""
         ...
 
+    def vectores(self, ids: Sequence[str]) -> dict[str, list[float]]:
+        """Devuelve los vectores guardados de los ids que existan."""
+        ...
+
     def contar(self) -> int:
         """Devuelve el número de vectores almacenados."""
         ...
@@ -155,6 +159,22 @@ class ChromaAlmacen:
                 ids, documentos, metadatos, distancias, strict=True
             )
         ]
+
+    def vectores(self, ids: Sequence[str]) -> dict[str, list[float]]:
+        """Lee del índice los vectores ya guardados, sin llamar al modelo."""
+        if not ids:
+            return {}
+        self.crear()
+        assert self._coleccion is not None
+        resultado = self._coleccion.get(ids=list(ids), include=["embeddings"])
+        identificadores = resultado.get("ids")
+        incrustaciones = resultado.get("embeddings")
+        if not identificadores or incrustaciones is None:
+            return {}
+        return {
+            str(identificador): [float(valor) for valor in vector]
+            for identificador, vector in zip(identificadores, incrustaciones, strict=True)
+        }
 
     def contar(self) -> int:
         """Cuenta los vectores de la colección."""

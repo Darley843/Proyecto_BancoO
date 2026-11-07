@@ -104,10 +104,10 @@ La recuperación es **híbrida**: `EnsembleRetriever` combina el almacén vector
 de Chroma con `BM25Retriever` en memoria sobre los fragmentos del alcance. Los
 pesos viven en `[recuperacion]` de `config/sucursal.toml` (`k`,
 `peso_vectorial`, `peso_bm25`) y se normalizan a suma 1 antes de pasarlos. El
-orden final lo decide el híbrido; después, cada candidato se vuelve a puntuar
-contra la consulta con el mismo embedding, de modo que `puntaje` significa
-siempre `1 − distancia coseno`, también para los fragmentos que solo devolvió
-BM25.
+orden final lo decide el híbrido; después, `puntaje` se calcula contra la
+consulta —vectorizada una sola vez por búsqueda— con los vectores que ya están
+guardados en el índice, de modo que significa siempre `1 − distancia coseno`,
+también para los fragmentos que solo devolvió BM25.
 
 **Se mantiene DeepSeek Flash** para redactar, con el prompt `qa_v2` y la
 validación de citas. Lo que cambia es el contexto: en lugar del corpus completo
