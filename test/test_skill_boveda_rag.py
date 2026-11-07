@@ -5,6 +5,7 @@ from __future__ import annotations
 import importlib.util
 import sys
 import tomllib
+from collections import Counter
 from pathlib import Path
 from types import ModuleType
 
@@ -94,6 +95,14 @@ def test_fragmentos_sin_menu_de_navegacion(fragmentos: list[Fragmento]) -> None:
     ]
 
     assert not con_menu, f"Fragmentos con menú de navegación: {con_menu}"
+
+
+def test_fragmentos_sin_textos_repetidos(fragmentos: list[Fragmento]) -> None:
+    """Ningún texto de fragmento se repite tras normalizar los espacios."""
+    normalizados = [" ".join(fragmento.texto.split()) for fragmento in fragmentos]
+    repetidos = sorted(texto for texto, copias in Counter(normalizados).items() if copias > 1)
+
+    assert not repetidos, f"Textos repetidos: {repetidos[:5]}"
 
 
 def test_intervalo_wilson_22_de_32(medir: ModuleType) -> None:

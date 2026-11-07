@@ -73,6 +73,15 @@ class LineaRepetida:
 
 
 @dataclass(frozen=True, slots=True)
+class TextoRepetido:
+    """Texto de fragmento repetido con su número de copias y de páginas."""
+
+    texto: str
+    copias: int
+    paginas: int
+
+
+@dataclass(frozen=True, slots=True)
 class ResumenFragmentos:
     """Métricas del proceso de construcción de fragmentos."""
 
@@ -96,6 +105,10 @@ class ResumenFragmentos:
     duplicados: int = 0
     fragmentos_reencabezados: int = 0
     encabezados_descartados: tuple[LineaRepetida, ...] = ()
+    textos_repetidos: int = 0
+    textos_duplicados: int = 0
+    textos_duplicados_entre_paginas: int = 0
+    textos_frecuentes: tuple[TextoRepetido, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -122,6 +135,17 @@ class _Seccion:
     padre: tuple[str, ...]
     nivel: int
     familia: str
+
+
+@dataclass(frozen=True, slots=True)
+class _DeduplicacionTextos:
+    """Resultado de descartar fragmentos con el mismo texto normalizado."""
+
+    fragmentos: tuple[Fragmento, ...]
+    textos: int
+    frecuentes: tuple[TextoRepetido, ...]
+    descartados: int
+    entre_paginas: int
 
 
 def ruta_fragmentos(config: Config, alcance: Alcance = "base") -> Path:
@@ -217,10 +241,11 @@ def construir_fragmentos(config: Config, alcance: Alcance = "base") -> Resultado
 
     hechos, revisiones, omitidos_sin_evidencia, omitidos_pii = _fragmentos_de_hechos(config)
     fragmentos.extend(hechos)
-    fragmentos, duplicados = _sin_repetidos(fragmentos)
+    fragmentos, duplicados = _sin_ids_repetidos(fragmentos)
+    deduplicacion = _sin_textos_repetidos(fragmentos)
 
     resumen = _resumir(
-        fragmentos,
+        deduplicacion.fragmentos,
         tablas_enteras=tablas_enteras,
         tablas_partidas=tablas_partidas,
         partes_tablas_partidas=partes_tablas_partidas,
@@ -233,8 +258,12 @@ def construir_fragmentos(config: Config, alcance: Alcance = "base") -> Resultado
         omitidos_pii=omitidos_pii,
         avisos=avisos,
         duplicados=duplicados,
+        textos_repetidos=deduplicacion.textos,
+        textos_duplicados=deduplicacion.descartados,
+        textos_duplicados_entre_paginas=deduplicacion.entre_paginas,
+        textos_frecuentes=deduplicacion.frecuentes,
     )
-    return ResultadoFragmentos(fragmentos=tuple(fragmentos), resumen=resumen)
+    return ResultadoFragmentos(fragmentos=deduplicacion.fragmentos, resumen=resumen)
 
 
 def escribir_fragmentos(
@@ -272,8 +301,21 @@ def formatear_resumen(resumen: ResumenFragmentos, ruta: Path) -> str:
             f"lineas_repetidas: {resumen.lineas_repetidas} (líneas distintas marcadas)",
             f"Fragmentos con encabezado repetido descartado: {resumen.fragmentos_reencabezados}",
             f"Duplicados descartados: {resumen.duplicados}",
+            (
+                f"Textos repetidos: {resumen.textos_repetidos} "
+                f"({resumen.textos_duplicados} fragmentos descartados; "
+                f"{resumen.textos_duplicados_entre_paginas} entre páginas distintas)"
+            ),
         ]
     )
+    if resumen.textos_frecuentes:
+        lineas.append("Textos repetidos más frecuentes:")
+        lineas.extend(
+            (f"  - {item.copias} copias en {item.paginas} páginas: {_recortar_texto(item.texto)}")
+            for item in resumen.textos_frecuentes
+        )
+    else:
+        lineas.append("Textos repetidos más frecuentes: ninguno")
     if resumen.lineas_frecuentes:
         lineas.append("Líneas repetidas más frecuentes:")
         lineas.extend(
@@ -925,6 +967,10 @@ def _resumir(
     omitidos_pii: int,
     avisos: tuple[str, ...] = (),
     duplicados: int = 0,
+    textos_repetidos: int = 0,
+    textos_duplicados: int = 0,
+    textos_duplicados_entre_paginas: int = 0,
+    textos_frecuentes: tuple[TextoRepetido, ...] = (),
 ) -> ResumenFragmentos:
     """Calcula las métricas del resumen a partir de los fragmentos construidos."""
     lista = list(fragmentos)
@@ -951,10 +997,14 @@ def _resumir(
         duplicados=duplicados,
         fragmentos_reencabezados=reencabezados,
         encabezados_descartados=encabezados_descartados,
+        textos_repetidos=textos_repetidos,
+        textos_duplicados=textos_duplicados,
+        textos_duplicados_entre_paginas=textos_duplicados_entre_paginas,
+        textos_frecuentes=textos_frecuentes,
     )
 
 
-def _sin_repetidos(fragmentos: Sequence[Fragmento]) -> tuple[list[Fragmento], int]:
+def _sin_ids_repetidos(fragmentos: Sequence[Fragmento]) -> tuple[list[Fragmento], int]:
     """Descarta fragmentos con id repetido y conserva el primero de cada uno."""
     vistos: set[str] = set()
     unicos: list[Fragmento] = []
@@ -964,3 +1014,72 @@ def _sin_repetidos(fragmentos: Sequence[Fragmento]) -> tuple[list[Fragmento], in
         vistos.add(fragmento.id)
         unicos.append(fragmento)
     return unicos, len(fragmentos) - len(unicos)
+
+
+def _normalizar_texto(texto: str) -> str:
+    """Colapsa los espacios de un texto para comparar fragmentos."""
+    return " ".join(texto.split())
+
+
+def _recortar_texto(texto: str, limite: int = 100) -> str:
+    """Colapsa los espacios y recorta un texto para el resumen."""
+    plano = _normalizar_texto(texto)
+    if len(plano) <= limite:
+        return plano
+    return plano[: limite - 3].rstrip() + "..."
+
+
+def _sin_textos_repetidos(fragmentos: Sequence[Fragmento]) -> _DeduplicacionTextos:
+    """Descarta fragmentos con texto idéntico tras normalizar los espacios.
+
+    Conserva la primera aparición en el orden de construcción, que es el orden
+    del corpus: páginas web por `page_id` alfabético y después PDF y videos. Un
+    descarte cuenta como «entre páginas» cuando su URL difiere de la conservada.
+    El top de textos repetidos se ordena por copias, páginas y primera aparición.
+    """
+    conservados: list[Fragmento] = []
+    primeros: dict[str, Fragmento] = {}
+    copias: Counter[str] = Counter()
+    paginas: dict[str, set[str]] = {}
+    originales: dict[str, str] = {}
+    posiciones: dict[str, int] = {}
+    descartados = 0
+    entre_paginas = 0
+
+    for fragmento in fragmentos:
+        clave = _normalizar_texto(fragmento.texto)
+        if not clave:
+            conservados.append(fragmento)
+            continue
+        copias[clave] += 1
+        paginas.setdefault(clave, set()).add(fragmento.url)
+        primero = primeros.get(clave)
+        if primero is not None:
+            descartados += 1
+            if fragmento.url != primero.url:
+                entre_paginas += 1
+            continue
+        primeros[clave] = fragmento
+        originales[clave] = fragmento.texto
+        posiciones[clave] = len(posiciones)
+        conservados.append(fragmento)
+
+    repetidos = [clave for clave, total in copias.items() if total > 1]
+    frecuentes = tuple(
+        TextoRepetido(
+            texto=originales[clave],
+            copias=copias[clave],
+            paginas=len(paginas[clave]),
+        )
+        for clave in sorted(
+            repetidos,
+            key=lambda clave: (-copias[clave], -len(paginas[clave]), posiciones[clave]),
+        )[:5]
+    )
+    return _DeduplicacionTextos(
+        fragmentos=tuple(conservados),
+        textos=len(repetidos),
+        frecuentes=frecuentes,
+        descartados=descartados,
+        entre_paginas=entre_paginas,
+    )
