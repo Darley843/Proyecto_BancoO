@@ -23,6 +23,7 @@ from banco_occidente_corpus.config import (
 from banco_occidente_corpus.live_capture import (
     BLOCKED_MESSAGE,
     TEMP_ENV,
+    _stop_message,
     audit_discovery,
     check_queue_robots,
     new_workdir,
@@ -472,3 +473,17 @@ def test_run_capture_no_toca_el_corpus_real(tmp_path: Path) -> None:
 
     # Assert
     assert real.paths.corpus_file.read_bytes() == antes
+
+
+def test_stop_message_resume_los_fallos_sin_texto_de_red() -> None:
+    """Un bloqueo persistente usa el mensaje neutro; un 404 conserva el detalle."""
+    # Arrange / Act
+    bloqueado = _stop_message([{"error": "HTTP 403"}])
+    sin_red = _stop_message([{"error": "sin conexion"}])
+    detalle = _stop_message([{"error": "HTTP 404"}])
+
+    # Assert
+    assert bloqueado == BLOCKED_MESSAGE
+    assert sin_red == BLOCKED_MESSAGE
+    assert "HTTP 404" in detalle
+    assert "no se escribió nada" in detalle

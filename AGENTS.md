@@ -43,7 +43,6 @@ make indice      # indexa la Bóveda con Ollama (web + PDF de producto + hechos)
 make indice-completo  # añade el resto de PDF y los videos
 make tablero     # tarifario + tablas de Gold -> data/estructurados/tablero.csv
 make app         # Sucursal 1965: FastAPI + app web en 127.0.0.1:8000
-make app-streamlit  # app Streamlit de la fase 1 (se retira en la fase 2)
 make evaluar     # 20 preguntas del alcance -> docs/RESULTADOS_20_PREGUNTAS.md
 make check       # lint + typecheck + pruebas
 make health      # integridad de las capas y del contrato de Gold
@@ -104,14 +103,16 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | `.../boveda/recuperador.py` | Recuperación híbrida vectorial + BM25 con pesos |
 | `.../tablero/tarifas.py` | Tarifario PDF → filas «concepto, valor y fecha» |
 | `.../tablero/tablas_web.py` | Lector de tablas Markdown y adaptadores por página |
-| `.../tablero/construir.py` | Une fuentes, escribe el CSV y cruza las 8 preguntas |
+| `.../tablero/construir.py` | Une fuentes, escribe el CSV y cruza las 12 preguntas |
 | `.../sucursal/tipos.py` | Turno y letras B/T/X |
 | `.../sucursal/digiturno.py` | Reglas de enrutamiento y clasificación de dudas |
 | `.../sucursal/grafo.py` | StateGraph con memoria, rutas y redacción |
 | `.../sucursal/ajustes.py` | Tope de gasto, TTL y modo demo |
 | `.../sucursal/costo.py` | Tarifas valle/pico, gasto diario y caché |
 | `.../sucursal/api.py` | Endpoints de estado, datos y trazabilidad |
-| `app/streamlit_app.py` | App Streamlit: capa delgada que delega en `asistente/` |
+| `.../live_capture.py` | Captura en vivo en carpeta temporal, con etapas para la app |
+| `app.py` | Arranque de FastAPI y la app web en `127.0.0.1:8000` |
+| `app/web/` | App web de la Sucursal 1965 (HTML/CSS/JS) que consume la API |
 | `scripts/tasks.py` | Tareas portables del Makefile |
 
 ## Verificación antes de dar algo por terminado

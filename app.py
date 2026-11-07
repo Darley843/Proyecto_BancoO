@@ -11,8 +11,8 @@ ruta anterior. Expone estado, Tablero, Bóveda, pipeline, Arqueo, Vestíbulo y
 ``POST /api/preguntar``: el grafo y sus dependencias se construyen en la primera
 pregunta, nunca al importar este módulo.
 
-La app Streamlit de la fase 1 sigue disponible con ``make app-streamlit`` hasta
-el PR de retiro (tarea 23.1).
+La app web vive en ``app/web/`` y consume la API; la lógica del asistente está en
+``asistente/`` y el grafo de la sucursal en ``sucursal/``.
 """
 
 from __future__ import annotations

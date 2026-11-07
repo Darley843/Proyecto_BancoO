@@ -21,6 +21,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage
 
 from banco_occidente_corpus.asistente.contexto_prompt import CanalOficial
+from banco_occidente_corpus.asistente.validacion import FRASE_SIN_DATOS
 from banco_occidente_corpus.boveda.tipos import Fragmento, Recuperador
 from banco_occidente_corpus.config import Config, Paths
 from banco_occidente_corpus.sucursal.ajustes import ConfiguracionSucursal
@@ -47,6 +48,7 @@ PREGUNTA_BOVEDA = "¿En qué año se fundó el Banco de Occidente?"
 PREGUNTA_TABLERO = "cuota de manejo"
 PREGUNTA_RECHAZO = "¿En qué acciones me recomiendas invertir?"
 RESPUESTA_BOVEDA = f"El Banco de Occidente fue fundado en 1965 en Cali [1].\n\nFuentes:\n- {URL}"
+RESPUESTA_SIN_DATOS = f"{FRASE_SIN_DATOS}."
 TEXTO_FRAGMENTO = "El Banco de Occidente fue fundado en 1965 en Cali y es parte del Grupo Aval."
 
 
@@ -419,6 +421,31 @@ def test_gasto_solo_si_hubo_modelo(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
 
     preguntar(escenario.cliente, PREGUNTA_RECHAZO, "hilo-gasto-x")
     assert escenario.gasto.hoy()[0] == pytest.approx(gasto_boveda)
+
+
+def test_frase_fija_con_tokens_cobra_y_no_cachea(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Si el modelo gastó tokens y cayó en la frase fija, se cobra y no se cachea."""
+    modelo = ModeloGuion([RESPUESTA_SIN_DATOS, RESPUESTA_SIN_DATOS])
+    escenario = preparar(monkeypatch, tmp_path, modelo=modelo, fragmentos=[fragmento()])
+
+    primera = preguntar(escenario.cliente, PREGUNTA_BOVEDA, "hilo-sin-datos").json()
+    gasto_primera = escenario.gasto.hoy()[0]
+    segunda = preguntar(escenario.cliente, PREGUNTA_BOVEDA, "hilo-sin-datos").json()
+
+    assert primera["respuesta"].startswith(FRASE_SIN_DATOS)
+    assert primera["uso_modelo"] is True
+    assert primera["tokens_entrada"] == 120
+    assert primera["tokens_salida"] == 40
+    assert primera["costo_usd"] > 0
+    assert gasto_primera == pytest.approx(primera["costo_usd"])
+    assert segunda["cache"] is False
+    assert segunda["uso_modelo"] is True
+    assert segunda["costo_usd"] > 0
+    assert escenario.gasto.hoy()[0] == pytest.approx(gasto_primera * 2)
+    assert len(modelo.llamadas) == 2
+    assert contar_cache(escenario) == 0
 
 
 def test_cache_hit_sin_gastar(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

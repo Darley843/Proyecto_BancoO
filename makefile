@@ -139,10 +139,6 @@ contexto: ## Genera data/contexto/contexto_banco.md y su manifest desde Gold
 app: ## Abre la Sucursal 1965 en http://127.0.0.1:8000 (API + app web)
 	$(UV) run python app.py
 
-.PHONY: app-streamlit
-app-streamlit: ## Abre la app Streamlit de la fase 1 (se retira en la fase 2)
-	$(UV) run streamlit run app/streamlit_app.py
-
 .PHONY: evaluar
 evaluar: ## Corre las 20 preguntas del alcance y escribe docs/RESULTADOS_20_PREGUNTAS.md (requiere DEEPSEEK_API_KEY)
 	$(UV) run python -m banco_occidente_corpus.asistente evaluar $(if $(SOLO),--solo $(SOLO),) $(if $(PAUSA),--pausa $(PAUSA),) $(if $(VERSION),--version $(VERSION),) $(if $(REVALIDAR),--revalidar,)
@@ -194,7 +190,7 @@ fmt: ## Formatea el codigo con ruff
 
 .PHONY: typecheck
 typecheck: ## Verifica tipos con ty
-	$(UV) run ty check src
+	$(UV) run --all-extras ty check src
 
 .PHONY: check
 check: lint typecheck test ## Lint + tipos + pruebas

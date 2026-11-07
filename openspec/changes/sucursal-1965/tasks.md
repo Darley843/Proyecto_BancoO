@@ -147,11 +147,11 @@
 - [ ] 22.5 Escribir `data/evaluacion/arqueo.json` y `docs/ARQUEO.md` sin fecha ni rutas absolutas, con recuperación, evaluación, McNemar, costo y conteo por tipo; verificar que dos ejecuciones con los mismos datos son idénticas y que las cifras del Markdown coinciden con el JSON.
 - [ ] 22.6 Añadir `make arqueo` y verificar que funciona sin `DEEPSEEK_API_KEY`, que no está encadenado a `all`, `gold` ni `deliver`, y que `make help` lo lista; documentar el comando y la interpretación del reporte en `docs/ARQUEO.md`.
 
-## 23. Retiro de Streamlit (Darley — pendiente)
+## 23. Retiro de Streamlit (Darley — hecho)
 
-- [ ] 23.1 Eliminar `app/streamlit_app.py`, `app/scraping_ui.py` y la dependencia `streamlit` con `uv remove streamlit`; verificar que `make check` y `make demo` pasan sin Streamlit instalado y que `make app` sigue levantando uvicorn.
-- [ ] 23.2 Actualizar `CONSTITUTION.md` §3 y §4, `AGENTS.md` (mapa del código y comandos), `README.md` y `docs/ESTANDAR.md` para quitar Streamlit y describir la app web; verificar que no quedan referencias activas con una búsqueda de «streamlit» en código, `pyproject.toml`, Makefile y documentación.
-- [ ] 23.3 Verificar que el retiro no borra `app/web/`, `app.py`, los datos de ejemplo ni la API, y que `git status` no incluye `data/asistente/` ni `data/boveda/`.
+- [x] 23.1 Eliminar `app/streamlit_app.py`, `app/scraping_ui.py` y la dependencia `streamlit` con `uv remove streamlit`; verificar que `make check` y `make demo` pasan sin Streamlit instalado y que `make app` sigue levantando uvicorn.
+- [x] 23.2 Actualizar `CONSTITUTION.md` §3 y §4, `AGENTS.md` (mapa del código y comandos), `README.md` y `docs/ESTANDAR.md` para quitar Streamlit y describir la app web; verificar que no quedan referencias activas con una búsqueda de «streamlit» en código, `pyproject.toml`, Makefile y documentación.
+- [x] 23.3 Verificar que el retiro no borra `app/web/`, `app.py`, los datos de ejemplo ni la API, y que `git status` no incluye `data/asistente/` ni `data/boveda/`.
 
 ## 24. Skill boveda-rag (Nayla — pendiente)
 
@@ -165,11 +165,11 @@
 - [ ] 25.2 Añadir pruebas de seguridad: que el servidor no acepta host público, que no se lee `.env`, que no hay claves en el código, que PII no entra en caché ni memoria y que los fragmentos con instrucciones no cambian el sistema; ejecutar `make check`.
 - [ ] 25.3 Escribir `docs/SEGURIDAD.md` con el modelo de amenazas (inyección en fragmentos, PII, abuso de costo, exposición del servidor, índice con datos personales) y su mitigación concreta; verificar que cada mitigación referencia una prueba o una regla de GGA.
 
-## 26. Diagramas con Archify (Darley — pendiente)
+## 26. Diagramas con Archify (Darley — hecho)
 
 - [x] 26.1 Generar con Archify el diagrama de arquitectura: navegador → FastAPI → grafo → Bóveda/Tablero → SQLite, con Ollama local y DeepSeek como servicio externo; verificar que el diagrama se renderiza y que el comando queda documentado en `README.md`.
-- [ ] 26.2 Generar con Archify el diagrama de datos: Gold → chunks → fragmentos → embeddings → Chroma → recuperación → respuesta citada, y Tablero PDF/tablas → CSV → respuesta con plantilla; verificar que las rutas y los sentidos de las flechas coinciden con el diseño.
-- [ ] 26.3 Añadir los diagramas al `README.md` y a `docs/MODELADO.md`, y verificar que no prometen componentes fuera de alcance (Extracto, time travel, EmbeddingGemma, Matryoshka).
+- [x] 26.2 Generar con Archify el diagrama de datos: Gold → chunks → fragmentos → embeddings → Chroma → recuperación → respuesta citada, y Tablero PDF/tablas → CSV → respuesta con plantilla; verificar que las rutas y los sentidos de las flechas coinciden con el diseño.
+- [x] 26.3 Añadir los diagramas al `README.md` y a `docs/MODELADO.md`, y verificar que no prometen componentes fuera de alcance (Extracto, time travel, EmbeddingGemma, Matryoshka).
 
 ## 27. Integración y cierre (equipo — pendiente)
 

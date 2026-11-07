@@ -622,7 +622,28 @@ async function pedirTurno(pregunta, hiloPeticion) {
   ) {
     throw new Error("La sucursal devolvió una respuesta incompleta.");
   }
+  await refrescarSaldo(app);
   return datos;
+}
+
+/**
+ * Vuelve a pedir el estado de la sucursal para actualizar el saldo del día.
+ *
+ * Es el punto único de toda respuesta: el formulario, los ejemplos, las
+ * secuencias y el reintento terminan en `pedirTurno`.
+ *
+ * @param {object | null} app Estado compartido de `app.js`.
+ * @returns {Promise<void>}
+ */
+async function refrescarSaldo(app) {
+  if (!app || typeof app.refrescarEstado !== "function") {
+    return;
+  }
+  try {
+    await app.refrescarEstado();
+  } catch {
+    // El saldo es informativo: un fallo aquí no invalida el turno.
+  }
 }
 
 /**

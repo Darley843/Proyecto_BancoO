@@ -15,7 +15,7 @@ La información pública del banco está dispersa en ~200 páginas HTML, 190 PDF
 32 videos, sin estructura común ni forma de citarla. Este proyecto la captura
 respetando `robots.txt`, la limpia a un corpus Gold con frontmatter y consolida un
 contexto único que alimenta un asistente LangChain con DeepSeek, con validación de
-fuente y app Streamlit. Esta fase usa el **contexto consolidado completo** en el
+fuente y una app web local. Esta fase usa el **contexto consolidado completo** en el
 prompt de sistema; la recuperación vectorial (RAG) es el Módulo 2.
 
 ## Arquitectura
@@ -34,7 +34,8 @@ flowchart LR
     G --> C["Contexto consolidado<br/>data/contexto/contexto_banco.md"]
     K --> C
     C --> A["Asistente LangChain<br/>langchain-deepseek · deepseek-flash"]
-    A --> ST["App Streamlit<br/>make app-streamlit · 4 pestañas"]
+    A --> API["API FastAPI<br/>127.0.0.1:8000"]
+    API --> W["App web · app/web<br/>HTML, CSS y JavaScript"]
 ```
 
 | Capa | Carpeta | Contenido | ¿Se versiona? |
@@ -64,26 +65,33 @@ Bronze y Silver no se versionan: son capturas reproducibles que se reconstruyen
 con el pipeline sin volver a la web. El repositorio versiona Gold y el contexto.
 Fuente: `data/gold/_INDICE.md`, `corpus.jsonl` y `data/contexto/manifest.json`.
 
-### Diagrama interactivo de la fase 2 (Archify)
+### Diagramas interactivos de la fase 2 (Archify)
 
 El recorrido **navegador → FastAPI → grafo → Bóveda/Tablero → SQLite**, con
 Ollama local y DeepSeek como servicio externo, vive en
 [`docs/arquitectura.html`](./docs/arquitectura.html). Su fuente tipada es
 `docs/arquitectura.json`; el HTML se genera, nunca se edita a mano.
 
+El flujo de datos — **Gold → chunks → fragmentos → Ollama → Chroma →
+recuperación → respuesta citada**, y **PDF/tablas → CSV → plantilla** — vive en
+[`docs/datos.html`](./docs/datos.html). Su fuente es `docs/datos.json` y también
+se genera con Archify.
+
 ```bash
 # una vez: instala la skill de Archify (Node >= 18)
 npx -y skills@latest add https://archify.si --skill archify --agent opencode --global --copy --yes
 
-# cada vez que cambie el diagrama
+# cada vez que cambie un diagrama
 node ~/.agents/skills/archify/bin/archify.mjs finalize architecture \
   docs/arquitectura.json docs/arquitectura.html --repo-root . --quality showcase --json
+node ~/.agents/skills/archify/bin/archify.mjs finalize dataflow \
+  docs/datos.json docs/datos.html --repo-root . --quality showcase --json
 ```
 
 En PowerShell el CLI queda en `$HOME\.agents\skills\archify\bin\archify.mjs`. La
-corrida deja los recibos `docs/arquitectura.finalize*.json` y
-`docs/arquitectura.browser-check.json`; si algún gate falla, se corrige el JSON y
-se repite el comando completo.
+corrida deja los recibos `docs/arquitectura.finalize*.json`,
+`docs/arquitectura.browser-check.json` y los equivalentes `docs/datos.*.json`; si
+algún gate falla, se corrige el JSON y se repite el comando completo.
 
 ## Requisitos e instalación
 
@@ -147,25 +155,6 @@ diseño, sin FastAPI ni claves:
 ```bash
 uv run python -m http.server 8001 --directory app/web   # http://localhost:8001
 ```
-
-### App Streamlit de la fase 1
-
-```bash
-make app-streamlit   # o: uv run streamlit run app/streamlit_app.py
-```
-
-Se retira al final de la fase 2 (OpenSpec `sucursal-1965`, tarea 23.1).
-
-| Pestaña | Qué muestra |
-|---|---|
-| **Scraping** | Etapas con sus conteos, métricas del corpus, deduplicación y captura en vivo de unas URLs en carpeta temporal |
-| **Preguntas** | Respuesta con su fuente; permite comparar `v0` y `v1` del prompt |
-| **Preguntas frecuentes** | Diez preguntas con fuente |
-| **Resumen** | Resumen ejecutivo con sus fuentes |
-
-La app solo pinta y cachea; la lógica vive en `asistente/`. El modelo se invoca
-solo al pulsar un botón, la pregunta pasa antes por detección de datos personales
-y cada respuesta se cachea por pregunta, versión y fecha del contexto.
 
 ### Pipeline y evaluación
 
@@ -384,9 +373,7 @@ Resultados vigentes y respuestas completas:
 ```text
 ├── app.py                     # arranque: FastAPI + app web en 127.0.0.1:8000 (make app)
 ├── app/
-│   ├── web/                   # Sucursal 1965: index.html, estilos.css, app.js, vistas/, datos-ejemplo/
-│   ├── streamlit_app.py       # interfaz fase 1: 4 pestañas (make app-streamlit)
-│   └── scraping_ui.py         # pestaña Scraping (etapas, métricas, captura en vivo)
+│   └── web/                   # Sucursal 1965: index.html, estilos.css, app.js, vistas/, datos-ejemplo/
 ├── src/banco_occidente_corpus/
 │   ├── net.py · discover.py · fetch.py · extract.py · dedupe.py
 │   ├── section.py · gold.py · checklist.py · stats.py · cli.py
@@ -468,7 +455,7 @@ atribución de materiales de terceros está en [`NOTICE.md`](./NOTICE.md).
 |---|---|
 | Darley Idárraga | Líder de repositorio e integración |
 | Yoldy Benavides | Ingeniería de datos |
-| Nayla Ledesma | Método y memoria; asistente LangChain y app Streamlit |
+| Nayla Ledesma | Método y memoria; asistente LangChain y app web |
 | Anny Valencia | Seguridad y calidad |
 
 Curso **TAAML**, Universidad Autónoma de Occidente (UAO).
