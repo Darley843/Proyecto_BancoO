@@ -74,16 +74,36 @@ class RevisionInvalida(ValueError):
 
 @dataclass(frozen=True, slots=True)
 class Revision:
-    """Veredicto de una persona del grupo sobre una respuesta."""
+    """Veredicto de una persona del grupo sobre una respuesta.
+
+    ``veredicto`` es el veredicto final que usan las metricas. Los campos
+    ``veredicto_2``, ``nota_2`` y ``revisor_2`` conservan una segunda firma
+    independiente; si existe, ``acuerdo`` indica si ambas coinciden.
+    """
 
     veredicto: str
     nota: str = ""
     revisor: str = ""
+    veredicto_2: str = ""
+    nota_2: str = ""
+    revisor_2: str = ""
 
     @property
     def es_propuesta(self) -> bool:
         """True si nadie del grupo la ha confirmado (sin revisor o marcada como propuesta)."""
         return not self.revisor or "propuesta" in self.revisor.casefold()
+
+    @property
+    def tiene_segunda_revision(self) -> bool:
+        """True si hay una segunda firma completa."""
+        return bool(self.revisor_2 and self.veredicto_2)
+
+    @property
+    def acuerdo(self) -> bool | None:
+        """True si las dos firmas coinciden; None si no hay segunda firma."""
+        if not self.tiene_segunda_revision:
+            return None
+        return self.veredicto == self.veredicto_2
 
     @property
     def texto(self) -> str:
@@ -189,10 +209,24 @@ def cargar_revision(archivo: Path | None = None) -> dict[int, Revision]:
                 f"Revision {fila.get('id')}: veredicto '{veredicto}' no es uno de "
                 f"{tuple(VEREDICTOS)}"
             )
+        veredicto_2 = str(fila.get("veredicto_2", "")).strip()
+        revisor_2 = str(fila.get("revisor_2", "")).strip()
+        if veredicto_2 and veredicto_2 not in VEREDICTOS:
+            raise RevisionInvalida(
+                f"Revision {fila.get('id')}: veredicto_2 '{veredicto_2}' no es uno de "
+                f"{tuple(VEREDICTOS)}"
+            )
+        if bool(veredicto_2) != bool(revisor_2):
+            raise RevisionInvalida(
+                f"Revision {fila.get('id')}: veredicto_2 y revisor_2 deben ir juntos"
+            )
         revision[int(fila["id"])] = Revision(
             veredicto=veredicto,
             nota=str(fila.get("nota", "")).strip(),
             revisor=str(fila.get("revisor", "")).strip(),
+            veredicto_2=veredicto_2,
+            nota_2=str(fila.get("nota_2", "")).strip(),
+            revisor_2=revisor_2,
         )
     return revision
 

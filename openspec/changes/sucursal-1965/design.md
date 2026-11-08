@@ -8,7 +8,7 @@ Ver `proposal.md` para la motivación y `specs/*/spec.md` para los requisitos. E
 - El asistente v1 envía `data/contexto/contexto_banco.md` completo (~167 000 tokens) en cada pregunta y valida la respuesta con `asistente/validacion.py`. `asistente/evaluacion.py` ya resuelve la evaluación de 20 preguntas y la revisión humana.
 - La app es un Streamlit delgado (`app/streamlit_app.py`, `app/scraping_ui.py`) sobre `asistente/servicio.py`; no tiene router, memoria, recuperación ni datos estructurados.
 - `panel.pipeline_summary(config)` ya resume las cinco etapas del pipeline leyendo solo disco, y `panel.corpus_metrics` resume el corpus y su contexto. La vista Cámara y `/api/pipeline` deben reutilizarlos.
-- El grupo ya abrió trabajo que este cambio adopta y no reimplementa: plantilla de PR (#43, hecho), `config/evaluacion/preguntas_fase2.toml` con 40 preguntas y su prueba (#44, hecho), y `arqueo/metricas.py` con `Tarifas`, `hit_at_k`, `mrr`, `exactitud`, `citas_correctas`, `resumen_uso`, `mcnemar` y las tarifas valle/pico (#45, en revisión). Esas ramas aún no están en `main`: el PR 0 y el orden de PR del plan las integran antes de tocar código nuevo.
+- El grupo ya abrió trabajo que este cambio adopta y no reimplementa: plantilla de PR (#43, hecho), `config/evaluacion/preguntas_fase2.toml` con 44 preguntas y su prueba (#44, hecho), y `arqueo/metricas.py` con `Tarifas`, `hit_at_k`, `mrr`, `exactitud`, `citas_correctas`, `resumen_uso`, `mcnemar` y las tarifas valle/pico (#45, en revisión). Esas ramas aún no están en `main`: el PR 0 y el orden de PR del plan las integran antes de tocar código nuevo.
 - Restricciones duras: `uv` como único gestor; pruebas sin red; docstrings en español y anotaciones de tipo; Gold no se edita; `data/boveda/` y las SQLite de `data/asistente/` no se versionan; el servidor escucha solo en `127.0.0.1`; DeepSeek Flash es el único modelo que se paga y los embeddings corren con Ollama local.
 
 ## Goals / Non-Goals
@@ -204,12 +204,13 @@ Alternativa descartada: React o Vue con Vite. Añade Node, build y dependencias 
 
 `arqueo/experimentos.py`:
 
-1. Carga las 40 preguntas con `asistente.evaluacion.cargar_preguntas` adaptada a los campos nuevos (`tipo`, `ruta_esperada`, `fuentes_esperadas`, `previa`). El cargador estricto de v1 no acepta esos campos; se añade un cargador de fase 2 en `arqueo/experimentos.py` para no romper la evaluación v1.
+1. Carga las 44 preguntas con `asistente.evaluacion.cargar_preguntas` adaptada a los campos nuevos (`tipo`, `ruta_esperada`, `fuentes_esperadas`, `previa`). El cargador estricto de v1 no acepta esos campos; se añade un cargador de fase 2 en `arqueo/experimentos.py` para no romper la evaluación v1.
 2. Para cada combinación de pesos (`1/0`, `0/1`, `0.2/0.8`, `0.4/0.6`, `0.6/0.4` y `0.8/0.2`), recupera `k=5` y calcula `hit_at_k` y `mrr` con `arqueo.metricas`; `1/0` y `0/1` son las líneas base vectorial y BM25 pura. Los pesos no requieren reindexar: se aplican al recuperador sobre el mismo índice. El experimento de prefijos usa un único índice extra sin prefijos en `data/boveda/experimentos/sin_prefijos` (no `tmp_path`, que es solo para pruebas) y se mide con los pesos por defecto. No llama a DeepSeek.
-3. Compara v1 y v2 sobre las 20 preguntas `tipo="alcance"` usando `revision_humana.toml` y `revision_humana_v2.toml`: convierte cada veredicto en acierto booleano (`correcta` o `rechazo_correcto` → `True`; `parcial`/`incorrecta` → `False`; sin revisión → `None`) y aplica `mcnemar`.
+3. Compara v1 y v2 sobre las 20 preguntas `tipo="alcance"` usando `revision_humana.toml` y `revision_humana_v2.toml`: convierte cada veredicto en acierto booleano (`correcta` o `rechazo_correcto` → `True`; `parcial`/`incorrecta` → `False`; sin revisión → `None`) y aplica `mcnemar`. `citas_correctas` usa definiciones distintas por versión: v1 lee `fuente` de `resultados.jsonl` (una sola URL) y v2 lee `metricas["fuentes"]` (todas las URL citadas); por eso las dos cifras no se comparan entre versiones. `revision_humana_v2.toml` puede traer una tabla `[sensibilidad]` con `[[sensibilidad.cambio]]`; el informe aplica esos cambios solo en un escenario alterno y conserva el veredicto principal y la segunda firma. Cada bloque de McNemar reporta también `p_minimo` y `alfa`; si el p mínimo alcanzable con `n` pares discordantes supera `ALFA`, ninguna combinación de esos pares puede ser significativa.
 
 Antes de fusionar #45 hay que corregir `acierta_terminos`: hoy normaliza a NFC y no quita tildes. La normalización sin tildes vive en `banco_occidente_corpus.texto.normalizar` (``casefold``, NFKD y eliminación de marcas combinantes) y `asistente/evaluacion.py` la reutiliza con `from ..texto import normalizar as _normalizar`, sin cambiar su comportamiento. El Arqueo debe comparar «línea» con «linea», así que la métrica usa `texto.normalizar` y se prueba con un par con y sin tilde. Esa corrección pertenece al PR de métricas, no al de experimentos.
 4. Escribe `data/evaluacion/arqueo.json` y `docs/ARQUEO.md` sin fecha ni rutas absolutas, para que dos corridas idénticas den los mismos bytes.
+5. El costo de v2 es una cota inferior: suma el turno de respuesta, pero no el clasificador de dudas ni la reformulación (#93). El informe cuenta por datos cuántas preguntas de alcance usaron el clasificador leyendo el motivo registrado en `metricas["motivo"]` de `resultados_v2.jsonl`: los motivos de regla y la marca `tablero_generico` no cuentan como clasificador, y las filas sin motivo se informan aparte. El ahorro frente a v1, que no usa clasificador, se expresa como «hasta X % menos».
 
 `make evaluar VERSION=v2` en `asistente/cli.py` detecta `v2`, construye el grafo y llama a `arqueo.experimentos.evaluar_v2`, que envía la `previa` en el mismo `thread_id` antes de la pregunta de seguimiento. Los resultados van a `data/evaluacion/resultados_v2.jsonl` y `docs/RESULTADOS_FASE2.md`; no sobrescriben los de v1. La revisión humana v2 vive en `config/evaluacion/revision_humana_v2.toml`.
 
@@ -510,7 +511,19 @@ reemplazarlas:
   de URL, deduplicación de texto en el recuperador).
 - En cada entrada de `recuperacion`: `etiqueta`, `por_defecto`, `aciertos`,
   `intervalo95`, `por_tipo` y `sin_tablero`.
-- En `costo`: `arqueo_usd`, siempre cero porque el Arqueo no llama a DeepSeek.
+- En `costo`: `arqueo_usd`, siempre cero porque el Arqueo no llama a DeepSeek;
+  `v1_alcance_usd`, `v2_alcance_usd`, `v2_alcance_preguntas`,
+  `v2_alcance_con_clasificador`, `v2_alcance_sin_motivo`,
+  `v2_alcance_cota_inferior`, `v2_total_cota_inferior` y
+  `ahorro_alcance_pct`. Las cifras de v2 son cotas
+  inferiores porque no incluyen el clasificador de dudas ni la reformulación.
+- `sensibilidad`: `revisor`, `cambios` (`id`, `de`, `a`, `nota`), `evaluacion`
+  y `mcnemar`. Es un escenario alterno de la revisión v2; no reemplaza la
+  evaluación principal ni la segunda firma.
+- En `mcnemar`, `mcnemar_pesos` y `mcnemar_pesos_todas`: `p_minimo` (p mínima
+  alcanzable con `n` pares discordantes) y `alfa` (0.05). El Markdown explica
+  si ese mínimo ya supera `alfa` y, por tanto, si ningún reparto de los pares
+  discordantes podría ser significativo.
 
 Sin fecha ni rutas absolutas: el archivo es determinista para los mismos datos y revisiones.
 
@@ -532,7 +545,7 @@ Sin fecha ni rutas absolutas: el archivo es determinista para los mismos datos y
 ## Migration Plan
 
 1. PR 0: dependencias y `uv.lock`; verificar `make check` y `make demo`.
-2. Integrar #43, #44 y #45 si aún no están en `main`; verificar que `arqueo/metricas.py` importa y que las 40 preguntas cargan.
+2. Integrar #43, #44 y #45 si aún no están en `main`; verificar que `arqueo/metricas.py` importa y que las 44 preguntas cargan.
 3. Bóveda (fragmentos, embeddings, almacén, índice, recuperador, mapa) con sus pruebas y `make indice`.
 4. Tablero con el CSV y la cobertura de las 8 preguntas.
 5. Prompt v2, `asistente/rag.py` y sus pruebas.

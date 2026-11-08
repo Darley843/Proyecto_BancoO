@@ -4,20 +4,44 @@ El modulo no llama a DeepSeek: los embeddings son locales (Ollama) o se inyectan
 en las pruebas. Los pesos se aplican sobre el mismo indice vectorial, de modo que
 cambiar de configuracion no reindexa el almacen. El unico indice extra es el de
 ``data/boveda/experimentos/sin_prefijos``, que se mide con los pesos por defecto.
+
+La evaluacion v2 (``evaluar_v2``) recibe el servicio de la Sucursal ya construido
+y solo lo invoca: no crea modelo ni cliente HTTP, de modo que ``make arqueo``
+sigue sin llamar a DeepSeek.
 """
 
 from __future__ import annotations
 
 import hashlib
+import time
 import tomllib
-from collections.abc import Mapping, Sequence
+from collections import Counter
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, replace
+from datetime import date
 from pathlib import Path
 from typing import Any, Literal, cast
 
 from langchain_core.embeddings import Embeddings
 
-from ..asistente.evaluacion import COBERTURAS, PreguntasInvalidas, Revision
+from ..asistente.evaluacion import (
+    COBERTURAS,
+    ETIQUETAS,
+    SALIDA_JSONL,
+    SALIDA_MARKDOWN,
+    VEREDICTOS,
+    PreguntaEvaluacion,
+    PreguntasInvalidas,
+    ResultadoEvaluacion,
+    Revision,
+    cargar_revision,
+    clasificar,
+    escribir_jsonl,
+    escribir_markdown,
+    fusionar,
+)
+from ..asistente.qa import RespuestaQA
+from ..asistente.validacion import es_sin_datos, extraer_urls_texto, separar_fuentes
 from ..boveda.almacen import AlmacenVectorial
 from ..boveda.configuracion import (
     ConfiguracionEmbeddings,
@@ -40,10 +64,12 @@ from ..boveda.tipos import Fragmento
 from ..config import PROJECT_ROOT, Config
 from .metricas import (
     ResultadoMcNemar,
+    citas_correctas,
     hit_at_k,
     intervalo_wilson,
     mcnemar,
     mrr,
+    resumen_uso,
 )
 
 #: Tipo de pregunta del banco de la fase 2.
@@ -57,6 +83,18 @@ ARCHIVO_PREGUNTAS_FASE2: Path = PROJECT_ROOT / "config" / "evaluacion" / "pregun
 ARCHIVO_REVISION_V1: Path = PROJECT_ROOT / "config" / "evaluacion" / "revision_humana.toml"
 #: Revision humana de las respuestas v2; puede no existir todavia.
 ARCHIVO_REVISION_V2: Path = PROJECT_ROOT / "config" / "evaluacion" / "revision_humana_v2.toml"
+#: Detalle por pregunta de la evaluacion v2 con el grafo.
+ARCHIVO_RESULTADOS_V2: Path = PROJECT_ROOT / "data" / "evaluacion" / "resultados_v2.jsonl"
+#: Tabla Markdown de la evaluacion v2.
+ARCHIVO_RESULTADOS_FASE2: Path = PROJECT_ROOT / "docs" / "RESULTADOS_FASE2.md"
+#: Memoria del grafo para la evaluacion v2, separada de la Ventanilla.
+RUTA_MEMORIA_V2: str = "data/asistente/memoria_evaluacion_v2.sqlite"
+#: Gasto de la evaluacion v2, separado del tope de la Ventanilla.
+RUTA_GASTO_V2: str = "data/asistente/gasto_evaluacion_v2.sqlite"
+#: Tope diario del servicio de evaluacion v2, en USD.
+TOPE_EVALUACION_USD: float = 0.20
+#: Prefijo de los hilos de la evaluacion: ``eval-v2-<id>-<corrida>``.
+PREFIJO_HILO: str = "eval-v2"
 #: Fragmentos que devuelve el recuperador y tamano de la ventana de las metricas.
 K_POR_DEFECTO: int = 5
 #: Archivo con la huella del contenido del indice sin prefijos.
@@ -798,3 +836,661 @@ def comparar_pesos(
         aciertos_defecto.append(detalle.posiciones[barrido.por_defecto] is not None)
         aciertos_vectorial.append(detalle.posiciones[barrido.vectorial] is not None)
     return mcnemar(aciertos_defecto, aciertos_vectorial)
+
+
+def hilo_de(pregunta: PreguntaFase2, corrida: str) -> str:
+    """Devuelve el hilo de una pregunta: ``eval-v2-<id>-<corrida>``.
+
+    El identificador es determinista dentro de una corrida (mismo id y misma
+    marca dan el mismo hilo) y unico entre corridas, para que la memoria de la
+    evaluacion no reutilice el historial de una ejecucion anterior.
+
+    Args:
+        pregunta: pregunta del banco de fase 2.
+        corrida: marca UTC del inicio de la corrida; en pruebas, un valor fijo.
+
+    Returns:
+        El identificador del hilo que comparten la previa y la pregunta.
+
+    Raises:
+        ValueError: si la corrida esta vacia.
+    """
+    if not corrida.strip():
+        raise ValueError("La corrida no puede estar vacia: el hilo debe ser unico.")
+    return f"{PREFIJO_HILO}-{pregunta.id}-{corrida.strip()}"
+
+
+def evaluar_v2(
+    responder: Callable[[str, str], Mapping[str, Any]],
+    preguntas: Sequence[PreguntaFase2],
+    *,
+    corrida: str,
+    archivo_jsonl: Path | None = None,
+    archivo_markdown: Path | None = None,
+    previos: Sequence[ResultadoEvaluacion] = (),
+    banco: Sequence[PreguntaFase2] | None = None,
+    pausa: float = 0.0,
+    al_terminar: Callable[[ResultadoEvaluacion], None] | None = None,
+    fecha: date | None = None,
+    modelo: str = "",
+) -> list[ResultadoEvaluacion]:
+    """Responde el banco de fase 2 con el grafo y escribe los artefactos de v2.
+
+    En un seguimiento envia primero ``previa`` en el mismo ``thread_id`` y
+    registra la respuesta a la segunda pregunta. Un fallo del servicio en una
+    pregunta queda como ``error`` y la corrida continua; si falla la previa, la
+    pregunta no se envia para no medir un seguimiento sin contexto.
+
+    Args:
+        responder: callable con la forma de ``ServicioPreguntas.preguntar``;
+            recibe la pregunta y el ``thread_id`` y devuelve el contrato JSON.
+        preguntas: preguntas que se ejecutan en esta corrida.
+        corrida: marca UTC del inicio; forma parte del ``thread_id``.
+        archivo_jsonl: destino del detalle; por defecto el de v2.
+        archivo_markdown: destino de la tabla; por defecto el de v2.
+        previos: filas de v2 que se conservan al usar ``--solo``.
+        banco: banco completo para los metadatos del Markdown; por defecto
+            ``preguntas``.
+        pausa: segundos de espera entre preguntas.
+        al_terminar: callback de avance por pregunta.
+        fecha: fecha de la corrida; por defecto hoy.
+        modelo: nombre del modelo para la cabecera del Markdown.
+
+    Returns:
+        Las filas escritas (las nuevas, fusionadas con ``previos`` si las hay).
+
+    Raises:
+        ValueError: si el destino es el de v1 o si la corrida esta vacia.
+    """
+    destino_jsonl = (archivo_jsonl or ARCHIVO_RESULTADOS_V2).expanduser()
+    destino_markdown = (archivo_markdown or ARCHIVO_RESULTADOS_FASE2).expanduser()
+    _rechazar_rutas_v1(destino_jsonl, destino_markdown)
+
+    nuevos: list[ResultadoEvaluacion] = []
+    for indice, pregunta in enumerate(preguntas):
+        if indice and pausa > 0:
+            time.sleep(pausa)
+        hilo = hilo_de(pregunta, corrida)
+        inicio = time.perf_counter()
+        segundos_previa = 0.0
+        try:
+            previa: Mapping[str, Any] | None = None
+            if pregunta.previa:
+                inicio_previa = time.perf_counter()
+                previa = responder(pregunta.previa, hilo)
+                segundos_previa = time.perf_counter() - inicio_previa
+            respuesta = responder(pregunta.pregunta, hilo)
+        except Exception as exc:  # noqa: BLE001 - se registra y se sigue
+            resultado = _resultado_error(pregunta, exc, time.perf_counter() - inicio, fecha=fecha)
+        else:
+            resultado = _resultado_v2(
+                pregunta,
+                respuesta,
+                previa=previa,
+                segundos=time.perf_counter() - inicio,
+                segundos_previa=segundos_previa,
+                fecha=fecha,
+            )
+        nuevos.append(resultado)
+        if al_terminar:
+            al_terminar(resultado)
+
+    resultados = list(fusionar(previos, nuevos)) if previos else nuevos
+    revision = cargar_revision(ARCHIVO_REVISION_V2)
+    texto = render_markdown_v2(
+        resultados,
+        banco or preguntas,
+        modelo=modelo,
+        corrida=corrida,
+        fecha=fecha,
+        revision=revision,
+    )
+    escribir_resultados_v2(
+        resultados,
+        texto,
+        archivo_jsonl=destino_jsonl,
+        archivo_markdown=destino_markdown,
+    )
+    return resultados
+
+
+def render_markdown_v2(
+    resultados: Sequence[ResultadoEvaluacion],
+    preguntas: Sequence[PreguntaFase2],
+    *,
+    modelo: str,
+    corrida: str,
+    fecha: date | None = None,
+    revision: Mapping[int, Revision] | None = None,
+) -> str:
+    """Tabla de la evaluacion v2 con rutas, citas, uso y respuestas.
+
+    La ruta obtenida se informa junto a la esperada, pero no decide la
+    clasificacion: en el Tablero la ruta ``T`` es provisional y una respuesta
+    que baja a la Boveda puede ser correcta.
+
+    Si se pasa ``revision``, agrega la seccion de la revision humana y las
+    segundas firmas. El veredicto final sigue siendo ``Revision.veredicto``;
+    ``veredicto_2`` solo se conserva para medir acuerdo.
+    """
+    hoy = fecha or date.today()
+    fechas = sorted({resultado.fecha for resultado in resultados if resultado.fecha})
+    if not fechas or fechas == [hoy.isoformat()]:
+        dia = hoy.isoformat()
+    else:
+        rango = fechas[0] if len(fechas) == 1 else f"{fechas[0]} a {fechas[-1]}"
+        dia = f"{hoy.isoformat()} (respuestas del modelo: {rango})"
+    por_id = {pregunta.id: pregunta for pregunta in preguntas}
+    conteo = Counter(resultado.clasificacion for resultado in resultados)
+
+    lineas = [
+        "# Resultados de la evaluacion v2 (grafo de la Sucursal)",
+        "",
+        f"Fecha: {dia}. Modelo: `{modelo or 'n/d'}`. Prompt: `qa_v2`. Corrida: `{corrida}`.",
+        "",
+        "Generado con `make evaluar VERSION=v2`. La ruta es el grafo de la Sucursal "
+        "(Boveda, Tablero y memoria por `thread_id`), no el contexto completo. Las "
+        "preguntas, su tipo y su ruta esperada estan en "
+        "`config/evaluacion/preguntas_fase2.toml`; el detalle por pregunta queda en "
+        "`data/evaluacion/resultados_v2.jsonl` y la revision humana v2 va aparte, en "
+        "`config/evaluacion/revision_humana_v2.toml`.",
+        "",
+        "## Resumen",
+        "",
+        "| Clasificacion automatica | Preguntas |",
+        "|---|---:|",
+    ]
+    for clave, etiqueta in ETIQUETAS.items():
+        if conteo[clave]:
+            lineas.append(f"| {etiqueta} | {conteo[clave]} |")
+    lineas += [f"| **Total** | **{len(resultados)}** |", ""]
+    lineas += _resumen_por_tipo(resultados, por_id)
+    lineas += _resumen_uso_v2(resultados)
+    lineas += _tabla_preguntas(resultados, por_id)
+    lineas += _respuestas(resultados, por_id)
+    lineas += _revision_humana(revision, preguntas)
+    lineas += [
+        "## Como se clasifica",
+        "",
+        "La heuristica es la de v1: si el corpus no tiene el dato, lo esperado es la "
+        "frase fija con el canal oficial (*rechazo correcto*); si lo tiene, se buscan "
+        "los terminos esperados y se marca *correcta*, *incompleta* o *revisar*. Una "
+        "respuesta sin datos cuando el corpus si los tiene es un falso negativo. La "
+        "revision humana es la que vale para el informe, y McNemar se calcula solo con "
+        "las 20 preguntas de tipo `alcance`.",
+        "",
+    ]
+    return "\n".join(lineas).rstrip() + "\n"
+
+
+def escribir_resultados_v2(
+    resultados: Sequence[ResultadoEvaluacion],
+    texto: str,
+    *,
+    archivo_jsonl: Path | None = None,
+    archivo_markdown: Path | None = None,
+) -> tuple[Path, Path]:
+    """Escribe el detalle JSONL y la tabla Markdown de la evaluacion v2.
+
+    Nunca escribe en los archivos de v1: ``_rechazar_rutas_v1`` lanza
+    ``ValueError`` si el destino coincide con ``resultados.jsonl`` o con
+    ``RESULTADOS_20_PREGUNTAS.md``.
+
+    Returns:
+        Las rutas del JSONL y del Markdown escritos.
+    """
+    destino_jsonl = (archivo_jsonl or ARCHIVO_RESULTADOS_V2).expanduser()
+    destino_markdown = (archivo_markdown or ARCHIVO_RESULTADOS_FASE2).expanduser()
+    _rechazar_rutas_v1(destino_jsonl, destino_markdown)
+    return (
+        escribir_jsonl(resultados, destino_jsonl),
+        escribir_markdown(texto, destino_markdown),
+    )
+
+
+def _rechazar_rutas_v1(archivo_jsonl: Path, archivo_markdown: Path) -> None:
+    """Impide que la evaluacion v2 sobrescriba los artefactos de v1.
+
+    Raises:
+        ValueError: si alguna ruta es la de v1.
+    """
+    if archivo_jsonl.resolve() == SALIDA_JSONL.resolve():
+        raise ValueError(
+            "La evaluacion v2 no sobrescribe data/evaluacion/resultados.jsonl: "
+            "usa --jsonl con un archivo propio de v2."
+        )
+    if archivo_markdown.resolve() == SALIDA_MARKDOWN.resolve():
+        raise ValueError(
+            "La evaluacion v2 no sobrescribe docs/RESULTADOS_20_PREGUNTAS.md: "
+            "usa --salida con un archivo propio de v2."
+        )
+
+
+def _pregunta_v1(pregunta: PreguntaFase2) -> PreguntaEvaluacion:
+    """Adapta una pregunta de fase 2 al tipo que entiende ``clasificar``."""
+    return PreguntaEvaluacion(
+        id=pregunta.id,
+        pregunta=pregunta.pregunta,
+        cobertura=pregunta.cobertura,
+        terminos=pregunta.terminos,
+        nota=pregunta.nota,
+    )
+
+
+def _respuesta_qa(texto: str, fuentes: Sequence[str], sin_datos: bool) -> RespuestaQA:
+    """Arma la respuesta minima que consume ``asistente.evaluacion.clasificar``."""
+    return RespuestaQA(
+        texto=texto,
+        fuente=fuentes[0] if fuentes else "",
+        sin_datos=sin_datos,
+    )
+
+
+def _resultado_v2(
+    pregunta: PreguntaFase2,
+    respuesta: Mapping[str, Any],
+    *,
+    previa: Mapping[str, Any] | None = None,
+    segundos: float,
+    segundos_previa: float = 0.0,
+    fecha: date | None = None,
+) -> ResultadoEvaluacion:
+    """Convierte el turno del servicio en una fila de ``resultados_v2.jsonl``.
+
+    Una ruta ``X`` cuenta como rechazo: la frase de PII no empieza con la frase
+    fija de "sin datos" y el rechazo por regla si, asi que el criterio unico es
+    la letra del turno o la frase fija del texto.
+    """
+    texto = str(respuesta.get("respuesta", ""))
+    fuentes = _urls_citadas(respuesta)
+    turno = str(respuesta.get("turno", ""))
+    sin_datos = turno == "X" or es_sin_datos(texto)
+    clasificacion, encontrados = clasificar(
+        _pregunta_v1(pregunta),
+        _respuesta_qa(texto, fuentes, sin_datos),
+    )
+    return ResultadoEvaluacion(
+        id=pregunta.id,
+        pregunta=pregunta.pregunta,
+        cobertura=pregunta.cobertura,
+        clasificacion=clasificacion,
+        respuesta=texto,
+        fuente=fuentes[0] if fuentes else "",
+        sin_datos=sin_datos,
+        avisos=[],
+        terminos_encontrados=encontrados,
+        terminos_esperados=len(pregunta.terminos),
+        segundos=round(segundos, 2),
+        respuesta_cruda=None,
+        metricas=_metricas_v2(
+            respuesta,
+            fuentes=fuentes,
+            previa=previa,
+            segundos_previa=segundos_previa,
+        ),
+        error="",
+        fecha=(fecha or date.today()).isoformat(),
+    )
+
+
+def _resultado_error(
+    pregunta: PreguntaFase2,
+    error: Exception,
+    segundos: float,
+    *,
+    fecha: date | None = None,
+) -> ResultadoEvaluacion:
+    """Fila de una pregunta que no se pudo responder, con el error explicado."""
+    return ResultadoEvaluacion(
+        id=pregunta.id,
+        pregunta=pregunta.pregunta,
+        cobertura=pregunta.cobertura,
+        clasificacion="error",
+        respuesta="",
+        fuente="",
+        sin_datos=False,
+        terminos_esperados=len(pregunta.terminos),
+        segundos=round(segundos, 2),
+        error=f"{type(error).__name__}: {error}",
+        fecha=(fecha or date.today()).isoformat(),
+    )
+
+
+def _urls_citadas(respuesta: Mapping[str, Any]) -> tuple[str, ...]:
+    """URL citadas por el turno, en orden y sin repetir.
+
+    Prioriza el bloque ``Fuentes:`` del texto (el contrato de ``qa_v2``), y
+    anade las URL del campo ``fuentes`` del servicio por si el texto no las
+    repite. Sin bloque, usa las URL del texto completo.
+    """
+    texto = str(respuesta.get("respuesta", ""))
+    cuerpo, bloque = separar_fuentes(texto)
+    urls: list[str] = list(extraer_urls_texto(bloque))
+    if not urls:
+        urls = list(extraer_urls_texto(cuerpo or texto))
+    for fuente in respuesta.get("fuentes") or []:
+        if isinstance(fuente, Mapping):
+            url = str(fuente.get("url", ""))
+            if url:
+                urls.append(url)
+    return tuple(dict.fromkeys(urls))
+
+
+def _entero(valor: object) -> int:
+    """Convierte un contador del contrato en entero; lo invalido cuenta como cero."""
+    if isinstance(valor, bool):
+        return 0
+    if isinstance(valor, int):
+        return valor
+    if isinstance(valor, float):
+        return int(valor)
+    return 0
+
+
+def _uso_de(respuesta: Mapping[str, Any]) -> dict[str, Any]:
+    """Arma el bloque ``uso`` que entiende ``asistente.metricas.leer_uso``."""
+    return {
+        "input_tokens": _entero(respuesta.get("tokens_entrada")),
+        "output_tokens": _entero(respuesta.get("tokens_salida")),
+        "input_token_details": {"cache_read": _entero(respuesta.get("tokens_cache"))},
+    }
+
+
+def _cache_de(uso: Mapping[str, Any]) -> int:
+    """Lee ``input_token_details.cache_read`` de un bloque ``uso``."""
+    detalle = uso.get("input_token_details")
+    if isinstance(detalle, Mapping):
+        return _entero(detalle.get("cache_read"))
+    return 0
+
+
+def _sumar_uso(uno: Mapping[str, Any], otro: Mapping[str, Any]) -> dict[str, Any]:
+    """Suma dos bloques ``uso`` para cobrar la previa y la pregunta juntas."""
+    return {
+        "input_tokens": _entero(uno.get("input_tokens")) + _entero(otro.get("input_tokens")),
+        "output_tokens": _entero(uno.get("output_tokens")) + _entero(otro.get("output_tokens")),
+        "input_token_details": {"cache_read": _cache_de(uno) + _cache_de(otro)},
+    }
+
+
+def _costo(respuesta: Mapping[str, Any]) -> float:
+    """Lee el costo del contrato; un valor ausente o invalido cuenta como cero."""
+    try:
+        return float(respuesta.get("costo_usd") or 0.0)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+def _metricas_v2(
+    respuesta: Mapping[str, Any],
+    *,
+    fuentes: Sequence[str],
+    previa: Mapping[str, Any] | None = None,
+    segundos_previa: float = 0.0,
+) -> dict[str, Any]:
+    """Metricas del turno para el JSONL, con uso y costo de la previa incluidos."""
+    uso = _uso_de(respuesta)
+    costo = _costo(respuesta)
+    detalle_previa: dict[str, Any] | None = None
+    if previa is not None:
+        uso = _sumar_uso(uso, _uso_de(previa))
+        costo += _costo(previa)
+        detalle_previa = {
+            "turno": str(previa.get("turno", "")),
+            "ruta": str(previa.get("ruta", "")),
+            "motivo": str(previa.get("motivo", "")),
+            "tokens_entrada": _entero(previa.get("tokens_entrada")),
+            "tokens_salida": _entero(previa.get("tokens_salida")),
+            "costo_usd": round(_costo(previa), 6),
+            "segundos": round(segundos_previa, 2),
+        }
+    return {
+        "uso": uso,
+        "respuesta": {},
+        "turno": str(respuesta.get("turno", "")),
+        "ruta": str(respuesta.get("ruta", "")),
+        "motivo": str(respuesta.get("motivo", "")),
+        "reformulada": respuesta.get("reformulada"),
+        "fuentes": list(fuentes),
+        "cache": bool(respuesta.get("cache", False)),
+        "costo_usd": round(costo, 6),
+        "previa": detalle_previa,
+    }
+
+
+def _tipo_de(resultado: ResultadoEvaluacion, por_id: Mapping[int, PreguntaFase2]) -> str:
+    """Tipo de la pregunta de una fila; vacio si el banco no la trae."""
+    pregunta = por_id.get(resultado.id)
+    return pregunta.tipo if pregunta is not None else ""
+
+
+def _fuentes_de(resultado: ResultadoEvaluacion) -> list[str]:
+    """URL citadas de una fila: las guardadas en ``metricas`` o la principal."""
+    guardadas = resultado.metricas.get("fuentes")
+    if isinstance(guardadas, list) and guardadas:
+        return [str(url) for url in guardadas]
+    return [resultado.fuente] if resultado.fuente else []
+
+
+def _ruta_ok(resultado: ResultadoEvaluacion, por_id: Mapping[int, PreguntaFase2]) -> bool:
+    """True si la letra del turno coincide con la ruta esperada.
+
+    Es informativo, sobre todo en ``tabla``: una ruta ``T`` que baja a la
+    Boveda puede seguir siendo una respuesta correcta.
+    """
+    pregunta = por_id.get(resultado.id)
+    if pregunta is None:
+        return False
+    return str(resultado.metricas.get("turno", "")) == pregunta.ruta_esperada
+
+
+def _aciertos_automaticos(resultados: Sequence[ResultadoEvaluacion]) -> int:
+    """Cuenta correctas, rechazos correctos y remisiones, como la tabla de v1."""
+    return sum(
+        1
+        for resultado in resultados
+        if resultado.clasificacion in {"correcta", "rechazo_correcto", "remision"}
+    )
+
+
+def _citas(
+    resultados: Sequence[ResultadoEvaluacion],
+    por_id: Mapping[int, PreguntaFase2],
+) -> float | None:
+    """Proporcion de preguntas con al menos una URL esperada citada."""
+    citadas: list[list[str]] = []
+    esperadas: list[list[str]] = []
+    for resultado in resultados:
+        pregunta = por_id.get(resultado.id)
+        if pregunta is None:
+            continue
+        citadas.append(_fuentes_de(resultado))
+        esperadas.append(list(pregunta.fuentes_esperadas))
+    return citas_correctas(citadas, esperadas) if citadas else None
+
+
+def _porcentaje(valor: float | None) -> str:
+    """Formatea una proporcion como porcentaje o deja ``n/d``."""
+    return "n/d" if valor is None else f"{valor * 100:.0f} %"
+
+
+def _celda(texto: str, limite: int = 0) -> str:
+    """Texto apto para una celda de tabla Markdown."""
+    limpio = " ".join(texto.replace("|", "\\|").split())
+    if limite and len(limpio) > limite:
+        limpio = limpio[: limite - 1].rstrip() + "…"
+    return limpio
+
+
+def _revision_humana(
+    revision: Mapping[int, Revision] | None,
+    preguntas: Sequence[PreguntaFase2],
+) -> list[str]:
+    """Seccion de la revision humana y las segundas firmas."""
+    if not revision:
+        return []
+    por_id = {pregunta.id: pregunta for pregunta in preguntas}
+    dobles = [
+        (identificador, fila)
+        for identificador, fila in sorted(revision.items())
+        if fila.tiene_segunda_revision
+    ]
+    revisores = sorted({fila.revisor for fila in revision.values() if fila.revisor})
+    revisores_2 = sorted({fila.revisor_2 for _, fila in dobles})
+    acuerdos = sum(1 for _, fila in dobles if fila.acuerdo)
+    lineas = [
+        "## Revision humana",
+        "",
+        f"Revisadas: **{len(revision)}**. Con segunda firma: **{len(dobles)}**.",
+    ]
+    if revisores:
+        lineas.append(f"Primera firma: **{', '.join(revisores)}**.")
+    if revisores_2:
+        lineas.append(f"Segunda firma: **{', '.join(revisores_2)}**.")
+    if not dobles:
+        lineas += ["", "No hay segundas firmas registradas.", ""]
+        return lineas
+    lineas += [
+        f"Acuerdos de veredicto: **{acuerdos}/{len(dobles)}**.",
+        "",
+        "| # | Pregunta | Primera firma | Segunda firma | ¿Coincide? |",
+        "|---:|---|---|---|---|",
+    ]
+    for identificador, fila in dobles:
+        pregunta = por_id.get(identificador)
+        texto = _celda(pregunta.pregunta, 55) if pregunta else "n/d"
+        coincide = "Sí" if fila.acuerdo else "No"
+        lineas.append(
+            f"| {identificador} | {texto} | {VEREDICTOS[fila.veredicto]} | "
+            f"{VEREDICTOS[fila.veredicto_2]} | {coincide} |"
+        )
+    lineas += [
+        "",
+        "El veredicto final es la primera firma (`veredicto`); la segunda se conserva "
+        "para medir acuerdo. En estas seis se aplico el criterio de v1: el veredicto "
+        "mide el contenido y la cita se mide aparte. McNemar usa el veredicto final, "
+        "no la segunda firma.",
+        "",
+    ]
+    return lineas
+
+
+def _resumen_por_tipo(
+    resultados: Sequence[ResultadoEvaluacion],
+    por_id: Mapping[int, PreguntaFase2],
+) -> list[str]:
+    """Tabla de aciertos, rutas y citas por tipo de pregunta."""
+    lineas = [
+        "## Por tipo",
+        "",
+        "| Tipo | Preguntas | Correctas | Ruta cumplida | Citas | Costo USD |",
+        "|---|---:|---:|---:|---:|---:|",
+    ]
+    for tipo in TIPOS:
+        del_tipo = [resultado for resultado in resultados if _tipo_de(resultado, por_id) == tipo]
+        if not del_tipo:
+            continue
+        rutas = sum(1 for resultado in del_tipo if _ruta_ok(resultado, por_id))
+        costo = sum(_costo(resultado.metricas) for resultado in del_tipo)
+        lineas.append(
+            f"| {tipo} | {len(del_tipo)} | {_aciertos_automaticos(del_tipo)} | "
+            f"{rutas} | {_porcentaje(_citas(del_tipo, por_id))} | {costo:.4f} |"
+        )
+    return [*lineas, ""]
+
+
+def _resumen_uso_v2(resultados: Sequence[ResultadoEvaluacion]) -> list[str]:
+    """Tabla de tokens, tiempo y costo de la corrida."""
+    resumen = resumen_uso(
+        [
+            {
+                "metricas": resultado.metricas,
+                "segundos": resultado.segundos,
+                "error": resultado.error,
+            }
+            for resultado in resultados
+        ]
+    )
+    tiempo_total = sum(resultado.segundos for resultado in resultados)
+    cobrado = sum(_costo(resultado.metricas) for resultado in resultados)
+    return [
+        "## Uso y costo",
+        "",
+        "| Preguntas | Errores | Tiempo total (s) | Tiempo promedio (s) | "
+        "Tokens entrada | Tokens salida | Costo cobrado (USD) | Costo tarifa valle (USD) |",
+        "|---:|---:|---:|---:|---:|---:|---:|---:|",
+        f"| {len(resultados)} | {resumen.errores} | {tiempo_total:.1f} | "
+        f"{resumen.tiempo_promedio:.2f} | {resumen.entrada_total:,} | "
+        f"{resumen.salida_total:,} | {cobrado:.4f} | "
+        f"{resumen.costo_usd_total:.4f} |",
+        "",
+        "El costo cobrado es el que registro el servicio en cada turno, con la previa; el "
+        "de tarifa valle se recalcula con `arqueo.metricas.resumen_uso`, igual que el "
+        "costo historico de v1, para comparar las dos versiones con la misma regla.",
+        "",
+    ]
+
+
+def _tabla_preguntas(
+    resultados: Sequence[ResultadoEvaluacion],
+    por_id: Mapping[int, PreguntaFase2],
+) -> list[str]:
+    """Tabla por pregunta con tipo, rutas, clasificacion y fuente."""
+    lineas = [
+        "## Tabla",
+        "",
+        "| # | Tipo | Pregunta | Previa | Ruta esperada | Ruta obtenida | "
+        "Reformulada | Clasificacion | Terminos | Fuente | s |",
+        "|---:|---|---|---|---|---|---|---|---|---:|---:|",
+    ]
+    for resultado in resultados:
+        pregunta = por_id.get(resultado.id)
+        esperada = pregunta.ruta_esperada if pregunta is not None else ""
+        previa = pregunta.previa if pregunta is not None else ""
+        obtenida = str(resultado.metricas.get("turno", "")) or "-"
+        reformulada = str(resultado.metricas.get("reformulada") or "")
+        terminos = (
+            f"{resultado.terminos_encontrados}/{resultado.terminos_esperados}"
+            if resultado.terminos_esperados
+            else "-"
+        )
+        etiqueta = ETIQUETAS.get(resultado.clasificacion, resultado.clasificacion)
+        lineas.append(
+            f"| {resultado.id} | {_tipo_de(resultado, por_id) or '-'} | "
+            f"{_celda(resultado.pregunta)} | {_celda(previa, 40) or '-'} | "
+            f"{esperada or '-'} | {obtenida} | {_celda(reformulada, 40) or '-'} | "
+            f"{etiqueta} | {terminos} | {_celda(resultado.fuente) or '-'} | "
+            f"{resultado.segundos:.1f} |"
+        )
+    return [*lineas, ""]
+
+
+def _respuestas(
+    resultados: Sequence[ResultadoEvaluacion],
+    por_id: Mapping[int, PreguntaFase2],
+) -> list[str]:
+    """Seccion de respuestas completas, con la previa y la ruta de cada turno."""
+    lineas = ["## Respuestas", ""]
+    for resultado in resultados:
+        pregunta = por_id.get(resultado.id)
+        lineas.append(f"### {resultado.id}. {resultado.pregunta}")
+        lineas.append("")
+        if pregunta is not None and pregunta.previa:
+            lineas.append(f"Previa: {pregunta.previa}")
+            lineas.append("")
+        ruta = str(resultado.metricas.get("turno", "")) or "-"
+        esperada = pregunta.ruta_esperada if pregunta is not None else "-"
+        etiqueta = ETIQUETAS.get(resultado.clasificacion, resultado.clasificacion)
+        lineas.append(
+            f"Tipo: **{_tipo_de(resultado, por_id) or 'n/d'}** · Ruta: **{ruta}** "
+            f"(esperada {esperada}) · Clasificacion: **{etiqueta}** · "
+            f"{resultado.segundos:.1f} s"
+        )
+        lineas.append("")
+        if resultado.error:
+            lineas.append(f"> Error: {_celda(resultado.error, 300)}")
+        else:
+            for linea in resultado.respuesta.strip().splitlines() or [""]:
+                lineas.append(f"> {linea}".rstrip())
+        lineas.append("")
+    return lineas

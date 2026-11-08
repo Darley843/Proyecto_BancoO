@@ -364,9 +364,16 @@ propuesta pendiente de confirmar.
 ```bash
 make evaluar SOLO=4,17        # repite solo esas preguntas y conserva las demás filas
 make evaluar REVALIDAR=1      # sin API: revalida las respuestas guardadas y aplica la revisión
+make evaluar VERSION=v2       # fase 2: 44 preguntas con el grafo -> docs/RESULTADOS_FASE2.md
 ```
 
-Resultados vigentes y respuestas completas:
+La evaluación `VERSION=v2` responde con el grafo de la Sucursal (Bóveda, Tablero y
+memoria por `thread_id`) en lugar del contexto completo, envía la pregunta previa
+de cada seguimiento en el mismo hilo y escribe
+`data/evaluacion/resultados_v2.jsonl` y
+[`docs/RESULTADOS_FASE2.md`](./docs/RESULTADOS_FASE2.md) sin tocar los archivos de v1.
+
+Resultados vigentes y respuestas completas de v1:
 [`docs/RESULTADOS_20_PREGUNTAS.md`](./docs/RESULTADOS_20_PREGUNTAS.md).
 
 ## Estructura del repositorio

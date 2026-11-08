@@ -4,7 +4,7 @@ Reporte reproducible de recuperacion, evaluacion y costo de la fase 2. Se genera
 
 ## Ficha de corrida
 
-- Commit: `1652b9e`.
+- Commit: `fd40808`.
 - Alcance del indice: `base`.
 - Indice con prefijos: `data/boveda/indice.json` con modelo `nomic-embed-text-v2-moe`, prefijos si, 869 fragmentos y dimension 768.
 - Indice sin prefijos: `data/boveda/experimentos/sin_prefijos/indice.json` con 869 fragmentos y dimension 768.
@@ -146,22 +146,44 @@ Posicion 1 a 5 de la primera URL esperada en el top 5; `—` significa que no ap
 | Version | Aciertos | Total | Exactitud | Citas correctas | Revisadas |
 |---|---:|---:|---:|---:|---:|
 | v1 | 16 | 20 | 0.8000 | 0.9444 | 20 |
-| v2 | — | — | — | — | — |
+| v2 | 11 | 20 | 0.5500 | 0.5556 | 20 |
 
 ## McNemar v1 frente a v2 (20 preguntas de alcance)
 
-Pendiente: no existe `config/evaluacion/revision_humana_v2.toml` con veredictos, asi que los 20 pares quedan excluidos y no se declara mejora. Cuando exista la revision v2, `make arqueo` la incorpora sin tocar codigo.
+| b | c | n | p exacta | p minimo | Excluidos |
+|---:|---:|---:|---:|---:|---:|
+| 5 | 0 | 5 | 0.062500 | 0.062500 | 0 |
+
+v1 acierta 16 de 20 y v2 acierta 11 de 20. De los 5 pares discordantes, b=5 son pares donde v1 acierta y v2 falla, y c=0 son pares donde v2 acierta y v1 falla; la direccion favorece a v1. El p exacto (0.062500) no llega al umbral de 0.05. Con 5 pares discordantes, el p minimo posible es 2·(1/2)^5 = 0.062500, que ya es >= 0.05: ningun reparto de esos pares podria ser significativo.
+
+## Sensibilidad de la revision humana
+
+Escenario alterno con la nota de **Nayla Ledesma**. No cambia el veredicto principal ni la segunda firma.
+
+| # | Veredicto principal | Veredicto de sensibilidad | Nota |
+|---:|---|---|---|
+| 2 | incorrecta | rechazo_correcto | El corpus solo cita la Carrera 3 No. 8-13 de Cali como lugar de la asamblea de accionistas; no dice que sea una oficina, asi que no encontrar el dato es un rechazo correcto. |
+
+| Escenario | Aciertos v2 | Exactitud v2 | b | c | n | p exacta | p minimo |
+|---|---:|---:|---:|---:|---:|---:|---:|
+| Principal | 11 | 0.5500 | 5 | 0 | 5 | 0.062500 | 0.062500 |
+| Sensibilidad | 12 | 0.6000 | 5 | 1 | 6 | 0.218750 | 0.031250 |
+
+v1 acierta 16 de 20 y v2 acierta 12 de 20. De los 6 pares discordantes, b=5 son pares donde v1 acierta y v2 falla, y c=1 son pares donde v2 acierta y v1 falla; la direccion favorece a v1. El p exacto (0.218750) no llega al umbral de 0.05. Con 6 pares discordantes, el p minimo posible es 2·(1/2)^6 = 0.031250, aunque el p observado no llega al umbral de 0.05.
 
 ## Costo y uso
 
 | Concepto | Valor |
 |---|---:|
 | Costo del Arqueo (DeepSeek) | 0.000000 |
-| Costo historico de v1 | 0.027624 |
-| Costo historico de v2 | pendiente |
+| Costo historico de v1 (20 de alcance) | 0.027624 |
+| Costo historico de v2 (44 preguntas, cota inferior) | 0.015728 |
+| Costo de v2 en las 20 de alcance (cota inferior) | 0.011873 |
+| Ahorro maximo en las 20 de alcance | hasta 57.0 % menos |
+| Preguntas de alcance con clasificador en v2 | 15 de 20 |
 | Preguntas del banco | 44 |
 
-El Arqueo no llama a DeepSeek: su costo es cero. `v1_usd` y `v2_usd` son el costo historico de las evaluaciones, calculado con las tarifas de `arqueo/metricas.py`.
+El Arqueo no llama a DeepSeek: su costo es cero. `v1_alcance_usd`, `v2_usd` y `v2_alcance_usd` son el costo historico de las evaluaciones, calculado con las tarifas de `arqueo/metricas.py`. Las dos cifras de v2 son cotas inferiores: cuentan el turno de respuesta, pero no el clasificador de dudas (se uso en 15 de las 20 preguntas de alcance) ni la reformulacion (#93). v1 no usa clasificador, asi que el ahorro en alcance se lee como hasta 57.0 % menos; la cifra de v2 en alcance es una cota inferior, no una medicion cerrada.
 
 ## Verificacion local contra el anexo A
 
@@ -176,14 +198,13 @@ Diferencias por normalizacion de URL y por deduplicacion de texto se reportan co
 
 ## Limites
 
-- revision_humana_v2.toml no existe o no tiene revisiones: el McNemar v1 vs v2 queda pendiente y se excluyen los 20 pares.
-- resultados_v2.jsonl no existe: la evaluacion v2 queda pendiente (tarea 22.3).
+- El costo de v2 en las 20 preguntas de alcance es una cota inferior: suma el turno de respuesta, pero no el clasificador de dudas (se uso en 15 de las 20 preguntas de alcance) ni la reformulacion (#93). El total de 44 tambien es una cota inferior. Por eso el ahorro frente a v1, que no usa clasificador, se lee como hasta 57.0 % menos, no como una cifra cerrada.
 - El indice sin prefijos se reutiliza si coinciden modelo, alcance, numero de fragmentos y huella del contenido; si no, se reconstruye.
 - El acierto se mide por URL, no por fragmento: una pregunta cuenta como acierto si aparece la pagina esperada aunque el fragmento con el dato no este en el top 5 (por ejemplo, la pregunta 7 y el fragmento de la fundacion en 1965).
 - El set no nombra el banco en sus preguntas. La prueba de robustez del #85 (indice de 893 fragmentos) mostro que agregar la marca a la consulta baja el hit@5 de 0.75 a 0.53 (McNemar p de 0.02).
 - `hit_at_5` y `mrr` comparan las URL exactamente. El script del anexo A normalizaba minusculas y barra final; el JSON informa en `avisos` si esa regla cambia algun resultado.
 - `EnsembleRetriever` deduplica por `page_content`. Si dos fragmentos comparten texto, `1/0` puede devolver menos de cinco resultados que una busqueda vectorial directa; la diferencia se cuenta, no se corrige en el recuperador.
-- `citas_correctas` de v1 usa el campo `fuente` de `resultados.jsonl`, que registra una sola URL por respuesta.
+- `citas_correctas` no se compara entre versiones: v1 usa el campo `fuente` de `resultados.jsonl`, que registra una sola URL por respuesta, y v2 usa la lista `metricas["fuentes"]` con todas las URL citadas.
 - El barrido tiene en la practica dos estados. `EnsembleRetriever` fusiona por rangos reciprocos (peso / (posicion + 60)): con esa constante el orden depende sobre todo de que peso supera 0.5, no de su valor exacto. Dentro de cada lado (peso vectorial menor o mayor que 0.5) el hit@5 casi no cambia; lo que cambia es el orden dentro del top 5, que se ve en el MRR.
 - Los seguimientos se buscan uniendo `previa` y `pregunta`, como `medir_recuperacion.py`. En produccion la Sucursal reformula con el nodo `reformular` del grafo, asi que su cifra real puede ser distinta.
 - Las preguntas de ruta T responden desde el Tablero: su hit@5 no mide la Boveda y se reporta con y sin ellas.
