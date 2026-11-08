@@ -524,6 +524,11 @@ reemplazarlas:
   alcanzable con `n` pares discordantes) y `alfa` (0.05). El Markdown explica
   si ese mínimo ya supera `alfa` y, por tanto, si ningún reparto de los pares
   discordantes podría ser significativo.
+- `mcnemar` y `sensibilidad.mcnemar` agregan `lectura`: la frase explicativa
+  que también imprime `docs/ARQUEO.md`, calculada una sola vez por
+  `_frase_mcnemar`. La vista Arqueo la muestra tal cual y no la recalcula; si
+  falta (reporte anterior a esta clave), muestra «—». `mcnemar_pesos` no la
+  lleva porque su comparación se explica con el texto fijo de la vista.
 
 Sin fecha ni rutas absolutas: el archivo es determinista para los mismos datos y revisiones.
 
