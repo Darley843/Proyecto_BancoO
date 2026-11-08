@@ -248,6 +248,31 @@ def test_ventanilla_detecta_voz_y_microfono() -> None:
     assert "return null" in codigo
 
 
+def test_ventanilla_detiene_el_dictado() -> None:
+    """El dictado se cierra solo y el botón vuelve a «Dictar» en cada salida."""
+    codigo = leer_ventanilla()
+    iniciar = bloque_funcion_ventanilla("iniciarDictado")
+    detener = bloque_funcion_ventanilla("detenerDictado")
+    nueva = bloque_funcion_ventanilla("nuevaConversacion")
+
+    desde_resultado = iniciar.split("instancia.onresult", 1)[1]
+    resultado = desde_resultado.split("instancia.onerror", 1)[0]
+    error = desde_resultado.split("instancia.onerror", 1)[1].split("instancia.onend", 1)[0]
+    fin = desde_resultado.split("instancia.onend", 1)[1].split("instancia.start()", 1)[0]
+
+    assert "detenerDictado();" in iniciar.split("try {", 1)[0]
+    assert "detenerDictado();" in resultado
+    assert "detenerDictado();" in error
+    assert "detenerDictado();" in fin
+    assert "permite el micrófono" in error
+    assert 'botonDictadoActual.textContent = "Dictar"' in detener
+    assert 'setAttribute("aria-pressed", "false")' in detener
+    assert "detenerDictado();" in nueva
+    assert 'addEventListener("hashchange", alSalirDeLaVista)' in codigo
+    assert 'addEventListener("pagehide", alSalirDeLaVista)' in codigo
+    assert 'addEventListener("visibilitychange", alSalirDeLaVista)' in codigo
+
+
 def test_ventanilla_estilos_usan_variables() -> None:
     """El bloque de la Ventanilla usa variables y prefija sus selectores."""
     bloque = bloque_ventanilla()
