@@ -65,7 +65,7 @@ oferta, presencia digital y datos duros.
 | **Fase 1** | Captura del sitio (Bronze), limpieza (Silver) y corpus Gold con metadatos | ✅ |
 | **Fase 2** | Cobertura del checklist y reporte `_INDICE.md` | ✅ |
 | **Fase 3** | Documentos (PDF), YouTube (subtítulos) y noticias (hechos oficiales + prensa curada) como fuentes complementarias | 🚧 |
-| **Fase 4** | Chunking + embeddings y consumo desde el RAG del Módulo 2 | 🚧 |
+| **Fase 4** | Chunking + embeddings, Bóveda, recuperación híbrida, Tablero, grafo y API local | ✅ |
 
 **Dentro del alcance:** páginas HTML públicas del dominio, `robots.txt`,
 `sitemap.xml` (índice de índices de Liferay), noticias, blog, información
@@ -193,7 +193,12 @@ ProyectoAvance1/
 │   ├── tablero/          # TABLERO: tarifario y tablas de Gold → CSV
 │   │   ├── tarifas.py    # líneas «concepto, valor y fecha» del tarifario
 │   │   ├── tablas_web.py # lector de tablas Markdown y adaptadores
-│   │   └── construir.py  # une fuentes, escribe el CSV y cruza las 8 preguntas
+│   │   └── construir.py  # une fuentes, escribe el CSV y cruza las 12 preguntas
+│   ├── arqueo/           # ARQUEO: experimentos, métricas, costo e informe
+│   │   ├── metricas.py   # hit@5, MRR, exactitud, McNemar y tarifas
+│   │   ├── experimentos.py # barrido de pesos y evaluación v2
+│   │   ├── informe.py    # arqueo.json y ARQUEO.md
+│   │   └── cache_embeddings.py # caché de embeddings para las corridas
 │   ├── sucursal/         # SUCURSAL: digiturno, grafo y API de la fase 2
 │   │   ├── tipos.py      # Turno y letras B/T/X
 │   │   ├── digiturno.py  # reglas de enrutamiento y clasificación de dudas
@@ -207,14 +212,15 @@ ProyectoAvance1/
 ├── test/                 # pytest + fixtures (sin red)
 ├── config/site.toml      # alcance, cortesía, filtros y secciones
 ├── config/contexto.toml  # secciones, prioridad y presupuesto del contexto
-├── config/prompts/       # prompts versionados (qa_v0.md, qa_v1.md, faq_v1.md, resumen_v1.md)
+├── config/prompts/       # prompts versionados (qa_v0.md, qa_v1.md, qa_v2.md, faq_v1.md, resumen_v1.md)
 ├── config/sucursal.toml  # embeddings locales, prefijos y recuperación de la fase 2
 ├── data/
 │   ├── raw/              # Bronze (ignorado por Git)
 │   ├── processed/        # Silver (ignorado por Git)
 │   ├── gold/             # Gold (VERSIONADO) → páginas, documentos y videos
 │   ├── contexto/         # Contexto (VERSIONADO) → prompt del asistente + manifest
-│   └── knowledge/        # Knowledge (VERSIONADO) → entidades, hechos, relaciones
+│   ├── knowledge/        # Knowledge (VERSIONADO) → entidades, hechos, relaciones
+│   └── evaluacion/       # EVALUACIÓN (VERSIONADO) → resultados v2 y arqueo.json
 ├── data/boveda/          # BÓVEDA (ignorado) → Chroma, fragmentos e indice.json
 ├── data/estructurados/   # TABLERO (VERSIONADO) → tablero.csv
 ├── scripts/
@@ -679,13 +685,20 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 - [x] Makefile portable y diagnóstico de red.
 - [x] Skill `semantic-extraction`, esquema JSON y validador de evidencia.
 - [x] Documentos PDF (balances e informes) y videos con subtítulos.
-- [ ] Poblar Knowledge para todas las secciones (semilla actual: identidad).
+- [ ] Poblar Knowledge para todas las secciones (semilla actual: 2 entidades,
+  6 hechos y 1 relación; 7 registros siguen en `review: pending`).
 - [ ] Re-capturar Bronze para poder regenerar desde cero las 181 páginas web del
   sitio (hoy Bronze conserva 1 HTML y Silver está vacío).
 - [ ] Procesar los 622 PDFs históricos restantes (hoy se captura 2022–2026).
 - [ ] Transcripciones de YouTube de todo el canal (hoy, las más recientes).
 - [x] Chunking por encabezados (`chunks_web.jsonl` versionado).
-- [ ] Embeddings y base vectorial para el Módulo 2 (propuesta en `docs/MODELADO.md`).
+- [x] Embeddings y base vectorial del Módulo 2: Bóveda con Ollama, Chroma,
+  recuperación híbrida y mapa (ver §3, §11 y `docs/MODELADO.md`).
+- [ ] Revisión humana de la evidencia de las 24 casillas del checklist: la
+  cobertura 24/24 de `_INDICE.md` es heurística y varias citas son falsos
+  positivos.
+- [ ] Informe consolidado del proyecto y guion de la demo de 15 minutos
+  (brechas P0 de `docs/AUDITORIA-MODULO-1.md`).
 - [x] Protección de `main` (2026-10-29): repositorio público y ruleset
   «Proteger-main» activo, sin excepciones: PR con 1 aprobación (de alguien
   distinto a quien hizo el último push), comentarios resueltos, CI

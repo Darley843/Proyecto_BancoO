@@ -110,7 +110,7 @@ ensayo de la demo, la proyección sube a ~93/100 sin tocar el pipeline.
 
 - [ ] **Cerrar la decisión del modelo.** Pasar de "pendiente confirmar con el profesor" a "se eligió DeepSeek Flash por X, Y, Z" con comparación frente a Ollama y OpenAI/Gemini (costo, privacidad, latencia, calidad en español).
 - [ ] **Ampliar o encuadrar la capa Knowledge.** Con 2 entidades y 6 hechos se lee como prototipo. Ampliarla a ~15–20 entidades y ~30 hechos (contacto, líneas, productos, sedes, directivos, filiales) o declarar en el informe que la base semántica del Módulo 1 es Gold + contexto consolidado.
-- [ ] **Actualizar cifras obsoletas en la documentación.** `MODELADO.md` dice 14 490 chunks, el archivo real tiene 14 279. El contexto es 166 647 tokens (no 167 057). Un revisor que cuente encontrará la diferencia.
+- [x] **Actualizar cifras obsoletas en la documentación.** `MODELADO.md` ya dice 14 279 chunks y 166 647 tokens del contexto, y el conteo de fragmentos coincide con `data/boveda/fragmentos_base.jsonl`.
 - [ ] **Regenerar el entregable.** `dist/corpus-gold-2026-10-23.zip` es anterior al contexto de noticias y al de hoy: correr `make deliver` antes de subir.
 - [ ] **Justificar la exclusión de redes sociales** con la política de redes que ya está en Gold (`/legal-politicas/redes-sociales`) y, si se puede, curar 3–5 publicaciones públicas a mano.
 

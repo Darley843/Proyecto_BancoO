@@ -4,10 +4,10 @@ Reporte reproducible de recuperacion, evaluacion y costo de la fase 2. Se genera
 
 ## Ficha de corrida
 
-- Commit: `d91b870`.
+- Commit: `3295903`.
 - Alcance del indice: `base`.
-- Indice con prefijos: `data/boveda/indice.json` con modelo `nomic-embed-text-v2-moe`, prefijos si, 869 fragmentos y dimension 768.
-- Indice sin prefijos: `data/boveda/experimentos/sin_prefijos/indice.json` con 869 fragmentos y dimension 768.
+- Indice con prefijos: `data/boveda/indice.json` con modelo `nomic-embed-text-v2-moe`, prefijos si, 874 fragmentos y dimension 768.
+- Indice sin prefijos: `data/boveda/experimentos/sin_prefijos/indice.json` con 874 fragmentos y dimension 768.
 - Configuracion: `k=5`, pesos por defecto `0.6/0.4`, confianza `0.95` para los intervalos de Wilson.
 - Preguntas: 44 (alcance 20, tabla 12, seguimiento 6, fuera 6); 36 con fuente; 22 evaluables de la Boveda (ruta B) y 14 del Tablero (ruta T).
 
