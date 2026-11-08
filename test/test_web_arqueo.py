@@ -153,6 +153,15 @@ def test_vista_marca_pendiente_los_bloques_nulos() -> None:
     assert "valorOPendiente" in codigo
 
 
+def test_vista_explica_que_el_costo_de_v2_es_una_cota_historica() -> None:
+    """La nota de costo dice que las cifras de v2 se midieron antes del #93."""
+    bloque = bloque_funcion("crearCosto")
+
+    assert "antes del arreglo del #93" in bloque
+    assert "cota inferior histórica" in bloque
+    assert "tres llamadas del turno" in bloque
+
+
 def test_vista_formatea_en_es_co_y_usa_tablas_accesibles() -> None:
     """Las cifras usan es-CO y cada tabla tiene caption y encabezados con scope."""
     codigo = leer_vista()

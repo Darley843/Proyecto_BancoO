@@ -6,11 +6,11 @@ claves nuevas (``uso``, ``mcnemar_pesos``, ``detalle``, ``conteos``, ``avisos``,
 ``p_minimo`` y ``alfa``. El McNemar v1 frente a v2 y el de ``sensibilidad``
 agregan ``lectura``: la frase explicativa que tambien usa el Markdown, para que
 la web y ``docs/ARQUEO.md`` digan exactamente lo mismo. El costo de v2, tanto el
-total como el de las 20 preguntas de alcance, es una cota inferior: cuenta el
-turno de respuesta pero no
-el clasificador de dudas ni la reformulacion (#93); el numero de preguntas que
-usaron el clasificador sale del motivo registrado en `resultados_v2.jsonl`, no
-de una constante.
+total como el de las 20 preguntas de alcance, es una cota inferior historica: se
+midio antes del arreglo del #93, cuando el turno solo contaba la respuesta y no
+el clasificador de dudas ni la reformulacion; el numero de preguntas que usaron
+el clasificador sale del motivo registrado en `resultados_v2.jsonl`, no de una
+constante.
 ``citas_correctas`` de v1 usa ``resultado.fuente`` y la de v2 usa
 ``metricas["fuentes"]``, asi que no se comparan entre versiones.
 
@@ -1093,11 +1093,13 @@ def render_markdown(arqueo: Mapping[str, Any], ficha: FichaCorrida) -> str:
         "",
         "El Arqueo no llama a DeepSeek: su costo es cero. `v1_alcance_usd`, `v2_usd` y "
         "`v2_alcance_usd` son el costo historico de las evaluaciones, calculado con las "
-        "tarifas de `arqueo/metricas.py`. Las dos cifras de v2 son cotas inferiores: "
-        "cuentan el turno de respuesta, pero no el clasificador de dudas "
-        f"({_clasificador_frase(costo)}) ni la reformulacion (#93). v1 no usa "
-        f"clasificador, asi que el ahorro en alcance se lee como {_ahorro_texto(costo)}; "
-        "la cifra de v2 en alcance es una cota inferior, no una medicion cerrada.",
+        "tarifas de `arqueo/metricas.py`. Las dos cifras de v2 son cotas inferiores: se "
+        "midieron antes del arreglo del #93 y no incluian el clasificador de dudas "
+        f"({_clasificador_frase(costo)}) ni la reformulacion. Una corrida nueva ya suma "
+        "las tres llamadas del turno, pero los numeros publicados no se re-midieron y "
+        "siguen siendo cotas inferiores historicas. v1 no usa clasificador, asi que el "
+        f"ahorro en alcance se lee como {_ahorro_texto(costo)}; la cifra de v2 en alcance "
+        "es una cota inferior, no una medicion cerrada.",
         "",
         "## Verificacion local contra el anexo A",
         "",
@@ -1130,11 +1132,13 @@ def render_markdown(arqueo: Mapping[str, Any], ficha: FichaCorrida) -> str:
     for aviso in arqueo["avisos"]:
         lineas.append(f"- {aviso}")
     lineas += [
-        "- El costo de v2 en las 20 preguntas de alcance es una cota inferior: suma el "
-        "turno de respuesta, pero no el clasificador de dudas "
-        f"({_clasificador_frase(costo)}) ni la reformulacion (#93). El total de 44 "
-        "tambien es una cota inferior. Por eso el ahorro frente a v1, que no usa "
-        f"clasificador, se lee como {_ahorro_texto(costo)}, no como una cifra cerrada.",
+        "- El costo de v2 en las 20 preguntas de alcance es una cota inferior historica: "
+        "se midio antes del arreglo del #93, sin el clasificador de dudas "
+        f"({_clasificador_frase(costo)}) ni la reformulacion. El total de 44 tambien es "
+        "una cota inferior historica. Una corrida nueva ya suma las tres llamadas del "
+        "turno; los numeros publicados no se re-midieron. Por eso el ahorro frente a v1, "
+        "que no usa clasificador, se lee como "
+        f"{_ahorro_texto(costo)}, no como una cifra cerrada.",
         "- El indice sin prefijos se reutiliza si coinciden modelo, alcance, numero "
         "de fragmentos y huella del contenido; si no, se reconstruye.",
         "- El acierto se mide por URL, no por fragmento: una pregunta cuenta como "

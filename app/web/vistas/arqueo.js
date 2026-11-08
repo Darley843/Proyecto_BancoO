@@ -531,7 +531,7 @@ function crearCosto(datos) {
       ),
       crearTexto(
         "p",
-        "El Arqueo no llama a DeepSeek: su costo es cero. Las cifras de v2 son cotas inferiores porque no incluyen el clasificador de dudas ni la reformulación.",
+        "El Arqueo no llama a DeepSeek: su costo es cero. Las cifras de v2 son una cota inferior histórica: se midieron antes del arreglo del #93 y no incluían el clasificador de dudas ni la reformulación. Una corrida nueva ya suma las tres llamadas del turno.",
         "arqueo__pista",
       ),
     );
