@@ -4,11 +4,14 @@ from __future__ import annotations
 
 import tomllib
 from pathlib import Path
+from typing import Any
 
 import pytest
 from langchain_core.language_models.fake_chat_models import FakeListChatModel
+from langchain_core.messages import AIMessage, BaseMessage
 
 from banco_occidente_corpus.asistente import modelo as modulo_modelo
+from banco_occidente_corpus.asistente.metricas import leer_uso
 from banco_occidente_corpus.sucursal.digiturno import (
     INSTRUCCION_DUDA,
     MAX_TOKENS_CLASIFICADOR,
@@ -31,6 +34,29 @@ PREGUNTAS_DE_PRODUCTO: tuple[str, ...] = (
     "¿Qué tarjeta me recomiendas para viajar?",
     "¿Qué bancos forman el Grupo Aval junto al Banco de Bogotá?",
 )
+
+
+class ModeloConUso:
+    """Modelo falso que devuelve un contenido fijo con uso y registra opciones."""
+
+    def __init__(self, contenido: str, *, entrada: int = 80, salida: int = 20) -> None:
+        """Guarda la salida y el uso de la única llamada."""
+        self._contenido = contenido
+        self._entrada = entrada
+        self._salida = salida
+        self.opciones: list[dict[str, Any]] = []
+
+    def invoke(self, mensajes: list[BaseMessage], **opciones: Any) -> AIMessage:
+        """Registra las opciones y devuelve el contenido con su uso."""
+        self.opciones.append(dict(opciones))
+        return AIMessage(
+            content=self._contenido,
+            usage_metadata={
+                "input_tokens": self._entrada,
+                "output_tokens": self._salida,
+                "total_tokens": self._entrada + self._salida,
+            },
+        )
 
 
 def config(tmp_path: Path, contenido: str) -> Path:
@@ -275,6 +301,57 @@ def test_modelo_que_falla_cae_en_b() -> None:
     )
 
     assert turno.letra == "B"
+
+
+def test_clasificador_reporta_su_uso() -> None:
+    """El clasificador entrega el uso de su llamada y respeta el tope de 512."""
+    modelo = ModeloConUso('{"letra": "B", "motivo": "requisitos"}')
+    registros: list[dict[str, Any]] = []
+
+    turno = clasificar(
+        "¿qué necesito para un crédito?",
+        clasificador=clasificador_deepseek(modelo),
+        registrar_uso=registros.append,
+    )
+
+    assert (turno.letra, turno.motivo) == ("B", "requisitos")
+    assert leer_uso(registros[0]).entrada == 80
+    assert leer_uso(registros[0]).salida == 20
+    assert modelo.opciones[0]["max_tokens"] == MAX_TOKENS_CLASIFICADOR
+
+
+def test_clasificador_reporta_uso_aunque_el_json_sea_invalido() -> None:
+    """Un JSON roto también consumió tokens y debe contarse."""
+    modelo = ModeloConUso("esto no es json")
+    registros: list[dict[str, Any]] = []
+
+    turno = clasificar(
+        "¿qué necesito para un crédito?",
+        clasificador=clasificador_deepseek(modelo),
+        registrar_uso=registros.append,
+    )
+
+    assert turno.letra == "B"
+    assert len(registros) == 1
+    assert leer_uso(registros[0]).entrada == 80
+
+
+def test_regla_que_evita_el_clasificador_no_reporta_uso() -> None:
+    """Si las reglas resuelven el turno, no hay llamada ni uso que registrar."""
+    registros: list[dict[str, Any]] = []
+
+    def clasificador_no_llamado(pregunta: str, registrar_uso: Any = None) -> Clasificacion | None:
+        """Falla si el digiturno intenta clasificar una pregunta de tarifas."""
+        raise AssertionError("no debía clasificar")
+
+    turno = clasificar(
+        "¿cuánto es la cuota de manejo?",
+        clasificador=clasificador_no_llamado,
+        registrar_uso=registros.append,
+    )
+
+    assert turno.letra == "T"
+    assert registros == []
 
 
 def test_contador_entrega_consecutivos() -> None:

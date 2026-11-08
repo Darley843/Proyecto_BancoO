@@ -27,7 +27,11 @@ from banco_occidente_corpus.config import Config, Paths
 from banco_occidente_corpus.sucursal.ajustes import ConfiguracionSucursal
 from banco_occidente_corpus.sucursal.api import PreguntarRespuesta
 from banco_occidente_corpus.sucursal.costo import CacheRespuestas, GastoDiario
-from banco_occidente_corpus.sucursal.digiturno import ContadorTurnos
+from banco_occidente_corpus.sucursal.digiturno import (
+    Clasificador,
+    ContadorTurnos,
+    clasificador_deepseek,
+)
 from banco_occidente_corpus.sucursal.grafo import (
     DependenciasGrafo,
     crear_grafo,
@@ -70,18 +74,36 @@ class RecuperadorFalso:
 class ModeloGuion:
     """Modelo falso que devuelve respuestas en orden y registra los mensajes."""
 
-    def __init__(self, respuestas: list[str]) -> None:
-        """Carga las respuestas que se devolverán una por llamada."""
+    def __init__(
+        self,
+        respuestas: list[str],
+        usos: list[dict[str, int]] | None = None,
+    ) -> None:
+        """Carga las respuestas y, si se dan, el uso de cada llamada."""
         self.respuestas = list(respuestas)
+        self.usos = list(usos) if usos is not None else None
         self.llamadas: list[list[BaseMessage]] = []
+        self.opciones: list[dict[str, Any]] = []
 
     def invoke(self, mensajes: list[BaseMessage], **opciones: Any) -> AIMessage:
-        """Registra la llamada y devuelve la siguiente respuesta con uso real."""
+        """Registra la llamada y devuelve la siguiente respuesta con su uso."""
         self.llamadas.append(list(mensajes))
-        return AIMessage(
-            content=self.respuestas.pop(0),
-            usage_metadata={"input_tokens": 120, "output_tokens": 40, "total_tokens": 160},
+        self.opciones.append(dict(opciones))
+        uso = (
+            self.usos.pop(0)
+            if self.usos is not None
+            else {"input_tokens": 120, "output_tokens": 40, "total_tokens": 160}
         )
+        return AIMessage(content=self.respuestas.pop(0), usage_metadata=uso)
+
+
+def uso_modelo(entrada: int, salida: int) -> dict[str, int]:
+    """Uso sintético de una llamada al modelo en el formato de `usage_metadata`."""
+    return {
+        "input_tokens": entrada,
+        "output_tokens": salida,
+        "total_tokens": entrada + salida,
+    }
 
 
 @dataclass
@@ -176,6 +198,7 @@ def preparar(
     modelo: ModeloGuion | None = None,
     fragmentos: list[Fragmento] | None = None,
     filas: list[Fila] | None = None,
+    clasificador: Clasificador | None = None,
 ) -> Escenario:
     """Crea la app con dobles, sin red, sobre un directorio temporal."""
     monkeypatch.setenv("SUCURSAL_TOPE_USD", "0.20")
@@ -205,6 +228,7 @@ def preparar(
         recuperador=RecuperadorFalso(fragmentos or []),
         filas=filas_escenario,
         modelo=modelo,
+        clasificador=clasificador,
         canal=canal(),
         contador=ContadorTurnos(),
     )
@@ -422,6 +446,64 @@ def test_gasto_solo_si_hubo_modelo(monkeypatch: pytest.MonkeyPatch, tmp_path: Pa
 
     preguntar(escenario.cliente, PREGUNTA_RECHAZO, "hilo-gasto-x")
     assert escenario.gasto.hoy()[0] == pytest.approx(gasto_boveda)
+
+
+def test_seguimiento_suma_reformulacion_y_redaccion(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """La reformulación y la redacción se cobran juntas en el turno."""
+    modelo = ModeloGuion(
+        [RESPUESTA_BOVEDA, "¿Cuánto cuesta abrir la cuenta?", RESPUESTA_BOVEDA],
+        usos=[uso_modelo(120, 40), uso_modelo(60, 10), uso_modelo(200, 50)],
+    )
+    escenario = preparar(monkeypatch, tmp_path, modelo=modelo, fragmentos=[fragmento()])
+
+    primera = preguntar(escenario.cliente, PREGUNTA_BOVEDA, "hilo-suma").json()
+    gasto_primera = escenario.gasto.hoy()[0]
+    segunda = preguntar(escenario.cliente, "¿Y cuánto cuesta?", "hilo-suma").json()
+
+    assert primera["costo_usd"] > 0
+    assert segunda["cache"] is False
+    assert segunda["reformulada"] == "¿Cuánto cuesta abrir la cuenta?"
+    assert segunda["tokens_entrada"] == 260
+    assert segunda["tokens_salida"] == 60
+    assert segunda["uso_modelo"] is True
+    assert segunda["costo_usd"] > 0
+    assert escenario.gasto.hoy()[0] == pytest.approx(gasto_primera + segunda["costo_usd"])
+    assert escenario.gasto.hoy()[1] == 3
+    assert escenario.gasto.hoy()[2] == 480
+    assert len(modelo.llamadas) == 3
+    assert modelo.opciones[1]["max_tokens"] == 512
+
+
+def test_clasificador_suma_su_uso(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """El clasificador de dudas y la redacción suman su uso en el comprobante."""
+    modelo = ModeloGuion(
+        ['{"letra": "B", "motivo": "requisitos"}', RESPUESTA_BOVEDA],
+        usos=[uso_modelo(80, 20), uso_modelo(120, 40)],
+    )
+    escenario = preparar(
+        monkeypatch,
+        tmp_path,
+        modelo=modelo,
+        fragmentos=[fragmento()],
+        clasificador=clasificador_deepseek(modelo),
+    )
+
+    cuerpo = preguntar(
+        escenario.cliente, "¿qué necesito para un crédito?", "hilo-clasificador"
+    ).json()
+
+    assert cuerpo["turno"] == "B"
+    assert cuerpo["uso_modelo"] is True
+    assert cuerpo["tokens_entrada"] == 200
+    assert cuerpo["tokens_salida"] == 60
+    assert cuerpo["costo_usd"] > 0
+    assert escenario.gasto.hoy()[0] == pytest.approx(cuerpo["costo_usd"])
+    assert escenario.gasto.hoy()[1] == 2
+    assert escenario.gasto.hoy()[2] == 260
+    assert len(modelo.llamadas) == 2
+    assert modelo.opciones[0]["max_tokens"] == 512
 
 
 def test_frase_fija_con_tokens_cobra_y_no_cachea(

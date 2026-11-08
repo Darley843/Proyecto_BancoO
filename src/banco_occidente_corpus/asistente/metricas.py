@@ -9,7 +9,7 @@ cache de DeepSeek a ``input_token_details.cache_read``.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
 from typing import Any
 
@@ -37,6 +37,38 @@ def extraer_metricas(respuesta: BaseMessage) -> dict[str, Any]:
     return {
         "uso": getattr(respuesta, "usage_metadata", None),
         "respuesta": getattr(respuesta, "response_metadata", None),
+    }
+
+
+def sumar_uso(usos: Iterable[Mapping[str, Any] | None]) -> dict[str, Any]:
+    """Suma varias respuestas del modelo en el formato de `extraer_metricas`.
+
+    Los `None` se ignoran. El caché de cada llamada se acota a su propia
+    entrada, igual que hace `sucursal.costo.costo_de_uso`, para que la suma no
+    descuente más tokens de los que el proveedor informó.
+
+    Args:
+        usos: métricas de cada llamada al modelo del turno.
+
+    Returns:
+        Un diccionario con la misma forma que `extraer_metricas`, con la entrada,
+        la salida y los aciertos de caché acumulados.
+    """
+    entrada = 0
+    salida = 0
+    cache = 0
+    for uso in usos:
+        detalle = leer_uso(uso)
+        entrada_llamada = detalle.entrada or 0
+        entrada += entrada_llamada
+        salida += detalle.salida or 0
+        cache += min(detalle.cache or 0, entrada_llamada)
+    return {
+        "uso": {
+            "input_tokens": entrada,
+            "output_tokens": salida,
+            "input_token_details": {"cache_read": cache},
+        }
     }
 
 

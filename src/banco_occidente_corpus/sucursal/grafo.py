@@ -29,6 +29,7 @@ from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
 
 from ..asistente.contexto_prompt import CanalOficial
+from ..asistente.metricas import extraer_metricas
 from ..asistente.prompts import Prompt, cargar_prompt
 from ..asistente.rag import ContextoRag
 from ..asistente.validacion import (
@@ -56,6 +57,10 @@ from .digiturno import (
 HISTORIAL_MAX_TOKENS = 1200
 #: Filas que la plantilla del Tablero puede listar sin volverse una tabla enorme.
 MAX_FILAS_TABLERO = 10
+#: Tope de tokens de la reformulación. Una pregunta autónoma es corta y el
+#: razonamiento de DeepSeek Flash cabe de sobra en 512, igual que en el
+#: clasificador; el tope de `qa` (2000) es para una respuesta completa con citas.
+MAX_TOKENS_REFORMULAR: int = 512
 #: Instrucción para convertir un seguimiento en pregunta autónoma.
 INSTRUCCION_REFORMULAR = (
     "Reescribe la última pregunta como una pregunta autónoma en español, usando "
@@ -103,6 +108,7 @@ class EstadoSucursal(TypedDict, total=False):
     respuesta: str
     fuentes: list[str]
     uso: dict[str, Any]
+    usos: list[dict[str, Any]]
     avisos: list[str]
 
 
@@ -244,6 +250,7 @@ def responder_turno(
             if dependencias.canal and dependencias.canal.url
             else [],
             "uso": {"uso_modelo": False},
+            "usos": [],
             "avisos": ["pii_bloqueada"],
             "messages": [],
         }
@@ -259,6 +266,7 @@ def responder_turno(
             "respuesta": "",
             "fuentes": [],
             "uso": {},
+            "usos": [],
             "avisos": [],
         },
         config={"configurable": {"thread_id": thread_id}},
@@ -304,12 +312,14 @@ def _nodo_reformular(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursa
             + previos
             + [HumanMessage(content=pregunta)]
         )
+        usos = list(estado.get("usos") or [])
         try:
-            salida = dependencias.modelo.invoke(mensajes)
+            salida = dependencias.modelo.invoke(mensajes, max_tokens=MAX_TOKENS_REFORMULAR)
             texto = texto_de_contenido(salida.content).strip()
         except Exception:
             return {"reformulada": pregunta}
-        return {"reformulada": texto or pregunta}
+        usos.append(extraer_metricas(salida))
+        return {"reformulada": texto or pregunta, "usos": usos}
 
     return reformular
 
@@ -319,14 +329,16 @@ def _nodo_digiturno(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal
 
     def digiturno(estado: EstadoSucursal) -> dict[str, Any]:
         consulta = estado.get("reformulada") or estado.get("pregunta", "")
+        usos = list(estado.get("usos") or [])
         turno = clasificar(
             consulta,
             configuracion=dependencias.configuracion_digiturno,
             permitidos=dependencias.permitidos,
             clasificador=dependencias.clasificador,
+            registrar_uso=usos.append,
             contador=dependencias.contador,
         )
-        return {"turno": asdict(turno)}
+        return {"turno": asdict(turno), "usos": usos}
 
     return digiturno
 
@@ -423,10 +435,14 @@ def _nodo_redactar(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal]
 
         uso = dict(respuesta.metricas)
         uso["uso_modelo"] = not respuesta.sin_datos
+        usos = list(estado.get("usos") or [])
+        if respuesta.metricas:
+            usos.append(respuesta.metricas)
         return {
             "respuesta": respuesta.texto,
             "fuentes": list(respuesta.fuentes),
             "uso": uso,
+            "usos": usos,
             "avisos": list(respuesta.avisos),
             "messages": [AIMessage(content=respuesta.texto)],
         }

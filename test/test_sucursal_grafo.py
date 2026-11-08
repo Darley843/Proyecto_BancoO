@@ -10,10 +10,12 @@ from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
 from langchain_core.messages.utils import count_tokens_approximately
 
 from banco_occidente_corpus.asistente.contexto_prompt import CanalOficial
+from banco_occidente_corpus.asistente.metricas import leer_uso
 from banco_occidente_corpus.asistente.validacion import respuesta_sin_datos
 from banco_occidente_corpus.boveda.tipos import Fragmento
-from banco_occidente_corpus.sucursal.digiturno import ContadorTurnos
+from banco_occidente_corpus.sucursal.digiturno import Clasificacion, ContadorTurnos
 from banco_occidente_corpus.sucursal.grafo import (
+    MAX_TOKENS_REFORMULAR,
     DependenciasGrafo,
     crear_grafo,
     es_seguimiento,
@@ -43,14 +45,32 @@ class RecuperadorFalso:
 class ModeloEspia:
     """Modelo falso que registra los mensajes y devuelve respuestas en orden."""
 
-    def __init__(self, respuestas: list[str]) -> None:
+    def __init__(
+        self,
+        respuestas: list[str],
+        usos: list[dict[str, Any] | None] | None = None,
+    ) -> None:
+        """Carga las respuestas y, si se dan, el uso de cada llamada."""
         self.respuestas = list(respuestas)
+        self.usos = list(usos) if usos is not None else None
         self.llamadas: list[list[BaseMessage]] = []
+        self.opciones: list[dict[str, Any]] = []
 
     def invoke(self, mensajes: list[BaseMessage], **opciones: Any) -> AIMessage:
-        """Registra la llamada y devuelve la siguiente respuesta."""
+        """Registra la llamada y devuelve la siguiente respuesta con su uso."""
         self.llamadas.append(list(mensajes))
-        return AIMessage(content=self.respuestas.pop(0))
+        self.opciones.append(dict(opciones))
+        uso = self.usos.pop(0) if self.usos is not None else None
+        return AIMessage(content=self.respuestas.pop(0), usage_metadata=uso)
+
+
+def uso_modelo(entrada: int, salida: int) -> dict[str, int]:
+    """Uso sintético de una llamada al modelo en el formato de `usage_metadata`."""
+    return {
+        "input_tokens": entrada,
+        "output_tokens": salida,
+        "total_tokens": entrada + salida,
+    }
 
 
 class ModeloRoto:
@@ -352,6 +372,62 @@ def test_seguimiento_reformula_con_el_historial(tmp_path: Path) -> None:
     # La reformulación lleva el historial recortado y la pregunta original.
     contenidos = [str(mensaje.content) for mensaje in modelo.llamadas[1]]
     assert any("¿Qué es la cuenta de ahorros?" in contenido for contenido in contenidos)
+
+
+def test_seguimiento_acumula_los_usos_del_turno(tmp_path: Path) -> None:
+    """La reformulación y la redacción dejan sus dos usos en el estado."""
+    modelo = ModeloEspia(
+        [
+            respuesta_valida(),
+            "¿Cuánto cuesta la cuenta de ahorros?",
+            respuesta_valida(),
+        ],
+        usos=[uso_modelo(120, 40), uso_modelo(60, 10), uso_modelo(200, 50)],
+    )
+    grafo, dependencias = deps(tmp_path, modelo=modelo, fragmentos=[fragmento()])
+
+    responder_turno(grafo, dependencias, "¿Qué es la cuenta de ahorros?", "t1")
+    estado = responder_turno(grafo, dependencias, "¿Y cuánto cuesta?", "t1")
+
+    assert [leer_uso(uso).entrada for uso in estado["usos"]] == [60, 200]
+    assert [leer_uso(uso).salida for uso in estado["usos"]] == [10, 50]
+    assert estado["uso"]["uso_modelo"] is True
+
+
+def test_reformulacion_limita_los_tokens(tmp_path: Path) -> None:
+    """La reformulación pide 512 tokens, no el tope de una respuesta completa."""
+    modelo = ModeloEspia([respuesta_valida(), "¿Cuánto cuesta la cuenta?", respuesta_valida()])
+    grafo, dependencias = deps(tmp_path, modelo=modelo, fragmentos=[fragmento()])
+
+    responder_turno(grafo, dependencias, "¿Qué es la cuenta de ahorros?", "t1")
+    responder_turno(grafo, dependencias, "¿Y cuánto cuesta?", "t1")
+
+    assert MAX_TOKENS_REFORMULAR == 512
+    assert modelo.opciones[1]["max_tokens"] == MAX_TOKENS_REFORMULAR
+
+
+def test_clasificador_suma_su_uso_en_el_estado(tmp_path: Path) -> None:
+    """El uso del clasificador viaja en `usos` aunque la redacción no use modelo."""
+
+    def clasificador(pregunta: str, registrar_uso: Any = None) -> Clasificacion | None:
+        """Registra el uso de la clasificación y manda la pregunta a la Bóveda."""
+        if registrar_uso is not None:
+            registrar_uso({"uso": uso_modelo(80, 20)})
+        return Clasificacion(letra="B", motivo="duda")
+
+    dependencias = DependenciasGrafo(
+        recuperador=RecuperadorFalso([]),
+        modelo=None,
+        clasificador=clasificador,
+        canal=canal(),
+        contador=ContadorTurnos(),
+    )
+    grafo = crear_grafo(dependencias, tmp_path / "memoria.sqlite")
+
+    estado = responder_turno(grafo, dependencias, "¿qué necesito para un crédito?", "t1")
+
+    assert estado["turno"]["letra"] == "B"
+    assert [leer_uso(uso).entrada for uso in estado["usos"]] == [80]
 
 
 def test_seguimiento_32_reformula_y_confirma_tablero(tmp_path: Path) -> None:
