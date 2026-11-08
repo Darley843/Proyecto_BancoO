@@ -16,6 +16,9 @@ from typing import Any, NamedTuple
 from ..asistente.metricas import leer_uso
 from ..texto import normalizar
 
+#: Nivel de significancia usado en el informe del Arqueo.
+ALFA: float = 0.05
+
 
 @dataclass(frozen=True, slots=True)
 class Tarifas:
@@ -302,6 +305,29 @@ def intervalo_wilson(
         0.0 if aciertos == 0 else max(0.0, centro - margen),
         1.0 if aciertos == evaluables else min(1.0, centro + margen),
     )
+
+
+def p_minimo_mcnemar(n: int) -> float:
+    """p minima de dos colas de la prueba exacta de McNemar con ``n`` pares.
+
+    El reparto mas extremo posible es ``b=0`` y ``c=n`` (o al reves), asi que
+    la p minima es ``2 * C(n, 0) / 2**n``. Sirve para saber si algun reparto
+    con ese numero de pares discordantes podria ser significativo.
+
+    Args:
+        n: numero de pares discordantes; no puede ser negativo.
+
+    Returns:
+        La p minima alcanzable; 1.0 si no hay pares discordantes.
+
+    Raises:
+        ValueError: si ``n`` es negativo.
+    """
+    if n < 0:
+        raise ValueError("n no puede ser negativo")
+    if n == 0:
+        return 1.0
+    return min(1.0, 2 * math.comb(n, 0) / (2**n))
 
 
 def mcnemar(

@@ -146,3 +146,14 @@ id = 20
 veredicto = "incorrecta"
 nota = "Dice que no encuentra; el corpus tiene 8 noticias (fallo conocido de la recuperacion)."
 revisor = "Anny Valencia"
+
+# Escenario de sensibilidad de la revision: no cambia el veredicto principal ni
+# la segunda firma. Sirve para medir cuanto cambian la exactitud y McNemar si se
+# aplica el criterio de la nota.
+[sensibilidad]
+revisor = "Nayla Ledesma"
+
+[[sensibilidad.cambio]]
+id = 2
+veredicto = "rechazo_correcto"
+nota = "El corpus solo cita la Carrera 3 No. 8-13 de Cali como lugar de la asamblea de accionistas; no dice que sea una oficina, asi que no encontrar el dato es un rechazo correcto."

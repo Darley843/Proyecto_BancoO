@@ -1,11 +1,20 @@
 """Informe del Arqueo: construye ``arqueo.json`` y ``docs/ARQUEO.md``.
 
 El JSON conserva las cinco claves del contrato de ``design.md`` y agrega solo
-claves nuevas (``uso``, ``mcnemar_pesos``, ``detalle``, ``conteos``, ``avisos``
-y ``referencia_anexo_a``). El Markdown se genera del mismo diccionario y con el
-mismo redondeo, para que las cifras coincidan y dos corridas identicas den los
-mismos bytes. Ninguna salida lleva fecha ni rutas absolutas. El modulo no llama
-a DeepSeek: como mucho usa Ollama para los embeddings locales.
+claves nuevas (``uso``, ``mcnemar_pesos``, ``detalle``, ``conteos``, ``avisos``,
+``referencia_anexo_a`` y ``sensibilidad``). Cada bloque de McNemar incluye
+``p_minimo`` y ``alfa``. El costo de v2, tanto el total como el de las 20
+preguntas de alcance, es una cota inferior: cuenta el turno de respuesta pero no
+el clasificador de dudas ni la reformulacion (#93); el numero de preguntas que
+usaron el clasificador sale del motivo registrado en `resultados_v2.jsonl`, no
+de una constante.
+``citas_correctas`` de v1 usa ``resultado.fuente`` y la de v2 usa
+``metricas["fuentes"]``, asi que no se comparan entre versiones.
+
+El Markdown se genera del mismo diccionario y con el mismo redondeo, para que
+las cifras coincidan y dos corridas identicas den los mismos bytes. Ninguna
+salida lleva fecha ni rutas absolutas. El modulo no llama a DeepSeek: como mucho
+usa Ollama para los embeddings locales.
 """
 
 from __future__ import annotations
@@ -20,6 +29,7 @@ from typing import Any
 from langchain_core.embeddings import Embeddings
 
 from ..asistente.evaluacion import (
+    VEREDICTOS,
     ResultadoEvaluacion,
     Revision,
     cargar_resultados,
@@ -56,10 +66,12 @@ from .experimentos import (
     vectorial_directo,
 )
 from .metricas import (
+    ALFA,
     ResultadoMcNemar,
     ResumenUso,
     citas_correctas,
     exactitud,
+    p_minimo_mcnemar,
     resumen_uso,
 )
 
@@ -121,6 +133,101 @@ def cargar_referencia_anexo_a(ruta: Path | None = None) -> dict[str, dict[str, f
             valores[metrica] = float(valor)
         referencia[nombre] = valores
     return referencia
+
+
+@dataclass(frozen=True, slots=True)
+class CambioSensibilidad:
+    """Cambio de veredicto de un escenario de sensibilidad."""
+
+    id: int
+    veredicto: str
+    nota: str = ""
+
+
+@dataclass(frozen=True, slots=True)
+class Sensibilidad:
+    """Escenario alterno de la revision humana.
+
+    No reemplaza el veredicto principal ni la segunda firma: solo se aplica al
+    bloque ``sensibilidad`` del reporte.
+    """
+
+    revisor: str
+    cambios: tuple[CambioSensibilidad, ...] = ()
+
+
+@dataclass(frozen=True, slots=True)
+class ConteoClasificador:
+    """Preguntas de alcance resueltas con clasificador y filas sin motivo."""
+
+    con_clasificador: int
+    sin_motivo: int
+
+
+def cargar_sensibilidad(ruta: Path | None = None) -> Sensibilidad | None:
+    """Carga la tabla ``[sensibilidad]`` de la revision humana v2.
+
+    El escenario se declara con ``[[sensibilidad.cambio]]``: cada fila trae
+    ``id``, ``veredicto`` y una ``nota`` corta. El veredicto principal y la
+    segunda firma del archivo no se modifican.
+
+    Args:
+        ruta: TOML alternativo; por defecto
+            ``config/evaluacion/revision_humana_v2.toml``.
+
+    Returns:
+        El escenario cargado, o ``None`` si el archivo o la tabla no existen.
+
+    Raises:
+        ValueError: si el TOML es invalido, falta el revisor, un cambio no
+            tiene id entero, repite un id o usa un veredicto desconocido.
+    """
+    archivo = ruta or ARCHIVO_REVISION_V2
+    if not archivo.exists():
+        return None
+    try:
+        datos: dict[str, Any] = tomllib.loads(archivo.read_text(encoding="utf-8"))
+    except tomllib.TOMLDecodeError as exc:
+        raise ValueError(f"TOML invalido en {archivo}: {exc}") from exc
+
+    bloque = datos.get("sensibilidad")
+    if not isinstance(bloque, dict):
+        return None
+    revisor = str(bloque.get("revisor", "")).strip()
+    if not revisor:
+        raise ValueError(f"{archivo}: [sensibilidad] sin revisor")
+    filas = bloque.get("cambio", [])
+    if not isinstance(filas, list):
+        raise ValueError(f"{archivo}: 'sensibilidad.cambio' debe ser una lista de tablas")
+
+    cambios: list[CambioSensibilidad] = []
+    vistos: set[int] = set()
+    for fila in filas:
+        if not isinstance(fila, dict):
+            raise ValueError(f"{archivo}: cada cambio de sensibilidad debe ser una tabla")
+        identificador = fila.get("id")
+        if not isinstance(identificador, int) or isinstance(identificador, bool):
+            raise ValueError(f"{archivo}: cambio de sensibilidad sin id entero")
+        if identificador in vistos:
+            raise ValueError(f"{archivo}: id {identificador} repetido en sensibilidad")
+        veredicto = str(fila.get("veredicto", "")).strip()
+        if veredicto not in VEREDICTOS:
+            raise ValueError(
+                f"{archivo}: sensibilidad {identificador} tiene veredicto "
+                f"'{veredicto}', que no es uno de {tuple(VEREDICTOS)}"
+            )
+        vistos.add(identificador)
+        cambios.append(
+            CambioSensibilidad(
+                id=identificador,
+                veredicto=veredicto,
+                nota=str(fila.get("nota", "")).strip(),
+            )
+        )
+    return Sensibilidad(
+        revisor=revisor,
+        cambios=tuple(sorted(cambios, key=lambda cambio: cambio.id)),
+    )
 
 
 @dataclass(frozen=True, slots=True)
@@ -240,7 +347,9 @@ def ejecutar_arqueo(
     )
 
     revision_v1 = cargar_revision(archivo_revision_v1 or ARCHIVO_REVISION_V1)
-    revision_v2 = cargar_revision(archivo_revision_v2 or ARCHIVO_REVISION_V2)
+    ruta_revision_v2 = archivo_revision_v2 or ARCHIVO_REVISION_V2
+    revision_v2 = cargar_revision(ruta_revision_v2)
+    sensibilidad = cargar_sensibilidad(ruta_revision_v2)
     resultados_v1 = cargar_resultados(archivo_resultados_v1 or ARCHIVO_RESULTADOS_V1)
     resultados_v2 = cargar_resultados(archivo_resultados_v2 or ARCHIVO_RESULTADOS_V2)
     directo = vectorial_directo(indice, proveedor, preguntas)
@@ -278,6 +387,7 @@ def ejecutar_arqueo(
         resultados_v2=resultados_v2,
         vectorial=directo,
         avisos=avisos,
+        sensibilidad=sensibilidad,
     )
     texto = render_markdown(arqueo, ficha)
 
@@ -300,6 +410,7 @@ def construir_arqueo(
     resultados_v2: Sequence[ResultadoEvaluacion] = (),
     vectorial: Mapping[int, Sequence[str]] | None = None,
     avisos: Sequence[str] = (),
+    sensibilidad: Sensibilidad | None = None,
 ) -> dict[str, Any]:
     """Arma el diccionario determinista de ``arqueo.json``.
 
@@ -313,6 +424,8 @@ def construir_arqueo(
         resultados_v2: filas de ``resultados_v2.jsonl``.
         vectorial: top 5 de la busqueda vectorial directa, para diagnosticos.
         avisos: notas de la corrida que se agregan a las generadas aqui.
+        sensibilidad: escenario alterno de la revision v2; si falta, el reporte
+            no incluye el bloque ``sensibilidad``.
 
     Returns:
         El diccionario listo para serializar.
@@ -328,7 +441,15 @@ def construir_arqueo(
         ids_alcance,
     )
     evaluacion_v2 = (
-        _evaluacion(preguntas, resultados_v2, revisiones_v2, ids_alcance) if revisiones_v2 else None
+        _evaluacion(
+            preguntas,
+            resultados_v2,
+            revisiones_v2,
+            ids_alcance,
+            fuentes_citadas=True,
+        )
+        if revisiones_v2
+        else None
     )
     mcnemar_versiones = comparar_versiones(
         revisiones_v1,
@@ -393,6 +514,18 @@ def construir_arqueo(
 
     resumen_v1 = _resumen_uso(resultados_v1)
     resumen_v2 = _resumen_uso(resultados_v2)
+    ids_alcance_set = set(ids_alcance)
+    resultados_v1_alcance = [
+        resultado for resultado in resultados_v1 if resultado.id in ids_alcance_set
+    ]
+    resultados_v2_alcance = [
+        resultado for resultado in resultados_v2 if resultado.id in ids_alcance_set
+    ]
+    resumen_v1_alcance = _resumen_uso(resultados_v1_alcance)
+    resumen_v2_alcance = _resumen_uso(resultados_v2_alcance)
+    conteo_clasificador = (
+        contar_preguntas_con_clasificador(resultados_v2, ids_alcance) if resultados_v2 else None
+    )
     medido = {
         "1/0": _referencia_medida(barrido, barrido.vectorial),
         "por_defecto": _referencia_medida(barrido, barrido.por_defecto),
@@ -407,9 +540,37 @@ def construir_arqueo(
             "v2_usd": (
                 round(resumen_v2.costo_usd_total, DECIMALES_COSTO) if resultados_v2 else None
             ),
+            "v1_alcance_usd": (
+                round(resumen_v1_alcance.costo_usd_total, DECIMALES_COSTO)
+                if resultados_v1_alcance
+                else None
+            ),
+            "v2_alcance_usd": (
+                round(resumen_v2_alcance.costo_usd_total, DECIMALES_COSTO)
+                if resultados_v2_alcance
+                else None
+            ),
+            "v2_alcance_preguntas": len(ids_alcance),
+            "v2_alcance_con_clasificador": (
+                conteo_clasificador.con_clasificador if conteo_clasificador is not None else None
+            ),
+            "v2_alcance_sin_motivo": (
+                conteo_clasificador.sin_motivo if conteo_clasificador is not None else None
+            ),
+            "v2_alcance_cota_inferior": bool(resultados_v2_alcance),
+            "v2_total_cota_inferior": bool(resultados_v2),
+            "ahorro_alcance_pct": _ahorro_alcance(resumen_v1_alcance, resumen_v2_alcance),
             "preguntas": len(preguntas),
             "arqueo_usd": 0.0,
         },
+        "sensibilidad": _sensibilidad_json(
+            sensibilidad,
+            preguntas,
+            revisiones_v1,
+            revisiones_v2,
+            resultados_v2,
+            ids_alcance,
+        ),
         "preguntas_por_tipo": _conteo_por_tipo(preguntas),
         "uso": {
             "v1": _resumen_json(resumen_v1),
@@ -491,13 +652,76 @@ def _intervalo_json(intervalo: tuple[float, float] | None) -> list[float] | None
     ]
 
 
+def contar_preguntas_con_clasificador(
+    resultados: Sequence[ResultadoEvaluacion],
+    ids: Sequence[int],
+) -> ConteoClasificador:
+    """Cuenta las preguntas de alcance segun el motivo guardado en la corrida.
+
+    Lee ``metricas["motivo"]`` de cada fila de ``resultados_v2.jsonl``. Los
+    motivos de regla y la marca ``tablero_generico`` no pasaron por el
+    clasificador; un motivo de texto libre si. Una fila sin motivo no se cuenta
+    como regla ni como clasificador: se informa aparte en ``sin_motivo``.
+
+    Args:
+        resultados: filas de ``resultados_v2.jsonl``.
+        ids: ids de las preguntas de alcance.
+
+    Returns:
+        Cuantas preguntas usaron el clasificador y cuantas filas no traen motivo.
+    """
+    objetivo = set(ids)
+    con_clasificador = 0
+    sin_motivo = 0
+    for resultado in resultados:
+        if resultado.id not in objetivo:
+            continue
+        motivo = resultado.metricas.get("motivo")
+        if not isinstance(motivo, str) or not motivo.strip():
+            sin_motivo += 1
+            continue
+        if not _motivo_de_regla(motivo):
+            con_clasificador += 1
+    return ConteoClasificador(con_clasificador=con_clasificador, sin_motivo=sin_motivo)
+
+
+#: Motivos que el digiturno o el tablero resuelven sin el clasificador de dudas.
+#: ``tablero_generico`` es la marca determinista que deja el nodo de tablero.
+MOTIVOS_DE_REGLA: frozenset[str] = frozenset(
+    {"identidad", "tarifas", "fuera_alcance", "tablero_generico"}
+)
+
+
+def _motivo_de_regla(motivo: str) -> bool:
+    """Indica si el motivo lo resolvio una regla y no el clasificador."""
+    return motivo in MOTIVOS_DE_REGLA or motivo.startswith("pii:")
+
+
+def _ahorro_alcance(v1: ResumenUso, v2: ResumenUso) -> float | None:
+    """Ahorro porcentual de v2 frente a v1 en alcance, redondeado a un decimal.
+
+    Es una cota superior del ahorro real porque el costo de v2 es una cota
+    inferior. Devuelve ``None`` si v1 no gasto o si v2 no tiene registros.
+    """
+    if v1.costo_usd_total <= 0 or v2.registros == 0:
+        return None
+    ahorro = (v1.costo_usd_total - v2.costo_usd_total) / v1.costo_usd_total * 100
+    return round(max(0.0, ahorro), 1)
+
+
 def _evaluacion(
     preguntas: Sequence[PreguntaFase2],
     resultados: Sequence[ResultadoEvaluacion],
     revision: Mapping[int, Revision],
     ids: Sequence[int],
+    *,
+    fuentes_citadas: bool = False,
 ) -> dict[str, Any] | None:
-    """Resume exactitud y citas de una version de la evaluacion."""
+    """Resume exactitud y citas de una version de la evaluacion.
+
+    Con ``fuentes_citadas`` usa la lista ``metricas["fuentes"]`` de v2; sin
+    ella usa ``resultado.fuente``, el unico campo que guarda v1.
+    """
     if not resultados and not revision:
         return None
     aciertos = aciertos_por_revision(revision, ids)
@@ -511,7 +735,15 @@ def _evaluacion(
         resultado = por_id.get(pregunta.id)
         if resultado is None:
             continue
-        citadas.append([resultado.fuente] if resultado.fuente else [])
+        if fuentes_citadas:
+            guardadas = resultado.metricas.get("fuentes")
+            citadas.append(
+                [str(url) for url in guardadas if isinstance(url, str)]
+                if isinstance(guardadas, list)
+                else []
+            )
+        else:
+            citadas.append([resultado.fuente] if resultado.fuente else [])
         esperadas.append(list(pregunta.fuentes_esperadas))
     citas = citas_correctas(citadas, esperadas) if citadas else None
     return {
@@ -520,6 +752,52 @@ def _evaluacion(
         "exactitud": _redondear(exactitud(aciertos)),
         "citas_correctas": _redondear(citas),
         "revisadas": sum(1 for acierto in aciertos if acierto is not None),
+    }
+
+
+def _sensibilidad_json(
+    sensibilidad: Sensibilidad | None,
+    preguntas: Sequence[PreguntaFase2],
+    revision_v1: Mapping[int, Revision],
+    revision_v2: Mapping[int, Revision],
+    resultados_v2: Sequence[ResultadoEvaluacion],
+    ids: Sequence[int],
+) -> dict[str, Any] | None:
+    """Aplica el escenario de sensibilidad y resume su evaluacion y McNemar."""
+    if sensibilidad is None or not sensibilidad.cambios or not revision_v2:
+        return None
+
+    revisadas = dict(revision_v2)
+    cambios: list[dict[str, Any]] = []
+    for cambio in sensibilidad.cambios:
+        previa = revisadas.get(cambio.id)
+        if previa is None:
+            raise ValueError(
+                f"La sensibilidad referencia la pregunta {cambio.id}, que no esta en "
+                "revision_humana_v2.toml."
+            )
+        cambios.append(
+            {
+                "id": cambio.id,
+                "de": previa.veredicto,
+                "a": cambio.veredicto,
+                "nota": cambio.nota,
+            }
+        )
+        revisadas[cambio.id] = replace(previa, veredicto=cambio.veredicto)
+
+    evaluacion = _evaluacion(
+        preguntas,
+        resultados_v2,
+        revisadas,
+        ids,
+        fuentes_citadas=True,
+    )
+    return {
+        "revisor": sensibilidad.revisor,
+        "cambios": cambios,
+        "evaluacion": evaluacion,
+        "mcnemar": _mcnemar_json(comparar_versiones(revision_v1, revisadas, ids), ids),
     }
 
 
@@ -546,12 +824,14 @@ def _resumen_json(resumen: ResumenUso) -> dict[str, Any]:
 
 
 def _mcnemar_json(resultado: ResultadoMcNemar, ids: Sequence[int]) -> dict[str, Any]:
-    """Serializa un resultado de McNemar con los conteos del contrato."""
+    """Serializa un resultado de McNemar con sus conteos y su p minima."""
     return {
         "b": resultado.b,
         "c": resultado.c,
         "n": resultado.n,
         "p": _redondear(resultado.p, DECIMALES_COSTO),
+        "p_minimo": _redondear(p_minimo_mcnemar(resultado.n), DECIMALES_COSTO),
+        "alfa": _redondear(ALFA, DECIMALES_COSTO),
         "excluidos": resultado.excluidos,
         "preguntas": len(ids),
     }
@@ -742,19 +1022,29 @@ def render_markdown(arqueo: Mapping[str, Any], ficha: FichaCorrida) -> str:
         "## McNemar v1 frente a v2 (20 preguntas de alcance)",
         "",
     ]
-    if arqueo["evaluacion"]["v2"] is None and mcnemar["n"] == 0:
+    if v2 is None:
         lineas.append(
             "Pendiente: no existe `config/evaluacion/revision_humana_v2.toml` con "
-            "veredictos, asi que los 20 pares quedan excluidos y no se declara mejora. "
+            "veredictos, asi que los 20 pares quedan excluidos y no se declara diferencia. "
             "Cuando exista la revision v2, `make arqueo` la incorpora sin tocar codigo."
         )
     else:
         lineas += [
-            "| b | c | n | p exacta | Excluidos |",
-            "|---:|---:|---:|---:|---:|",
+            "| b | c | n | p exacta | p minimo | Excluidos |",
+            "|---:|---:|---:|---:|---:|---:|",
             f"| {mcnemar['b']} | {mcnemar['c']} | {mcnemar['n']} | "
-            f"{_num(mcnemar['p'], DECIMALES_COSTO)} | {mcnemar['excluidos']} |",
+            f"{_num(mcnemar['p'], DECIMALES_COSTO)} | "
+            f"{_num(mcnemar['p_minimo'], DECIMALES_COSTO)} | {mcnemar['excluidos']} |",
+            "",
+            _frase_mcnemar(
+                mcnemar,
+                v1["aciertos"] if v1 is not None else 0,
+                v2["aciertos"],
+                mcnemar["preguntas"],
+            ),
         ]
+
+    lineas += _seccion_sensibilidad(arqueo, v2, mcnemar)
 
     costo = arqueo["costo"]
     lineas += [
@@ -764,12 +1054,22 @@ def render_markdown(arqueo: Mapping[str, Any], ficha: FichaCorrida) -> str:
         "| Concepto | Valor |",
         "|---|---:|",
         f"| Costo del Arqueo (DeepSeek) | {_usd(costo['arqueo_usd'])} |",
-        f"| Costo historico de v1 | {_usd(costo['v1_usd'])} |",
-        f"| Costo historico de v2 | {_usd(costo['v2_usd']) if costo['v2_usd'] is not None else 'pendiente'} |",
+        f"| Costo historico de v1 (20 de alcance) | {_usd(costo['v1_alcance_usd'])} |",
+        f"| Costo historico de v2 (44 preguntas, cota inferior) | "
+        f"{_usd(costo['v2_usd']) if costo['v2_usd'] is not None else 'pendiente'} |",
+        f"| Costo de v2 en las 20 de alcance (cota inferior) | "
+        f"{_usd(costo['v2_alcance_usd']) if costo['v2_alcance_usd'] is not None else 'pendiente'} |",
+        f"| Ahorro maximo en las 20 de alcance | {_ahorro_texto(costo)} |",
+        f"| Preguntas de alcance con clasificador en v2 | {_clasificador_texto(costo)} |",
         f"| Preguntas del banco | {costo['preguntas']} |",
         "",
-        "El Arqueo no llama a DeepSeek: su costo es cero. `v1_usd` y `v2_usd` son el costo "
-        "historico de las evaluaciones, calculado con las tarifas de `arqueo/metricas.py`.",
+        "El Arqueo no llama a DeepSeek: su costo es cero. `v1_alcance_usd`, `v2_usd` y "
+        "`v2_alcance_usd` son el costo historico de las evaluaciones, calculado con las "
+        "tarifas de `arqueo/metricas.py`. Las dos cifras de v2 son cotas inferiores: "
+        "cuentan el turno de respuesta, pero no el clasificador de dudas "
+        f"({_clasificador_frase(costo)}) ni la reformulacion (#93). v1 no usa "
+        f"clasificador, asi que el ahorro en alcance se lee como {_ahorro_texto(costo)}; "
+        "la cifra de v2 en alcance es una cota inferior, no una medicion cerrada.",
         "",
         "## Verificacion local contra el anexo A",
         "",
@@ -802,6 +1102,11 @@ def render_markdown(arqueo: Mapping[str, Any], ficha: FichaCorrida) -> str:
     for aviso in arqueo["avisos"]:
         lineas.append(f"- {aviso}")
     lineas += [
+        "- El costo de v2 en las 20 preguntas de alcance es una cota inferior: suma el "
+        "turno de respuesta, pero no el clasificador de dudas "
+        f"({_clasificador_frase(costo)}) ni la reformulacion (#93). El total de 44 "
+        "tambien es una cota inferior. Por eso el ahorro frente a v1, que no usa "
+        f"clasificador, se lee como {_ahorro_texto(costo)}, no como una cifra cerrada.",
         "- El indice sin prefijos se reutiliza si coinciden modelo, alcance, numero "
         "de fragmentos y huella del contenido; si no, se reconstruye.",
         "- El acierto se mide por URL, no por fragmento: una pregunta cuenta como "
@@ -816,8 +1121,9 @@ def render_markdown(arqueo: Mapping[str, Any], ficha: FichaCorrida) -> str:
         "- `EnsembleRetriever` deduplica por `page_content`. Si dos fragmentos comparten "
         "texto, `1/0` puede devolver menos de cinco resultados que una busqueda vectorial "
         "directa; la diferencia se cuenta, no se corrige en el recuperador.",
-        "- `citas_correctas` de v1 usa el campo `fuente` de `resultados.jsonl`, que "
-        "registra una sola URL por respuesta.",
+        "- `citas_correctas` no se compara entre versiones: v1 usa el campo `fuente` de "
+        "`resultados.jsonl`, que registra una sola URL por respuesta, y v2 usa la lista "
+        '`metricas["fuentes"]` con todas las URL citadas.',
         "- El barrido tiene en la practica dos estados. `EnsembleRetriever` fusiona por "
         "rangos reciprocos (peso / (posicion + 60)): con esa constante el orden depende "
         "sobre todo de que peso supera 0.5, no de su valor exacto. Dentro de cada lado "
@@ -841,6 +1147,145 @@ def render_markdown(arqueo: Mapping[str, Any], ficha: FichaCorrida) -> str:
         "corrida lo construye una vez en `data/boveda/experimentos/sin_prefijos`.",
     ]
     return "\n".join(lineas).rstrip() + "\n"
+
+
+def _seccion_sensibilidad(
+    arqueo: Mapping[str, Any],
+    v2: Mapping[str, Any] | None,
+    mcnemar: Mapping[str, Any],
+) -> list[str]:
+    """Devuelve la seccion del escenario de sensibilidad, si existe."""
+    sensibilidad = arqueo["sensibilidad"]
+    if sensibilidad is None or v2 is None:
+        return []
+    evaluacion = sensibilidad["evaluacion"]
+    if evaluacion is None:
+        return []
+    alterno = sensibilidad["mcnemar"]
+    v1 = arqueo["evaluacion"]["v1"]
+    lineas = [
+        "",
+        "## Sensibilidad de la revision humana",
+        "",
+        f"Escenario alterno con la nota de **{sensibilidad['revisor']}**. No cambia el "
+        "veredicto principal ni la segunda firma.",
+        "",
+        "| # | Veredicto principal | Veredicto de sensibilidad | Nota |",
+        "|---:|---|---|---|",
+    ]
+    for cambio in sensibilidad["cambios"]:
+        lineas.append(
+            f"| {cambio['id']} | {cambio['de']} | {cambio['a']} | {_celda(cambio['nota'])} |"
+        )
+    lineas += [
+        "",
+        "| Escenario | Aciertos v2 | Exactitud v2 | b | c | n | p exacta | p minimo |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|",
+        f"| Principal | {v2['aciertos']} | {_num(v2['exactitud'])} | {mcnemar['b']} | "
+        f"{mcnemar['c']} | {mcnemar['n']} | {_num(mcnemar['p'], DECIMALES_COSTO)} | "
+        f"{_num(mcnemar['p_minimo'], DECIMALES_COSTO)} |",
+        f"| Sensibilidad | {evaluacion['aciertos']} | {_num(evaluacion['exactitud'])} | "
+        f"{alterno['b']} | {alterno['c']} | {alterno['n']} | "
+        f"{_num(alterno['p'], DECIMALES_COSTO)} | "
+        f"{_num(alterno['p_minimo'], DECIMALES_COSTO)} |",
+        "",
+        _frase_mcnemar(
+            alterno,
+            v1["aciertos"] if v1 is not None else 0,
+            evaluacion["aciertos"],
+            alterno["preguntas"],
+        ),
+    ]
+    return lineas
+
+
+def _frase_mcnemar(
+    datos: Mapping[str, Any],
+    aciertos_v1: int,
+    aciertos_v2: int,
+    total: int,
+) -> str:
+    """Explica aciertos, pares discordantes, direccion, p y excluidos.
+
+    El texto sale de los conteos del McNemar y de los aciertos de cada version.
+    Nunca usa la palabra ``mejora``: si la direccion favorece a v1, lo dice.
+    """
+    b = datos["b"]
+    c = datos["c"]
+    n = datos["n"]
+    p = _num(datos["p"], DECIMALES_COSTO)
+    if b > c:
+        direccion = "favorece a v1"
+        frase_direccion = "la direccion favorece a v1"
+    elif c > b:
+        direccion = "favorece a v2"
+        frase_direccion = "la direccion favorece a v2"
+    else:
+        direccion = "no hay direccion"
+        frase_direccion = "no hay direccion"
+
+    partes = [
+        f"v1 acierta {aciertos_v1} de {total} y v2 acierta {aciertos_v2} de {total}.",
+        f"De los {n} pares discordantes, b={b} son pares donde v1 acierta y v2 falla, "
+        f"y c={c} son pares donde v2 acierta y v1 falla; {frase_direccion}.",
+    ]
+    if n == 0:
+        partes.append("Sin pares discordantes, la prueba no puede declarar diferencia.")
+    elif datos["p"] < 0.05:
+        partes.append(
+            f"El p exacto ({p}) es menor que el umbral de 0.05: la diferencia es "
+            f"significativa y {direccion}."
+        )
+    else:
+        minimo = _num(datos["p_minimo"], DECIMALES_COSTO)
+        umbral = f"Con {n} pares discordantes, el p minimo posible es 2·(1/2)^{n} = {minimo}"
+        if datos["p_minimo"] >= 0.05:
+            umbral += ", que ya es >= 0.05: ningun reparto de esos pares podria ser significativo."
+        else:
+            umbral += ", aunque el p observado no llega al umbral de 0.05."
+        partes.append(f"El p exacto ({p}) no llega al umbral de 0.05. {umbral}")
+
+    if datos["excluidos"]:
+        partes.append(
+            f"Se excluyeron {datos['excluidos']} pares sin veredicto en alguna de "
+            "las dos versiones."
+        )
+    return " ".join(partes)
+
+
+def _ahorro_texto(costo: Mapping[str, Any]) -> str:
+    """Formatea el ahorro de alcance como ``hasta X % menos``."""
+    valor = costo["ahorro_alcance_pct"]
+    return "pendiente" if valor is None else f"hasta {float(valor):.1f} % menos"
+
+
+def _clasificador_texto(costo: Mapping[str, Any]) -> str:
+    """Muestra cuantas preguntas de alcance usaron clasificador en v2."""
+    total = costo["v2_alcance_con_clasificador"]
+    if total is None:
+        return "pendiente"
+    texto = f"{total} de {costo['v2_alcance_preguntas']}"
+    sin_motivo = costo.get("v2_alcance_sin_motivo") or 0
+    if sin_motivo:
+        texto += f" ({sin_motivo} sin motivo)"
+    return texto
+
+
+def _clasificador_frase(costo: Mapping[str, Any]) -> str:
+    """Frase con el conteo de preguntas de alcance que usaron clasificador."""
+    total = costo["v2_alcance_con_clasificador"]
+    if total is None:
+        return "sin resultados v2 para contarlo"
+    frase = f"se uso en {total} de las {costo['v2_alcance_preguntas']} preguntas de alcance"
+    sin_motivo = costo.get("v2_alcance_sin_motivo") or 0
+    if sin_motivo:
+        frase += f"; {sin_motivo} fila(s) sin motivo no se pudieron determinar"
+    return frase
+
+
+def _celda(texto: str) -> str:
+    """Ajusta un texto para una celda de tabla Markdown."""
+    return " ".join(str(texto).replace("|", "\\|").split())
 
 
 def _fila_evaluacion(nombre: str, datos: Mapping[str, Any] | None) -> str:

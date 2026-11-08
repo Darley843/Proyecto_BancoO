@@ -8,6 +8,7 @@ from typing import Any
 import pytest
 
 from banco_occidente_corpus.arqueo.metricas import (
+    ALFA,
     TARIFAS_DEEPSEEK_FLASH,
     TARIFAS_DEEPSEEK_FLASH_PICO,
     ResumenUso,
@@ -19,6 +20,7 @@ from banco_occidente_corpus.arqueo.metricas import (
     intervalo_wilson,
     mcnemar,
     mrr,
+    p_minimo_mcnemar,
     resumen_uso,
 )
 
@@ -504,6 +506,38 @@ def test_mcnemar_excluye_pares_con_none() -> None:
     assert resultado.n == 1
     assert resultado.excluidos == 2
     assert resultado.p == 1.0
+
+
+def test_p_minimo_mcnemar_con_cinco_pares_supera_alfa() -> None:
+    """Con n=5 el reparto mas extremo da 0.0625, mayor que ALFA."""
+    # Act
+    minimo = p_minimo_mcnemar(5)
+
+    # Assert
+    assert ALFA == 0.05
+    assert minimo == 0.0625
+    assert minimo > ALFA
+
+
+def test_p_minimo_mcnemar_con_seis_pares_baja_de_alfa() -> None:
+    """Con n=6 el minimo ya puede ser significativo, aunque no lo sea el observado."""
+    # Act
+    minimo = p_minimo_mcnemar(6)
+
+    # Assert
+    assert minimo == 0.03125
+    assert minimo < ALFA
+
+
+def test_p_minimo_mcnemar_sin_discordantes_da_uno() -> None:
+    """Sin pares discordantes no hay reparto que pueda declarar diferencia."""
+    assert p_minimo_mcnemar(0) == 1.0
+
+
+def test_p_minimo_mcnemar_rechaza_n_negativo() -> None:
+    """El numero de pares discordantes no puede ser negativo."""
+    with pytest.raises(ValueError):
+        p_minimo_mcnemar(-1)
 
 
 def test_intervalo_wilson_ejemplo_23_de_36() -> None:

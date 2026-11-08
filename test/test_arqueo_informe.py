@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import json
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any
@@ -18,6 +18,7 @@ from langchain_core.embeddings import DeterministicFakeEmbedding
 
 from banco_occidente_corpus.arqueo.experimentos import (
     ARCHIVO_REVISION_V1,
+    ARCHIVO_REVISION_V2,
     Barrido,
     barrer_pesos,
     cargar_preguntas_fase2,
@@ -25,14 +26,21 @@ from banco_occidente_corpus.arqueo.experimentos import (
     vectorial_directo,
 )
 from banco_occidente_corpus.arqueo.informe import (
+    ARCHIVO_RESULTADOS_V1,
+    ARCHIVO_RESULTADOS_V2,
     FichaCorrida,
+    Sensibilidad,
     cargar_referencia_anexo_a,
+    cargar_sensibilidad,
     construir_arqueo,
+    contar_preguntas_con_clasificador,
     ejecutar_arqueo,
     render_markdown,
 )
 from banco_occidente_corpus.asistente.evaluacion import (
     ResultadoEvaluacion,
+    Revision,
+    cargar_resultados,
     cargar_revision,
 )
 from banco_occidente_corpus.boveda.almacen import Coincidencia
@@ -145,7 +153,28 @@ def resultados_de_prueba() -> list[ResultadoEvaluacion]:
     ]
 
 
-def corrida_de_prueba() -> tuple[dict[str, Any], str, FichaCorrida]:
+def resultado_con_motivo(identificador: int, motivo: str | None) -> ResultadoEvaluacion:
+    """Fila minima de v2 con el motivo guardado en ``metricas``."""
+    return ResultadoEvaluacion(
+        id=identificador,
+        pregunta="pregunta",
+        cobertura="si",
+        clasificacion="correcta",
+        respuesta="",
+        fuente="",
+        sin_datos=False,
+        metricas={"motivo": motivo},
+    )
+
+
+def corrida_de_prueba(
+    *,
+    revision_v1: Mapping[int, Revision] | None = None,
+    resultados_v1: Sequence[ResultadoEvaluacion] | None = None,
+    resultados_v2: Sequence[ResultadoEvaluacion] = (),
+    revision_v2: Mapping[int, Revision] | None = None,
+    sensibilidad: Sensibilidad | None = None,
+) -> tuple[dict[str, Any], str, FichaCorrida]:
     """Ejecuta el barrido y arma el reporte con datos sinteticos."""
     preguntas = cargar_preguntas_fase2()
     fragmentos = fragmentos_de_prueba()
@@ -172,9 +201,14 @@ def corrida_de_prueba() -> tuple[dict[str, Any], str, FichaCorrida]:
         preguntas,
         barrido,
         sin_prefijos,
-        revision_v1=cargar_revision(ARCHIVO_REVISION_V1),
-        resultados_v1=resultados_de_prueba(),
+        revision_v1=(
+            revision_v1 if revision_v1 is not None else cargar_revision(ARCHIVO_REVISION_V1)
+        ),
+        revision_v2=revision_v2,
+        resultados_v1=resultados_v1 if resultados_v1 is not None else resultados_de_prueba(),
+        resultados_v2=resultados_v2,
         vectorial=vectorial_directo(almacen, embeddings, preguntas),
+        sensibilidad=sensibilidad,
     )
     ficha = FichaCorrida(
         commit="abc1234",
@@ -196,6 +230,16 @@ def corrida_de_prueba() -> tuple[dict[str, Any], str, FichaCorrida]:
         peso_bm25=0.4,
     )
     return arqueo, render_markdown(arqueo, ficha), ficha
+
+
+def corrida_con_v2() -> tuple[dict[str, Any], str, FichaCorrida]:
+    """Arma el reporte con los resultados y la revision reales de v2."""
+    return corrida_de_prueba(
+        resultados_v1=cargar_resultados(ARCHIVO_RESULTADOS_V1),
+        resultados_v2=cargar_resultados(ARCHIVO_RESULTADOS_V2),
+        revision_v2=cargar_revision(ARCHIVO_REVISION_V2),
+        sensibilidad=cargar_sensibilidad(ARCHIVO_REVISION_V2),
+    )
 
 
 def test_arqueo_conserva_las_cinco_claves_del_contrato() -> None:
@@ -490,3 +534,241 @@ def test_el_estado_del_indice_extra_no_cambia_los_reportes(
     assert primer_md.read_bytes() == segundo_md.read_bytes()
     assert "se construyo en esta corrida" in primer_aviso
     assert "ya existia" in segundo_aviso
+
+
+def test_v2_citas_cuentan_las_fuentes_citadas_y_no_solo_la_primera() -> None:
+    """Una URL esperada que no es la primera fuente citada tambien cuenta en v2."""
+    # Arrange
+    resultados = cargar_resultados(ARCHIVO_RESULTADOS_V2)
+    pregunta_12 = next(resultado for resultado in resultados if resultado.id == 12)
+
+    # Act
+    arqueo, _, _ = corrida_de_prueba(
+        resultados_v2=[pregunta_12],
+        revision_v2=cargar_revision(ARCHIVO_REVISION_V2),
+    )
+
+    # Assert
+    esperada = "https://www.bancodeoccidente.com.co/sistema-kubo"
+    assert pregunta_12.fuente != esperada
+    assert esperada in pregunta_12.metricas["fuentes"]
+    v2 = arqueo["evaluacion"]["v2"]
+    assert v2 is not None
+    assert v2["citas_correctas"] == 1.0
+
+
+def test_v2_con_los_datos_reales_da_citas_de_05556() -> None:
+    """La revision y los resultados reales de v2 producen la cifra del informe."""
+    # Act
+    arqueo, _, _ = corrida_con_v2()
+
+    # Assert
+    v2 = arqueo["evaluacion"]["v2"]
+    assert v2 is not None
+    assert v2["aciertos"] == 11
+    assert v2["total"] == 20
+    assert v2["exactitud"] == 0.55
+    assert v2["citas_correctas"] == 0.5556
+    assert arqueo["mcnemar"]["b"] == 5
+    assert arqueo["mcnemar"]["c"] == 0
+    assert arqueo["mcnemar"]["n"] == 5
+    assert arqueo["mcnemar"]["p"] == 0.0625
+
+
+def test_costo_de_alcance_es_cota_inferior_y_el_ahorro_es_un_maximo() -> None:
+    """El costo de v2 en alcance no incluye clasificador ni reformulacion."""
+    # Act
+    arqueo, texto, _ = corrida_con_v2()
+    costo = arqueo["costo"]
+
+    # Assert
+    assert costo["v2_alcance_usd"] == 0.011873
+    assert costo["v2_usd"] == 0.015728
+    assert costo["v2_alcance_cota_inferior"] is True
+    assert costo["v2_total_cota_inferior"] is True
+    assert costo["v2_alcance_con_clasificador"] == 15
+    assert costo["v2_alcance_sin_motivo"] == 0
+    assert costo["ahorro_alcance_pct"] == 57.0
+    seccion = texto.split("## Costo y uso", 1)[1].split("\n## ", 1)[0]
+    assert "cota inferior" in seccion
+    assert "hasta 57.0 % menos" in seccion
+    assert "15 de las 20" in seccion
+    assert "completa" not in seccion
+
+
+def test_contar_preguntas_con_clasificador_lee_el_motivo_guardado() -> None:
+    """Clasifica por motivo: regla, clasificador y filas sin motivo aparte."""
+    # Arrange
+    resultados = [
+        resultado_con_motivo(1, "identidad"),
+        resultado_con_motivo(2, "tarifas"),
+        resultado_con_motivo(3, "tablero_generico"),
+        resultado_con_motivo(4, "Consulta general sobre productos."),
+        resultado_con_motivo(5, ""),
+        resultado_con_motivo(6, None),
+        resultado_con_motivo(7, "Consulta general fuera del alcance de la prueba."),
+    ]
+
+    # Act
+    conteo = contar_preguntas_con_clasificador(resultados, [1, 2, 3, 4, 5, 6, 7])
+
+    # Assert
+    assert conteo.con_clasificador == 2
+    assert conteo.sin_motivo == 2
+
+
+def test_conteo_real_de_clasificador_sigue_dando_15_de_20() -> None:
+    """Con los motivos reales de v2, 15 preguntas pasaron por el clasificador."""
+    # Arrange
+    preguntas = cargar_preguntas_fase2()
+    ids = [pregunta.id for pregunta in preguntas if pregunta.tipo == "alcance"]
+
+    # Act
+    conteo = contar_preguntas_con_clasificador(cargar_resultados(ARCHIVO_RESULTADOS_V2), ids)
+
+    # Assert
+    assert conteo.con_clasificador == 15
+    assert conteo.sin_motivo == 0
+
+
+def test_sensibilidad_cambia_solo_el_escenario_alterno() -> None:
+    """La nota de Nayla no toca el veredicto principal ni la segunda firma."""
+    # Act
+    arqueo, texto, _ = corrida_con_v2()
+    sensibilidad = arqueo["sensibilidad"]
+
+    # Assert
+    assert sensibilidad is not None
+    assert sensibilidad["revisor"] == "Nayla Ledesma"
+    assert sensibilidad["cambios"] == [
+        {
+            "id": 2,
+            "de": "incorrecta",
+            "a": "rechazo_correcto",
+            "nota": (
+                "El corpus solo cita la Carrera 3 No. 8-13 de Cali como lugar de la "
+                "asamblea de accionistas; no dice que sea una oficina, asi que no "
+                "encontrar el dato es un rechazo correcto."
+            ),
+        }
+    ]
+    evaluacion = sensibilidad["evaluacion"]
+    alterno = sensibilidad["mcnemar"]
+    assert evaluacion is not None
+    assert evaluacion["aciertos"] == 12
+    assert evaluacion["exactitud"] == 0.6
+    assert alterno["b"] == 5
+    assert alterno["c"] == 1
+    assert alterno["n"] == 6
+    assert alterno["p"] == 0.21875
+    assert alterno["p_minimo"] == 0.03125
+    assert arqueo["evaluacion"]["v2"]["aciertos"] == 11
+    assert arqueo["mcnemar"]["b"] == 5
+    assert arqueo["mcnemar"]["c"] == 0
+    revision = cargar_revision(ARCHIVO_REVISION_V2)
+    assert revision[2].veredicto == "incorrecta"
+    assert revision[2].veredicto_2 == "incorrecta"
+    assert revision[2].revisor_2 == "Darley843"
+    assert "## Sensibilidad de la revision humana" in texto
+    assert "Nayla Ledesma" in texto
+    assert "0.218750" in texto
+    assert "0.031250" in texto
+
+
+def test_mcnemar_explica_aciertos_discordantes_y_p_minimo() -> None:
+    """El caso real dice 16 y 11 de 20, favorece a v1 y explica el p minimo."""
+    # Act
+    arqueo, texto, _ = corrida_con_v2()
+    mcnemar = arqueo["mcnemar"]
+    seccion = texto.split("## McNemar v1 frente a v2", 1)[1].split("\n## ", 1)[0]
+
+    # Assert
+    assert mcnemar["p"] == 0.0625
+    assert mcnemar["p_minimo"] == 0.0625
+    assert "16 de 20" in seccion
+    assert "11 de 20" in seccion
+    assert "favorece a v1" in seccion
+    assert "2·(1/2)^5" in seccion
+    assert "umbral de 0.05" in seccion
+    assert "ningun reparto de esos pares podria ser significativo" in seccion
+    assert "mejora" not in seccion
+    assert "ALFA" not in seccion
+    assert "0.050000" not in seccion
+
+
+def test_mcnemar_con_c_mayor_que_b_dice_favorece_a_v2() -> None:
+    """Con c>b y p<0.05 el parrafo declara la direccion hacia v2."""
+    # Arrange
+    preguntas = cargar_preguntas_fase2()
+    ids = [pregunta.id for pregunta in preguntas if pregunta.tipo == "alcance"]
+    revision_v1 = {identificador: Revision(veredicto="incorrecta") for identificador in ids}
+    revision_v2 = {
+        identificador: Revision(veredicto="correcta" if identificador <= 6 else "incorrecta")
+        for identificador in ids
+    }
+
+    # Act
+    arqueo, texto, _ = corrida_de_prueba(
+        revision_v1=revision_v1,
+        revision_v2=revision_v2,
+        resultados_v2=cargar_resultados(ARCHIVO_RESULTADOS_V2),
+    )
+    mcnemar = arqueo["mcnemar"]
+    seccion = texto.split("## McNemar v1 frente a v2", 1)[1].split("\n## ", 1)[0]
+
+    # Assert
+    assert mcnemar["b"] == 0
+    assert mcnemar["c"] == 6
+    assert mcnemar["p"] < 0.05
+    assert "favorece a v2" in seccion
+    assert "diferencia es significativa" in seccion
+    assert "mejora" not in seccion
+
+
+def test_cargar_sensibilidad_lee_la_tabla_del_proyecto() -> None:
+    """La tabla [sensibilidad] del TOML real trae el revisor y el cambio."""
+    # Act
+    sensibilidad = cargar_sensibilidad(ARCHIVO_REVISION_V2)
+
+    # Assert
+    assert sensibilidad is not None
+    assert sensibilidad.revisor == "Nayla Ledesma"
+    assert [cambio.id for cambio in sensibilidad.cambios] == [2]
+    assert sensibilidad.cambios[0].veredicto == "rechazo_correcto"
+    assert "Carrera 3 No. 8-13" in sensibilidad.cambios[0].nota
+
+
+def test_cargar_sensibilidad_sin_tabla_devuelve_none(tmp_path: Path) -> None:
+    """Un TOML de revision sin [sensibilidad] no inventa un escenario."""
+    # Arrange
+    archivo = tmp_path / "revision.toml"
+    archivo.write_text(
+        '[[revision]]\nid = 1\nveredicto = "correcta"\nrevisor = "Alguien"\n',
+        encoding="utf-8",
+    )
+
+    # Act
+    sensibilidad = cargar_sensibilidad(archivo)
+
+    # Assert
+    assert sensibilidad is None
+
+
+def test_cargar_sensibilidad_rechaza_un_veredicto_desconocido(tmp_path: Path) -> None:
+    """Un veredicto fuera de VEREDICTOS se rechaza con la ruta en el mensaje."""
+    # Arrange
+    archivo = tmp_path / "revision.toml"
+    archivo.write_text(
+        "[sensibilidad]\n"
+        'revisor = "Nayla Ledesma"\n'
+        "\n"
+        "[[sensibilidad.cambio]]\n"
+        "id = 2\n"
+        'veredicto = "inventado"\n',
+        encoding="utf-8",
+    )
+
+    # Act / Assert
+    with pytest.raises(ValueError) as error:
+        cargar_sensibilidad(archivo)
+    assert str(archivo) in str(error.value)

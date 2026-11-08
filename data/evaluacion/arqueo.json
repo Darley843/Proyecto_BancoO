@@ -8,9 +8,17 @@
     "preguntas": 44
   },
   "costo": {
+    "ahorro_alcance_pct": 57.0,
     "arqueo_usd": 0.0,
     "preguntas": 44,
+    "v1_alcance_usd": 0.027624,
     "v1_usd": 0.027624,
+    "v2_alcance_con_clasificador": 15,
+    "v2_alcance_cota_inferior": true,
+    "v2_alcance_preguntas": 20,
+    "v2_alcance_sin_motivo": 0,
+    "v2_alcance_usd": 0.011873,
+    "v2_total_cota_inferior": true,
     "v2_usd": 0.015728
   },
   "detalle": {
@@ -696,35 +704,41 @@
     },
     "v2": {
       "aciertos": 11,
-      "citas_correctas": 0.5,
+      "citas_correctas": 0.5556,
       "exactitud": 0.55,
       "revisadas": 20,
       "total": 20
     }
   },
   "mcnemar": {
+    "alfa": 0.05,
     "b": 5,
     "c": 0,
     "excluidos": 0,
     "n": 5,
     "p": 0.0625,
+    "p_minimo": 0.0625,
     "preguntas": 20
   },
   "mcnemar_pesos": {
+    "alfa": 0.05,
     "b": 0,
     "c": 0,
     "excluidos": 0,
     "n": 0,
     "p": 1.0,
+    "p_minimo": 1.0,
     "preguntas": 22,
     "principal": true
   },
   "mcnemar_pesos_todas": {
+    "alfa": 0.05,
     "b": 0,
     "c": 0,
     "excluidos": 0,
     "n": 0,
     "p": 1.0,
+    "p_minimo": 1.0,
     "preguntas": 36,
     "principal": false
   },
@@ -1219,6 +1233,34 @@
         "mrr": 0.5838
       }
     }
+  },
+  "sensibilidad": {
+    "cambios": [
+      {
+        "a": "rechazo_correcto",
+        "de": "incorrecta",
+        "id": 2,
+        "nota": "El corpus solo cita la Carrera 3 No. 8-13 de Cali como lugar de la asamblea de accionistas; no dice que sea una oficina, asi que no encontrar el dato es un rechazo correcto."
+      }
+    ],
+    "evaluacion": {
+      "aciertos": 12,
+      "citas_correctas": 0.5556,
+      "exactitud": 0.6,
+      "revisadas": 20,
+      "total": 20
+    },
+    "mcnemar": {
+      "alfa": 0.05,
+      "b": 5,
+      "c": 1,
+      "excluidos": 0,
+      "n": 6,
+      "p": 0.21875,
+      "p_minimo": 0.03125,
+      "preguntas": 20
+    },
+    "revisor": "Nayla Ledesma"
   },
   "uso": {
     "v1": {
