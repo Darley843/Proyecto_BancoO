@@ -132,11 +132,11 @@
 - [x] 20.1 Implementar `app/web/vistas/vestibulo.js` con los hitos de `config/vestibulo.toml` (año, texto, URL) y una entrada clara a la Ventanilla; verificar con `vestibulo.json` y con la API que los hitos coinciden con el TOML.
 - [x] 20.2 Verificar que el vestíbulo funciona sin clave ni índice, porque es la pantalla de bienvenida, y que no hace llamadas al modelo.
 
-## 21. PR 18 — Arqueo (vista) (Anny — pendiente)
+## 21. PR 18 — Arqueo (vista) (Anny — hecho)
 
-- [ ] 21.1 Implementar `app/web/vistas/arqueo.js` con hit@5, MRR, exactitud, citas correctas, costo y el resultado de McNemar; verificar con `arqueo.json` de ejemplo y, cuando exista el reporte real, con `/api/arqueo` que las cifras coinciden.
-- [ ] 21.2 Mostrar el estado «sin arqueo» cuando `disponible` es falso y no presentar métricas vacías como resultados; verificar sin `data/evaluacion/arqueo.json`.
-- [ ] 21.3 Verificar que la vista distingue recuperación, evaluación v1/v2 y costo, y que no recalcula métricas en el navegador.
+- [x] 21.1 Implementar `app/web/vistas/arqueo.js` con hit@5, MRR, exactitud, citas correctas, costo y el resultado de McNemar; verificar con `arqueo.json` de ejemplo y, cuando exista el reporte real, con `/api/arqueo` que las cifras coinciden.
+- [x] 21.2 Mostrar el estado «sin arqueo» cuando `disponible` es falso y no presentar métricas vacías como resultados; verificar sin `data/evaluacion/arqueo.json`.
+- [x] 21.3 Verificar que la vista distingue recuperación, evaluación v1/v2 y costo, y que no recalcula métricas en el navegador.
 
 ## 22. Experimentos del Arqueo (Anny — en curso)
 

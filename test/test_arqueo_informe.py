@@ -696,6 +696,23 @@ def test_mcnemar_explica_aciertos_discordantes_y_p_minimo() -> None:
     assert "0.050000" not in seccion
 
 
+def test_lectura_del_mcnemar_es_identica_en_json_y_markdown() -> None:
+    """La frase guardada en el JSON es exactamente la que imprime el Markdown."""
+    # Act
+    arqueo, texto, _ = corrida_con_v2()
+    principal = arqueo["mcnemar"]["lectura"]
+    alterno = arqueo["sensibilidad"]["mcnemar"]["lectura"]
+
+    # Assert
+    assert isinstance(principal, str)
+    assert isinstance(alterno, str)
+    seccion = texto.split("## McNemar v1 frente a v2", 1)[1].split("\n## ", 1)[0]
+    assert principal in seccion
+    seccion_sensibilidad = texto.split("## Sensibilidad de la revision humana", 1)[1]
+    seccion_sensibilidad = seccion_sensibilidad.split("\n## ", 1)[0]
+    assert alterno in seccion_sensibilidad
+
+
 def test_mcnemar_con_c_mayor_que_b_dice_favorece_a_v2() -> None:
     """Con c>b y p<0.05 el parrafo declara la direccion hacia v2."""
     # Arrange

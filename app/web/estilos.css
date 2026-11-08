@@ -2031,3 +2031,162 @@ main:focus {
 }
 
 /* --- fin ventanilla --- */
+
+/* --- arqueo (PR 18) --- */
+
+.arqueo {
+  display: grid;
+  gap: 20px;
+}
+
+.arqueo__aviso,
+.arqueo__pendiente {
+  margin: 0;
+  padding: 10px 14px;
+  border-left: 3px solid var(--aviso);
+  border-radius: var(--radio);
+  background: var(--dorado-suave);
+  color: var(--texto);
+  font-size: 14px;
+}
+
+.arqueo__sin-arqueo {
+  padding: 20px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  box-shadow: var(--sombra);
+}
+
+.arqueo__resumen {
+  margin: 0;
+  color: var(--texto-suave);
+}
+
+.arqueo__resumen-nota {
+  font-size: 14px;
+}
+
+.arqueo__seccion {
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  box-shadow: var(--sombra);
+}
+
+.arqueo__titulo {
+  margin: 0;
+  color: var(--azul);
+  font-size: 19px;
+}
+
+.arqueo__pista {
+  margin: 0;
+  color: var(--texto-suave);
+  font-size: 14px;
+}
+
+.arqueo__lectura {
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 3px solid var(--azul);
+  border-radius: var(--radio);
+  background: var(--azul-suave);
+  color: var(--texto);
+  font-size: 14px;
+}
+
+.arqueo__tabla-envoltura {
+  overflow-x: auto;
+}
+
+.arqueo__tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.arqueo__caption {
+  padding-bottom: 8px;
+  color: var(--texto-suave);
+  font-size: 13px;
+  text-align: left;
+}
+
+.arqueo__tabla th,
+.arqueo__tabla td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--borde);
+  text-align: left;
+  vertical-align: top;
+}
+
+.arqueo__tabla thead th {
+  color: var(--texto-suave);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.arqueo__tabla tbody th {
+  color: var(--texto);
+  font-weight: 600;
+}
+
+.arqueo__tabla--numerica th:not(:first-child),
+.arqueo__tabla--numerica td:not(:first-child) {
+  font-family: var(--fuente-cifras);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.arqueo__avisos {
+  margin: 0;
+  padding-left: 20px;
+  color: var(--texto-suave);
+  font-size: 14px;
+}
+
+.arqueo__error {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.arqueo__reintentar {
+  padding: 6px 14px;
+  border: 1px solid var(--borde);
+  border-radius: var(--radio);
+  background: var(--superficie);
+  color: var(--azul);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+@media (max-width: 600px) {
+  .arqueo__seccion {
+    padding: 12px;
+  }
+
+  .arqueo__tabla {
+    font-size: 13px;
+  }
+
+  .arqueo__tabla th,
+  .arqueo__tabla td {
+    padding: 6px 8px;
+  }
+
+  .arqueo__tabla--numerica th:not(:first-child),
+  .arqueo__tabla--numerica td:not(:first-child) {
+    white-space: normal;
+  }
+}
+
+/* --- fin arqueo --- */

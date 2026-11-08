@@ -4,7 +4,7 @@ Reporte reproducible de recuperacion, evaluacion y costo de la fase 2. Se genera
 
 ## Ficha de corrida
 
-- Commit: `fd40808`.
+- Commit: `2f3fd70`.
 - Alcance del indice: `base`.
 - Indice con prefijos: `data/boveda/indice.json` con modelo `nomic-embed-text-v2-moe`, prefijos si, 869 fragmentos y dimension 768.
 - Indice sin prefijos: `data/boveda/experimentos/sin_prefijos/indice.json` con 869 fragmentos y dimension 768.

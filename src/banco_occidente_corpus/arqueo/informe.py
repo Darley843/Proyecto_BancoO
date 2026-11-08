@@ -3,8 +3,11 @@
 El JSON conserva las cinco claves del contrato de ``design.md`` y agrega solo
 claves nuevas (``uso``, ``mcnemar_pesos``, ``detalle``, ``conteos``, ``avisos``,
 ``referencia_anexo_a`` y ``sensibilidad``). Cada bloque de McNemar incluye
-``p_minimo`` y ``alfa``. El costo de v2, tanto el total como el de las 20
-preguntas de alcance, es una cota inferior: cuenta el turno de respuesta pero no
+``p_minimo`` y ``alfa``. El McNemar v1 frente a v2 y el de ``sensibilidad``
+agregan ``lectura``: la frase explicativa que tambien usa el Markdown, para que
+la web y ``docs/ARQUEO.md`` digan exactamente lo mismo. El costo de v2, tanto el
+total como el de las 20 preguntas de alcance, es una cota inferior: cuenta el
+turno de respuesta pero no
 el clasificador de dudas ni la reformulacion (#93); el numero de preguntas que
 usaron el clasificador sale del motivo registrado en `resultados_v2.jsonl`, no
 de una constante.
@@ -456,6 +459,18 @@ def construir_arqueo(
         revisiones_v2,
         ids_alcance,
     )
+    mcnemar = _mcnemar_json(mcnemar_versiones, ids_alcance)
+    aciertos_v1 = evaluacion_v1["aciertos"] if evaluacion_v1 is not None else 0
+    mcnemar["lectura"] = (
+        _frase_mcnemar(
+            mcnemar,
+            aciertos_v1,
+            evaluacion_v2["aciertos"],
+            mcnemar["preguntas"],
+        )
+        if evaluacion_v2 is not None
+        else None
+    )
     ids_boveda = ids_por_ruta(barrido, "B")
     ids_evaluables = ids_por_ruta(barrido)
     mcnemar_pesos = comparar_pesos(barrido, ids_boveda)
@@ -534,7 +549,7 @@ def construir_arqueo(
     return {
         "recuperacion": recuperacion,
         "evaluacion": {"v1": evaluacion_v1, "v2": evaluacion_v2},
-        "mcnemar": _mcnemar_json(mcnemar_versiones, ids_alcance),
+        "mcnemar": mcnemar,
         "costo": {
             "v1_usd": round(resumen_v1.costo_usd_total, DECIMALES_COSTO),
             "v2_usd": (
@@ -570,6 +585,7 @@ def construir_arqueo(
             revisiones_v2,
             resultados_v2,
             ids_alcance,
+            aciertos_v1=aciertos_v1,
         ),
         "preguntas_por_tipo": _conteo_por_tipo(preguntas),
         "uso": {
@@ -762,6 +778,8 @@ def _sensibilidad_json(
     revision_v2: Mapping[int, Revision],
     resultados_v2: Sequence[ResultadoEvaluacion],
     ids: Sequence[int],
+    *,
+    aciertos_v1: int,
 ) -> dict[str, Any] | None:
     """Aplica el escenario de sensibilidad y resume su evaluacion y McNemar."""
     if sensibilidad is None or not sensibilidad.cambios or not revision_v2:
@@ -793,11 +811,22 @@ def _sensibilidad_json(
         ids,
         fuentes_citadas=True,
     )
+    alterno = _mcnemar_json(comparar_versiones(revision_v1, revisadas, ids), ids)
+    alterno["lectura"] = (
+        _frase_mcnemar(
+            alterno,
+            aciertos_v1,
+            evaluacion["aciertos"],
+            alterno["preguntas"],
+        )
+        if evaluacion is not None
+        else None
+    )
     return {
         "revisor": sensibilidad.revisor,
         "cambios": cambios,
         "evaluacion": evaluacion,
-        "mcnemar": _mcnemar_json(comparar_versiones(revision_v1, revisadas, ids), ids),
+        "mcnemar": alterno,
     }
 
 
@@ -824,7 +853,11 @@ def _resumen_json(resumen: ResumenUso) -> dict[str, Any]:
 
 
 def _mcnemar_json(resultado: ResultadoMcNemar, ids: Sequence[int]) -> dict[str, Any]:
-    """Serializa un resultado de McNemar con sus conteos y su p minima."""
+    """Serializa un resultado de McNemar con sus conteos y su p minima.
+
+    La clave ``lectura`` la agregan los llamadores que conocen los aciertos de
+    las dos versiones; ``mcnemar_pesos`` no la lleva.
+    """
     return {
         "b": resultado.b,
         "c": resultado.c,
@@ -1036,12 +1069,7 @@ def render_markdown(arqueo: Mapping[str, Any], ficha: FichaCorrida) -> str:
             f"{_num(mcnemar['p'], DECIMALES_COSTO)} | "
             f"{_num(mcnemar['p_minimo'], DECIMALES_COSTO)} | {mcnemar['excluidos']} |",
             "",
-            _frase_mcnemar(
-                mcnemar,
-                v1["aciertos"] if v1 is not None else 0,
-                v2["aciertos"],
-                mcnemar["preguntas"],
-            ),
+            str(mcnemar.get("lectura") or "—"),
         ]
 
     lineas += _seccion_sensibilidad(arqueo, v2, mcnemar)
@@ -1162,7 +1190,6 @@ def _seccion_sensibilidad(
     if evaluacion is None:
         return []
     alterno = sensibilidad["mcnemar"]
-    v1 = arqueo["evaluacion"]["v1"]
     lineas = [
         "",
         "## Sensibilidad de la revision humana",
@@ -1189,12 +1216,7 @@ def _seccion_sensibilidad(
         f"{_num(alterno['p'], DECIMALES_COSTO)} | "
         f"{_num(alterno['p_minimo'], DECIMALES_COSTO)} |",
         "",
-        _frase_mcnemar(
-            alterno,
-            v1["aciertos"] if v1 is not None else 0,
-            evaluacion["aciertos"],
-            alterno["preguntas"],
-        ),
+        str(alterno.get("lectura") or "—"),
     ]
     return lineas
 
@@ -1209,6 +1231,7 @@ def _frase_mcnemar(
 
     El texto sale de los conteos del McNemar y de los aciertos de cada version.
     Nunca usa la palabra ``mejora``: si la direccion favorece a v1, lo dice.
+    Se guarda en ``mcnemar["lectura"]`` y el Markdown imprime esa misma cadena.
     """
     b = datos["b"]
     c = datos["c"]
