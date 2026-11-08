@@ -65,15 +65,18 @@ class EspiaEmbeddings(Embeddings):
     """Proveedor de pruebas que registra el texto exacto que recibe."""
 
     def __init__(self, dimension: int = 3) -> None:
+        """Guarda la dimensión y los registros de lo recibido."""
         self.dimension = dimension
         self.documentos: list[str] = []
         self.consultas: list[str] = []
 
     def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Registra los textos y devuelve un vector constante por documento."""
         self.documentos.extend(texts)
         return [[1.0] * self.dimension for _ in texts]
 
     def embed_query(self, text: str) -> list[float]:
+        """Registra la consulta y devuelve un vector constante."""
         self.consultas.append(text)
         return [1.0] * self.dimension
 
@@ -94,9 +97,10 @@ class AlmacenFalso:
     """Almacén en memoria que cumple el protocolo de la Bóveda."""
 
     def __init__(self) -> None:
+        """Inicia el almacén en memoria vacío."""
         self.reinicios = 0
         self.ids: list[str] = []
-        self.vectores: list[list[float]] = []
+        self._vectores: list[list[float]] = []
         self.documentos: list[str] = []
         self.metadatos: list[dict[str, Any]] = []
 
@@ -112,13 +116,22 @@ class AlmacenFalso:
     ) -> None:
         """Acumula el lote recibido."""
         self.ids.extend(ids)
-        self.vectores.extend([list(vector) for vector in vectores])
+        self._vectores.extend([list(vector) for vector in vectores])
         self.documentos.extend(documentos)
         self.metadatos.extend(metadatos)
 
     def buscar(self, vector: Sequence[float], k: int = 5) -> list[Coincidencia]:
         """No implementa búsqueda: el índice solo inserta."""
         return []
+
+    def vectores(self, ids: Sequence[str]) -> dict[str, list[float]]:
+        """Devuelve los vectores guardados de los ids que existan."""
+        guardados = dict(zip(self.ids, self._vectores, strict=True))
+        return {
+            identificador: guardados[identificador]
+            for identificador in ids
+            if identificador in guardados
+        }
 
     def contar(self) -> int:
         """Devuelve cuántos vectores se insertaron."""
@@ -128,7 +141,7 @@ class AlmacenFalso:
         """Vacía el almacén y cuenta el reinicio."""
         self.reinicios += 1
         self.ids.clear()
-        self.vectores.clear()
+        self._vectores.clear()
         self.documentos.clear()
         self.metadatos.clear()
 
@@ -376,6 +389,23 @@ def test_chroma_buscar_devuelve_similitud_coseno(tmp_path: Path) -> None:
     assert resultados[0].id == "cerca"
     assert resultados[0].similitud == pytest.approx(1.0 - resultados[0].distancia)
     assert resultados[0].similitud > resultados[1].similitud
+
+
+def test_chroma_vectores_devuelve_los_guardados(tmp_path: Path) -> None:
+    """Los vectores se leen por id sin volver a llamar al modelo."""
+    almacen = ChromaAlmacen(tmp_path / "chroma")
+    almacen.agregar(
+        ["a", "b"],
+        [[1.0, 0.0], [0.0, 1.0]],
+        ["documento a", "documento b"],
+        [{"tipo": "pagina"}, {"tipo": "pagina"}],
+    )
+
+    vectores = almacen.vectores(["b", "falta", "a"])
+
+    assert set(vectores) == {"a", "b"}
+    assert vectores["a"] == pytest.approx([1.0, 0.0])
+    assert vectores["b"] == pytest.approx([0.0, 1.0])
 
 
 def test_chroma_rechaza_k_no_positivo(tmp_path: Path) -> None:

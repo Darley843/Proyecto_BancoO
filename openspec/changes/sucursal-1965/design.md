@@ -99,7 +99,7 @@ Alternativa descartada: actualización incremental por hash. Ahorra tiempo, pero
 
 `boveda/recuperador.py` combina un retriever de Chroma con `BM25Retriever` mediante `langchain_classic.retrievers.EnsembleRetriever`, con pesos `peso_vectorial` y `peso_bm25` de `config/sucursal.toml`. BM25 se construye en memoria desde los fragmentos del alcance activo.
 
-El contrato fija `puntaje = 1 - distancia coseno`. Para cumplirlo también en los fragmentos que solo devuelve BM25, el recuperador vuelve a puntuar cada candidato contra la consulta con el mismo embedding y reporta esa similitud; el orden final lo decide el `EnsembleRetriever`. Así `puntaje` siempre significa lo mismo y el Arqueo puede compararlo entre configuraciones.
+El contrato fija `puntaje = 1 - distancia coseno`. La consulta se vectoriza una sola vez por búsqueda. Para cumplir el contrato también en los fragmentos que solo devuelve BM25, el recuperador lee del índice los vectores ya guardados de los candidatos y los compara contra ese vector; solo si un fragmento no está en Chroma lo vectoriza al vuelo. El orden final lo decide el `EnsembleRetriever`. Así `puntaje` siempre significa lo mismo, sin pagar embeddings de más, y el Arqueo puede compararlo entre configuraciones.
 
 Alternativa descartada: normalizar el score de BM25 a 0–1. Es más barato, pero rompe el contrato y mezcla dos escalas en el mismo campo.
 

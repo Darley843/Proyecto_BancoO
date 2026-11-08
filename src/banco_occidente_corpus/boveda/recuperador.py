@@ -1,9 +1,10 @@
 """Recuperador híbrido de la Bóveda: vectorial + BM25 con pesos configurables.
 
-El orden final lo decide `EnsembleRetriever`. Después de fusionar, cada candidato
-se vuelve a puntuar con el mismo embedding de la consulta, de modo que `puntaje`
-significa siempre `1 - distancia coseno`, también para los fragmentos que solo
-devolvió BM25. El módulo no hace red propia: embeddings y almacén se inyectan.
+El orden final lo decide `EnsembleRetriever`. La consulta se vectoriza una sola
+vez por búsqueda, y `puntaje` se calcula contra los vectores que ya están
+guardados en el índice, de modo que significa siempre `1 - distancia coseno`,
+también para los fragmentos que solo devolvió BM25. El módulo no hace red propia:
+embeddings y almacén se inyectan.
 """
 
 from __future__ import annotations
@@ -40,6 +41,8 @@ class RecuperadorVectorial(BaseRetriever):
     almacen: Any
     embeddings: Any
     k: int = K_MINIMO
+    #: Vector de la consulta ya calculado; si falta, se pide a los embeddings.
+    vector: Sequence[float] | None = None
 
     def _get_relevant_documents(
         self,
@@ -48,7 +51,7 @@ class RecuperadorVectorial(BaseRetriever):
         run_manager: CallbackManagerForRetrieverRun | None = None,
     ) -> list[Document]:
         """Devuelve los k fragmentos más cercanos del almacén."""
-        vector = self.embeddings.embed_query(query)
+        vector = self.vector if self.vector is not None else self.embeddings.embed_query(query)
         coincidencias = self.almacen.buscar(vector, k=self.k)
         return [
             Document(
@@ -87,30 +90,68 @@ class RecuperadorHibrido:
             for fragmento in fragmentos
         ]
         self._k = max(ajustes.k, K_MINIMO)
-        self._vectorial = RecuperadorVectorial(almacen=almacen, embeddings=embeddings, k=self._k)
+        self._almacen = almacen
+        self._pesos = _normalizar_pesos(ajustes)
         self._bm25 = BM25Retriever.from_documents(
             self._documentos, k=self._k, preprocess_func=_tokenizar
         )
-        self._ensemble = EnsembleRetriever(
-            retrievers=[self._vectorial, self._bm25],
-            weights=_normalizar_pesos(ajustes),
-        )
 
     def buscar(self, consulta: str, k: int = 5) -> list[Fragmento]:
-        """Devuelve hasta k fragmentos ordenados por relevancia y con puntaje."""
+        """Devuelve hasta k fragmentos ordenados por relevancia y con puntaje.
+
+        La consulta se vectoriza una sola vez. Ese vector alimenta la búsqueda
+        vectorial y, después de la fusión, el `puntaje` de cada candidato se
+        calcula con los vectores que ya están guardados en el índice.
+        """
         if k <= 0:
             raise ValueError("k debe ser mayor que cero")
-        documentos = self._ensemble.invoke(consulta)[:k]
+        vector_consulta = self._embeddings.embed_query(consulta)
+        # El recuperador vectorial se arma por búsqueda para pasarle el vector
+        # ya calculado sin compartir estado entre peticiones concurrentes.
+        vectorial = RecuperadorVectorial(
+            almacen=self._almacen,
+            embeddings=self._embeddings,
+            k=self._k,
+            vector=vector_consulta,
+        )
+        ensemble = EnsembleRetriever(
+            retrievers=[vectorial, self._bm25],
+            weights=self._pesos,
+        )
+        documentos = ensemble.invoke(consulta)[:k]
         if not documentos:
             return []
 
-        vector_consulta = self._embeddings.embed_query(consulta)
-        vectores = self._embeddings.embed_documents([doc.page_content for doc in documentos])
+        vectores = self._vectores_guardados(documentos)
         resultados: list[Fragmento] = []
-        for documento, vector in zip(documentos, vectores, strict=True):
+        for documento in documentos:
             base = self._fragmento(documento)
-            resultados.append(replace(base, puntaje=_similitud_coseno(vector_consulta, vector)))
+            vector = vectores.get(base.id)
+            puntaje = 0.0 if vector is None else _similitud_coseno(vector_consulta, vector)
+            resultados.append(replace(base, puntaje=puntaje))
         return resultados
+
+    def _vectores_guardados(self, documentos: Sequence[Document]) -> dict[str, list[float]]:
+        """Lee los vectores de los fragmentos recuperados en el índice.
+
+        Si un fragmento aparece en BM25 pero no en el índice (por ejemplo, con
+        Gold más nuevo que Chroma), se vectoriza solo ese texto para no dejar su
+        `puntaje` en cero.
+        """
+        ids = [str(documento.metadata.get("id", "")) for documento in documentos]
+        vectores = self._almacen.vectores([identificador for identificador in ids if identificador])
+        faltantes = [
+            documento
+            for documento, identificador in zip(documentos, ids, strict=True)
+            if identificador and identificador not in vectores
+        ]
+        if faltantes:
+            calculados = self._embeddings.embed_documents(
+                [documento.page_content for documento in faltantes]
+            )
+            for documento, vector in zip(faltantes, calculados, strict=True):
+                vectores[str(documento.metadata.get("id", ""))] = vector
+        return vectores
 
     def _fragmento(self, documento: Document) -> Fragmento:
         """Recupera el fragmento original o lo reconstruye desde sus metadatos."""
