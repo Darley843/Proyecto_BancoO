@@ -1,4 +1,4 @@
-﻿# Auditoría SkillSpector de las skills del proyecto
+# Auditoría SkillSpector de las skills del proyecto
 
 **Fecha:** 25 de octubre de 2026 · **Herramienta:** SkillSpector 2.12.0 (`--no-llm`, análisis estático) · **Revisó:** Anny Valencia
 
@@ -34,6 +34,57 @@ Todas quedan en CAUTION porque el escaneo es parcial: las skills citan archivos 
 ## Alcance de esta revisión
 
 Se revisaron a mano las líneas marcadas y los dos scripts. No es una auditoría línea por línea de las más de 2.000 líneas de las ocho skills.
+
+---
+
+## Actualización del 7 de noviembre de 2026: Archify y boveda-rag
+
+**Herramienta:** SkillSpector 2.12.0 (`--no-llm`, análisis estático) · **Revisó:** Anny Valencia
+
+| Skill | Origen | Versión auditada | Nota | Severidad | Scripts | Dictamen |
+|---|---|---|---|---|---|---|
+| archify | Externa (`tt-a1i/archify`, MIT) | v3.2.0, commit `a4065941f12be7967436261d9934784e381d423c` | 99/100 | CRITICAL | Sí (Node, 206 archivos) | Aceptada con condiciones |
+| boveda-rag | Equipo (Nayla) | `main` del 7 de noviembre de 2026 | 7/100 | LOW | Sí (`medir_recuperacion.py`, `validar_indice.py`) | Aceptada con recomendación |
+
+Archify se auditó **antes de instalarla**, desde un clon del repositorio oficial (el que enlaza https://archify.si), sin ejecutar su instalador. La nota de 99/100 no se sostiene en la revisión manual: casi todos los hallazgos son limitaciones del analizador o falsos positivos. El escaneo quedó parcial: 15 analizadores en estado `degraded` y 43 artefactos citados en `SKILL.md` sin inspeccionar.
+
+### Revisión manual de Archify
+
+- **AE1 ×43 (`SKILL.md`):** «Referenced artifact was not completely inspected». Es cobertura parcial del analizador, como el AE1 de semantic-extraction; no es indicio de evasión.
+- **YR4 ×16 (`assets/template.html` y 15 HTML de `examples/`):** falso positivo. La línea marcada (`template.html:146`) es la fuente JetBrains Mono incrustada en base64 (`data:font/woff2;base64,...`), con su licencia OFL en `assets/`. Los ejemplos son diagramas generados con esa plantilla y la repiten.
+- **EA3 ×25 (los mismos HTML):** falso positivo. La línea marcada en la plantilla (`template.html:135`) es el texto de la licencia MIT.
+- **AE4 (`examples/locales/ru.json`):** falso positivo. Es la traducción al ruso: texto en cirílico junto a claves en inglés.
+- **LP3 (`SKILL.md`):** real. La skill no declara permisos y su código usa procesos y red:
+  - Procesos: Node se lanza a sí mismo para ejecutar sus propios scripts (`process.execPath` en `archify`, `finalize`, `preview`, `delivery-update`, `check` y `render-examples`); `git --no-replace-objects` en modo de solo lectura (`sources.mjs`, `repository-evidence.mjs`) para los diagramas de repositorio; y el abridor del sistema para mostrar el HTML generado (`open-artifact.mjs`). `visual-check.mjs` también lanza un proceso y no se revisó en detalle.
+  - Red: `scripts/check-update.mjs` consulta `https://tt-a1i.github.io/archify/skill-updates/archify/stable.json` con tiempo límite, valida el manifiesto (versión, sha256 y caracteres de control) y solo avisa: no descarga ni instala nada. `renderers/shared/brand-marks.mjs` descarga páginas e imágenes desde la URL que se le pasa, para obtener logos.
+
+### Hallazgos fuera de SkillSpector
+
+- **Instalación sin versión fija.** El comando del proyecto (`npx -y skills@latest add https://archify.si ... --yes`) instala la última versión sin confirmación ni hash. Existen copias de terceros con el mismo nombre (por ejemplo, `belinwu/archify`), así que conviene fijar el repositorio y el commit auditados.
+- **Logos del banco.** Si se le pide a Archify el logo del Banco de Occidente, `brand-marks.mjs` lo descarga del sitio del banco sin las reglas de captura del proyecto (`robots.txt`, 1,5 s entre peticiones y cabecera `From`).
+
+### Condiciones para usar Archify
+
+1. Instalarla desde `github.com/tt-a1i/archify` en el commit `a4065941f12be7967436261d9934784e381d423c` (v3.2.0), no con `@latest`, y repetir esta auditoría antes de actualizar.
+2. Seguir usándola fuera del pipeline, de `uv.lock` y de la CI, como hoy.
+3. No usar las marcas automáticas con URL del banco: pasar el logo como archivo local.
+4. Omitir el paso de aviso de actualización (`references/update-awareness.md`) si no se quieren llamadas salientes.
+
+### boveda-rag
+
+Se volvió a escanear porque `medir_recuperacion.py` cambió después del #68 (con el #78 y el #85). Con la copia del repositorio da 7/100 LOW y un solo aviso LP3 (no declara permisos y usa lectura y escritura de archivos y la llamada local a Ollama), igual que en el #68.
+
+Un primer escaneo de la carpeta de trabajo dio 78/100 HIGH (SC8 ×2 y SC9) por `scripts/__pycache__/medir_recuperacion.cpython-313.pyc`, un bytecode que Python generó al correr el script en el equipo. Git lo ignora (`.gitignore`, `__pycache__/`), así que no es parte de la skill. **Las skills se escanean desde una copia limpia, no desde la carpeta de trabajo.**
+
+### Cómo repetir
+
+```bash
+git clone https://github.com/tt-a1i/archify.git
+git -C archify checkout a4065941f12be7967436261d9934784e381d423c
+skillspector scan archify/archify --no-llm --format markdown > reporte-archify.md
+```
+
+En Windows, `--output` no está soportado: hay que redirigir la salida, y conviene activar `PYTHONUTF8=1` para que el reporte conserve los caracteres. El reporte completo de Archify supera las 1.000 líneas y no se copia aquí; el de boveda-rag está al final de este documento.
 
 ---
 
@@ -908,3 +959,130 @@ Recommendation: CAUTION
 Status: partial
 
 - One or more recursive skill scans were incomplete.
+
+
+--- boveda-rag (7 de noviembre de 2026) ---
+
+# SkillSpector Security Report
+
+**Skill:** boveda\-rag
+**Source:** `C:\Users\PC\Documents\Proyecto_BancoO\.opencode\skills\boveda-rag`
+**Scanned:** 2026-11-07 18:02:05 UTC
+
+## Risk Assessment
+
+| Metric | Value |
+|--------|-------|
+| Score | 7/100 |
+| Severity | LOW |
+| Recommendation | CAUTION |
+
+## Components (3)
+
+| File | Type | Lines | Executable |
+|------|------|-------|------------|
+| `SKILL.md` | markdown | 201 | No |
+| `scripts/medir_recuperacion.py` | python | 571 | Yes |
+| `scripts/validar_indice.py` | python | 297 | Yes |
+
+## Issues (1)
+
+### 🟡 MEDIUM: LP3
+
+**Location:** `SKILL.md:1`
+**Confidence:** 70%
+
+**Message:** Skill declares no tool scope \('permissions' or 'allowed\-tools'\) but code capabilities were detected: file\_read, file\_write, network\.
+
+**Remediation:** Clarify the skill's intended tool scope and review how the host runtime enforces it; runtime permissions are unknown unless separately verified\. For Claude Code / Agent Skills SKILL\.md, 'allowed\-tools' records preapproved tools, not a permission ceiling; add a tool only when it is independently approved as necessary, not to silence this finding\. For MCP server manifests, use a 'permissions' list naming the required capabilities\.
+
+---
+
+## Inspection Completeness
+
+| Metric | Value |
+|--------|-------|
+| Execution | successful |
+| Status | partial |
+| Coverage | 100\.0% |
+| Fully inspected | 3 |
+| Partially inspected | 0 |
+| Entirely uninspected | 0 |
+
+### Ledger Exceptions
+
+| Reason / Status | Location | Details |
+|-----------------|----------|---------|
+| reference\_missing | `SKILL.md:29-29` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:30-30` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:31-31` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:34-34` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:37-37` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:38-38` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:39-39` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:41-41` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:42-42` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:45-45` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:47-47` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:48-48` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:51-51` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:52-52` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:53-53` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:55-55` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:63-63` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:64-64` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:85-85` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:112-112` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:115-115` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:118-118` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:123-123` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:138-138` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:139-139` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:142-142` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:144-144` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:145-145` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:147-147` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:165-165` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:166-166` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:192-192` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:193-193` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:194-194` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+| reference\_missing | `SKILL.md:198-198` | A local path\-like reference does not match any bundled artifact, such as a file the skill writes at runtime\. |
+
+### Analyzer Statuses
+
+| Reason / Status | Location | Details |
+|-----------------|----------|---------|
+| completed | `artifact_integrity` |  |
+| completed | `behavioral_ast` |  |
+| completed | `behavioral_taint_tracking` |  |
+| no\_applicable\_files | `bundled_execution_surface` | No files matched this analyzer's applicability contract\. |
+| completed | `mcp_least_privilege` |  |
+| completed | `mcp_rug_pull` |  |
+| completed | `mcp_tool_poisoning` |  |
+| disabled\_by\_configuration | `meta_analyzer` | Analyzer was disabled by the requested configuration\. |
+| disabled\_by\_configuration | `semantic_developer_intent` | Analyzer was disabled by the requested configuration\. |
+| disabled\_by\_configuration | `semantic_quality_policy` | Analyzer was disabled by the requested configuration\. |
+| disabled\_by\_configuration | `semantic_security_discovery` | Analyzer was disabled by the requested configuration\. |
+| completed | `static_patterns_agent_snooping` |  |
+| completed | `static_patterns_anti_refusal` |  |
+| completed | `static_patterns_data_exfiltration` |  |
+| completed | `static_patterns_deserialization` |  |
+| completed | `static_patterns_excessive_agency` |  |
+| completed | `static_patterns_harmful_content` |  |
+| completed | `static_patterns_memory_poisoning` |  |
+| completed | `static_patterns_output_handling` |  |
+| completed | `static_patterns_privilege_escalation` |  |
+| completed | `static_patterns_prompt_injection` |  |
+| completed | `static_patterns_rogue_agent` |  |
+| completed | `static_patterns_ssrf` |  |
+| completed | `static_patterns_supply_chain` |  |
+| completed | `static_patterns_system_prompt_leakage` |  |
+| completed | `static_patterns_tool_misuse` |  |
+| completed | `static_yara` |  |
+
+## Metadata
+
+- **Executable Scripts:** Yes
+
+*Generated by SkillSpector v2.12.0*

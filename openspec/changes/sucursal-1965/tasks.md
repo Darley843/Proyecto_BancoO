@@ -17,11 +17,11 @@
 - [x] 3.1 Verificar que `config/evaluacion/preguntas_fase2.toml` tiene 44 preguntas con `tipo` (`alcance`, `tabla`, `seguimiento`, `fuera`), `ruta_esperada` (`B`, `T`, `X`), `fuentes_esperadas` y `previa` solo en las de seguimiento; comprobar los conteos 20/12/6/6 y que cada URL esperada existe exactamente en `data/gold/corpus.jsonl`.
 - [x] 3.2 Verificar que las 12 preguntas de tipo `tabla` apuntan al tarifario (41 a 44) y a las páginas de asistencias, Cuota Protegida, promociones y proyectos de vivienda, y que las 6 de tipo `fuera` incluyen saldo, cédula, consejo de inversión, otro banco, inyección de prompt y clima; ejecutar `uv run pytest test/test_preguntas_fase2.py`.
 
-## 4. Métricas del Arqueo (Anny — en revisión en #45)
+## 4. Métricas del Arqueo (Anny — hecho en #45)
 
-- [ ] 4.1 Verificar que `arqueo/metricas.py` expone `hit_at_k`, `mrr`, `exactitud`, `citas_correctas`, `resumen_uso`, `mcnemar` y la dataclass `Tarifas` con `TARIFAS_DEEPSEEK_FLASH` y `TARIFAS_DEEPSEEK_FLASH_PICO`; ejecutar `uv run pytest test/test_arqueo_metricas.py` y comprobar los casos de listas vacías, `k <= 0`, pares incompletos y `p = 1` sin discordancias.
+- [x] 4.1 Verificar que `arqueo/metricas.py` expone `hit_at_k`, `mrr`, `exactitud`, `citas_correctas`, `resumen_uso`, `mcnemar` y la dataclass `Tarifas` con `TARIFAS_DEEPSEEK_FLASH` y `TARIFAS_DEEPSEEK_FLASH_PICO`; ejecutar `uv run pytest test/test_arqueo_metricas.py` y comprobar los casos de listas vacías, `k <= 0`, pares incompletos y `p = 1` sin discordancias.
 - [x] 4.2 Hacer que `acierta_terminos` use `banco_occidente_corpus.texto.normalizar` (``casefold``, NFKD y eliminación de marcas combinantes), la misma función que reutiliza `asistente/evaluacion.py`, y añadir pruebas con «petición»/«peticion» y con «línea» frente a «linea» en los dos sentidos; verificar que el resto de la suite de métricas sigue pasando.
-- [ ] 4.3 Verificar que `TARIFAS_DEEPSEEK_FLASH` y `TARIFAS_DEEPSEEK_FLASH_PICO` son la única fuente de precios y que el docstring declara la franja de pico (01:00–04:00 y 06:00–10:00 UTC de lunes a viernes); comprobar que ningún otro archivo del repo repite esos valores.
+- [x] 4.3 Verificar que `TARIFAS_DEEPSEEK_FLASH` y `TARIFAS_DEEPSEEK_FLASH_PICO` son la única fuente de precios y que el docstring declara la franja de pico (01:00–04:00 y 06:00–10:00 UTC de lunes a viernes); comprobar que ningún otro archivo del repo repite esos valores.
 
 ## 5. PR 3 — Fragmentos (Nayla — pendiente)
 
@@ -45,12 +45,12 @@
 - [x] 7.3 Añadir la sección `[recuperacion]` de `config/sucursal.toml` (`k`, `peso_vectorial`, `peso_bm25`; los prefijos ya viven en `[embeddings]`) con validación de tipos y valores; verificar con pruebas de configuración inválida y con una prueba de contrato de que el recuperador real y el simulado satisfacen `Recuperador`.
 - [x] 7.4 Documentar en `docs/MODELADO.md` el híbrido, el significado único de `puntaje` y cómo se eligen los pesos; verificar que el texto no promete normalizar BM25 y que el Arqueo puede variar los pesos desde configuración.
 
-## 8. PR 6 — Prompt v2 y RAG (Anny — pendiente)
+## 8. PR 6 — Prompt v2 y RAG (Anny — hecho)
 
-- [ ] 8.1 Crear `config/prompts/qa_v2.md` con frontmatter `version: v2`, `tarea: qa`, secciones `## Sistema` y `## Recordatorio`, `<fragmentos>` numerados con su `Fuente`, citas `[n]`, lista final `Fuentes:` y la regla de tratar los fragmentos como datos; verificar con `cargar_prompt("qa", "v2")` que el contrato de `prompts.py` se cumple y que `v0`/`v1` no cambian.
-- [ ] 8.2 Implementar `asistente/rag.py` con `formatear_fragmentos`, `validar_citas` y el adaptador `ContextoRag` que reutiliza las comprobaciones atómicas de `asistente.validacion` (frase fija, cifras inventadas, fuga, PII y tope de palabras); verificar con `FakeListChatModel` los casos cita válida, cita fuera de rango, fuente inventada, cifra inventada, fuga de prompt y PII.
-- [ ] 8.3 Añadir pruebas del prompt v2 y de la integración con `servicio`/`cli` sin red; verificar que `versiones_disponibles("qa")` incluye `v2` y que una respuesta sin cita cae en la frase fija con aviso.
-- [ ] 8.4 Documentar en `docs/EXPERIMENTOS_PROMPTS.md` la diferencia entre `qa_v1` (contexto completo) y `qa_v2` (fragmentos citados); verificar que el documento explica el formato `[n]`, la lista de fuentes y la validación posterior.
+- [x] 8.1 Crear `config/prompts/qa_v2.md` con frontmatter `version: v2`, `tarea: qa`, secciones `## Sistema` y `## Recordatorio`, `<fragmentos>` numerados con su `Fuente`, citas `[n]`, lista final `Fuentes:` y la regla de tratar los fragmentos como datos; verificar con `cargar_prompt("qa", "v2")` que el contrato de `prompts.py` se cumple y que `v0`/`v1` no cambian.
+- [x] 8.2 Implementar `asistente/rag.py` con `formatear_fragmentos`, `validar_citas` y el adaptador `ContextoRag` que reutiliza las comprobaciones atómicas de `asistente.validacion` (frase fija, cifras inventadas, fuga, PII y tope de palabras); verificar con `FakeListChatModel` los casos cita válida, cita fuera de rango, fuente inventada, cifra inventada, fuga de prompt y PII.
+- [x] 8.3 Añadir pruebas del prompt v2 y de la integración con `servicio`/`cli` sin red; verificar que `versiones_disponibles("qa")` incluye `v2` y que una respuesta sin cita cae en la frase fija con aviso.
+- [x] 8.4 Documentar en `docs/EXPERIMENTOS_PROMPTS.md` la diferencia entre `qa_v1` (contexto completo) y `qa_v2` (fragmentos citados); verificar que el documento explica el formato `[n]`, la lista de fuentes y la validación posterior.
 
 ## 9. PR 7 — Tablero con tarifario y tablas web (Darley — pendiente)
 

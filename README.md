@@ -78,8 +78,17 @@ recuperación → respuesta citada**, y **PDF/tablas → CSV → plantilla** —
 se genera con Archify.
 
 ```bash
-# una vez: instala la skill de Archify (Node >= 18)
-npx -y skills@latest add https://archify.si --skill archify --agent opencode --global --copy --yes
+# una vez: instala Archify v3.2.0 en el commit auditado (Node >= 18).
+# No uses `skills@latest`: actualizar exige repetir la auditoría
+# (docs/auditoria-skills-proyecto.md).
+tmp="$(mktemp -d)"
+git init -q "$tmp"
+git -C "$tmp" fetch -q --depth 1 https://github.com/tt-a1i/archify.git a4065941f12be7967436261d9934784e381d423c
+git -C "$tmp" checkout -q FETCH_HEAD
+rm -rf ~/.agents/skills/archify
+mkdir -p ~/.agents/skills
+cp -r "$tmp/archify" ~/.agents/skills/archify
+rm -rf "$tmp"
 
 # cada vez que cambie un diagrama
 node ~/.agents/skills/archify/bin/archify.mjs finalize architecture \
@@ -87,6 +96,21 @@ node ~/.agents/skills/archify/bin/archify.mjs finalize architecture \
 node ~/.agents/skills/archify/bin/archify.mjs finalize dataflow \
   docs/datos.json docs/datos.html --repo-root . --quality showcase --json
 ```
+
+En PowerShell, la instalación equivalente es la que se probó en Windows:
+
+```powershell
+$tmp = Join-Path $env:TEMP "archify-src"
+git init -q $tmp
+git -C $tmp fetch -q --depth 1 https://github.com/tt-a1i/archify.git a4065941f12be7967436261d9934784e381d423c
+git -C $tmp checkout -q FETCH_HEAD
+Remove-Item -Recurse -Force "$HOME\.agents\skills\archify" -ErrorAction SilentlyContinue
+New-Item -ItemType Directory -Force "$HOME\.agents\skills" | Out-Null
+Copy-Item -Recurse "$tmp\archify" "$HOME\.agents\skills\archify"
+Remove-Item -Recurse -Force $tmp
+```
+
+La skill instalada debe tener 206 archivos, como en la auditoría.
 
 En PowerShell el CLI queda en `$HOME\.agents\skills\archify\bin\archify.mjs`. La
 corrida deja los recibos `docs/arquitectura.finalize*.json`,

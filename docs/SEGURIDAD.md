@@ -213,13 +213,14 @@ dependencia de Python ejecuta código no revisado o exfiltra datos.
 - `skills-lock.json` fija el hash de la skill externa
   `corpus-medallion-financiero`; las skills internas viven en `.opencode/skills/`
   y se versionan con el repositorio.
-- **Archify** se instala **de forma global, fuera del proyecto**, con
-  `npx -y skills@latest add https://archify.si --skill archify --agent opencode --global --copy --yes`
-  (Node >= 18) y se ejecuta con `node ~/.agents/skills/archify/bin/archify.mjs`.
+- **Archify** se instala **de forma global, fuera del proyecto**, fijada en el
+  commit auditado: se descarga `tt-a1i/archify` en `a4065941` (v3.2.0) y se
+  copia la carpeta `archify/` a `~/.agents/skills/archify` (ver `README.md`).
+  Requiere Node >= 18 y se ejecuta con `node ~/.agents/skills/archify/bin/archify.mjs`.
   No es dependencia del pipeline, no entra en `uv.lock` ni en la CI, y el HTML
   generado no se edita a mano; la fuente tipada (`docs/arquitectura.json`,
   `docs/datos.json`) sí se versiona. El `pre-commit` excluye el HTML generado de
-  las correcciones de formato. Su auditoría con **SkillSpector está pendiente**.
+  las correcciones de formato. Archify v3.2.0 (commit `a4065941`) se auditó con **SkillSpector** el 7 de noviembre de 2026 y quedó aceptada con condiciones; ver `docs/auditoria-skills-proyecto.md`.
 - Los MCP de `opencode.json` son de solo consulta (`docs-langchain`,
   `reference-langchain`) o corren en un entorno aparte (`scrapling` con
   `uvx --from "scrapling[ai,fetchers]>=0.5"`); no escriben en Bronze, Silver ni
@@ -234,9 +235,9 @@ dependencia de Python ejecuta código no revisado o exfiltra datos.
 `requirements.txt`.
 
 **Residual.** No hay `pip-audit`/SBOM ni verificación de firma más allá de los
-hashes de `uv.lock`. `skills@latest` y `scrapling>=0.5` son versiones flotantes;
-conviene fijarlas y repetir la auditoría. **Archify queda sin auditar con
-SkillSpector** y se instala global, fuera del proyecto, así que su código Node no
+hashes de `uv.lock`. `scrapling>=0.5` es una versión flotante;
+conviene fijarla y repetir la auditoría. Archify ya no usa `skills@latest`: se instala fijada en el commit auditado y se auditó con
+SkillSpector (aceptada con condiciones), pero se instala global, fuera del proyecto, y su código Node no
 pasa por `uv.lock` ni por la CI. La recomendación de la auditoría de añadir
 permisos `deny` para `.env` y `git push` en `opencode.json` sigue pendiente y
 fuera de este cambio.
@@ -374,12 +375,12 @@ No se activan en CI ni en la suite.
 | Riesgo | Por qué se acepta y qué lo acota | Propuesta |
 |---|---|---|
 | **Los turnos `X` por regla quedan en la memoria.** Los `X` por PII no, porque `responder_turno` retorna antes de `grafo.invoke`. En un seguimiento, `_nodo_reformular` usa `historial[:-1]`, que incluye el par `X`; el texto vuelve al modelo en la reformulación. | No hay PII (se bloquea antes) y el digiturno vuelve a clasificar la pregunta reformulada; el RAG valida citas y fugas. Un intento de inyección podría intentar influir en la reformulación, pero no en las reglas del sistema. | **Solo documentar en este cambio.** Abrir un PR pequeño de Darley: en `_nodo_reformular`, descartar los pares cuyo `AIMessage` empiece por `FRASE_SIN_DATOS` antes de recortar el historial, con una prueba de que un `X` seguido de «¿Y cuánto cuesta?» no envía el texto del `X` al modelo. No tocar `sucursal/grafo.py` aquí. |
-| **El gasto no cuenta la reformulación ni el clasificador de dudas.** `GastoDiario.sumar` solo se llama en `_mapear` con el uso de `redactar`; `_nodo_reformular` usa el modelo `qa` con `max_tokens=2000` y el clasificador 512. | El tope bloquea la redacción y las rutas `T`/`X`/caché siguen gratis, así que el exceso está acotado por esas dos llamadas por turno, no es ilimitado. | Añadir `registrar_uso` a `DependenciasGrafo` y que `_nodo_reformular`/`_nodo_digiturno` llamen con `extraer_metricas`; bajar el `max_tokens` de reformulación. Es cambio de `grafo.py`/`preguntar.py` para otro PR. |
+| **El gasto no cuenta la reformulación ni el clasificador de dudas.** `GastoDiario.sumar` solo se llama en `_mapear` con el uso de `redactar`; `_nodo_reformular` usa el modelo `qa` con `max_tokens=2000` y el clasificador 512. | El tope bloquea la redacción y las rutas `T`/`X`/caché siguen gratis, así que el exceso está acotado por esas dos llamadas por turno, no es ilimitado. | Añadir `registrar_uso` a `DependenciasGrafo` y que `_nodo_reformular`/`_nodo_digiturno` llamen con `extraer_metricas`; bajar el `max_tokens` de reformulación. Es cambio de `grafo.py`/`preguntar.py` para otro PR; se sigue en el issue #93. |
 | **La caché dura 1 hora.** La clave no incluye el índice ni el CSV; tras `make indice` o `make tablero` una respuesta puede quedar obsoleta hasta que expire. | El corpus cambia poco y la clave incluye la versión del prompt, así que un cambio de prompt invalida las entradas. | Limpiar `data/asistente/cache.sqlite` en `make indice`/`make tablero` o añadir un fingerprint de `indice.json`/`tablero.csv` a la clave. Para demos, `cache_ttl_segundos = 0`. |
 | **Los chunks web/PDF no se re-escanean con `detectar_pii`.** Solo los hechos pasan por el detector. | Gold tiene 0 detecciones al 2026-11-07 y la captura no entra a login ni formularios. | Aplicar `detectar_pii` a los chunks al construir fragmentos y reportar los omitidos también para ellos. |
 | **La guardia de red permite loopback salvo el puerto de Ollama.** El loopback es necesario para `TestClient` en Windows, que crea su self-pipe con `socket.socketpair()` sobre `127.0.0.1`; el puerto `11434` queda bloqueado en `connect` y `connect_ex`. | No permite salir a internet y una prueba que llame a Ollama falla aunque el servicio esté encendido; los embeddings se doblan con `DeterministicFakeEmbedding`. | Ninguna: `test/test_seguridad.py::test_guardia_de_red_bloquea_ollama_local` lo comprueba. |
 | **La pregunta y los fragmentos se envían a DeepSeek.** | Es inherente al modelo externo; la PII se filtra antes y el corpus es público. | Revisar la retención del proveedor y no enviar preguntas con datos personales; el proyecto no lo hace. |
-| **Archify no está auditado con SkillSpector.** Se instala de forma global, fuera del proyecto, y ejecuta código Node que no pasa por `uv.lock` ni por la CI. | Es una herramienta de documentación, no una dependencia del pipeline; el HTML generado no se edita a mano. | Ejecutar SkillSpector sobre `~/.agents/skills/archify` y fijar la versión de `skills` en el README. |
+| **Archify se usa con condiciones.** Se instala de forma global, fuera del proyecto, ejecuta código Node que no pasa por `uv.lock` ni por la CI, usa red (aviso de actualizaciones y descarga de logos) y lanza procesos. | Archify v3.2.0 (commit `a4065941`) se auditó con SkillSpector el 7 de noviembre de 2026: la nota de 99/100 se debe a falsos positivos y a cobertura parcial. Es una herramienta de documentación, no una dependencia del pipeline, y el HTML generado no se edita a mano. | La instalación ya está fijada en el commit auditado (`README.md`). Se mantiene: no pedirle logos del banco por URL y repetir la auditoría antes de actualizar; ver `docs/auditoria-skills-proyecto.md`. |
 
 ## 7. Cómo verificar
 
