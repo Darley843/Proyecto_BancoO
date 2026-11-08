@@ -91,6 +91,10 @@ class AlmacenFijo:
         self.busquedas += 1
         return self._coincidencias[:k]
 
+    def vectores(self, ids: Sequence[str]) -> dict[str, list[float]]:
+        """No guarda vectores: el recuperador los calcula con sus embeddings."""
+        return {}
+
     def contar(self) -> int:
         """Devuelve el numero de fragmentos del doble."""
         return len(self._coincidencias)

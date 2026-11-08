@@ -91,6 +91,10 @@ class AlmacenFijo:
         """Devuelve el orden fijo recortado a k."""
         return self._coincidencias[:k]
 
+    def vectores(self, ids: Sequence[str]) -> dict[str, list[float]]:
+        """No guarda vectores: el recuperador los calcula con sus embeddings."""
+        return {}
+
     def contar(self) -> int:
         """Devuelve el numero de coincidencias."""
         return len(self._coincidencias)
