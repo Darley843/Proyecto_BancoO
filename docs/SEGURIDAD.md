@@ -128,9 +128,19 @@ endpoint puede consumir la cuota de DeepSeek.
   `sha256(pregunta normalizada|ruta|versión del prompt)` y TTL de **1 hora**
   (`cache_ttl_segundos = 3600`); un acierto devuelve `cache: true`, costo cero y
   tokens cero. La clave no contiene la pregunta en claro.
-- `uso_modelo` es verdadero si hubo tokens de entrada o salida, aunque la
-  respuesta termine en la frase fija; en ese caso **se cobra y no se cachea**,
-  para no tapar una mejora del índice.
+- `uso_modelo` es verdadero si cualquiera de las tres llamadas del turno
+  (reformular, clasificar o redactar) informó tokens de entrada o salida, aunque
+  la respuesta termine en la frase fija; en ese caso **se cobra** y, si la
+  redacción no dejó una respuesta citable, **no se cachea** para no tapar una
+  mejora del índice.
+- Cada nodo del grafo acumula el `usage_metadata` de su llamada en el estado
+  (`usos`); `_mapear` suma los tokens y llama **una sola vez** a
+  `GastoDiario.sumar` con el total y el número real de invocaciones. El
+  comprobante muestra ese total en `tokens_entrada`, `tokens_salida`,
+  `tokens_cache` y `costo_usd`.
+- La reformulación y el clasificador piden `max_tokens = 512` por llamada; la
+  caché de respuestas sigue dependiendo solo de la redacción, así que un turno
+  resuelto con plantilla no se cachea aunque haya gastado en el clasificador.
 - `costo_de_uso` aplica las tarifas valle/pico importadas de
   `arqueo/metricas.py` y descuenta los tokens de caché del proveedor.
 
@@ -138,11 +148,18 @@ endpoint puede consumir la cuota de DeepSeek.
 `::test_cache_expira`; `test/test_sucursal_preguntar.py::test_tope_alcanzado_solo_para_modelo`,
 `::test_gasto_solo_si_hubo_modelo`, `::test_cache_hit_sin_gastar`,
 `::test_frase_fija_con_tokens_cobra_y_no_cachea`,
-`::test_rechazo_no_escribe_cache`. Regla de GGA: «Se repiten los precios de
-DeepSeek…».
+`::test_rechazo_no_escribe_cache`,
+`::test_seguimiento_suma_reformulacion_y_redaccion`,
+`::test_clasificador_suma_su_uso`;
+`test/test_sucursal_grafo.py::test_seguimiento_acumula_los_usos_del_turno`,
+`::test_reformulacion_limita_los_tokens`;
+`test/test_sucursal_digiturno.py::test_clasificador_reporta_su_uso`. Regla de
+GGA: «Se repiten los precios de DeepSeek…».
 
-**Residual.** El gasto cuenta solo `redactar`; la reformulación y el clasificador
-de dudas no se cobran. Ver §6.
+**Residual.** El tope se comprueba antes de ejecutar el turno: uno que empieza
+por debajo puede terminarlo por encima con su propio costo (reformular,
+clasificar y redactar). El margen es el costo de un turno, no un gasto
+ilimitado.
 
 ### 3.4 Exposición del servidor
 
@@ -375,7 +392,6 @@ No se activan en CI ni en la suite.
 | Riesgo | Por qué se acepta y qué lo acota | Propuesta |
 |---|---|---|
 | **Los turnos `X` por regla quedan en la memoria.** Los `X` por PII no, porque `responder_turno` retorna antes de `grafo.invoke`. En un seguimiento, `_nodo_reformular` usa `historial[:-1]`, que incluye el par `X`; el texto vuelve al modelo en la reformulación. | No hay PII (se bloquea antes) y el digiturno vuelve a clasificar la pregunta reformulada; el RAG valida citas y fugas. Un intento de inyección podría intentar influir en la reformulación, pero no en las reglas del sistema. | **Solo documentar en este cambio.** Abrir un PR pequeño de Darley: en `_nodo_reformular`, descartar los pares cuyo `AIMessage` empiece por `FRASE_SIN_DATOS` antes de recortar el historial, con una prueba de que un `X` seguido de «¿Y cuánto cuesta?» no envía el texto del `X` al modelo. No tocar `sucursal/grafo.py` aquí. |
-| **El gasto no cuenta la reformulación ni el clasificador de dudas.** `GastoDiario.sumar` solo se llama en `_mapear` con el uso de `redactar`; `_nodo_reformular` usa el modelo `qa` con `max_tokens=2000` y el clasificador 512. | El tope bloquea la redacción y las rutas `T`/`X`/caché siguen gratis, así que el exceso está acotado por esas dos llamadas por turno, no es ilimitado. | Añadir `registrar_uso` a `DependenciasGrafo` y que `_nodo_reformular`/`_nodo_digiturno` llamen con `extraer_metricas`; bajar el `max_tokens` de reformulación. Es cambio de `grafo.py`/`preguntar.py` para otro PR; se sigue en el issue #93. |
 | **La caché dura 1 hora.** La clave no incluye el índice ni el CSV; tras `make indice` o `make tablero` una respuesta puede quedar obsoleta hasta que expire. | El corpus cambia poco y la clave incluye la versión del prompt, así que un cambio de prompt invalida las entradas. | Limpiar `data/asistente/cache.sqlite` en `make indice`/`make tablero` o añadir un fingerprint de `indice.json`/`tablero.csv` a la clave. Para demos, `cache_ttl_segundos = 0`. |
 | **Los chunks web/PDF no se re-escanean con `detectar_pii`.** Solo los hechos pasan por el detector. | Gold tiene 0 detecciones al 2026-11-07 y la captura no entra a login ni formularios. | Aplicar `detectar_pii` a los chunks al construir fragmentos y reportar los omitidos también para ellos. |
 | **La guardia de red permite loopback salvo el puerto de Ollama.** El loopback es necesario para `TestClient` en Windows, que crea su self-pipe con `socket.socketpair()` sobre `127.0.0.1`; el puerto `11434` queda bloqueado en `connect` y `connect_ex`. | No permite salir a internet y una prueba que llame a Ollama falla aunque el servicio esté encendido; los embeddings se doblan con `DeterministicFakeEmbedding`. | Ninguna: `test/test_seguridad.py::test_guardia_de_red_bloquea_ollama_local` lo comprueba. |

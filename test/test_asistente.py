@@ -38,6 +38,7 @@ from banco_occidente_corpus.asistente.metricas import (
     extraer_metricas,
     formatear_metricas,
     leer_uso,
+    sumar_uso,
 )
 from banco_occidente_corpus.asistente.modelo import (
     FaltaApiKey,
@@ -892,6 +893,33 @@ def test_leer_uso_usa_el_uso_crudo_como_respaldo() -> None:
     assert uso.razonamiento == 7_900
     assert uso.cache == 40
     assert uso.finish_reason == "length"
+
+
+def test_sumar_uso_acumula_entrada_salida_y_cache() -> None:
+    """Las tres llamadas del turno se suman y el caché se acota por llamada."""
+    usos = [
+        {
+            "uso": {
+                "input_tokens": 120,
+                "output_tokens": 40,
+                "input_token_details": {"cache_read": 20},
+            }
+        },
+        None,
+        {
+            "uso": {
+                "input_tokens": 60,
+                "output_tokens": 10,
+                "input_token_details": {"cache_read": 80},
+            }
+        },
+    ]
+
+    total = leer_uso(sumar_uso(usos))
+
+    assert total.entrada == 180
+    assert total.salida == 50
+    assert total.cache == 80
 
 
 def test_formatear_metricas_sin_datos_devuelve_vacio() -> None:

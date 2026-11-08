@@ -4,15 +4,15 @@ El grafo y sus dependencias (recuperador, filas del Tablero, modelo, clasificado
 canal) se construyen la primera vez que se pregunta, nunca al importar `app.py`.
 La caché se consulta antes de clasificar y solo para preguntas que no son de
 seguimiento, de modo que un acierto no gasta una reformulación. El gasto se suma
-cuando el modelo informó tokens, aunque la respuesta termine en la frase fija; en
-ese caso el turno también cuenta como uso de modelo y no se guarda en la caché
-para no tapar una mejora del índice. En modo demo no se crea el chat model, no se
-escribe gasto y no se cachea nada.
-
-Limitación conocida: el gasto cuenta solo los tokens de `redactar`. La reformulación
-y la clasificación de dudas también llaman al modelo y el grafo todavía no expone su
-uso; para contarlos, `DependenciasGrafo` debería recibir un `registrar_uso` que los
-nodos invocaran con `extraer_metricas`.
+una sola vez por turno con el total de las tres llamadas al modelo (reformular,
+clasificar y redactar): cada nodo acumula su `extraer_metricas` en `usos` y
+`_mapear` cobra el total en `GastoDiario`. El turno cuenta como uso de modelo
+cuando cualquiera de las tres informó tokens, aunque la respuesta termine en la
+frase fija; en ese caso se cobra y no se guarda en la caché para no tapar una
+mejora del índice. La caché sigue dependiendo del resultado de `redactar`, así
+que un turno resuelto con plantilla no se cachea aunque haya gastado en el
+clasificador. En modo demo no se crea el chat model, no se escribe gasto y no se
+cachea nada.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from typing import Any
 from langchain_core.language_models import BaseChatModel
 
 from ..asistente.contexto_prompt import CanalOficial, ContextoAusente, cargar_contexto
-from ..asistente.metricas import leer_uso
+from ..asistente.metricas import leer_uso, sumar_uso
 from ..asistente.modelo import FaltaApiKey, crear_modelo_para
 from ..asistente.validacion import es_sin_datos, sanear_pregunta
 from ..boveda.recuperador import crear_recuperador
@@ -508,15 +508,20 @@ class ServicioPreguntas:
     ) -> dict[str, Any]:
         """Convierte el estado del grafo en el cuerpo JSON del contrato.
 
-        El modelo puede gastar tokens y aun así terminar en la frase fija: si
-        `leer_uso` informa tokens de entrada o de salida, el turno cuenta como
-        uso de modelo, se cobra y no se guarda en la caché.
+        El turno puede gastar tokens y aun así terminar en la frase fija: si
+        cualquiera de las tres llamadas informó tokens, el turno cuenta como uso
+        de modelo, se cobra una sola vez con el total y no se guarda en la caché
+        si la redacción no produjo una respuesta citable.
         """
         turno = estado.get("turno") or {}
         letra = str(turno.get("letra", "B"))
         ruta = ruta_de_letra(letra)
         uso = estado.get("uso") or {}
-        detalle = leer_uso(uso)
+        usos = list(estado.get("usos") or [])
+        if not usos and uso:
+            usos = [uso]
+        total_uso = sumar_uso(usos)
+        detalle = leer_uso(total_uso)
         tokens_entrada = detalle.entrada or 0
         tokens_salida = detalle.salida or 0
         uso_modelo = bool(uso.get("uso_modelo", False)) or tokens_entrada > 0 or tokens_salida > 0
@@ -549,10 +554,11 @@ class ServicioPreguntas:
             "costo_usd": 0.0,
         }
         if uso_modelo and not self._ajustes.demo:
-            costo, tokens = costo_de_uso(uso, tarifas_para(datetime.now(UTC)))
+            costo, tokens = costo_de_uso(total_uso, tarifas_para(datetime.now(UTC)))
             payload["costo_usd"] = round(costo, 6)
-            self._gasto.sumar(costo, tokens)
-            if self._usar_cache and letra != "X" and not es_sin_datos(respuesta):
+            self._gasto.sumar(costo, tokens, llamadas=max(len(usos), 1))
+            redacto = bool(uso.get("uso_modelo", False))
+            if self._usar_cache and letra != "X" and redacto and not es_sin_datos(respuesta):
                 clave = CacheRespuestas.clave(reformulada or pregunta, ruta, version)
                 self._guardar_en_cache(clave, payload)
 

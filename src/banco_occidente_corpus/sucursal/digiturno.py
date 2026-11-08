@@ -20,6 +20,7 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import HumanMessage, SystemMessage
 from pydantic import BaseModel, ValidationError
 
+from ..asistente.metricas import extraer_metricas
 from ..asistente.validacion import detectar_pii, sanear_pregunta
 from ..config import PROJECT_ROOT
 from ..texto import normalizar
@@ -130,8 +131,13 @@ class ContadorTurnos:
             return numero
 
 
+#: Callback para registrar el uso de una llamada al modelo del clasificador.
+RegistradorUso = Callable[[dict[str, Any]], None]
 #: Clasificador de dudas inyectable; devuelve None si no puede decidir.
-Clasificador = Callable[[str], Clasificacion | None]
+#:
+#: Un clasificador que quiera reportar su consumo acepta el kwarg opcional
+#: `registrar_uso`. Los dobles que no lo aceptan solo se usan sin registrador.
+Clasificador = Callable[..., Clasificacion | None]
 
 
 def cargar_configuracion_digiturno(ruta: Path | None = None) -> ConfiguracionDigiturno:
@@ -166,6 +172,7 @@ def clasificar(
     configuracion: ConfiguracionDigiturno | None = None,
     permitidos: Iterable[str] = (),
     clasificador: Clasificador | None = None,
+    registrar_uso: RegistradorUso | None = None,
     contador: ContadorTurnos | None = None,
 ) -> Turno:
     """Asigna un turno a la pregunta siguiendo el orden de reglas.
@@ -175,6 +182,8 @@ def clasificar(
         configuracion: palabras y patrones; se cargan del TOML si falta.
         permitidos: teléfonos públicos que no cuentan como PII.
         clasificador: función para las dudas; sin ella, la ruta por defecto es B.
+        registrar_uso: callback opcional que recibe las métricas de la llamada
+            del clasificador. Solo se pasa si el clasificador lo acepta.
         contador: consecutivo de turnos; si falta se usa uno nuevo.
 
     Returns:
@@ -208,7 +217,11 @@ def clasificar(
         return Turno(numero=numero, letra="T", motivo="tarifas")
 
     if clasificador is not None:
-        clasificacion = clasificador(texto)
+        clasificacion = (
+            clasificador(texto, registrar_uso=registrar_uso)
+            if registrar_uso is not None
+            else clasificador(texto)
+        )
         if clasificacion is not None:
             return Turno(numero=numero, letra=clasificacion.letra, motivo=clasificacion.motivo)
         return Turno(numero=numero, letra="B", motivo="defecto:modelo_sin_respuesta")
@@ -219,27 +232,42 @@ def clasificar(
 def clasificador_deepseek(modelo: BaseChatModel) -> Clasificador:
     """Envuelve un modelo de chat en un clasificador con respaldo a `None`.
 
+    El tope de tokens se pasa en cada llamada para que también aplique cuando el
+    clasificador comparte el modelo de Q&A, como hace la Sucursal. El uso se
+    registra antes de interpretar el JSON: una clasificación inválida también
+    consumió tokens.
+
     Args:
         modelo: `BaseChatModel` construido con `timeout` (ver `crear_clasificador`).
 
     Returns:
         Una función que devuelve `Clasificacion` o `None` si la salida no es válida.
+        Acepta un `registrar_uso` opcional para entregar las métricas de la llamada.
     """
 
-    def clasificar_con_modelo(pregunta: str) -> Clasificacion | None:
+    def clasificar_con_modelo(
+        pregunta: str,
+        registrar_uso: RegistradorUso | None = None,
+    ) -> Clasificacion | None:
         mensajes = [
             SystemMessage(content=INSTRUCCION_DUDA),
             HumanMessage(content=pregunta),
         ]
         try:
-            respuesta = modelo.invoke(mensajes, response_format={"type": "json_object"})
+            respuesta = modelo.invoke(
+                mensajes,
+                max_tokens=MAX_TOKENS_CLASIFICADOR,
+                response_format={"type": "json_object"},
+            )
         except (TypeError, ValueError):
             try:
-                respuesta = modelo.invoke(mensajes)
+                respuesta = modelo.invoke(mensajes, max_tokens=MAX_TOKENS_CLASIFICADOR)
             except Exception:
                 return None
         except Exception:
             return None
+        if registrar_uso is not None:
+            registrar_uso(extraer_metricas(respuesta))
         contenido = getattr(respuesta, "content", respuesta)
         if not isinstance(contenido, str):
             return None

@@ -183,7 +183,7 @@ v1 acierta 16 de 20 y v2 acierta 12 de 20. De los 6 pares discordantes, b=5 son 
 | Preguntas de alcance con clasificador en v2 | 15 de 20 |
 | Preguntas del banco | 44 |
 
-El Arqueo no llama a DeepSeek: su costo es cero. `v1_alcance_usd`, `v2_usd` y `v2_alcance_usd` son el costo historico de las evaluaciones, calculado con las tarifas de `arqueo/metricas.py`. Las dos cifras de v2 son cotas inferiores: cuentan el turno de respuesta, pero no el clasificador de dudas (se uso en 15 de las 20 preguntas de alcance) ni la reformulacion (#93). v1 no usa clasificador, asi que el ahorro en alcance se lee como hasta 57.0 % menos; la cifra de v2 en alcance es una cota inferior, no una medicion cerrada.
+El Arqueo no llama a DeepSeek: su costo es cero. `v1_alcance_usd`, `v2_usd` y `v2_alcance_usd` son el costo historico de las evaluaciones, calculado con las tarifas de `arqueo/metricas.py`. Las dos cifras de v2 son cotas inferiores: se midieron antes del arreglo del #93 y no incluian el clasificador de dudas (se uso en 15 de las 20 preguntas de alcance) ni la reformulacion. Una corrida nueva ya suma las tres llamadas del turno, pero los numeros publicados no se re-midieron y siguen siendo cotas inferiores historicas. v1 no usa clasificador, asi que el ahorro en alcance se lee como hasta 57.0 % menos; la cifra de v2 en alcance es una cota inferior, no una medicion cerrada.
 
 ## Verificacion local contra el anexo A
 
@@ -198,7 +198,7 @@ Diferencias por normalizacion de URL y por deduplicacion de texto se reportan co
 
 ## Limites
 
-- El costo de v2 en las 20 preguntas de alcance es una cota inferior: suma el turno de respuesta, pero no el clasificador de dudas (se uso en 15 de las 20 preguntas de alcance) ni la reformulacion (#93). El total de 44 tambien es una cota inferior. Por eso el ahorro frente a v1, que no usa clasificador, se lee como hasta 57.0 % menos, no como una cifra cerrada.
+- El costo de v2 en las 20 preguntas de alcance es una cota inferior historica: se midio antes del arreglo del #93, sin el clasificador de dudas (se uso en 15 de las 20 preguntas de alcance) ni la reformulacion. El total de 44 tambien es una cota inferior historica. Una corrida nueva ya suma las tres llamadas del turno; los numeros publicados no se re-midieron. Por eso el ahorro frente a v1, que no usa clasificador, se lee como hasta 57.0 % menos, no como una cifra cerrada.
 - El indice sin prefijos se reutiliza si coinciden modelo, alcance, numero de fragmentos y huella del contenido; si no, se reconstruye.
 - El acierto se mide por URL, no por fragmento: una pregunta cuenta como acierto si aparece la pagina esperada aunque el fragmento con el dato no este en el top 5 (por ejemplo, la pregunta 7 y el fragmento de la fundacion en 1965).
 - El set no nombra el banco en sus preguntas. La prueba de robustez del #85 (indice de 893 fragmentos) mostro que agregar la marca a la consulta baja el hit@5 de 0.75 a 0.53 (McNemar p de 0.02).
