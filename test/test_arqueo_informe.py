@@ -580,7 +580,7 @@ def test_v2_con_los_datos_reales_da_citas_de_05556() -> None:
 
 
 def test_costo_de_alcance_es_cota_inferior_y_el_ahorro_es_un_maximo() -> None:
-    """El costo de v2 en alcance no incluye clasificador ni reformulacion."""
+    """El costo de v2 en alcance se midio antes del #93 y es una cota historica."""
     # Act
     arqueo, texto, _ = corrida_con_v2()
     costo = arqueo["costo"]
@@ -594,10 +594,14 @@ def test_costo_de_alcance_es_cota_inferior_y_el_ahorro_es_un_maximo() -> None:
     assert costo["v2_alcance_sin_motivo"] == 0
     assert costo["ahorro_alcance_pct"] == 57.0
     seccion = texto.split("## Costo y uso", 1)[1].split("\n## ", 1)[0]
+    limites = texto.split("## Limites", 1)[1].split("\n## ", 1)[0]
     assert "cota inferior" in seccion
+    assert "antes del arreglo del #93" in seccion
     assert "hasta 57.0 % menos" in seccion
     assert "15 de las 20" in seccion
     assert "completa" not in seccion
+    assert "cota inferior historica" in limites
+    assert "antes del arreglo del #93" in limites
 
 
 def test_contar_preguntas_con_clasificador_lee_el_motivo_guardado() -> None:
