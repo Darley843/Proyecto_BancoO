@@ -1,12 +1,12 @@
-# Modelado: Módulo 1 y propuesta para el Módulo 2
+# Modelado: Módulo 1 y Módulo 2
 
-Este documento alimenta la sección **Modelado** del informe. Separa lo que ya
-está implementado (Módulo 1) de lo que el grupo propone para el Módulo 2, donde
-el asistente pasa de "todo el contexto en el prompt" a recuperación (RAG).
+Este documento alimenta la sección **Modelado** del informe. Recorre lo
+implementado en el Módulo 1 (contexto completo en el prompt) y en el Módulo 2,
+donde el asistente pasa a recuperación (RAG) con la Bóveda.
 
-> Estado: la Bóveda del Módulo 2 ya está implementada (fragmentos, embeddings
-> locales, índice Chroma y mapa); el recuperador híbrido y el grafo llegan en los
-> PR siguientes del cambio `sucursal-1965`.
+> Estado: el Módulo 2 está implementado en la Bóveda y la Sucursal 1965
+> (fragmentos, embeddings locales, índice Chroma, recuperación híbrida, mapa,
+> grafo con memoria, Tablero y API local).
 
 ## 1. Módulo 1 (implementado)
 
@@ -14,7 +14,7 @@ el asistente pasa de "todo el contexto en el prompt" a recuperación (RAG).
 |---|---|---|
 | Fuente | Sitio oficial, capturado respetando `robots.txt`, 1,5 s entre peticiones y header `From` | `docs/FUENTES.md` |
 | Limpieza | Bronze → Silver (texto útil, sin boilerplate) → Gold (Markdown + frontmatter) | `CONSTITUTION.md` §7 |
-| Conocimiento consolidado | `data/contexto/contexto_banco.md`: 191 páginas, ~167 000 tokens estimados | `make contexto` |
+| Conocimiento consolidado | `data/contexto/contexto_banco.md`: 191 páginas, 166 647 tokens estimados | `make contexto` |
 | LLM | DeepSeek Flash (`deepseek-flash`) por API, orquestado con LangChain (`ChatDeepSeek`) | `asistente/modelo.py` |
 | Estrategia | Contexto completo en el mensaje de sistema, temperatura 0, prompt versionado | `config/prompts/qa_v1.md` |
 | Control de alucinaciones | Frase fija si no hay dato, cita obligatoria de fuente, validación de cifras, URL y PII | `asistente/validacion.py` |
@@ -35,7 +35,7 @@ estable derivado del contenido.
 | Archivo | Contenido | Tamaño | Versionado |
 |---|---|---:|---|
 | `data/knowledge/chunks_web.jsonl` | 1 388 chunks de las 181 páginas web (~162 000 tokens) | 1,2 MB | Sí |
-| `data/knowledge/chunks.jsonl` | 14 490 chunks: páginas, PDF y videos (~9 millones de tokens) | 43 MB | No (se regenera) |
+| `data/knowledge/chunks.jsonl` | 14 279 chunks: páginas, PDF y videos (~11,1 millones de tokens) | 43 MB | No (se regenera) |
 
 Limitación observada: algunos chunks arrancan con restos del menú del sitio
 (por ejemplo "Canales digitales / Segmentos / Mesa de dinero"). La Bóveda los
@@ -47,7 +47,7 @@ ruido no compite por similitud en el índice.
 
 | Pieza | Elección | Dónde |
 |---|---|---|
-| Fragmentos | 957 fragmentos (878 de páginas, 81 de PDF y 6 hechos); fusión hasta 80 tokens, límite de 400 y tablas largas partidas por filas | `boveda/fragmentos.py`, `make fragmentos` |
+| Fragmentos | 957 fragmentos (870 de páginas, 81 de PDF y 6 hechos); fusión hasta 80 tokens, límite de 400 y tablas largas partidas por filas | `boveda/fragmentos.py`, `make fragmentos` |
 | Embeddings | `nomic-embed-text-v2-moe` en Ollama local, 768 dimensiones, sin clave ni costo | `boveda/embeddings.py` |
 | Prefijos | `search_document: ` al indexar y `search_query: ` al consultar; se desactivan con `prefijos = false` | `config/sucursal.toml` |
 | Índice | Chroma persistente en `data/boveda/chroma`, colección `boveda`, distancia coseno | `boveda/almacen.py` |
@@ -190,8 +190,8 @@ concepto más corto, para que «Cheque de Gerencia» gane sobre «Anulación …
 Cheques de Gerencia».
 
 Estado actual: el CSV se regenera con `make tablero`; las 12 preguntas de tabla
-se cruzan en cada corrida y la 43 (chequera) queda pendiente del arreglo del
-tarifario del PR #75.
+se cruzan en cada corrida y la 43 (chequera) ya encuentra fila en el tarifario
+actual. Si alguna no encuentra fila o valor, el comando falla con su detalle.
 
 ### Grafo con memoria
 

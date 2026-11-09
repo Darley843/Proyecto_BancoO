@@ -112,7 +112,7 @@
 
 ## 17. PR 14 — Bóveda (vista) (Yoldy — pendiente)
 
-- [ ] 17.1 Implementar `app/web/vistas/boveda.js` con el mapa de puntos, la posición de la pregunta y la lista del top de fragmentos con título, sección, tipo y similitud; verificar con `mapa.json` y con la API una consulta real.
+- [x] 17.1 Implementar `app/web/vistas/boveda.js` con el mapa de puntos, la posición de la pregunta y la lista del top de fragmentos con título, sección, tipo y similitud; verificar con `mapa.json` y con la API una consulta real.
 - [x] 17.2 Mostrar el estado «índice no listo» cuando la API lo informe y no dibujar un mapa vacío como si hubiera datos; verificar deteniendo el índice o apuntando a un directorio sin `data/boveda/`.
 - [x] 17.3 Verificar que la vista no usa librerías externas ni hace peticiones distintas de `/api/boveda/mapa`; revisar el archivo y la red del navegador.
 
@@ -173,11 +173,11 @@
 
 ## 27. Integración y cierre (equipo — pendiente)
 
-- [ ] 27.1 Ejecutar `make fmt`, `make check`, `make demo` y `make health`; verificar que lint, tipos, pruebas y pipeline offline pasan al 100 % y que no hay dependencias de red en la suite.
-- [ ] 27.2 Ejecutar `make indice`, `make tablero` y `make arqueo` sobre el corpus real; verificar el conteo de fragmentos, las 8 de 8 preguntas de tabla y que `arqueo.json` y `ARQUEO.md` se generan sin llamar a DeepSeek.
-- [ ] 27.3 Arrancar `make app` y recorrer las seis vistas; verificar `/api/estado`, `/api/preguntar` con una pregunta de alcance y una de seguimiento, `/api/tablero`, `/api/boveda/mapa`, `/api/pipeline`, `/api/arqueo` y `/api/vestibulo` contra el contrato.
-- [ ] 27.4 Ejecutar `make evaluar VERSION=v2` con una pregunta de humo y verificar que usa el grafo, que las preguntas de seguimiento envían la previa en el mismo hilo, que los resultados van a los archivos de v2 y que v1 no se sobrescribe.
-- [ ] 27.5 Revisar `git status` y el diff final: sin `data/boveda/`, sin SQLite de `data/asistente/`, sin `.env`, sin claves, sin cambios en `data/raw/` ni en `data/gold/`, y sin Streamlit; confirmar que `CONSTITUTION.md`, `AGENTS.md` y `docs/ESTANDAR.md` describen el estado final.
+- [x] 27.1 Ejecutar `make fmt`, `make check`, `make demo` y `make health`; verificar que lint, tipos, pruebas y pipeline offline pasan al 100 % y que no hay dependencias de red en la suite.
+- [x] 27.2 Ejecutar `make indice`, `make tablero` y `make arqueo` sobre el corpus real; verificar el conteo de fragmentos, las 12 de 12 preguntas de tabla y que `arqueo.json` y `ARQUEO.md` se generan sin llamar a DeepSeek.
+- [x] 27.3 Arrancar `make app` y recorrer las seis vistas; verificar `/api/estado`, `/api/preguntar` con una pregunta de alcance y una de seguimiento, `/api/tablero`, `/api/boveda/mapa`, `/api/pipeline`, `/api/arqueo` y `/api/vestibulo` contra el contrato.
+- [x] 27.4 Ejecutar `make evaluar VERSION=v2` con una pregunta de humo y verificar que usa el grafo, que las preguntas de seguimiento envían la previa en el mismo hilo, que los resultados van a los archivos de v2 y que v1 no se sobrescribe.
+- [x] 27.5 Revisar `git status` y el diff final: sin `data/boveda/`, sin SQLite de `data/asistente/`, sin `.env`, sin claves, sin cambios en `data/raw/` ni en `data/gold/`, y sin Streamlit; confirmar que `CONSTITUTION.md`, `AGENTS.md` y `docs/ESTANDAR.md` describen el estado final.
 
 ## Workflow follow-up
 

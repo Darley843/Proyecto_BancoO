@@ -138,7 +138,10 @@ documento_titulo: Informe Final Octubre 2026
 
 24 casillas en 4 categorías (`identidad`, `oferta`, `presencia`, `datos`).
 `checklist.py` busca evidencia en el corpus y `make stats` escribe el estado en
-`data/gold/_INDICE.md`.
+`data/gold/_INDICE.md`. La cobertura 24/24 es **heurística**: el detector busca
+una palabra en el título, la URL o el texto y toma la primera coincidencia, así
+que algunas citas pueden ser falsos positivos. La evidencia de las 24 casillas
+debe revisarse a mano antes de presentarla (ver `CONSTITUTION.md` §14).
 
 ## 7. Entregable
 

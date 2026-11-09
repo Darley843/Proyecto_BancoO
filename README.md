@@ -15,8 +15,10 @@ La información pública del banco está dispersa en ~200 páginas HTML, 190 PDF
 32 videos, sin estructura común ni forma de citarla. Este proyecto la captura
 respetando `robots.txt`, la limpia a un corpus Gold con frontmatter y consolida un
 contexto único que alimenta un asistente LangChain con DeepSeek, con validación de
-fuente y una app web local. Esta fase usa el **contexto consolidado completo** en el
-prompt de sistema; la recuperación vectorial (RAG) es el Módulo 2.
+fuente y una app web local. El Módulo 1 usa el **contexto consolidado completo** en
+el prompt de sistema; el Módulo 2 añade la Bóveda (fragmentos, Ollama/Chroma y
+recuperación híbrida), el Tablero de tarifas, el grafo con memoria y la app web de
+la Sucursal 1965.
 
 ## Arquitectura
 
@@ -61,9 +63,11 @@ encabezados `##` son fronteras de *chunk* y los metadatos permiten citar el orig
 | Capa Knowledge | 2 entidades, 6 hechos, 1 relación (semilla validada) |
 | Cobertura del checklist | 24/24 (heurística) |
 
-Bronze y Silver no se versionan: son capturas reproducibles que se reconstruyen
-con el pipeline sin volver a la web. El repositorio versiona Gold y el contexto.
-Fuente: `data/gold/_INDICE.md`, `corpus.jsonl` y `data/contexto/manifest.json`.
+Bronze y Silver no se versionan. En el checkout de Git solo se conserva **1 HTML**
+de Bronze y Silver está vacío, así que un clon limpio **no puede regenerar** las
+181 páginas web sin volver a capturar (`make all`; ver `CONSTITUTION.md` §14). El
+repositorio versiona Gold, el contexto y los resultados de evaluación. Fuente:
+`data/gold/_INDICE.md`, `corpus.jsonl` y `data/contexto/manifest.json`.
 
 ### Diagramas interactivos de la fase 2 (Archify)
 
@@ -241,7 +245,7 @@ modelo: salen de un CSV determinista que se versiona.
 make tablero    # tarifario PDF + tablas de Gold -> data/estructurados/tablero.csv
 ```
 
-Cruza las 8 preguntas de tipo `tabla` del set de fase 2 y falla con el detalle si
+Cruza las 12 preguntas de tipo `tabla` del set de fase 2 y falla con el detalle si
 alguna no encuentra fila. Cada fila trae `concepto`, `categoria`, `valor`,
 `moneda`, `recargos`, `periodicidad`, `vigente_desde`, `origen`
 (`tarifario`/`tabla_web`), `pagina` y `fuente`.
@@ -329,8 +333,8 @@ Response 200, con la misma forma que `app/web/datos-ejemplo/preguntar.json`:
   cuando la fuente viene del Tablero, que no tiene puntaje.
 - Un acierto de caché devuelve `cache: true` con tokens y costo en cero, y aun así
   deja el turno en el hilo para el seguimiento siguiente.
-- El gasto cuenta solo la redacción: la reformulación y la clasificación de dudas
-  todavía no se suman al acumulado.
+- El turno cobra una sola vez el total de las tres llamadas al modelo (reformular,
+  clasificar y redactar); `llamadas` refleja el número real de invocaciones.
 
 Errores, siempre como `{"error": {"codigo", "mensaje"}}`:
 
@@ -366,13 +370,11 @@ cliente.
 
 ## Capturas
 
-<table>
-  <tr><td align="center"><img src="docs/capturas/app-scraping.png" alt="Pestaña Scraping" width="440"><br><sub>Scraping: pipeline y captura en vivo</sub></td><td align="center"><img src="docs/capturas/app-preguntas.png" alt="Pestaña Preguntas" width="440"><br><sub>Preguntas: respuesta con su fuente</sub></td></tr>
-  <tr><td align="center"><img src="docs/capturas/app-detalles.png" alt="Detalles técnicos" width="440"><br><sub>Detalles técnicos: métricas y avisos</sub></td><td align="center"><img src="docs/capturas/app-faq.png" alt="Preguntas frecuentes" width="440"><br><sub>Preguntas frecuentes</sub></td></tr>
-  <tr><td align="center"><img src="docs/capturas/app-resumen.png" alt="Resumen" width="440"><br><sub>Resumen ejecutivo con fuentes</sub></td><td align="center"><img src="docs/capturas/app-preguntas-v0.png" alt="Prompt v0" width="440"><br><sub>Línea base del prompt (<code>v0</code>)</sub></td></tr>
-  <tr><td align="center"><img src="docs/capturas/app-preguntas-v1-horario.png" alt="Prompt v1" width="440"><br><sub><code>v1</code>: rechazo correcto si el dato no está</sub></td><td align="center"><img src="docs/capturas/app-cache.png" alt="Caché" width="440"><br><sub>Caché por pregunta y versión</sub></td></tr>
-  <tr><td align="center"><img src="docs/capturas/app-pii.png" alt="Bloqueo de PII" width="440"><br><sub>Bloqueo de datos personales</sub></td><td align="center"><img src="docs/capturas/app-sin-clave.png" alt="Sin clave" width="440"><br><sub>Sin <code>DEEPSEEK_API_KEY</code>: aviso y comandos</sub></td></tr>
-</table>
+La app vigente es `app/web/` y se abre con `make app` en
+`http://127.0.0.1:8000`. Sus seis vistas son Vestíbulo, Ventanilla, Bóveda,
+Tablero, Cámara y Arqueo. Las imágenes de `docs/capturas/` pertenecen a la app
+Streamlit retirada en la fase 2 y se conservan solo como registro histórico; las
+capturas vigentes deben tomarse de la app web.
 
 ## Resultados de la evaluación
 
@@ -456,6 +458,9 @@ no forma parte de `make all`, `make gold`, `make deliver`, `make docs`, `make do
 [`CONSTITUTION.md`](./CONSTITUTION.md) (verdad central) · [`docs/ESTANDAR.md`](./docs/ESTANDAR.md)
 (trazabilidad) · [`docs/FUENTES.md`](./docs/FUENTES.md) (fuentes y `robots.txt`) ·
 [`docs/ALCANCE.md`](./docs/ALCANCE.md) (20 preguntas) ·
+[`docs/MODELADO.md`](./docs/MODELADO.md) (Módulos 1 y 2) ·
+[`docs/ARQUEO.md`](./docs/ARQUEO.md) (recuperación, evaluación y costo) ·
+[`docs/RESULTADOS_FASE2.md`](./docs/RESULTADOS_FASE2.md) (44 preguntas de la fase 2) ·
 [`docs/SEGURIDAD.md`](./docs/SEGURIDAD.md) (modelo de amenazas) ·
 [`AGENTS.md`](./AGENTS.md).
 
