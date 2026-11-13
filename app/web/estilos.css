@@ -1642,6 +1642,76 @@ main:focus {
   font-size: 14px;
 }
 
+.ventanilla__avance,
+.ventanilla__recorrido {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.ventanilla__avance {
+  padding: 12px 16px;
+  border-left: 4px solid var(--azul);
+  border-radius: var(--radio);
+  background: var(--azul-suave);
+}
+
+.ventanilla__avance[hidden] {
+  display: none;
+}
+
+.ventanilla__recorrido {
+  margin-bottom: 12px;
+  font-size: 13px;
+}
+
+.ventanilla__paso {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: baseline;
+  color: var(--texto);
+  font-size: 14px;
+}
+
+.ventanilla__paso::before {
+  flex: none;
+  width: 1.2em;
+  font-weight: 700;
+  text-align: center;
+}
+
+.ventanilla__paso--hecho::before {
+  content: "✓";
+  color: var(--exito);
+}
+
+.ventanilla__paso--en-curso::before {
+  content: "●";
+  color: var(--dorado);
+  animation: ventanilla-latido 1s ease-in-out infinite alternate;
+}
+
+.ventanilla__paso-etapa {
+  min-width: 6.5em;
+  color: var(--azul);
+  font-weight: 600;
+}
+
+.ventanilla__paso-texto {
+  flex: 1 1 12em;
+  min-width: 0;
+  color: var(--texto-suave);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ventanilla__paso--en-curso::before {
+    animation: none;
+  }
+}
+
 .ventanilla__error {
   display: grid;
   gap: 4px;
@@ -2031,6 +2101,18 @@ main:focus {
 }
 
 /* --- fin ventanilla --- */
+
+/* Latido del paso en curso de la Ventanilla (streaming). Va fuera del bloque
+   porque `from` y `to` no son selectores de la vista. */
+@keyframes ventanilla-latido {
+  from {
+    opacity: 0.35;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
 
 /* --- arqueo (PR 18) --- */
 
