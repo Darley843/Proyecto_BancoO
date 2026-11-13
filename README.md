@@ -52,6 +52,8 @@ flowchart LR
     G -->|"mixta"| R
     G -->|"mixta"| T
     G -->|"X"| X["Rechazo<br/>frase fija sin datos"]
+    G -->|"perfil"| P["Perfil<br/>Store de LangGraph · 0 tokens"]
+    P <-->|"namespace perfil"| PS[("SQLite<br/>perfil.sqlite")]
     E["Ollama<br/>nomic-embed-text-v2-moe"] --> Q[("Qdrant local<br/>data/boveda/qdrant · coseno")]
     R --> Q
     R --> E
@@ -63,6 +65,7 @@ flowchart LR
     T --> API
     C --> API
     X --> API
+    P --> API
     API -.->|"streaming por etapas"| U
 ```
 
@@ -284,9 +287,11 @@ guarda la conversación con `SqliteSaver` en `data/asistente/memoria.sqlite` y
 aísla cada sesión por `thread_id`. Un seguimiento se reformula solo si hay
 historial; el Tablero responde sin modelo cuando hay 1-3 filas o varias del
 mismo concepto (hasta 10), y la Bóveda toma el relevo con 0, más de 10 o
-conceptos distintos. El `Store` de largo plazo con namespace
-`perfil/cliente_local` no está implementado: el checkpointer guarda la
-conversación, no las preferencias del cliente.
+conceptos distintos. La memoria de largo plazo usa un `Store` de LangGraph (`SqliteStore` en
+`data/asistente/perfil.sqlite`) con namespace `("perfil", sha256(perfil_id))`:
+guarda solo el nombre y la empresa que el cliente declara, los consulta con
+`store.search()` desde cualquier conversación y se borra con «olvida mi perfil».
+Esos datos no llegan al modelo, a la caché ni al checkpointer.
 
 ### API local y variables
 
