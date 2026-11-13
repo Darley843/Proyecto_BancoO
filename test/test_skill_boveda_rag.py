@@ -11,10 +11,12 @@ from types import ModuleType
 
 import pytest
 
+from banco_occidente_corpus.boveda.almacen import QdrantAlmacen
 from banco_occidente_corpus.boveda.fragmentos import (
     TOKENS_MAXIMOS,
     construir_fragmentos,
 )
+from banco_occidente_corpus.boveda.indice import escribir_metadatos
 from banco_occidente_corpus.boveda.tipos import Fragmento
 from banco_occidente_corpus.config import load_config
 
@@ -185,3 +187,153 @@ def test_poner_marca_menciona_el_banco(
 ) -> None:
     """La inyección reemplaza «el banco» o añade la marca antes del cierre."""
     assert medir.poner_marca(consulta) == esperado
+
+
+@pytest.fixture(scope="module")
+def validar() -> ModuleType:
+    """Carga el script de validación del índice por ruta."""
+    return _cargar_script("validar_indice")
+
+
+def _indice_temporal(tmp_path: Path, **cambios: object) -> Path:
+    """Escribe un indice.json válido y aplica los cambios pedidos."""
+    metadatos: dict[str, object] = {
+        "modelo": "nomic-embed-text-v2-moe",
+        "prefijos": True,
+        "alcance": "base",
+        "fragmentos": 1,
+        "dimension": 768,
+        "almacen": "qdrant",
+    }
+    metadatos.update(cambios)
+    carpeta = tmp_path / "boveda"
+    escribir_metadatos(carpeta, metadatos)
+    return carpeta / "indice.json"
+
+
+def _qdrant_con_768() -> QdrantAlmacen:
+    """Crea un almacén en memoria con un vector de 768 dimensiones."""
+    almacen = QdrantAlmacen()
+    almacen.agregar(
+        ["frag:a"],
+        [[0.0] * 767 + [1.0]],
+        ["texto de prueba"],
+        [{"tipo": "pagina", "seccion": "oferta"}],
+    )
+    return almacen
+
+
+def test_validar_indice_acepta_qdrant(validar: ModuleType, tmp_path: Path) -> None:
+    """La colección, el conteo, la dimensión y la métrica coinciden."""
+    indice = _indice_temporal(tmp_path)
+    almacen = _qdrant_con_768()
+    try:
+        comprobaciones, _ = validar.comprobar(
+            ruta_indice=indice,
+            tipo="qdrant",
+            almacen=almacen,
+        )
+    finally:
+        almacen.cerrar()
+
+    assert all(item.ok for item in comprobaciones), [item for item in comprobaciones if not item.ok]
+    assert any(item.nombre == "coleccion de qdrant" for item in comprobaciones)
+    assert any(item.nombre == "metrica de qdrant" for item in comprobaciones)
+
+
+def test_validar_indice_detecta_conteo_incorrecto(validar: ModuleType, tmp_path: Path) -> None:
+    """Un indice.json que declara más fragmentos que la colección falla."""
+    indice = _indice_temporal(tmp_path, fragmentos=2)
+    almacen = _qdrant_con_768()
+    try:
+        comprobaciones, _ = validar.comprobar(
+            ruta_indice=indice,
+            tipo="qdrant",
+            almacen=almacen,
+        )
+    finally:
+        almacen.cerrar()
+
+    fallos = {item.nombre for item in comprobaciones if not item.ok}
+    assert "fragmentos" in fallos
+
+
+def test_validar_indice_detecta_dimension_incorrecta(validar: ModuleType, tmp_path: Path) -> None:
+    """Un vector de 4 dimensiones no pasa la comprobación de 768."""
+    indice = _indice_temporal(tmp_path)
+    almacen = QdrantAlmacen()
+    almacen.agregar(["frag:a"], [[1.0, 0.0, 0.0, 0.0]], ["texto"], [{"tipo": "pagina"}])
+    try:
+        comprobaciones, _ = validar.comprobar(
+            ruta_indice=indice,
+            tipo="qdrant",
+            almacen=almacen,
+        )
+    finally:
+        almacen.cerrar()
+
+    fallos = {item.nombre for item in comprobaciones if not item.ok}
+    assert "dimension real" in fallos
+
+
+class AlmacenConMetrica:
+    """Doble mínimo para probar la comprobación de la métrica."""
+
+    coleccion = "boveda"
+    tipo = "qdrant"
+
+    def contar(self) -> int:
+        """Devuelve un vector."""
+        return 1
+
+    def metrica_almacenada(self) -> str:
+        """Declara una métrica distinta de coseno."""
+        return "euclid"
+
+    def dimension_almacenada(self) -> int:
+        """Declara 768 dimensiones."""
+        return 768
+
+
+def test_validar_indice_detecta_metrica_incorrecta(validar: ModuleType, tmp_path: Path) -> None:
+    """La colección debe declarar distancia coseno."""
+    indice = _indice_temporal(tmp_path)
+
+    comprobaciones, _ = validar.comprobar(
+        ruta_indice=indice,
+        tipo="qdrant",
+        almacen=AlmacenConMetrica(),
+    )
+
+    fallos = {item.nombre for item in comprobaciones if not item.ok}
+    assert "metrica de qdrant" in fallos
+
+
+def test_validar_indice_detecta_almacen_declarado_distinto(
+    validar: ModuleType, tmp_path: Path
+) -> None:
+    """Un índice Chroma con configuración Qdrant se reporta como fallo."""
+    indice = _indice_temporal(tmp_path, almacen="chroma")
+    almacen = _qdrant_con_768()
+    try:
+        comprobaciones, _ = validar.comprobar(
+            ruta_indice=indice,
+            tipo="qdrant",
+            almacen=almacen,
+        )
+    finally:
+        almacen.cerrar()
+
+    fallos = {item.nombre for item in comprobaciones if not item.ok}
+    assert "almacen declarado" in fallos
+
+
+def test_validar_indice_sin_coleccion_no_la_crea(validar: ModuleType, tmp_path: Path) -> None:
+    """Si no hay colección, informa sin crear una carpeta vacía."""
+    indice = _indice_temporal(tmp_path)
+    carpeta = tmp_path / "sin-almacen"
+
+    with pytest.raises(FileNotFoundError, match="No hay colección"):
+        validar.comprobar(ruta_indice=indice, ruta_almacen=carpeta, tipo="qdrant")
+
+    assert not carpeta.exists()

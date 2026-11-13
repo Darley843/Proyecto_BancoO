@@ -102,6 +102,10 @@ indice-completo: ## Indexa ademas el resto de PDF y los videos (Ollama)
 	$(UV) run python -m banco_occidente_corpus.boveda fragmentos --alcance completo
 	$(UV) run python -m banco_occidente_corpus.boveda indice --alcance completo
 
+.PHONY: migrar-qdrant
+migrar-qdrant: ## Copia el índice de Chroma a Qdrant sin recalcular embeddings
+	$(UV) run python -m banco_occidente_corpus.boveda migrar-qdrant
+
 .PHONY: tablero
 tablero: ## Construye data/estructurados/tablero.csv y cruza las 8 preguntas de tabla
 	$(UV) run python -m banco_occidente_corpus.tablero

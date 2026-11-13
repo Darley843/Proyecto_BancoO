@@ -1,6 +1,6 @@
 ---
 name: boveda-rag
-description: Opera, mide y diagnostica la Bóveda RAG de la Sucursal 1965; reconstruye el índice de Chroma con Ollama, consulta el recuperador, mide hit@5 y MRR y diagnostica fallos de indexación o recuperación.
+description: Opera, mide y diagnostica la Bóveda RAG de la Sucursal 1965; reconstruye el índice de Qdrant con Ollama, consulta el recuperador, mide hit@5 y MRR y diagnostica fallos de indexación o recuperación.
 ---
 
 # Bóveda RAG
@@ -42,8 +42,8 @@ consume los chunks y los hechos que producen esas dos skills.
    el PR no esté fusionado, `sucursal/digiturno.py` sigue aplicando
    `detectar_pii` como primera regla. Ley 1581 de 2012.
 4. **El índice no se versiona.** `.gitignore` contiene `data/boveda/`, que
-   incluye Chroma, `indice.json` y `mediciones/`. Se comprueba con
-   `git check-ignore -v data/boveda/chroma`.
+   incluye Qdrant (`data/boveda/qdrant/`), Chroma opcional, `indice.json` y
+   `mediciones/`. Se comprueba con `git check-ignore -v data/boveda/qdrant`.
 5. **El servidor es solo local.** `app.py` fija `HOST = "127.0.0.1"` y
    `make app` arranca uvicorn en `http://127.0.0.1:8000`. Nunca `0.0.0.0` ni un
    host público.
@@ -56,6 +56,22 @@ consume los chunks y los hechos que producen esas dos skills.
    colección al terminar de vectorizar; dos procesos a la vez dejan un índice
    incoherente. Espera a que `make indice` termine y valida con
    `scripts/validar_indice.py`.
+8. **La carpeta de Qdrant es de un solo proceso.** El modo embebido bloquea
+   `data/boveda/qdrant/`; si `make arqueo`, `make indice` o una medición fallan
+   con `AlmacenBloqueado`, **cierra la app antes de medir** y vuelve a intentarlo.
+
+### Almacén: Qdrant por defecto, Chroma opcional
+
+`[almacen] tipo = "qdrant"` en `config/sucursal.toml` es el valor por defecto;
+`"chroma"` mantiene el motor anterior. Para pasar un índice Chroma ya construido
+a Qdrant sin vectorizar de nuevo:
+
+```bash
+make migrar-qdrant
+```
+
+La colección declara HNSW, pero el modo embebido de Qdrant busca de forma exacta;
+con este tamaño de corpus es más precisa, y el ANN real requiere servidor.
 
 ## Reconstruir la Bóveda
 
@@ -141,6 +157,7 @@ con McNemar.
 | El `hit@5` por URL cuenta la pregunta 7 como acierto aunque el fragmento con la respuesta no esté entre los 5 | La métrica compara solo la URL esperada, no el pasaje | Complementar con una medida de pasaje: los términos esperados en el texto recuperado, reportada junto al `hit@5` por URL |
 | BM25 no encuentra por tildes o espacios | El preprocesador viejo partía por espacios y conservaba signos | Ya corregido: `boveda/recuperador.py::_tokenizar` usa `texto.normalizar` y `re.findall(r"\w+")` |
 | Mediciones incoherentes | Se midió durante `make indice` o con fragmentos distintos del índice | Esperar a que termine, ejecutar `scripts/validar_indice.py` y medir con ese mismo índice |
+| `AlmacenBloqueado` al medir o indexar | La app tiene abierta la carpeta de Qdrant (modo local de un solo proceso) | Cerrar `make app` antes de medir; el índice no se dañó |
 | Índice con unos 846 fragmentos y sin PDF, cifras de hit@5 menores | Faltaba `data/knowledge/chunks.jsonl` al construir los fragmentos: el alcance quedó solo con la web | `make chunks` y luego `make indice`; el resumen de `make fragmentos` lo avisa y muestra `Fragmentos PDF` en cero |
 | Fuente esperada discutible | Preguntas 2 y 16: la 2 depende de la página de inversionistas; la 16 tiene tres URL alternativas. La 20 no es un fallo de cobertura: sus 8 noticias están en `chunks_web.jsonl`; falla porque la pregunta es genérica («noticias recientes») y la búsqueda por vectores no capta qué es reciente | Revisar `fuentes_esperadas` o reformular la pregunta; no cambiar el índice por la 20 |
 | Fragmentos con muchos temas | Preguntas 3 y 4: la fuente de la 4 es la página de Ayuda, un solo fragmento de unos 350 tokens que mezcla varios temas; la 3 tiene su propia página (`/ayuda/linea-servicio-cliente`) y no entra al top 5, causa no confirmada | Inspeccionar el top 5 con `--salida` antes de cambiar nada |
@@ -192,7 +209,7 @@ make check
 uv run pytest test/test_skill_boveda_rag.py -q
 uv run python .opencode/skills/boveda-rag/scripts/validar_indice.py
 uv run python .opencode/skills/boveda-rag/scripts/medir_recuperacion.py
-git check-ignore -v data/boveda/chroma
+git check-ignore -v data/boveda/qdrant
 ```
 
 Los controles de `test/test_skill_boveda_rag.py` no usan Ollama ni red:

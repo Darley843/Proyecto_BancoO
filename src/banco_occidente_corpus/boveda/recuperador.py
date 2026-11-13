@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import math
 import re
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from dataclasses import replace
 from typing import Any
 
@@ -24,11 +24,11 @@ from langchain_core.retrievers import BaseRetriever
 
 from ..config import Config
 from ..texto import normalizar
-from .almacen import AlmacenVectorial, ChromaAlmacen
+from .almacen import AlmacenVectorial, crear_almacen
 from .configuracion import ConfiguracionRecuperacion, cargar_configuracion_recuperacion
 from .embeddings import crear_embeddings
 from .fragmentos import Alcance
-from .indice import leer_fragmentos, ruta_almacen
+from .indice import comprobar_almacen, leer_fragmentos
 from .tipos import Fragmento
 
 #: k mínimo con el que se consultan los recuperadores antes de fusionar.
@@ -43,6 +43,8 @@ class RecuperadorVectorial(BaseRetriever):
     k: int = K_MINIMO
     #: Vector de la consulta ya calculado; si falta, se pide a los embeddings.
     vector: Sequence[float] | None = None
+    #: Igualdad por campos del payload, por ejemplo `{"seccion": "identidad"}`.
+    filtro: Mapping[str, Any] | None = None
 
     def _get_relevant_documents(
         self,
@@ -52,7 +54,10 @@ class RecuperadorVectorial(BaseRetriever):
     ) -> list[Document]:
         """Devuelve los k fragmentos más cercanos del almacén."""
         vector = self.vector if self.vector is not None else self.embeddings.embed_query(query)
-        coincidencias = self.almacen.buscar(vector, k=self.k)
+        if self.filtro:
+            coincidencias = self.almacen.buscar(vector, k=self.k, filtro=self.filtro)
+        else:
+            coincidencias = self.almacen.buscar(vector, k=self.k)
         return [
             Document(
                 page_content=coincidencia.documento,
@@ -186,13 +191,17 @@ def crear_recuperador(
         alcance: alcance indexado que se quiere consultar.
         configuracion: k y pesos; se cargan del TOML si falta.
         embeddings: proveedor alternativo; por defecto Ollama.
-        almacen: almacén alternativo; por defecto Chroma.
+        almacen: almacén alternativo; por defecto el motor de `[almacen].tipo`.
 
     Returns:
         Un `RecuperadorHibrido` listo para `buscar`.
     """
     proveedor = embeddings or crear_embeddings()
-    destino = almacen or ChromaAlmacen(ruta_almacen(config))
+    if almacen is None:
+        comprobar_almacen(config)
+        destino = crear_almacen(config)
+    else:
+        destino = almacen
     fragmentos = leer_fragmentos(config, alcance)
     return RecuperadorHibrido(destino, proveedor, fragmentos, configuracion)
 

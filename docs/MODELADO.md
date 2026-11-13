@@ -50,8 +50,8 @@ ruido no compite por similitud en el índice.
 | Fragmentos | 957 fragmentos (870 de páginas, 81 de PDF y 6 hechos); fusión hasta 80 tokens, límite de 400 y tablas largas partidas por filas | `boveda/fragmentos.py`, `make fragmentos` |
 | Embeddings | `nomic-embed-text-v2-moe` en Ollama local, 768 dimensiones, sin clave ni costo | `boveda/embeddings.py` |
 | Prefijos | `search_document: ` al indexar y `search_query: ` al consultar; se desactivan con `prefijos = false` | `config/sucursal.toml` |
-| Índice | Chroma persistente en `data/boveda/chroma`, colección `boveda`, distancia coseno | `boveda/almacen.py` |
-| Metadatos | `data/boveda/indice.json` con modelo, prefijos, alcance, fragmentos y dimensión | `make indice` |
+| Índice | Qdrant local en `data/boveda/qdrant`, colección `boveda`, distancia coseno; Chroma sigue disponible con `[almacen] tipo = "chroma"` | `boveda/almacen.py` |
+| Metadatos | `data/boveda/indice.json` con modelo, prefijos, alcance, fragmentos, dimensión y almacén | `make indice` |
 | Alcance base | Páginas web, PDF con `categoria_documento: producto` y hechos verificados | `make indice` |
 | Alcance completo | Añade el resto de PDF y los videos transcritos | `make indice-completo` |
 | Recuperación | Híbrida: vectorial + BM25 con pesos configurables y `puntaje` = 1 − coseno | `boveda/recuperador.py` |
@@ -60,7 +60,7 @@ ruido no compite por similitud en el índice.
 ### Mapa PCA: solo exploratorio
 
 El mapa de la Bóveda (`data/boveda/mapa.json`) se calcula en `make indice` con los
-mismos vectores que se insertan en Chroma, sin volver a llamar a Ollama. Guarda
+mismos vectores que se insertan en el índice, sin volver a llamar a Ollama. Guarda
 la media, los componentes, el mínimo y el rango de PCA para ubicar después cada
 pregunta en el mismo plano. Es **solo una vista**: no recupera, no decide rutas y
 no interviene en el Arqueo. El top que acompaña a la pregunta lo da el
@@ -85,15 +85,19 @@ Alternativas descartadas: `sentence-transformers` con `multilingual-e5-base`
 
 ### Base de datos vectorial
 
-**Chroma** (`langchain-chroma`) persistida en `data/boveda/chroma`, con la
-métrica coseno fijada al crear la colección. Guarda los metadatos de cada
-fragmento (`url`, `titulo`, `seccion`, `encabezado`, `tipo`, `tokens`), así que
-la respuesta puede seguir citando la fuente.
+**Qdrant** (`qdrant-client`) en modo embebido, persistido en `data/boveda/qdrant`,
+con la métrica coseno y el HNSW por defecto al crear la colección. Cada punto
+guarda en el payload `url`, `titulo`, `seccion`, `encabezado`, `tipo`, `tokens` y
+el texto, así que la respuesta puede seguir citando la fuente. Chroma queda como
+opción de compatibilidad (`[almacen] tipo = "chroma"`); `make migrar-qdrant` copia
+un índice Chroma existente sin recalcular embeddings.
 
-La colección se reconstruye entera en cada `make indice`: no hay *upsert*
-incremental, para no dejar fragmentos huérfanos cuando cambia el chunking. El
-índice es un derivado, no se versiona (`data/boveda/` está en `.gitignore`) y se
-regenera desde Gold y Knowledge.
+La colección declara HNSW, pero el modo embebido busca de forma exacta; con este
+tamaño de corpus es más precisa, y el ANN real requiere servidor. La colección se
+reconstruye entera en cada `make indice`: no hay *upsert* incremental, para no
+dejar fragmentos huérfanos cuando cambia el chunking. El índice es un derivado, no
+se versiona (`data/boveda/` está en `.gitignore`) y se regenera desde Gold y
+Knowledge.
 
 Alternativa: **FAISS**, más rápido en búsquedas puras, pero sin metadatos ni
 persistencia propios; habría que mantener un archivo aparte.
@@ -101,7 +105,7 @@ persistencia propios; habría que mantener un archivo aparte.
 ### Recuperación y prompt del Módulo 2
 
 La recuperación es **híbrida**: `EnsembleRetriever` combina el almacén vectorial
-de Chroma con `BM25Retriever` en memoria sobre los fragmentos del alcance. Los
+de Qdrant con `BM25Retriever` en memoria sobre los fragmentos del alcance. Los
 pesos viven en `[recuperacion]` de `config/sucursal.toml` (`k`,
 `peso_vectorial`, `peso_bm25`) y se normalizan a suma 1 antes de pasarlos. El
 orden final lo decide el híbrido; después, `puntaje` se calcula contra la

@@ -38,14 +38,24 @@ from ..asistente.evaluacion import (
     cargar_resultados,
     cargar_revision,
 )
-from ..boveda.almacen import AlmacenVectorial, ChromaAlmacen
+from ..boveda.almacen import (
+    AlmacenVectorial,
+    cerrar_almacen,
+    crear_almacen,
+    crear_almacen_en_ruta,
+)
 from ..boveda.configuracion import (
     cargar_configuracion_embeddings,
     cargar_configuracion_recuperacion,
 )
 from ..boveda.embeddings import crear_embeddings
 from ..boveda.fragmentos import Alcance
-from ..boveda.indice import leer_fragmentos, leer_metadatos, ruta_almacen
+from ..boveda.indice import (
+    comprobar_almacen,
+    leer_fragmentos,
+    leer_metadatos,
+    ruta_almacen,
+)
 from ..config import PROJECT_ROOT, Config
 from .cache_embeddings import EmbeddingsEnCache
 from .experimentos import (
@@ -283,7 +293,7 @@ def ejecutar_arqueo(
         salida_json: ruta del JSON; por defecto ``data/evaluacion/arqueo.json``.
         salida_md: ruta del Markdown; por defecto ``docs/ARQUEO.md``.
         embeddings: proveedor alternativo (pruebas); por defecto Ollama.
-        almacen: indice principal alternativo (pruebas); por defecto Chroma.
+        almacen: indice principal alternativo (pruebas); por defecto el configurado.
         almacen_sin_prefijos: indice extra alternativo (pruebas).
         reconstruir_sin_prefijos: fuerza a reconstruir el indice sin prefijos.
 
@@ -300,9 +310,10 @@ def ejecutar_arqueo(
         raise FileNotFoundError(
             "No hay indice de la Boveda: ejecuta `make indice` antes de `make arqueo`."
         )
+    comprobar_almacen(config)
     if almacen is None and not ruta_almacen(config).exists():
         raise FileNotFoundError(
-            "No hay indice de la Boveda en data/boveda/chroma: ejecuta `make indice`."
+            f"No hay indice de la Boveda en {ruta_almacen(config)}: ejecuta `make indice`."
         )
 
     ajustes_embeddings = cargar_configuracion_embeddings()
@@ -310,52 +321,61 @@ def ejecutar_arqueo(
     proveedor = EmbeddingsEnCache(embeddings or crear_embeddings(ajustes_embeddings))
     preguntas = cargar_preguntas_fase2(archivo_preguntas)
     fragmentos = leer_fragmentos(config, alcance)
-    indice = almacen or ChromaAlmacen(ruta_almacen(config))
+    indice_creado = almacen is None
+    indice = almacen or crear_almacen(config)
+    indice_extra: AlmacenVectorial | None = None
+    try:
+        barrido = barrer_pesos(
+            indice,
+            proveedor,
+            fragmentos,
+            preguntas,
+            configuracion=ajustes_recuperacion,
+        )
 
-    barrido = barrer_pesos(
-        indice,
-        proveedor,
-        fragmentos,
-        preguntas,
-        configuracion=ajustes_recuperacion,
-    )
+        carpeta_extra = carpeta_sin_prefijos(config)
+        existia_extra = leer_metadatos(carpeta_extra) is not None
+        resumen_extra = construir_indice_sin_prefijos(
+            config,
+            alcance,
+            embeddings=embeddings,
+            almacen=almacen_sin_prefijos,
+            reconstruir=reconstruir_sin_prefijos,
+            configuracion=ajustes_embeddings,
+        )
+        proveedor_sin = EmbeddingsEnCache(
+            embeddings or crear_embeddings(replace(ajustes_embeddings, prefijos=False))
+        )
+        indice_extra = almacen_sin_prefijos or crear_almacen_en_ruta(
+            resumen_extra.ruta_almacen, resumen_extra.almacen
+        )
+        etiqueta_extra = (
+            f"{etiqueta_pesos(ajustes_recuperacion.peso_vectorial, ajustes_recuperacion.peso_bm25)}"
+            " sin prefijos"
+        )
+        sin_prefijos = medir_configuracion(
+            indice_extra,
+            proveedor_sin,
+            fragmentos,
+            preguntas,
+            etiqueta=etiqueta_extra,
+            vectorial=ajustes_recuperacion.peso_vectorial,
+            bm25=ajustes_recuperacion.peso_bm25,
+            prefijos=False,
+        )
 
-    carpeta_extra = carpeta_sin_prefijos(config)
-    existia_extra = leer_metadatos(carpeta_extra) is not None
-    resumen_extra = construir_indice_sin_prefijos(
-        config,
-        alcance,
-        embeddings=embeddings,
-        almacen=almacen_sin_prefijos,
-        reconstruir=reconstruir_sin_prefijos,
-        configuracion=ajustes_embeddings,
-    )
-    proveedor_sin = EmbeddingsEnCache(
-        embeddings or crear_embeddings(replace(ajustes_embeddings, prefijos=False))
-    )
-    indice_extra = almacen_sin_prefijos or ChromaAlmacen(resumen_extra.ruta_almacen)
-    etiqueta_extra = (
-        f"{etiqueta_pesos(ajustes_recuperacion.peso_vectorial, ajustes_recuperacion.peso_bm25)}"
-        " sin prefijos"
-    )
-    sin_prefijos = medir_configuracion(
-        indice_extra,
-        proveedor_sin,
-        fragmentos,
-        preguntas,
-        etiqueta=etiqueta_extra,
-        vectorial=ajustes_recuperacion.peso_vectorial,
-        bm25=ajustes_recuperacion.peso_bm25,
-        prefijos=False,
-    )
-
-    revision_v1 = cargar_revision(archivo_revision_v1 or ARCHIVO_REVISION_V1)
-    ruta_revision_v2 = archivo_revision_v2 or ARCHIVO_REVISION_V2
-    revision_v2 = cargar_revision(ruta_revision_v2)
-    sensibilidad = cargar_sensibilidad(ruta_revision_v2)
-    resultados_v1 = cargar_resultados(archivo_resultados_v1 or ARCHIVO_RESULTADOS_V1)
-    resultados_v2 = cargar_resultados(archivo_resultados_v2 or ARCHIVO_RESULTADOS_V2)
-    directo = vectorial_directo(indice, proveedor, preguntas)
+        revision_v1 = cargar_revision(archivo_revision_v1 or ARCHIVO_REVISION_V1)
+        ruta_revision_v2 = archivo_revision_v2 or ARCHIVO_REVISION_V2
+        revision_v2 = cargar_revision(ruta_revision_v2)
+        sensibilidad = cargar_sensibilidad(ruta_revision_v2)
+        resultados_v1 = cargar_resultados(archivo_resultados_v1 or ARCHIVO_RESULTADOS_V1)
+        resultados_v2 = cargar_resultados(archivo_resultados_v2 or ARCHIVO_RESULTADOS_V2)
+        directo = vectorial_directo(indice, proveedor, preguntas)
+    finally:
+        if indice_creado:
+            cerrar_almacen(indice)
+        if almacen_sin_prefijos is None and indice_extra is not None:
+            cerrar_almacen(indice_extra)
 
     avisos: list[str] = []
     if meta_principal.get("fragmentos") != len(fragmentos):

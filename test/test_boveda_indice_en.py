@@ -46,9 +46,13 @@ def make_config(tmp_path: Path) -> Config:
 
 
 class EspiaEmbeddings(Embeddings):
-    """Proveedor de pruebas que cuenta cuantos textos vectoriza."""
+    """Proveedor de pruebas que registra los textos que recibe.
+
+    `documentos` acumula los textos indexados y `consultas`, las preguntas.
+    """
 
     def __init__(self, dimension: int = 4) -> None:
+        """Guarda la dimensión y los registros de lo recibido."""
         self.dimension = dimension
         self.documentos: list[str] = []
         self.consultas: list[str] = []
@@ -149,7 +153,7 @@ def test_indice_sin_prefijos_se_construye_y_se_reutiliza(tmp_path: Path) -> None
     assert vectorizados == 2
     assert len(espia.documentos) == 2
     assert primero.ruta_almacen == segundo.ruta_almacen
-    assert primero.ruta_almacen == carpeta_sin_prefijos(config) / "chroma"
+    assert primero.ruta_almacen == carpeta_sin_prefijos(config) / "qdrant"
     metadatos = leer_metadatos(carpeta_sin_prefijos(config))
     assert metadatos is not None
     assert metadatos["prefijos"] is False

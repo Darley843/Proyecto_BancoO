@@ -46,20 +46,20 @@ from ..boveda.almacen import AlmacenVectorial
 from ..boveda.configuracion import (
     ConfiguracionEmbeddings,
     ConfiguracionRecuperacion,
+    cargar_configuracion_almacen,
     cargar_configuracion_embeddings,
     cargar_configuracion_recuperacion,
 )
 from ..boveda.embeddings import crear_embeddings
 from ..boveda.fragmentos import Alcance
 from ..boveda.indice import (
-    NOMBRE_ALMACEN,
-    NOMBRE_METADATOS,
     ResumenIndice,
     construir_indice_en,
     leer_fragmentos,
     leer_metadatos,
 )
 from ..boveda.recuperador import RecuperadorHibrido, RecuperadorVectorial
+from ..boveda.rutas import NOMBRE_METADATOS, TipoAlmacen, ruta_almacen_en
 from ..boveda.tipos import Fragmento
 from ..config import PROJECT_ROOT, Config
 from .metricas import (
@@ -678,26 +678,29 @@ def construir_indice_sin_prefijos(
     almacen: AlmacenVectorial | None = None,
     reconstruir: bool = False,
     configuracion: ConfiguracionEmbeddings | None = None,
+    tipo_almacen: TipoAlmacen | None = None,
 ) -> ResumenIndice:
     """Construye o reutiliza el unico indice del experimento sin prefijos.
 
-    Si ``indice.json`` declara el mismo modelo, alcance y numero de fragmentos,
-    la carpeta de Chroma existe y ``huella.txt`` coincide con los ids y textos
-    actuales, se reutiliza para no vectorizar de nuevo. Si la huella falta o no
-    coincide, el indice se reconstruye y la huella se vuelve a escribir.
+    Si ``indice.json`` declara el mismo modelo, alcance, numero de fragmentos y
+    motor, la carpeta del almacen existe y ``huella.txt`` coincide con los ids y
+    textos actuales, se reutiliza para no vectorizar de nuevo. Si la huella falta
+    o no coincide, el indice se reconstruye y la huella se vuelve a escribir.
 
     Args:
         config: configuracion con las rutas del corpus.
         alcance: alcance de los fragmentos que se indexan.
         embeddings: proveedor alternativo (pruebas); por defecto Ollama.
-        almacen: almacen alternativo (pruebas); por defecto Chroma.
+        almacen: almacen alternativo (pruebas); por defecto el configurado.
         reconstruir: fuerza la reconstruccion aunque exista un indice compatible.
         configuracion: parametros de embeddings; se cargan del TOML si faltan.
+        tipo_almacen: motor del indice extra; si falta, se lee ``[almacen].tipo``.
 
     Returns:
         El resumen del indice sin prefijos.
     """
     ajustes = replace(configuracion or cargar_configuracion_embeddings(), prefijos=False)
+    tipo = tipo_almacen or cargar_configuracion_almacen().tipo
     fragmentos = leer_fragmentos(config, alcance)
     if not fragmentos:
         raise ValueError(f"No hay fragmentos para indexar en el alcance {alcance!r}")
@@ -705,7 +708,7 @@ def construir_indice_sin_prefijos(
     metadatos = leer_metadatos(carpeta)
     huella = _huella_fragmentos(fragmentos)
     if not reconstruir and _compatible(
-        metadatos, carpeta, ajustes, len(fragmentos), alcance, huella
+        metadatos, carpeta, ajustes, len(fragmentos), alcance, huella, tipo
     ):
         assert metadatos is not None
         return ResumenIndice(
@@ -715,7 +718,8 @@ def construir_indice_sin_prefijos(
             fragmentos=len(fragmentos),
             dimension=int(metadatos["dimension"]),
             ruta_metadatos=carpeta / NOMBRE_METADATOS,
-            ruta_almacen=carpeta / NOMBRE_ALMACEN,
+            ruta_almacen=ruta_almacen_en(carpeta, tipo),
+            almacen=tipo,
         )
 
     proveedor = embeddings or crear_embeddings(ajustes)
@@ -726,6 +730,7 @@ def construir_indice_sin_prefijos(
         ajustes=ajustes,
         embeddings=proveedor,
         almacen=almacen,
+        tipo_almacen=tipo,
     )
     _escribir_huella(carpeta, huella)
     return resumen
@@ -757,11 +762,15 @@ def _compatible(
     fragmentos: int,
     alcance: Alcance,
     huella: str,
+    tipo: TipoAlmacen,
 ) -> bool:
     """Indica si el indice sin prefijos existente se puede reutilizar."""
     if metadatos is None:
         return False
-    if not (carpeta / NOMBRE_ALMACEN).exists():
+    declarado = metadatos.get("almacen")
+    if isinstance(declarado, str) and declarado != tipo:
+        return False
+    if not ruta_almacen_en(carpeta, tipo).exists():
         return False
     ruta_huella = carpeta / NOMBRE_HUELLA
     if not ruta_huella.exists() or ruta_huella.read_text(encoding="utf-8").strip() != huella:

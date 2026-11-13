@@ -34,14 +34,14 @@ import httpx
 from langchain_core.documents import Document
 
 from banco_occidente_corpus.arqueo.metricas import hit_at_k, mrr
-from banco_occidente_corpus.boveda.almacen import ChromaAlmacen
+from banco_occidente_corpus.boveda.almacen import crear_almacen
 from banco_occidente_corpus.boveda.configuracion import (
     ConfiguracionRecuperacion,
     cargar_configuracion_recuperacion,
 )
 from banco_occidente_corpus.boveda.embeddings import crear_embeddings
 from banco_occidente_corpus.boveda.fragmentos import Alcance
-from banco_occidente_corpus.boveda.indice import ruta_almacen
+from banco_occidente_corpus.boveda.indice import comprobar_almacen, ruta_almacen
 from banco_occidente_corpus.boveda.recuperador import (
     RecuperadorVectorial,
     crear_recuperador,
@@ -398,10 +398,11 @@ def construir_recuperador(
 
     if not ruta_almacen(config).exists():
         raise FileNotFoundError(
-            "No hay índice en data/boveda/chroma: ejecuta `make indice` antes de medir."
+            f"No hay índice en {ruta_almacen(config)}: ejecuta `make indice` antes de medir."
         )
+    comprobar_almacen(config)
     vectorial = RecuperadorVectorial(
-        almacen=ChromaAlmacen(ruta_almacen(config)),
+        almacen=crear_almacen(config),
         embeddings=crear_embeddings(),
         k=k,
     )

@@ -36,6 +36,8 @@ RAIZ = Path(__file__).resolve().parents[1]
 
 #: Rutas representativas que deben quedar fuera de Git.
 RUTAS_IGNORADAS: tuple[str, ...] = (
+    "data/boveda/qdrant/meta.json",
+    "data/boveda/qdrant/.lock",
     "data/boveda/chroma/chroma.sqlite3",
     "data/boveda/indice.json",
     "data/asistente/memoria.sqlite",

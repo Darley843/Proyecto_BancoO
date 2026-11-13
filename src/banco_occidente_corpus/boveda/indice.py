@@ -10,7 +10,7 @@ vectores se regenera `data/boveda/mapa.json` (PCA, ver `mapa.py`).
 from __future__ import annotations
 
 import json
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Iterator, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
@@ -19,21 +19,51 @@ import httpx
 from langchain_core.embeddings import Embeddings
 
 from ..config import Config
-from .almacen import AlmacenVectorial, ChromaAlmacen
-from .configuracion import ConfiguracionEmbeddings, cargar_configuracion_embeddings
+from .almacen import AlmacenVectorial, cerrar_almacen, crear_almacen, crear_almacen_en
+from .configuracion import (
+    ConfiguracionEmbeddings,
+    cargar_configuracion_almacen,
+    cargar_configuracion_embeddings,
+)
 from .embeddings import crear_embeddings
 from .fragmentos import ALCANCES, Alcance, ruta_fragmentos
 from .mapa import construir_mapa, escribir_mapa
+from .rutas import (
+    NOMBRE_METADATOS,
+    NOMBRE_QDRANT,
+    TipoAlmacen,
+    carpeta_boveda,
+    ruta_almacen,
+    ruta_almacen_en,
+    ruta_metadatos,
+)
 from .tipos import Fragmento
 
 #: Fragmentos que se envían a Ollama en cada lote.
 LOTE_EMBEDDINGS: int = 64
-#: Fragmentos que se insertan en Chroma en cada lote.
+#: Fragmentos que se insertan en el almacén en cada lote.
 LOTE_ALMACEN: int = 256
-#: Archivo de metadatos del índice.
-NOMBRE_METADATOS: str = "indice.json"
-#: Carpeta del índice persistente.
-NOMBRE_ALMACEN: str = "chroma"
+#: Nombre de la carpeta del almacén por defecto (compatibilidad con el Arqueo).
+NOMBRE_ALMACEN: str = NOMBRE_QDRANT
+
+__all__ = [
+    "AvisoLote",
+    "Progreso",
+    "ResumenIndice",
+    "TiempoAgotadoEmbeddings",
+    "carpeta_boveda",
+    "comprobar_almacen",
+    "construir_indice",
+    "construir_indice_en",
+    "escribir_metadatos",
+    "formatear_duracion",
+    "formatear_resumen_indice",
+    "leer_fragmentos",
+    "leer_metadatos",
+    "metadatos_fragmento",
+    "ruta_almacen",
+    "ruta_metadatos",
+]
 
 
 @dataclass(frozen=True, slots=True)
@@ -47,6 +77,7 @@ class ResumenIndice:
     dimension: int
     ruta_metadatos: Path
     ruta_almacen: Path
+    almacen: TipoAlmacen = "qdrant"
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,19 +105,35 @@ class TiempoAgotadoEmbeddings(RuntimeError):
         self.timeout_segundos = timeout_segundos
 
 
-def carpeta_boveda(config: Config) -> Path:
-    """Devuelve `data/boveda` para el proyecto configurado."""
-    return config.paths.root / "data" / "boveda"
+def comprobar_almacen(config: Config, carpeta: Path | None = None) -> dict[str, Any] | None:
+    """Comprueba que el índice existente corresponda al almacén configurado.
 
+    Un `indice.json` sin la clave `almacen` se considera compatible: es el
+    formato anterior a la migración. Si la clave existe y no coincide con
+    `[almacen].tipo`, el error explica qué comando ejecutar.
 
-def ruta_metadatos(config: Config) -> Path:
-    """Devuelve la ruta de `data/boveda/indice.json`."""
-    return carpeta_boveda(config) / NOMBRE_METADATOS
+    Args:
+        config: configuración con las rutas del corpus.
+        carpeta: carpeta del índice; por defecto `data/boveda`.
 
+    Returns:
+        Los metadatos del índice, o `None` si no hay `indice.json`.
 
-def ruta_almacen(config: Config) -> Path:
-    """Devuelve la ruta de `data/boveda/chroma`."""
-    return carpeta_boveda(config) / NOMBRE_ALMACEN
+    Raises:
+        ValueError: si el índice declara un almacén distinto del configurado.
+    """
+    metadatos = leer_metadatos(carpeta or carpeta_boveda(config))
+    if metadatos is None:
+        return None
+    declarado = metadatos.get("almacen")
+    configurado = cargar_configuracion_almacen().tipo
+    if isinstance(declarado, str) and declarado != configurado:
+        raise ValueError(
+            f"El índice se construyó con {declarado} y la configuración pide "
+            f"{configurado}: ejecuta `make migrar-qdrant` o cambia [almacen].tipo "
+            "en config/sucursal.toml."
+        )
+    return metadatos
 
 
 def leer_fragmentos(config: Config, alcance: Alcance = "base") -> list[Fragmento]:
@@ -134,7 +181,8 @@ def construir_indice(
         alcance: `base` (web, PDF de producto y hechos) o `completo`.
         configuracion: parámetros de embeddings; se cargan del TOML si faltan.
         embeddings: proveedor alternativo (pruebas); por defecto Ollama.
-        almacen: almacén alternativo (pruebas); por defecto Chroma.
+        almacen: almacén alternativo (pruebas); por defecto el que devuelve
+            `crear_almacen(config)` (Qdrant por defecto).
         progreso: callback opcional que recibe el avance de cada lote.
 
     Returns:
@@ -145,17 +193,22 @@ def construir_indice(
     if not fragmentos:
         raise ValueError(f"No hay fragmentos para indexar en el alcance {alcance!r}")
     proveedor = embeddings or crear_embeddings(ajustes)
-    destino = almacen or ChromaAlmacen(ruta_almacen(config))
-    return construir_indice_en(
-        carpeta_boveda(config),
-        fragmentos,
-        alcance=alcance,
-        ajustes=ajustes,
-        embeddings=proveedor,
-        almacen=destino,
-        config_mapa=config,
-        progreso=progreso,
-    )
+    creado = almacen is None
+    destino = almacen or crear_almacen(config)
+    try:
+        return construir_indice_en(
+            carpeta_boveda(config),
+            fragmentos,
+            alcance=alcance,
+            ajustes=ajustes,
+            embeddings=proveedor,
+            almacen=destino,
+            config_mapa=config,
+            progreso=progreso,
+        )
+    finally:
+        if creado:
+            cerrar_almacen(destino)
 
 
 def construir_indice_en(
@@ -167,6 +220,7 @@ def construir_indice_en(
     embeddings: Embeddings,
     config_mapa: Config | None = None,
     almacen: AlmacenVectorial | None = None,
+    tipo_almacen: TipoAlmacen = "qdrant",
     progreso: Progreso | None = None,
 ) -> ResumenIndice:
     """Construye un índice en una carpeta arbitraria y escribe sus metadatos.
@@ -176,7 +230,7 @@ def construir_indice_en(
     No cambia el comportamiento de `construir_indice`, que delega aquí.
 
     Args:
-        carpeta: carpeta del índice; contendrá `chroma/` e `indice.json`.
+        carpeta: carpeta del índice; contendrá `qdrant/` o `chroma/` e `indice.json`.
         fragmentos: fragmentos que se van a vectorizar e insertar.
         alcance: alcance declarado en los metadatos.
         ajustes: parámetros de embeddings (modelo, prefijos y timeout).
@@ -184,7 +238,8 @@ def construir_indice_en(
         config_mapa: configuracion del proyecto para escribir `mapa.json`; solo la
             pasa el indice principal. Sin este parametro no se toca el mapa, para
             que el indice sin prefijos no sobrescriba el mapa principal.
-        almacen: almacén alternativo; por defecto `ChromaAlmacen(carpeta/chroma)`.
+        almacen: almacén alternativo; por defecto el motor `tipo_almacen`.
+        tipo_almacen: `qdrant` o `chroma` cuando no se inyecta un almacén.
         progreso: callback opcional que recibe el avance de cada lote.
 
     Returns:
@@ -192,43 +247,49 @@ def construir_indice_en(
     """
     if not fragmentos:
         raise ValueError(f"No hay fragmentos para indexar en el alcance {alcance!r}")
-    destino = almacen or ChromaAlmacen(carpeta / NOMBRE_ALMACEN)
-
-    # Vectorizar primero: si el proveedor falla, el índice anterior queda intacto.
-    vectores = _vectorizar(
-        embeddings,
-        fragmentos,
-        timeout_segundos=ajustes.timeout,
-        progreso=progreso,
-    )
-    dimension = len(vectores[0])
-    if dimension == 0:
-        raise ValueError("El proveedor de embeddings devolvió vectores vacíos")
-    if any(len(vector) != dimension for vector in vectores):
-        raise ValueError("El proveedor de embeddings devolvió vectores de distinta dimensión")
-
-    destino.reiniciar()
-    _insertar(destino, fragmentos, vectores)
-    contados = destino.contar()
-    if contados != len(fragmentos):
-        raise RuntimeError(
-            f"El almacén declara {contados} vectores pero se insertaron {len(fragmentos)}"
+    creado = almacen is None
+    destino = almacen or crear_almacen_en(carpeta, tipo_almacen)
+    tipo: TipoAlmacen = getattr(destino, "tipo", tipo_almacen)
+    try:
+        # Vectorizar primero: si el proveedor falla, el índice anterior queda intacto.
+        vectores = _vectorizar(
+            embeddings,
+            fragmentos,
+            timeout_segundos=ajustes.timeout,
+            progreso=progreso,
         )
+        dimension = len(vectores[0])
+        if dimension == 0:
+            raise ValueError("El proveedor de embeddings devolvió vectores vacíos")
+        if any(len(vector) != dimension for vector in vectores):
+            raise ValueError("El proveedor de embeddings devolvió vectores de distinta dimensión")
 
-    resumen = ResumenIndice(
-        alcance=alcance,
-        modelo=ajustes.modelo,
-        prefijos=ajustes.prefijos,
-        fragmentos=len(fragmentos),
-        dimension=dimension,
-        ruta_metadatos=carpeta / NOMBRE_METADATOS,
-        ruta_almacen=carpeta / NOMBRE_ALMACEN,
-    )
-    _escribir_metadatos(resumen)
-    if config_mapa is not None and len(fragmentos) >= 2:
-        # El mapa usa los mismos vectores recién insertados: no vuelve a llamar a Ollama.
-        escribir_mapa(config_mapa, construir_mapa(fragmentos, vectores, alcance=alcance))
-    return resumen
+        destino.reiniciar()
+        _insertar(destino, fragmentos, vectores)
+        contados = destino.contar()
+        if contados != len(fragmentos):
+            raise RuntimeError(
+                f"El almacén declara {contados} vectores pero se insertaron {len(fragmentos)}"
+            )
+
+        resumen = ResumenIndice(
+            alcance=alcance,
+            modelo=ajustes.modelo,
+            prefijos=ajustes.prefijos,
+            fragmentos=len(fragmentos),
+            dimension=dimension,
+            ruta_metadatos=carpeta / NOMBRE_METADATOS,
+            ruta_almacen=ruta_almacen_en(carpeta, tipo),
+            almacen=tipo,
+        )
+        _escribir_metadatos(resumen)
+        if config_mapa is not None and len(fragmentos) >= 2:
+            # El mapa usa los mismos vectores recién insertados: no vuelve a llamar a Ollama.
+            escribir_mapa(config_mapa, construir_mapa(fragmentos, vectores, alcance=alcance))
+        return resumen
+    finally:
+        if creado:
+            cerrar_almacen(destino)
 
 
 def leer_metadatos(carpeta: Path) -> dict[str, Any] | None:
@@ -316,12 +377,12 @@ def _insertar(
             ids=[fragmento.id for fragmento in lote],
             vectores=vectores[inicio : inicio + LOTE_ALMACEN],
             documentos=[fragmento.texto for fragmento in lote],
-            metadatos=[_metadatos(fragmento) for fragmento in lote],
+            metadatos=[metadatos_fragmento(fragmento) for fragmento in lote],
         )
 
 
-def _metadatos(fragmento: Fragmento) -> dict[str, Any]:
-    """Convierte un fragmento en metadatos planos para Chroma."""
+def metadatos_fragmento(fragmento: Fragmento) -> dict[str, Any]:
+    """Convierte un fragmento en metadatos planos para el almacén."""
     datos = asdict(fragmento)
     datos.pop("puntaje", None)
     datos.pop("texto", None)
@@ -334,18 +395,28 @@ def _lotes(items: Sequence[Fragmento], tamano: int) -> Iterator[Sequence[Fragmen
         yield items[inicio : inicio + tamano]
 
 
-def _escribir_metadatos(resumen: ResumenIndice) -> None:
-    """Escribe `indice.json` de forma determinista."""
-    metadatos = {
-        "modelo": resumen.modelo,
-        "prefijos": resumen.prefijos,
-        "alcance": resumen.alcance,
-        "fragmentos": resumen.fragmentos,
-        "dimension": resumen.dimension,
-    }
-    resumen.ruta_metadatos.parent.mkdir(parents=True, exist_ok=True)
-    resumen.ruta_metadatos.write_text(
-        json.dumps(metadatos, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+def escribir_metadatos(carpeta: Path, metadatos: Mapping[str, Any]) -> Path:
+    """Escribe `indice.json` de forma determinista y devuelve su ruta."""
+    ruta = carpeta / NOMBRE_METADATOS
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    ruta.write_text(
+        json.dumps(dict(metadatos), ensure_ascii=False, indent=2, sort_keys=True) + "\n",
         encoding="utf-8",
         newline="\n",
+    )
+    return ruta
+
+
+def _escribir_metadatos(resumen: ResumenIndice) -> None:
+    """Escribe `indice.json` con el alcance y el almacén del resumen."""
+    escribir_metadatos(
+        resumen.ruta_metadatos.parent,
+        {
+            "modelo": resumen.modelo,
+            "prefijos": resumen.prefijos,
+            "alcance": resumen.alcance,
+            "fragmentos": resumen.fragmentos,
+            "dimension": resumen.dimension,
+            "almacen": resumen.almacen,
+        },
     )
