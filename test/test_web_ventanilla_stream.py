@@ -96,6 +96,20 @@ def test_el_comprobante_muestra_el_recorrido() -> None:
     assert "Recorrido del turno" in bloque_funcion(codigo, "pintarComprobante")
 
 
+def test_ventanilla_persiste_y_envia_el_perfil_id() -> None:
+    """La Ventanilla guarda el `perfil_id` en localStorage y lo manda en el cuerpo."""
+    codigo = leer("vistas/ventanilla.js")
+    obtener = bloque_funcion(codigo, "obtenerPerfilId")
+    pedir = bloque_funcion(codigo, "pedirTurno")
+
+    assert 'const CLAVE_PERFIL = "sucursal-perfil-id";' in codigo
+    assert "window.localStorage.getItem(CLAVE_PERFIL)" in obtener
+    assert "window.localStorage.setItem(CLAVE_PERFIL, nuevo)" in obtener
+    assert "perfil_id: obtenerPerfilId()" in pedir
+    assert 'perfil: "Perfil"' in codigo
+    assert 'memoria: "Perfil"' in codigo
+
+
 def test_estilos_del_avance() -> None:
     """El avance tiene estilos con variables y respeta el movimiento reducido."""
     css = leer("estilos.css")

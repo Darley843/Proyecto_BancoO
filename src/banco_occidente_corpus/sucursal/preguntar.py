@@ -1,9 +1,10 @@
 """Servicio de `POST /api/preguntar`: grafo perezoso, caché, gasto y modo demo.
 
-El grafo y sus dependencias (recuperador, filas del Tablero, modelo, clasificador y
-canal) se construyen la primera vez que se pregunta, nunca al importar `app.py`.
-La caché se consulta antes de clasificar y solo para preguntas que no son de
-seguimiento, de modo que un acierto no gasta una reformulación. El gasto se suma
+El grafo y sus dependencias (recuperador, filas del Tablero, modelo, clasificador,
+canal y store de perfil) se construyen la primera vez que se pregunta, nunca al
+importar `app.py`. La caché se consulta antes de clasificar y solo para preguntas
+que no son de seguimiento ni de perfil, de modo que un acierto no gasta una
+reformulación y una respuesta personal no se reutiliza. El gasto se suma
 una sola vez por turno con el total de las tres llamadas al modelo (reformular,
 clasificar y redactar): cada nodo acumula su `extraer_metricas` en `usos` y
 `_mapear` cobra el total en `GastoDiario`. El turno cuenta como uso de modelo
@@ -19,6 +20,7 @@ from __future__ import annotations
 
 import json
 import logging
+import sqlite3
 import threading
 import time
 from collections.abc import Callable, Mapping, Sequence
@@ -28,6 +30,9 @@ from pathlib import Path
 from typing import Any
 
 from langchain_core.language_models import BaseChatModel
+from langgraph.store.base import BaseStore
+from langgraph.store.memory import InMemoryStore
+from langgraph.store.sqlite import SqliteStore
 
 from ..asistente.contexto_prompt import CanalOficial, ContextoAusente, cargar_contexto
 from ..asistente.metricas import leer_uso, sumar_uso
@@ -55,6 +60,7 @@ from .grafo import (
     responder_turno,
     tablero_responde_sin_modelo,
 )
+from .perfil import detectar_intencion, huella_perfil, normalizar_perfil_id
 
 #: Logger del servicio; nunca recibe la pregunta, la respuesta ni el `thread_id`.
 LOGGER = logging.getLogger(__name__)
@@ -65,12 +71,19 @@ RUTA_INDICE = "data/boveda/indice.json"
 RUTA_MEMORIA = "data/asistente/memoria.sqlite"
 #: Ruta de la caché de respuestas.
 RUTA_CACHE = "data/asistente/cache.sqlite"
+#: Store de largo plazo del perfil.
+RUTA_PERFIL = "data/asistente/perfil.sqlite"
 #: Rutas que puede tomar un turno, en el orden en que se prueban en la caché.
+#: La ruta ``perfil`` no se sondea: nunca se lee ni se escribe en la caché.
 RUTAS: tuple[str, ...] = ("boveda", "tablero", "rechazo", "mixta")
 #: Letra del turno a ruta descriptiva del contrato JSON.
 RUTA_POR_LETRA: dict[str, str] = {"B": "boveda", "T": "tablero", "X": "rechazo"}
 #: Motivos que cambian la ruta sin cambiar la letra del turno.
-RUTA_POR_MOTIVO: dict[str, str] = {"cortesia": "cortesia", "mixta": "mixta"}
+RUTA_POR_MOTIVO: dict[str, str] = {
+    "cortesia": "cortesia",
+    "mixta": "mixta",
+    "perfil": "perfil",
+}
 #: Campos del cuerpo que se guarda en la caché, sin los volátiles del turno.
 CAMPOS_PAYLOAD: frozenset[str] = frozenset(
     {
@@ -152,7 +165,9 @@ def ruta_de_turno(letra: str, motivo: str = "") -> str:
 
     La cortesía conserva la letra `B` y la pregunta mixta la letra `T` para no
     tocar el contrato de letras; su motivo (`cortesia` o `mixta`) elige la ruta
-    que ve la Ventanilla.
+    que ve la Ventanilla. El perfil puro usa ``perfil``; el mixto conserva la
+    letra del residual y su motivo ``perfil:<motivo>`` resuelve a la ruta de ese
+    residual.
 
     Args:
         letra: letra del turno (`B`, `T` o `X`).
@@ -161,6 +176,10 @@ def ruta_de_turno(letra: str, motivo: str = "") -> str:
     Returns:
         La ruta descriptiva del contrato JSON.
     """
+    if motivo == "perfil":
+        return "perfil"
+    if motivo.startswith("perfil:"):
+        motivo = motivo.split(":", 1)[1]
     prefijo = motivo.split(":", 1)[0]
     return RUTA_POR_MOTIVO.get(prefijo, ruta_de_letra(letra))
 
@@ -190,6 +209,11 @@ def requiere_modelo(
         True si el turno puede llamar a DeepSeek; False si las reglas y el
         Tablero lo resuelven sin modelo.
     """
+    intencion = detectar_intencion(pregunta)
+    if intencion is not None:
+        if not intencion.resto:
+            return False
+        pregunta = intencion.resto
     if con_historial and es_seguimiento(pregunta):
         return True
     turno = clasificar(
@@ -287,6 +311,7 @@ def construir_piezas(
     crear_recuperador_boveda: Callable[[], Recuperador] | None = None,
     ruta_memoria: Path | None = None,
     inyeccion: bool | None = None,
+    ruta_perfil: Path | None = None,
 ) -> PiezasGrafo:
     """Construye dependencias y grafo una sola vez, sin red si se inyectan dobles.
 
@@ -305,6 +330,9 @@ def construir_piezas(
             uno propio para no mezclar sus hilos con la conversación real.
         inyeccion: True añade el fragmento de prueba de la demo de blindaje;
             False lo excluye siempre. Si falta, decide `SUCURSAL_DEMO_INYECCION`.
+        ruta_perfil: archivo SQLite del store de perfil; por defecto
+            `data/asistente/perfil.sqlite`. En modo demo se usa un store en
+            memoria y no se toca el disco.
 
     Returns:
         Las piezas listas para atender preguntas.
@@ -330,8 +358,29 @@ def construir_piezas(
         configuracion_digiturno=cargar_configuracion_digiturno(),
         contador=ContadorTurnos(),
     )
-    grafo = crear_grafo(dependencias, ruta_memoria or config.paths.root / RUTA_MEMORIA)
+    store = _crear_store_perfil(config, ajustes, ruta_perfil)
+    grafo = crear_grafo(
+        dependencias,
+        ruta_memoria or config.paths.root / RUTA_MEMORIA,
+        store=store,
+    )
     return PiezasGrafo(dependencias=dependencias, grafo=grafo)
+
+
+def _crear_store_perfil(
+    config: Config,
+    ajustes: ConfiguracionSucursal,
+    ruta_perfil: Path | None,
+) -> BaseStore:
+    """Crea el store de LangGraph: memoria en demo, SQLite en la Sucursal."""
+    if ajustes.demo:
+        return InMemoryStore()
+    ruta = ruta_perfil or config.paths.root / RUTA_PERFIL
+    ruta.parent.mkdir(parents=True, exist_ok=True)
+    # SqliteStore abre sus propias transacciones con BEGIN; la conexión debe
+    # estar en autocommit o sqlite3 abre una transacción implícita y falla.
+    conexion = sqlite3.connect(str(ruta), check_same_thread=False, isolation_level=None)
+    return SqliteStore(conexion)
 
 
 class ServicioPreguntas:
@@ -391,12 +440,20 @@ class ServicioPreguntas:
             )
         return self._cache
 
-    def preguntar(self, pregunta: str, thread_id: str) -> dict[str, Any]:
+    def preguntar(
+        self,
+        pregunta: str,
+        thread_id: str,
+        perfil_id: str = "",
+    ) -> dict[str, Any]:
         """Responde una pregunta y devuelve el cuerpo JSON del contrato.
 
         Args:
             pregunta: texto del cliente.
             thread_id: identificador de la conversación que envía la Ventanilla.
+            perfil_id: identificador opcional de la memoria de largo plazo. Se
+                hashea antes de entrar al grafo; si falta o no sirve, el turno
+                de perfil responde que la memoria no está activa.
 
         Returns:
             El diccionario con los catorce campos de `PreguntarRespuesta`.
@@ -423,14 +480,30 @@ class ServicioPreguntas:
 
         piezas = self._piezas_o_error()
         version = piezas.dependencias.prompt.nombre
+        intencion = detectar_intencion(limpia)
+        perfil = normalizar_perfil_id(perfil_id)
 
-        if self._usar_cache and not self._ajustes.demo and not es_seguimiento(limpia):
+        # La ruta de perfil no se lee de la caché: una respuesta de «¿Dónde
+        # trabajo?» pertenece a una persona y no puede reutilizarse.
+        if (
+            self._usar_cache
+            and not self._ajustes.demo
+            and not es_seguimiento(limpia)
+            and intencion is None
+        ):
             guardado = self._buscar_en_cache(limpia, version)
             if guardado is not None:
                 return self._desde_cache(guardado, piezas, limpia, hilo, inicio)
 
+        if intencion is not None and not perfil:
+            # Sin perfil_id no hay modelo que gastar: el nodo responde la
+            # memoria inactiva y el turno sigue siendo ruta perfil.
+            estado = responder_turno(piezas.grafo, piezas.dependencias, limpia, hilo, "")
+            return self._mapear(estado, piezas, limpia, hilo, version, inicio)
+
         self._comprobar_tope(limpia, piezas, hilo)
-        estado = responder_turno(piezas.grafo, piezas.dependencias, limpia, hilo)
+        huella = huella_perfil(perfil) if perfil else ""
+        estado = responder_turno(piezas.grafo, piezas.dependencias, limpia, hilo, huella)
         return self._mapear(estado, piezas, limpia, hilo, version, inicio)
 
     @staticmethod
@@ -550,6 +623,10 @@ class ServicioPreguntas:
         turno = estado.get("turno") or {}
         letra = str(turno.get("letra", "B"))
         motivo = str(turno.get("motivo", ""))
+        perfil_tocado = bool(estado.get("perfil_tocado", False))
+        perfil_modificado = bool(estado.get("perfil_modificado", False))
+        if perfil_modificado and motivo != "perfil" and not motivo.startswith("perfil:"):
+            motivo = f"perfil:{motivo}"
         ruta = ruta_de_turno(letra, motivo)
         uso = estado.get("uso") or {}
         usos = list(estado.get("usos") or [])
@@ -579,10 +656,14 @@ class ServicioPreguntas:
         else:
             fuentes = fuentes_de_boveda(fragmentos, list(estado.get("fuentes") or []))
 
+        confirmacion = str(estado.get("confirmacion_perfil") or "")
+        if confirmacion and not respuesta.startswith(confirmacion):
+            respuesta = f"{confirmacion}\n\n{respuesta}".strip()
+
         payload: dict[str, Any] = {
             "turno": letra,
             "ruta": ruta,
-            "motivo": str(turno.get("motivo", "")),
+            "motivo": motivo,
             "uso_modelo": uso_modelo,
             "reformulada": reformulada if reformulada != pregunta else None,
             "respuesta": respuesta,
@@ -597,7 +678,14 @@ class ServicioPreguntas:
             payload["costo_usd"] = round(costo, 6)
             self._gasto.sumar(costo, tokens, llamadas=max(len(usos), 1))
             redacto = bool(uso.get("uso_modelo", False))
-            if self._usar_cache and letra != "X" and redacto and not es_sin_datos(respuesta):
+            if (
+                self._usar_cache
+                and letra != "X"
+                and redacto
+                and not es_sin_datos(respuesta)
+                and not perfil_tocado
+                and ruta != "perfil"
+            ):
                 clave = CacheRespuestas.clave(reformulada or pregunta, ruta, version)
                 self._guardar_en_cache(clave, payload)
 

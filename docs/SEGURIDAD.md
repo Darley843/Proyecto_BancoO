@@ -32,6 +32,7 @@ este documento debe revisarse.
 | Índice, fragmentos y mapa | `data/boveda/`, ignorado por Git | No; Ollama es local |
 | Pregunta sin PII | Memoria del hilo (`memoria.sqlite`) | Sí, a DeepSeek cuando la ruta usa modelo |
 | Respuesta y fuentes | Memoria y caché (`cache.sqlite`, 1 h) | No, salvo la retención del proveedor |
+| Perfil declarado (nombre y empresa) | `data/asistente/perfil.sqlite`, ignorado por Git | No; la consulta se responde en local y el modelo solo recibe la pregunta residual |
 | PII | No se guarda: se rechaza antes de la memoria y del modelo | No |
 | Clave de DeepSeek | Solo el entorno de la sesión | Sí, en la cabecera HTTP del proveedor |
 | Trazas LangSmith | No se activan por defecto | No, mientras sigan apagadas |
@@ -154,6 +155,44 @@ personales».
 formatos nuevos y puede marcar como PII un teléfono corporativo publicado. La
 memoria local guarda preguntas sin PII; quien tenga acceso a la máquina puede
 leerla. Borrar `data/asistente/` elimina ese historial.
+
+#### 3.2.1 Memoria de perfil (excepción acotada)
+
+**Qué guarda.** Solo dos datos que el usuario declara de forma explícita:
+`nombre` y `empresa`. No guarda ciudad, documentos, teléfonos, correos,
+números de tarjeta ni datos de terceros. El mensaje pasa primero por
+`detectar_pii`; si hay PII, no se guarda nada.
+
+**Dónde.** En el store de LangGraph, `SqliteStore` sobre
+`data/asistente/perfil.sqlite` (ignorado por Git, junto a la memoria y la
+caché). El namespace es `("perfil", sha256(perfil_id))`; el `perfil_id` crudo
+no se guarda en el estado, la caché ni los logs. En modo demo y en las pruebas
+se usa `InMemoryStore`.
+
+**Qué no sale.** La ruta `perfil` responde con plantilla local, sin modelo y sin
+Bóveda. En un mensaje mixto («me llamo Ana, ¿qué es un CDT?») el modelo recibe
+solo la pregunta residual, nunca el nombre ni la empresa; la confirmación se
+antepone después, en local. El perfil **no se lee ni se escribe en la caché**
+(`CacheRespuestas.clave` no lo necesita porque la ruta se excluye), y los logs
+solo registran ruta y motivo. La **memoria del hilo tampoco conserva** el
+mensaje de perfil: en el turno puro no queda ni la pregunta ni la respuesta, y
+en el mixto queda solo el residual y la respuesta sin la confirmación. Así una
+reformulación posterior no puede reenviar `nombre` ni `empresa` al modelo.
+
+**Cómo se borra.** El usuario escribe «olvida mi perfil» (o «borra mis datos»,
+«olvida mi nombre», «olvida mi empresa»); el nodo `perfil` borra el documento
+del namespace. Borrar `data/asistente/perfil.sqlite` elimina todos los perfiles
+locales.
+
+**Límite.** El `perfil_id` es una credencial local aleatoria que la Ventanilla
+guarda en `localStorage`: quien conozca ese identificador y tenga acceso a la
+API local podría leer el perfil. No hay autenticación de usuarios ni servidor
+remoto; la Sucursal sigue escuchando solo en `127.0.0.1`.
+
+**Evidencia.** `test/test_sucursal_perfil.py`: aislamiento entre Ana y Beto,
+ruta de perfil sin caché, mensaje mixto sin datos del perfil en el modelo,
+PII sin guardado, «olvida mi perfil» y las 44 preguntas de fase 2 sin activar
+`detectar_intencion`.
 
 ### 3.3 Abuso de costo
 
@@ -478,6 +517,7 @@ No se activan en CI ni en la suite.
 | **Los chunks web/PDF no se re-escanean con `detectar_pii`.** Solo los hechos pasan por el detector. | Gold tiene 0 detecciones al 2026-11-07 y la captura no entra a login ni formularios. | Aplicar `detectar_pii` a los chunks al construir fragmentos y reportar los omitidos también para ellos. |
 | **La guardia de red permite loopback salvo el puerto de Ollama.** El loopback es necesario para `TestClient` en Windows, que crea su self-pipe con `socket.socketpair()` sobre `127.0.0.1`; el puerto `11434` queda bloqueado en `connect` y `connect_ex`. | No permite salir a internet y una prueba que llame a Ollama falla aunque el servicio esté encendido; los embeddings se doblan con `DeterministicFakeEmbedding`. | Ninguna: `test/test_seguridad.py::test_guardia_de_red_bloquea_ollama_local` lo comprueba. |
 | **La pregunta y los fragmentos se envían a DeepSeek.** | Es inherente al modelo externo; la PII se filtra antes y el corpus es público. | Revisar la retención del proveedor y no enviar preguntas con datos personales; el proyecto no lo hace. |
+| **El perfil local guarda nombre y empresa.** El `perfil_id` es una credencial sin autenticación: quien tenga el UUID y acceso a la API local podría consultarlo. | Solo se guarda lo que el usuario declara, en `data/asistente/perfil.sqlite` (ignorado por Git), sin caché, logs ni envío al modelo. La Sucursal escucha solo en `127.0.0.1` y el usuario puede borrarlo con «olvida mi perfil». | No hay multiusuario ni autenticación en esta fase; si se publica fuera de loopback, añadir autenticación y rotación de `perfil_id`. |
 | **Archify se usa con condiciones.** Se instala de forma global, fuera del proyecto, ejecuta código Node que no pasa por `uv.lock` ni por la CI, usa red (aviso de actualizaciones y descarga de logos) y lanza procesos. | Archify v3.2.0 (commit `a4065941`) se auditó con SkillSpector el 7 de noviembre de 2026: la nota de 99/100 se debe a falsos positivos y a cobertura parcial. Es una herramienta de documentación, no una dependencia del pipeline, y el HTML generado no se edita a mano. | La instalación ya está fijada en el commit auditado (`README.md`). Se mantiene: no pedirle logos del banco por URL y repetir la auditoría antes de actualizar; ver `docs/auditoria-skills-proyecto.md`. |
 
 ## 7. Cómo verificar
@@ -493,7 +533,8 @@ uv run pytest test/test_sucursal_preguntar.py::test_pii_no_entra_en_cache_ni_en_
 
 # Índice y SQLite fuera de Git
 git ls-files data/boveda data/asistente
-git check-ignore -v data/boveda/chroma/chroma.sqlite3 data/asistente/memoria.sqlite
+git check-ignore -v data/boveda/chroma/chroma.sqlite3 data/asistente/memoria.sqlite \
+  data/asistente/perfil.sqlite
 
 # Precios de DeepSeek en un solo lugar
 git grep -n "0\.003\|0\.006" -- src config app.py scripts
@@ -514,6 +555,7 @@ roja, no como un timeout silencioso.
 - `README.md` — instalación de Archify, variables de entorno y arranque local.
 - `config/prompts/qa_v2.md` — reglas 2 y 9 sobre fragmentos y preguntas.
 - `src/banco_occidente_corpus/asistente/validacion.py` — PII, fugas y frase fija.
+- `src/banco_occidente_corpus/sucursal/perfil.py` — memoria de perfil y detección.
 - `src/banco_occidente_corpus/asistente/rag.py` — neutralización y citas.
 - `src/banco_occidente_corpus/sucursal/preguntar.py` — caché, gasto y logs.
 - `src/banco_occidente_corpus/sucursal/costo.py` — tope y TTL.

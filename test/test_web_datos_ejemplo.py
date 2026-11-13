@@ -119,10 +119,10 @@ def test_no_sobran_archivos_de_ejemplo() -> None:
 
 
 def test_preguntar_usa_letras_y_rutas_validas() -> None:
-    """El turno es B, T o X y la ruta es una de las tres del Digiturno."""
+    """El turno es B, T o X y la ruta es una de las del contrato."""
     datos = leer("preguntar")
     assert datos["turno"] in {"B", "T", "X"}
-    assert datos["ruta"] in {"boveda", "tablero", "rechazo"}
+    assert datos["ruta"] in {"boveda", "tablero", "rechazo", "cortesia", "mixta", "perfil"}
     assert all(
         {"n", "titulo", "url", "seccion", "tipo", "similitud"} <= set(f) for f in datos["fuentes"]
     )
@@ -179,16 +179,18 @@ def test_funciones_javascript_documentadas() -> None:
 
 
 def test_ventanilla_usa_el_contrato_y_el_hilo() -> None:
-    """La Ventanilla envía pregunta y thread_id, y solo persiste el hilo."""
+    """La Ventanilla envía pregunta, hilo y perfil; persiste hilo y perfil."""
     codigo = leer_ventanilla()
     assert 'pedir("preguntar"' in codigo
     assert "pregunta" in codigo
     assert "thread_id" in codigo
+    assert "perfil_id" in codigo
     assert "sessionStorage" in codigo
     assert "crypto.randomUUID" in codigo
     assert 'CLAVE_HILO = "sucursal-ventanilla-hilo"' in codigo
-    assert codigo.count("setItem(") == 1
-    assert "localStorage" not in codigo
+    assert 'CLAVE_PERFIL = "sucursal-perfil-id"' in codigo
+    assert codigo.count("setItem(") == 2
+    assert "localStorage" in codigo
     assert "fetch(" not in codigo
     assert "innerHTML" not in codigo
 

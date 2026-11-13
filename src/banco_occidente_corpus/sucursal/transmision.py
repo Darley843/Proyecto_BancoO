@@ -44,6 +44,7 @@ MODOS_STREAM: list[str] = ["tasks", "values"]
 ETAPAS: dict[str, tuple[str, str]] = {
     "reformular": ("reformulando", "Revisando si la pregunta depende del historial…"),
     "digiturno": ("router", "El Digiturno decide la ruta del turno…"),
+    "perfil": ("memoria", "Guardando o consultando tu perfil…"),
     "boveda": ("buscando", "Buscando fragmentos en la Bóveda…"),
     "tablero": ("buscando", "Consultando el Tablero de tarifas…"),
     "mixto": ("buscando", "Consultando el Tablero y la Bóveda a la vez…"),
@@ -59,6 +60,7 @@ NOMBRES_RUTA: dict[str, str] = {
     "rechazo": "Rechazo",
     "cortesia": "Cortesía",
     "mixta": "Mixta (Tablero + Bóveda)",
+    "perfil": "Perfil",
 }
 
 #: Mensaje genérico para un fallo inesperado; el detalle queda solo en el log.
@@ -215,6 +217,16 @@ def resumir_resultado(nodo: str, resultado: Mapping[str, Any]) -> tuple[str, dic
         return "Pregunta autónoma: no hizo falta reformular.", {"reformulo": False}
     if nodo == "digiturno":
         return _resumen_digiturno(resultado)
+    if nodo == "perfil":
+        if resultado.get("respuesta"):
+            return "Perfil respondido desde tu memoria, sin búsqueda.", {
+                "perfil": True,
+                "guardado": bool(resultado.get("perfil_modificado")),
+            }
+        return "Datos del perfil guardados; sigue la pregunta.", {
+            "perfil": True,
+            "guardado": bool(resultado.get("perfil_modificado")),
+        }
     if nodo == "boveda":
         total = len(resultado.get("fragmentos") or [])
         if total == 0:

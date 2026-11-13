@@ -21,6 +21,9 @@ import { crearEncabezadoVista, crearTexto, formatearUsd } from "../comun.js";
 /** Clave de `sessionStorage` donde vive el hilo de la conversación. */
 const CLAVE_HILO = "sucursal-ventanilla-hilo";
 
+/** Clave de `localStorage` donde vive el identificador de perfil. */
+const CLAVE_PERFIL = "sucursal-perfil-id";
+
 /** Identificador del campo de pregunta. */
 const ID_PREGUNTA = "ventanilla-pregunta";
 
@@ -48,6 +51,7 @@ const RUTAS = {
   rechazo: "Rechazo",
   cortesia: "Cortesía",
   mixta: "Mixta (Tablero + Bóveda)",
+  perfil: "Perfil",
 };
 
 /** Nombres legibles de los tipos de fuente. */
@@ -63,6 +67,7 @@ const TIPOS = {
 const ETAPAS = {
   reformulando: "Memoria",
   router: "Digiturno",
+  memoria: "Perfil",
   buscando: "Búsqueda",
   redactando: "Redacción",
 };
@@ -169,6 +174,29 @@ function guardarHilo(valor) {
     window.sessionStorage.setItem(CLAVE_HILO, valor);
   } catch {
     // Si no se puede guardar, el hilo dura solo esta visita.
+  }
+}
+
+/**
+ * Lee o crea el identificador de perfil que sobrevive a las recargas.
+ *
+ * Es un UUID aleatorio que se guarda solo en este navegador. No se muestra ni
+ * se registra; la API lo usa para aislar la memoria de largo plazo.
+ *
+ * @returns {string} Identificador de perfil.
+ */
+function obtenerPerfilId() {
+  try {
+    const guardado = window.localStorage.getItem(CLAVE_PERFIL);
+    if (typeof guardado === "string" && PATRON_UUID.test(guardado)) {
+      return guardado;
+    }
+    const nuevo = crearHilo();
+    window.localStorage.setItem(CLAVE_PERFIL, nuevo);
+    return nuevo;
+  } catch {
+    // Sin almacenamiento: el perfil dura solo esta carga de la página.
+    return crearHilo();
   }
 }
 
@@ -645,7 +673,11 @@ async function pedirTurno(pregunta, hiloPeticion, alAvanzar = () => {}) {
   if (!app || typeof app.pedir !== "function") {
     throw new Error("La sucursal no está disponible en este momento.");
   }
-  const cuerpo = { pregunta, thread_id: hiloPeticion };
+  const cuerpo = {
+    pregunta,
+    thread_id: hiloPeticion,
+    perfil_id: obtenerPerfilId(),
+  };
   const datos =
     typeof app.pedirEnVivo === "function"
       ? await app.pedirEnVivo("preguntar", { cuerpo }, alAvanzar)

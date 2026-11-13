@@ -308,13 +308,14 @@ El gasto (`data/asistente/gasto.sqlite`) y la caché
 
 `POST /api/preguntar` recibe la pregunta y el hilo de la Ventanilla. El grafo, el
 recuperador y el modelo se construyen en la primera pregunta del proceso, no al
-importar `app.py`. El Digiturno decide la ruta: `B` (Bóveda), `T` (Tablero con
-plantilla) o `X` (rechazo).
+importar `app.py`. El Digiturno decide la letra: `B` (Bóveda), `T` (Tablero con
+plantilla) o `X` (rechazo). El campo `ruta` distingue además `cortesia`,
+`mixta` y `perfil`; las letras no cambian.
 
 ```bash
 curl -s http://127.0.0.1:8000/api/preguntar \
   -H "Content-Type: application/json" \
-  -d '{"pregunta": "¿Cuál es la cuota de manejo de la tarjeta débito?", "thread_id": "ses-abc"}'
+  -d '{"pregunta": "¿Cuál es la cuota de manejo de la tarjeta débito?", "thread_id": "ses-abc", "perfil_id": "perfil-demo"}'
 ```
 
 Request:
@@ -322,9 +323,14 @@ Request:
 ```json
 {
   "pregunta": "¿Cuál es la cuota de manejo de la tarjeta débito?",
-  "thread_id": "ses-abc"
+  "thread_id": "ses-abc",
+  "perfil_id": "perfil-demo"
 }
 ```
+
+`perfil_id` es opcional: identifica la memoria de largo plazo (nombre y empresa)
+que la Ventanilla guarda en `localStorage`. Sin él, una pregunta de perfil
+responde que la memoria no está activa; el resto de rutas funciona igual.
 
 Response 200, con la misma forma que `app/web/datos-ejemplo/preguntar.json`:
 
