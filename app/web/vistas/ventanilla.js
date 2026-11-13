@@ -8,6 +8,12 @@
  * El `thread_id` vive en `sessionStorage`; las preguntas y respuestas quedan
  * solo en memoria y se pierden al recargar. Todo el texto se crea con
  * `crearTexto`, nunca como HTML.
+ *
+ * Streaming (responsable: Yoldy): con la API encendida, la pregunta va a
+ * `POST /api/preguntar/stream` y la vista pinta el avance del grafo por
+ * etapas (reformular, Digiturno, búsqueda y redacción) mientras espera. El
+ * evento `final` trae el mismo cuerpo de `POST /api/preguntar`; si la conexión
+ * se corta, se muestra el error de siempre y el hilo se conserva.
  */
 
 import { crearEncabezadoVista, crearTexto, formatearUsd } from "../comun.js";
@@ -50,6 +56,14 @@ const TIPOS = {
   "hecho verificado": "Hecho verificado",
 };
 
+/** Nombres visibles de las etapas que envía el streaming. */
+const ETAPAS = {
+  reformulando: "Memoria",
+  router: "Digiturno",
+  buscando: "Búsqueda",
+  redactando: "Redacción",
+};
+
 /** Patrón de un UUID, para reutilizar solo hilos con forma válida. */
 const PATRON_UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -86,6 +100,9 @@ let botonDictadoActual = null;
 
 /** Consecutivo local para los identificadores de los turnos. */
 let contadorTurnos = 0;
+
+/** Etapas del turno en curso, para repintarlas si se vuelve a la vista. */
+let avance = [];
 
 /**
  * Crea un hilo nuevo con `crypto.randomUUID` y un respaldo para navegadores
@@ -564,7 +581,13 @@ async function enviarSecuencia(preguntas) {
         vistaActual.entrada.value = preguntaActual;
         mostrarEstado(vistaActual, `Atendiendo: «${preguntaActual}»…`);
       }
-      const datos = await pedirTurno(preguntaActual, hiloPeticion);
+      reiniciarAvance(vistaActual);
+      const datos = await pedirTurno(preguntaActual, hiloPeticion, (etapa) => {
+        if (hilo === hiloPeticion) {
+          registrarEtapa(etapa);
+          pintarAvance(vistaActual);
+        }
+      });
       if (hilo !== hiloPeticion) {
         return;
       }
@@ -572,7 +595,9 @@ async function enviarSecuencia(preguntas) {
         pregunta: preguntaActual,
         datos,
         fecha: new Date(),
+        etapas: avance.filter((etapa) => etapa.estado === "hecho"),
       };
+      reiniciarAvance(vistaActual);
       turnos.push(turno);
       if (vistaActual) {
         agregarTurno(vistaActual, turno);
@@ -590,6 +615,7 @@ async function enviarSecuencia(preguntas) {
     }
   } finally {
     enCurso = false;
+    reiniciarAvance(vistaActual);
     if (vistaActual) {
       if (vistaActual.estado.textContent.startsWith("Atendiendo")) {
         limpiarEstado(vistaActual);
@@ -602,19 +628,25 @@ async function enviarSecuencia(preguntas) {
 /**
  * Pide un turno a la API y comprueba que la respuesta tenga la forma mínima.
  *
+ * Usa `app.pedirEnVivo` (streaming por etapas); en la maqueta
+ * (`datos-ejemplo/`) ese mismo método devuelve el JSON de ejemplo sin etapas.
+ *
  * @param {string} pregunta Pregunta saneada por el formulario.
  * @param {string} hiloPeticion Hilo al que pertenece la pregunta.
+ * @param {(etapa: object) => void} [alAvanzar] Recibe cada etapa del grafo.
  * @returns {Promise<object>} Respuesta del contrato.
  * @throws {Error} Si la API no está disponible o la respuesta está incompleta.
  */
-async function pedirTurno(pregunta, hiloPeticion) {
+async function pedirTurno(pregunta, hiloPeticion, alAvanzar = () => {}) {
   const app = vistaActual?.app;
   if (!app || typeof app.pedir !== "function") {
     throw new Error("La sucursal no está disponible en este momento.");
   }
-  const datos = await app.pedir("preguntar", {
-    cuerpo: { pregunta, thread_id: hiloPeticion },
-  });
+  const cuerpo = { pregunta, thread_id: hiloPeticion };
+  const datos =
+    typeof app.pedirEnVivo === "function"
+      ? await app.pedirEnVivo("preguntar", { cuerpo }, alAvanzar)
+      : await app.pedir("preguntar", { cuerpo });
   if (
     !datos ||
     typeof datos.respuesta !== "string" ||
@@ -624,6 +656,80 @@ async function pedirTurno(pregunta, hiloPeticion) {
   }
   await refrescarSaldo(app);
   return datos;
+}
+
+/**
+ * Guarda una etapa del turno en curso: la abre o la marca como terminada.
+ *
+ * @param {{nodo?: string, etapa?: string, estado?: string, texto?: string}} etapa
+ *   Evento `etapa` del streaming.
+ * @returns {void}
+ */
+function registrarEtapa(etapa) {
+  if (!etapa || typeof etapa !== "object") {
+    return;
+  }
+  const paso = {
+    nodo: String(etapa.nodo ?? ""),
+    etapa: String(etapa.etapa ?? ""),
+    estado: etapa.estado === "hecho" ? "hecho" : "en_curso",
+    texto: textoODefecto(etapa.texto, "Atendiendo…"),
+  };
+  if (paso.estado === "hecho") {
+    const abierta = avance.findLastIndex(
+      (previa) => previa.nodo === paso.nodo && previa.estado === "en_curso",
+    );
+    if (abierta !== -1) {
+      avance[abierta] = paso;
+      return;
+    }
+  }
+  avance.push(paso);
+}
+
+/**
+ * Vacía el avance del turno y lo oculta.
+ *
+ * @param {object | null} vista Referencias de la vista.
+ * @returns {void}
+ */
+function reiniciarAvance(vista) {
+  avance = [];
+  pintarAvance(vista);
+}
+
+/**
+ * Pinta la lista de etapas del turno en curso.
+ *
+ * @param {object | null} vista Referencias de la vista.
+ * @returns {void}
+ */
+function pintarAvance(vista) {
+  if (!vista?.avance) {
+    return;
+  }
+  vista.avance.replaceChildren(...avance.map(crearPaso));
+  vista.avance.hidden = avance.length === 0;
+}
+
+/**
+ * Crea un paso del avance: nombre de la etapa y lo que pasó en ella.
+ *
+ * @param {{etapa: string, estado: string, texto: string}} paso Etapa guardada.
+ * @returns {HTMLLIElement} El elemento de la lista.
+ */
+function crearPaso(paso) {
+  const elemento = document.createElement("li");
+  elemento.className = `ventanilla__paso ventanilla__paso--${paso.estado === "hecho" ? "hecho" : "en-curso"}`;
+  elemento.append(
+    crearTexto(
+      "span",
+      ETAPAS[paso.etapa] ?? textoODefecto(paso.etapa, "Etapa"),
+      "ventanilla__paso-etapa",
+    ),
+    crearTexto("span", paso.texto, "ventanilla__paso-texto"),
+  );
+  return elemento;
 }
 
 /**
@@ -927,6 +1033,17 @@ function pintarComprobante(contenedor, turno) {
   );
   agregarDato(listaDatos, "Caché", datos.cache === true ? "Sí" : "No");
   tirilla.append(listaDatos);
+
+  const etapas = Array.isArray(turno.etapas) ? turno.etapas : [];
+  if (etapas.length > 0) {
+    tirilla.append(
+      crearTexto("h3", "Recorrido del turno", "ventanilla__fuentes-titulo"),
+    );
+    const recorrido = document.createElement("ol");
+    recorrido.className = "ventanilla__recorrido";
+    recorrido.append(...etapas.map(crearPaso));
+    tirilla.append(recorrido);
+  }
 
   const fuentes = Array.isArray(datos.fuentes) ? datos.fuentes : [];
   tirilla.append(
@@ -1460,6 +1577,11 @@ export async function render(contenedor, estado) {
   const avisos = crearAvisos(app, continuaba);
   const formulario = crearFormulario();
 
+  const listaAvance = document.createElement("ol");
+  listaAvance.className = "ventanilla__avance";
+  listaAvance.setAttribute("aria-label", "Avance del turno");
+  listaAvance.hidden = true;
+
   const cuerpo = document.createElement("div");
   cuerpo.className = "ventanilla__cuerpo";
 
@@ -1495,6 +1617,7 @@ export async function render(contenedor, estado) {
     avisos,
     formulario.elemento,
     formulario.estado,
+    listaAvance,
     formulario.error,
     cuerpo,
   );
@@ -1516,6 +1639,7 @@ export async function render(contenedor, estado) {
     botonesEjemplo: formulario.botonesEjemplo,
     estado: formulario.estado,
     error: formulario.error,
+    avance: listaAvance,
     avisoContinuacion: avisos.querySelector(".ventanilla__continuacion"),
     lista,
     comprobante,
@@ -1530,6 +1654,7 @@ export async function render(contenedor, estado) {
   if (enCurso) {
     mostrarEstado(vistaActual, "Atendiendo una pregunta…");
   }
+  pintarAvance(vistaActual);
   actualizarControles(vistaActual, enCurso);
 }
 

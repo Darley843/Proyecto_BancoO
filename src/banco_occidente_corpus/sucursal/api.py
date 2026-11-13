@@ -4,6 +4,8 @@ Los endpoints de datos solo leen artefactos ya construidos (`tablero.csv`,
 `indice.json`, `mapa.json`, `arqueo.json`, `config/vestibulo.toml`).
 `POST /api/preguntar` delega en `sucursal.preguntar`, que construye el grafo y sus
 dependencias la primera vez que se pregunta y no al importar este módulo.
+`POST /api/preguntar/stream` atiende el mismo turno con el mismo servicio, pero
+envía el avance de cada nodo como eventos del servidor (SSE, `sucursal.transmision`).
 """
 
 from __future__ import annotations
@@ -17,7 +19,7 @@ from typing import Any, Literal
 
 import httpx
 from fastapi import APIRouter, Query
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from ollama import ResponseError
 from pydantic import BaseModel, Field
 
@@ -28,7 +30,14 @@ from ..tablero.consultas import buscar_filas
 from ..tablero.tipos import Fila, leer_filas, ruta_tablero
 from .ajustes import ConfiguracionSucursal, tope_efectivo
 from .costo import CacheRespuestas, GastoDiario
-from .preguntar import ErrorSucursal, PiezasGrafo, ServicioPreguntas, leer_indice
+from .preguntar import (
+    ErrorSucursal,
+    PiezasGrafo,
+    ServicioPreguntas,
+    construir_piezas,
+    leer_indice,
+)
+from .transmision import MensajeTurno, TransmisionTurno, con_avance
 
 #: Largo máximo de la pregunta que se ubica en el mapa.
 LARGO_PREGUNTA_MAPA = 500
@@ -36,6 +45,8 @@ LARGO_PREGUNTA_MAPA = 500
 RUTA_ARQUEO = "data/evaluacion/arqueo.json"
 #: Ruta de los hitos del Vestíbulo.
 RUTA_VESTIBULO = "config/vestibulo.toml"
+#: Encabezados del streaming: sin caché y sin búfer en proxies intermedios.
+ENCABEZADOS_SSE: dict[str, str] = {"Cache-Control": "no-cache", "X-Accel-Buffering": "no"}
 
 
 class EstadoRespuesta(BaseModel):
@@ -207,10 +218,13 @@ def crear_router(
             lee `data/boveda/mapa.json` y usa Ollama y el recuperador real.
 
     Returns:
-        El router con los siete endpoints de la Sucursal.
+        El router con los ocho endpoints de la Sucursal.
     """
     router = APIRouter(prefix="/api")
-    servicio = ServicioPreguntas(config, ajustes, gasto, cache=cache, piezas=piezas)
+    fabrica = piezas or _fabrica_piezas(config, ajustes)
+    servicio = ServicioPreguntas(
+        config, ajustes, gasto, cache=cache, piezas=lambda: con_avance(fabrica())
+    )
     servicio_mapa = mapa_boveda or ServicioMapa(config)
 
     @router.get("/estado", response_model=EstadoRespuesta)
@@ -336,7 +350,57 @@ def crear_router(
             return _error(error)
         return PreguntarRespuesta.model_validate(respuesta)
 
+    @router.post("/preguntar/stream", response_model=None)
+    def preguntar_stream(
+        datos: PreguntarRequest | None = None,
+    ) -> StreamingResponse | JSONResponse:
+        """Atiende la pregunta y transmite el avance del grafo por SSE.
+
+        Envía un evento `etapa` cuando cada nodo empieza y termina, y cierra
+        con `final` (el mismo cuerpo de `POST /api/preguntar`) o con `error`.
+        Los rechazos previos al grafo (pregunta vacía, sin hilo, sin índice,
+        sin clave o tope) responden con su estado HTTP y el JSON de siempre,
+        para que la Ventanilla los maneje igual que hoy.
+
+        Args:
+            datos: pregunta y `thread_id`, igual que en `POST /api/preguntar`.
+
+        Returns:
+            Un `text/event-stream` o `{"error": {"codigo", "mensaje"}}`.
+        """
+        peticion = datos or PreguntarRequest()
+
+        def atender() -> dict[str, Any]:
+            """Atiende el turno y valida el cuerpo con el contrato de la API."""
+            respuesta = servicio.preguntar(peticion.pregunta, peticion.thread_id)
+            return PreguntarRespuesta.model_validate(respuesta).model_dump(mode="json")
+
+        transmision = TransmisionTurno(atender).iniciar()
+        primero = transmision.siguiente()
+        if primero is not None and primero.tipo == "error":
+            return _error_de_mensaje(primero)
+        return StreamingResponse(
+            transmision.eventos_sse(primero),
+            media_type="text/event-stream",
+            headers=ENCABEZADOS_SSE,
+        )
+
     return router
+
+
+def _fabrica_piezas(config: Config, ajustes: ConfiguracionSucursal) -> Callable[[], PiezasGrafo]:
+    """Devuelve la fábrica real del grafo, la misma que usa `ServicioPreguntas`."""
+
+    def construir() -> PiezasGrafo:
+        """Construye el grafo y sus dependencias con la configuración real."""
+        return construir_piezas(config, ajustes)
+
+    return construir
+
+
+def _error_de_mensaje(mensaje: MensajeTurno) -> JSONResponse:
+    """Devuelve el error del streaming con su estado HTTP y el JSON del contrato."""
+    return JSONResponse(status_code=mensaje.estado_http, content=mensaje.datos)
 
 
 def _error(error: ErrorSucursal) -> JSONResponse:

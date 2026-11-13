@@ -32,6 +32,21 @@ const ENDPOINTS = {
   vestibulo: "/api/vestibulo",
 };
 
+/**
+ * Endpoints con streaming (eventos SSE). La clave es la del recurso normal en
+ * `ENDPOINTS`; el evento `final` trae el mismo contrato que esa ruta.
+ */
+const ENDPOINTS_STREAM = {
+  preguntar: "/api/preguntar/stream",
+};
+
+/** Milisegundos sin recibir nada del streaming antes de abandonar la petición. */
+const ESPERA_STREAM_MS = 60000;
+
+/** Mensaje cuando la conexión se corta antes del evento final. */
+const MENSAJE_CORTE =
+  "Se perdió la conexión con la sucursal antes de terminar el turno.";
+
 /** Tiempo límite de una petición normal a la API (la Ventanilla puede tardar). */
 const ESPERA_MS = 60000;
 
@@ -43,7 +58,8 @@ const CLAVE_TEMA = "sucursal-tema";
 
 /**
  * Estado compartido con las vistas. Cada vista recibe este objeto en
- * `render(contenedor, estado)` y usa `estado.pedir` para obtener datos.
+ * `render(contenedor, estado)` y usa `estado.pedir` para obtener datos, o
+ * `estado.pedirEnVivo` para recibir el avance de un turno por streaming.
  */
 const estado = {
   /** "api" cuando el servidor responde; "ejemplo" cuando se usa la maqueta. */
@@ -51,6 +67,7 @@ const estado = {
   /** Última respuesta de `/api/estado` (o de `estado.json`). */
   resumen: null,
   pedir,
+  pedirEnVivo,
   refrescarEstado,
   formatearUsd,
 };
@@ -85,6 +102,188 @@ async function pedir(nombre, opciones = {}) {
       }
     : {};
   return leerJson(url, init);
+}
+
+/**
+ * Pide un recurso con streaming (SSE) y avisa cada etapa mientras llega.
+ *
+ * Solo `preguntar` tiene streaming (`POST /api/preguntar/stream`). En modo de
+ * ejemplo, o si el servidor no conoce la ruta (404 o 405, un backend
+ * anterior), usa `pedir`, que devuelve el mismo contrato sin etapas. El tiempo
+ * límite cuenta desde el último dato recibido, no desde el inicio: un turno
+ * largo que sigue avanzando no se corta.
+ *
+ * @param {keyof ENDPOINTS_STREAM} nombre Recurso con streaming: `preguntar`.
+ * @param {{cuerpo: object}} opciones Cuerpo JSON del POST.
+ * @param {(etapa: object) => void} [alAvanzar] Recibe cada evento `etapa`.
+ * @returns {Promise<any>} El cuerpo del evento `final`.
+ * @throws {Error} Con el mensaje del contrato, de corte o de tiempo agotado.
+ */
+async function pedirEnVivo(nombre, opciones, alAvanzar = () => {}) {
+  if (estado.modo === "ejemplo" || !(nombre in ENDPOINTS_STREAM)) {
+    return pedir(nombre, opciones);
+  }
+  const controlador = new AbortController();
+  let espera = 0;
+  const reiniciarEspera = () => {
+    window.clearTimeout(espera);
+    espera = window.setTimeout(() => controlador.abort(), ESPERA_STREAM_MS);
+  };
+  reiniciarEspera();
+  try {
+    let respuesta;
+    try {
+      respuesta = await fetch(new URL(ENDPOINTS_STREAM[nombre], window.location.origin), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "text/event-stream",
+        },
+        body: JSON.stringify(opciones.cuerpo),
+        signal: controlador.signal,
+      });
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        throw error;
+      }
+      throw new Error(MENSAJE_CORTE);
+    }
+    if (respuesta.status === 404 || respuesta.status === 405) {
+      window.clearTimeout(espera);
+      return pedir(nombre, opciones);
+    }
+    const tipo = respuesta.headers.get("Content-Type") ?? "";
+    if (!respuesta.ok || !tipo.includes("text/event-stream")) {
+      throw await errorDeRespuesta(respuesta);
+    }
+    return await leerEventos(respuesta, alAvanzar, reiniciarEspera);
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error(
+        `La sucursal dejó de responder durante ${ESPERA_STREAM_MS / 1000} s. Intenta de nuevo.`,
+      );
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(espera);
+  }
+}
+
+/**
+ * Lee los eventos SSE de la respuesta hasta el evento `final`.
+ *
+ * @param {Response} respuesta Respuesta `text/event-stream` de la API.
+ * @param {(etapa: object) => void} alAvanzar Recibe cada evento `etapa`.
+ * @param {() => void} alRecibir Se llama con cada trozo, para el tiempo límite.
+ * @returns {Promise<object>} El cuerpo del evento `final`.
+ * @throws {Error} Si llega un evento `error` o el flujo se corta antes del final.
+ */
+async function leerEventos(respuesta, alAvanzar, alRecibir) {
+  if (!respuesta.body || typeof respuesta.body.getReader !== "function") {
+    return procesarBloques(await respuesta.text(), alAvanzar).final;
+  }
+  const lector = respuesta.body.getReader();
+  const decodificador = new TextDecoder("utf-8");
+  let pendiente = "";
+  for (;;) {
+    let lectura;
+    try {
+      lectura = await lector.read();
+    } catch (error) {
+      if (error?.name === "AbortError") {
+        throw error;
+      }
+      throw new Error(MENSAJE_CORTE);
+    }
+    if (lectura.done) {
+      break;
+    }
+    alRecibir();
+    pendiente += decodificador.decode(lectura.value, { stream: true });
+    const corte = pendiente.lastIndexOf("\n\n");
+    if (corte === -1) {
+      continue;
+    }
+    const completos = pendiente.slice(0, corte + 2);
+    pendiente = pendiente.slice(corte + 2);
+    const { final } = procesarBloques(completos, alAvanzar);
+    if (final) {
+      lector.cancel().catch(() => {});
+      return final;
+    }
+  }
+  return procesarBloques(pendiente, alAvanzar).final;
+}
+
+/**
+ * Interpreta bloques SSE completos y reparte las etapas.
+ *
+ * @param {string} texto Uno o varios bloques separados por línea en blanco.
+ * @param {(etapa: object) => void} alAvanzar Recibe cada evento `etapa`.
+ * @returns {{final: object | null}} El cuerpo del evento `final`, si llegó.
+ * @throws {Error} Si llega un evento `error` o si el texto termina sin `final`
+ *   cuando ya no quedan datos por leer.
+ */
+function procesarBloques(texto, alAvanzar) {
+  const bloques = texto.replace(/\r\n/g, "\n").split("\n\n");
+  for (const bloque of bloques) {
+    const evento = interpretarEvento(bloque);
+    if (!evento) {
+      continue;
+    }
+    if (evento.tipo === "etapa") {
+      alAvanzar(evento.datos);
+    } else if (evento.tipo === "final") {
+      return { final: evento.datos };
+    } else if (evento.tipo === "error") {
+      throw new Error(
+        evento.datos?.error?.mensaje ?? "La sucursal informó un error.",
+      );
+    }
+  }
+  return { final: null };
+}
+
+/**
+ * Convierte un bloque SSE (`event:` y `data:`) en un objeto.
+ *
+ * @param {string} bloque Texto de un evento, sin la línea en blanco final.
+ * @returns {{tipo: string, datos: any} | null} El evento, o `null` si está
+ *   vacío o su JSON no es válido.
+ */
+function interpretarEvento(bloque) {
+  let tipo = "message";
+  const datos = [];
+  for (const linea of bloque.split("\n")) {
+    if (linea.startsWith("event:")) {
+      tipo = linea.slice(6).trim();
+    } else if (linea.startsWith("data:")) {
+      datos.push(linea.slice(5).trimStart());
+    }
+  }
+  if (datos.length === 0) {
+    return null;
+  }
+  try {
+    return { tipo, datos: JSON.parse(datos.join("\n")) };
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Convierte una respuesta HTTP fallida en un error con el mensaje del contrato.
+ *
+ * @param {Response} respuesta Respuesta que no es un streaming válido.
+ * @returns {Promise<Error>} El error listo para lanzar.
+ */
+async function errorDeRespuesta(respuesta) {
+  try {
+    const datos = await respuesta.json();
+    return new Error(datos?.error?.mensaje ?? `HTTP ${respuesta.status}`);
+  } catch {
+    return new Error(`HTTP ${respuesta.status}`);
+  }
 }
 
 /**

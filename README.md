@@ -262,7 +262,7 @@ conceptos distintos.
 ### API local y variables
 
 `make app` levanta la API y la app web solo en `http://127.0.0.1:8000` (nunca
-`0.0.0.0`). Endpoints: `/api/estado`, `POST /api/preguntar`, `/api/tablero`,
+`0.0.0.0`). Endpoints: `/api/estado`, `POST /api/preguntar`, `POST /api/preguntar/stream`, `/api/tablero`,
 `/api/boveda/mapa`, `/api/pipeline`, `/api/arqueo` y `/api/vestibulo`.
 
 | Variable | Para qué |
@@ -348,6 +348,34 @@ Errores, siempre como `{"error": {"codigo", "mensaje"}}`:
 
 Con `SUCURSAL_DEMO=1` la Bóveda responde con el fragmento principal y su fuente,
 marcado como demo, sin crear el modelo ni escribir gasto.
+
+### Preguntar con streaming
+
+`POST /api/preguntar/stream` recibe el mismo cuerpo y atiende el turno con el
+mismo servicio (caché, tope, memoria y blindaje), pero responde
+`text/event-stream` con el avance del grafo. La Ventanilla lo usa para mostrar
+las etapas mientras espera y guarda el «Recorrido del turno» en el comprobante.
+
+```bash
+curl -sN http://127.0.0.1:8000/api/preguntar/stream \
+  -H "Content-Type: application/json" \
+  -d '{"pregunta": "¿En qué año se fundó el Banco de Occidente?", "thread_id": "ses-abc"}'
+```
+
+| Evento | Cuándo | `data` |
+|---|---|---|
+| `etapa` | cada nodo empieza (`en_curso`) y termina (`hecho`) | `{nodo, etapa, estado, texto, detalle}`; `etapa` es `reformulando`, `router`, `buscando` o `redactando` |
+| `final` | el turno terminó | el mismo cuerpo de `POST /api/preguntar` |
+| `error` | un nodo falló a mitad del turno | `{"error": {"codigo": "error_interno", "mensaje"}}` |
+
+- Las etapas salen de `grafo.stream(stream_mode=["tasks", "values"])` y nunca
+  llevan la pregunta, la respuesta ni el hilo. La respuesta solo llega en `final`,
+  ya validada con sus citas: no se transmite texto que el blindaje no revisó.
+- Los rechazos previos al grafo (422, 429 y 503 de la tabla anterior) responden
+  con su estado HTTP y el JSON de siempre, sin abrir el streaming.
+- Un acierto de caché no ejecuta nodos: llega solo el evento `final`.
+- Si la conexión se corta, la Ventanilla muestra el error con «Reintentar» y el
+  hilo se conserva. `POST /api/preguntar` sigue igual para la evaluación y las pruebas.
 
 ### Scraper de demostración
 
