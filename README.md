@@ -16,7 +16,7 @@ La información pública del banco está dispersa en ~200 páginas HTML, 190 PDF
 respetando `robots.txt`, la limpia a un corpus Gold con frontmatter y consolida un
 contexto único que alimenta un asistente LangChain con DeepSeek, con validación de
 fuente y una app web local. El Módulo 1 usa el **contexto consolidado completo** en
-el prompt de sistema; el Módulo 2 añade la Bóveda (fragmentos, Ollama/Chroma y
+el prompt de sistema; el Módulo 2 añade la Bóveda (fragmentos, Ollama/Qdrant y
 recuperación híbrida), el Tablero de tarifas, el grafo con memoria y la app web de
 la Sucursal 1965.
 
@@ -38,6 +38,32 @@ flowchart LR
     C --> A["Asistente LangChain<br/>langchain-deepseek · deepseek-flash"]
     A --> API["API FastAPI<br/>127.0.0.1:8000"]
     API --> W["App web · app/web<br/>HTML, CSS y JavaScript"]
+```
+
+El grafo de la fase 2 decide la ruta antes de buscar y responde por SSE:
+
+```mermaid
+flowchart LR
+    U["App web · navegador"] -->|"POST /api/preguntar<br/>o SSE /stream"| API["FastAPI<br/>127.0.0.1:8000"]
+    API --> G["Grafo LangGraph<br/>reformular → digiturno"]
+    G -->|"cortesía"| C["Respuesta directa<br/>sin búsqueda · 0 tokens"]
+    G -->|"B"| R["Bóveda<br/>recuperador híbrido"]
+    G -->|"T"| T["@tool consultar_tablero<br/>esquema Pydantic"]
+    G -->|"mixta"| R
+    G -->|"mixta"| T
+    G -->|"X"| X["Rechazo<br/>frase fija sin datos"]
+    E["Ollama<br/>nomic-embed-text-v2-moe"] --> Q[("Qdrant local<br/>data/boveda/qdrant · coseno")]
+    R --> Q
+    R --> E
+    T --> CSV[("tablero.csv<br/>data/estructurados")]
+    G -->|"redactar"| D["DeepSeek<br/>deepseek-flash"]
+    G <-->|"checkpoint por thread_id"| S[("SQLite<br/>memoria.sqlite")]
+    D --> API
+    R --> API
+    T --> API
+    C --> API
+    X --> API
+    API -.->|"streaming por etapas"| U
 ```
 
 | Capa | Carpeta | Contenido | ¿Se versiona? |
@@ -76,7 +102,7 @@ Ollama local y DeepSeek como servicio externo, vive en
 [`docs/arquitectura.html`](./docs/arquitectura.html). Su fuente tipada es
 `docs/arquitectura.json`; el HTML se genera, nunca se edita a mano.
 
-El flujo de datos — **Gold → chunks → fragmentos → Ollama → Chroma →
+El flujo de datos — **Gold → chunks → fragmentos → Ollama → Qdrant →
 recuperación → respuesta citada**, y **PDF/tablas → CSV → plantilla** — vive en
 [`docs/datos.html`](./docs/datos.html). Su fuente es `docs/datos.json` y también
 se genera con Archify.
@@ -207,13 +233,14 @@ ollama pull nomic-embed-text-v2-moe     # una sola vez
 make fragmentos                          # data/boveda/fragmentos_base.jsonl (sin red)
 make indice                              # indexa web + PDF de producto + hechos
 make indice-completo                     # añade el resto de PDF y los videos
+make migrar-qdrant                       # copia un índice Chroma existente a Qdrant
 ```
 
 | Pieza | Dónde | Qué hace |
 |---|---|---|
 | Fragmentos | `boveda/fragmentos.py` | Fusiona chunks hasta 80 tokens, limita a 400 y parte tablas largas por filas |
 | Embeddings | `boveda/embeddings.py` | `nomic-embed-text-v2-moe` con `base_url` explícito y prefijos de tarea |
-| Índice | `boveda/almacen.py` | Chroma persistente en `data/boveda/chroma`, distancia coseno |
+| Índice | `boveda/almacen.py` | Qdrant local en `data/boveda/qdrant`, colección `boveda` y coseno; Chroma opcional con `[almacen] tipo` |
 | Recuperación | `boveda/recuperador.py` | Híbrido vectorial + BM25 con pesos de `config/sucursal.toml` |
 | Mapa | `boveda/mapa.py` | PCA 2D de los vectores, normalizado de 0 a 100; se regenera en `make indice` |
 
@@ -252,12 +279,14 @@ alguna no encuentra fila. Cada fila trae `concepto`, `categoria`, `valor`,
 
 ### Grafo con memoria
 
-El grafo encadena `reformular → digiturno → Bóveda/Tablero/rechazo → redactar`,
+El grafo encadena `reformular → digiturno → Bóveda/Tablero/mixto/cortesía/rechazo → redactar`,
 guarda la conversación con `SqliteSaver` en `data/asistente/memoria.sqlite` y
 aísla cada sesión por `thread_id`. Un seguimiento se reformula solo si hay
 historial; el Tablero responde sin modelo cuando hay 1-3 filas o varias del
 mismo concepto (hasta 10), y la Bóveda toma el relevo con 0, más de 10 o
-conceptos distintos.
+conceptos distintos. El `Store` de largo plazo con namespace
+`perfil/cliente_local` no está implementado: el checkpointer guarda la
+conversación, no las preferencias del cliente.
 
 ### API local y variables
 
@@ -443,7 +472,7 @@ Resultados vigentes y respuestas completas de v1:
 │   ├── live_capture.py        # captura en vivo en carpeta temporal
 │   ├── contexto.py · knowledge.py · documents.py · videos.py · news.py
 │   ├── asistente/             # Q&A, FAQ, resumen y evaluación con DeepSeek
-│   ├── boveda/               # fragmentos, embeddings, índice Chroma y recuperador
+│   ├── boveda/               # fragmentos, embeddings, índice Qdrant y recuperador
 │   ├── sucursal/             # digiturno (B/T/X), grafo y API de la fase 2
 │   └── tablero/              # tarifario y tablas de Gold → data/estructurados/tablero.csv
 ├── scripts/                   # demo_offline.py · scrape_empresa.py · tasks.py
