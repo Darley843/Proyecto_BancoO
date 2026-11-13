@@ -8,13 +8,18 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from pydantic import ValidationError
 
 from banco_occidente_corpus.config import Config, Paths
 from banco_occidente_corpus.tablero import (
+    MAX_FILAS_HERRAMIENTA,
+    ConsultaTablero,
     Fila,
     buscar_filas,
     comparar_filas,
     concepto_sin_franquicia,
+    crear_herramienta_tablero,
+    filas_de_consulta,
     filas_para_plantilla,
 )
 from banco_occidente_corpus.tablero.__main__ import main
@@ -654,3 +659,71 @@ def test_main_reporta_error_por_stderr(
 
     assert main() == 1
     assert "falta el tarifario" in capsys.readouterr().err
+
+
+def test_herramienta_declara_nombre_y_esquema_pydantic() -> None:
+    """La rúbrica pide un @tool con nombre propio y args_schema de Pydantic."""
+    herramienta = crear_herramienta_tablero([])
+
+    assert herramienta.name == "consultar_tablero"
+    assert herramienta.args_schema is ConsultaTablero
+    esquema = ConsultaTablero.model_json_schema()
+    assert esquema["required"] == ["consulta"]
+    assert set(esquema["properties"]) == {"consulta", "producto", "limite"}
+    assert "tarifas" in (herramienta.description or "")
+
+
+def test_herramienta_rechaza_consulta_corta() -> None:
+    """El esquema valida la entrada antes de tocar el catálogo."""
+    herramienta = crear_herramienta_tablero([fila("Cheque de Gerencia", "34.400")])
+
+    with pytest.raises(ValidationError):
+        herramienta.invoke({"consulta": "ab"})
+
+
+@pytest.mark.parametrize("limite", [0, MAX_FILAS_HERRAMIENTA + 1])
+def test_herramienta_rechaza_limite_fuera_de_rango(limite: int) -> None:
+    """Un límite imposible no se corrige en silencio: el esquema lo rechaza."""
+    with pytest.raises(ValidationError):
+        ConsultaTablero(consulta="cheque de gerencia", limite=limite)
+
+
+def test_herramienta_devuelve_la_cifra_exacta() -> None:
+    """Con el CSV real, el cheque de gerencia devuelve 34.400 COP y su fuente."""
+    herramienta = crear_herramienta_tablero(leer_filas(ARCHIVO_TABLERO))
+
+    resultado = herramienta.invoke({"consulta": "¿Cuánto cuesta un cheque de gerencia?"})
+
+    assert [fila["concepto"] for fila in resultado] == ["Cheque de Gerencia"]
+    assert resultado[0]["valor"] == "34.400"
+    assert resultado[0]["moneda"] == "COP"
+    assert resultado[0]["fuente"].startswith("https://www.bancodeoccidente.com.co/")
+
+
+def test_herramienta_sin_coincidencias_devuelve_vacio() -> None:
+    """Si el Tablero no tiene la tarifa, la herramienta no inventa una fila."""
+    herramienta = crear_herramienta_tablero([fila("Cheque de Gerencia", "34.400")])
+
+    assert herramienta.invoke({"consulta": "seguro de mascotas"}) == []
+
+
+def test_herramienta_usa_el_producto_como_pista() -> None:
+    """El producto filtra cuando alguna fila lo menciona y no cuando no existe."""
+    filas = [
+        fila("Cuota de manejo Credencial Gold", "37.300", periodicidad="mensual"),
+        fila("Cuota de manejo tarjeta débito", "16.700", periodicidad="mensual"),
+    ]
+    herramienta = crear_herramienta_tablero(filas)
+
+    assert [
+        f["concepto"]
+        for f in herramienta.invoke({"consulta": "cuota de manejo", "producto": "Gold"})
+    ] == ["Cuota de manejo Credencial Gold"]
+    assert herramienta.invoke({"consulta": "cuota de manejo", "producto": "Platinum"})
+
+
+def test_filas_de_consulta_respeta_el_limite() -> None:
+    """La herramienta nunca devuelve más filas de las que se le piden."""
+    filas = [fila(f"Gastos médicos {indice}", str(1_000 + indice)) for indice in range(5)]
+
+    assert len(filas_de_consulta(filas, "gastos médicos", limite=2)) == 2

@@ -1,8 +1,11 @@
 """Digiturno de la Sucursal: reglas primero y modelo solo para dudas.
 
 El orden es fijo y se detiene en la primera coincidencia: datos personales,
-fuera de alcance, palabras de tarifas y, solo si sigue dudoso, una clasificación
-con DeepSeek a temperatura 0. La pregunta no se guarda en ningún sitio.
+fuera de alcance, cortesía, identidad, pregunta mixta, palabras de tarifas y,
+solo si sigue dudoso, una clasificación con DeepSeek a temperatura 0. La
+cortesía no gasta búsqueda ni tokens, y la pregunta mixta pide a la vez una
+cifra del Tablero y una explicación de la Bóveda. La pregunta no se guarda en
+ningún sitio.
 """
 
 from __future__ import annotations
@@ -98,6 +101,82 @@ PATRONES_IDENTIDAD: tuple[str, ...] = (
     r"\b(grupo empresarial|grupo aval)\b",
     r"\b(presidente|junta directiva|gobierno corporativo)\b",
 )
+#: Palabras que, junto a un saludo, no aportan tema y se responden sin buscar.
+PALABRAS_CORTESIA: frozenset[str] = frozenset(
+    {
+        "adios",
+        "amiga",
+        "amigo",
+        "ayuda",
+        "bienvenida",
+        "bienvenido",
+        "buen",
+        "buena",
+        "buenas",
+        "bueno",
+        "buenos",
+        "chao",
+        "dia",
+        "dias",
+        "favor",
+        "gracias",
+        "hasta",
+        "hola",
+        "luego",
+        "mil",
+        "muchas",
+        "mucho",
+        "muy",
+        "noches",
+        "nos",
+        "por",
+        "senor",
+        "senora",
+        "su",
+        "tal",
+        "tardes",
+        "todo",
+        "tu",
+        "vemos",
+    }
+)
+#: Frases completas de cortesía: capacidades, identidad o charla breve.
+FRASES_CORTESIA: tuple[str, ...] = (
+    "ayuda",
+    "como esta",
+    "como estas",
+    "como funcionas",
+    "como te va",
+    "en que me puedes ayudar",
+    "en que puedes ayudar",
+    "para que sirves",
+    "que haces",
+    "que puedes hacer",
+    "que sabes hacer",
+    "que servicios ofreces",
+    "que tal",
+    "quien eres",
+)
+#: Tope de palabras de una cortesía; un saludo con tema ya no es cortesía.
+MAX_PALABRAS_CORTESIA: int = 8
+#: Palabras que piden una explicación y, con una palabra de tarifas, hacen la
+#: ruta mixta (cifra del Tablero + beneficios de la Bóveda).
+PALABRAS_EXPLICACION: tuple[str, ...] = (
+    "beneficio",
+    "beneficios",
+    "caracteristica",
+    "caracteristicas",
+    "para que sirve",
+    "para que sirven",
+    "que incluye",
+    "que incluyen",
+    "requisito",
+    "requisitos",
+    "ventaja",
+    "ventajas",
+)
+#: Palabra que separa las palabras de una frase ya normalizada.
+_PALABRA = re.compile(r"\w+")
 
 
 class Clasificacion(BaseModel):
@@ -166,6 +245,61 @@ def cargar_configuracion_digiturno(ruta: Path | None = None) -> ConfiguracionDig
     )
 
 
+def es_cortesia(pregunta: str) -> bool:
+    """Decide si la pregunta es solo un saludo, una despedida o una gracias.
+
+    Se responde sin buscar en el corpus, sin Tablero y sin modelo. La regla es
+    deliberadamente estrecha: el texto normalizado debe ser una frase de
+    :data:`FRASES_CORTESIA` (con un saludo delante, si acaso) o estar formado
+    únicamente por palabras de :data:`PALABRAS_CORTESIA`. Así «hola, ¿cuál es la
+    cuota de la tarjeta?» conserva su tema y sigue la ruta de tarifas.
+
+    Args:
+        pregunta: texto del cliente.
+
+    Returns:
+        True si es una cortesía que no requiere búsqueda.
+    """
+    palabras = _PALABRA.findall(normalizar(pregunta))
+    if not palabras:
+        return False
+
+    texto = " ".join(palabras)
+    for frase in FRASES_CORTESIA:
+        if texto == frase or texto.endswith(f" {frase}"):
+            prefijo = texto[: -len(frase)].split()
+            if all(palabra in PALABRAS_CORTESIA for palabra in prefijo):
+                return True
+
+    return len(palabras) <= MAX_PALABRAS_CORTESIA and all(
+        palabra in PALABRAS_CORTESIA for palabra in palabras
+    )
+
+
+def es_consulta_mixta(
+    pregunta: str,
+    configuracion: ConfiguracionDigiturno | None = None,
+) -> bool:
+    """Decide si la pregunta pide una cifra del Tablero y una explicación.
+
+    Es mixta cuando aparecen a la vez una palabra de tarifas (ruta T) y una
+    palabra de explicación o beneficios (ruta B). La ruta mixta consulta las dos
+    fuentes en un solo turno y cita las dos.
+
+    Args:
+        pregunta: texto del cliente.
+        configuracion: palabras del digiturno; se cargan del TOML si falta.
+
+    Returns:
+        True si la pregunta necesita el Tablero y la Bóveda a la vez.
+    """
+    ajustes = configuracion or cargar_configuracion_digiturno()
+    texto = normalizar(pregunta)
+    pide_tarifa = any(_contiene(texto, palabra) for palabra in ajustes.palabras_tarifas)
+    pide_explicacion = any(_contiene(texto, palabra) for palabra in PALABRAS_EXPLICACION)
+    return pide_tarifa and pide_explicacion
+
+
 def clasificar(
     pregunta: str,
     *,
@@ -176,6 +310,11 @@ def clasificar(
     contador: ContadorTurnos | None = None,
 ) -> Turno:
     """Asigna un turno a la pregunta siguiendo el orden de reglas.
+
+    El orden es: datos personales, fuera de alcance, cortesía, identidad,
+    pregunta mixta, tarifas y clasificador. La cortesía responde directo y la
+    mixta conserva la letra `T` con motivo `mixta` para que el grafo consulte
+    las dos fuentes sin cambiar el contrato de letras.
 
     Args:
         pregunta: texto del cliente.
@@ -210,8 +349,14 @@ def clasificar(
         if re.search(patron, normalizado):
             return Turno(numero=numero, letra="X", motivo="fuera_alcance")
 
+    if es_cortesia(texto):
+        return Turno(numero=numero, letra="B", motivo="cortesia")
+
     if any(re.search(patron, normalizado) for patron in PATRONES_IDENTIDAD):
         return Turno(numero=numero, letra="B", motivo="identidad")
+
+    if es_consulta_mixta(texto, ajustes):
+        return Turno(numero=numero, letra="T", motivo="mixta")
 
     if any(_contiene(normalizado, palabra) for palabra in ajustes.palabras_tarifas):
         return Turno(numero=numero, letra="T", motivo="tarifas")

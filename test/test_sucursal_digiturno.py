@@ -22,6 +22,8 @@ from banco_occidente_corpus.sucursal.digiturno import (
     clasificador_deepseek,
     clasificar,
     crear_clasificador,
+    es_consulta_mixta,
+    es_cortesia,
 )
 
 RAIZ = Path(__file__).resolve().parents[1]
@@ -409,3 +411,75 @@ def test_configuracion_por_defecto_clasifica() -> None:
 
     assert clasificar("cuota de manejo", configuracion=ajustes).letra == "T"
     assert clasificar("hola", configuracion=ajustes).letra == "B"
+
+
+@pytest.mark.parametrize(
+    "pregunta",
+    [
+        "Hola",
+        "hola!",
+        "Buenos días",
+        "buenas tardes",
+        "Buenas noches",
+        "gracias",
+        "Muchas gracias por todo",
+        "¿Qué puedes hacer?",
+        "¿Quién eres?",
+        "adios",
+    ],
+)
+def test_cortesia_responde_sin_buscar(pregunta: str) -> None:
+    """Los saludos y agradecimientos se responden directo, sin pasar al modelo."""
+    turno = clasificar(pregunta)
+
+    assert turno.letra == "B"
+    assert turno.motivo == "cortesia"
+    assert es_cortesia(pregunta) is True
+
+
+@pytest.mark.parametrize(
+    "pregunta",
+    [
+        "hola, ¿cuál es la cuota de la tarjeta?",
+        "gracias, ¿cuánto cuesta el cheque de gerencia?",
+        "¿Qué es un CDT?",
+        "¿cuánto cuesta un cheque de gerencia?",
+    ],
+)
+def test_saludo_con_tema_no_es_cortesia(pregunta: str) -> None:
+    """Un saludo que trae una pregunta real conserva su ruta."""
+    assert es_cortesia(pregunta) is False
+    assert clasificar(pregunta).motivo != "cortesia"
+
+
+@pytest.mark.parametrize(
+    "pregunta",
+    [
+        "¿Qué beneficios tiene la Credencial Gold y cuánto cuesta su cuota de manejo?",
+        "¿Cuáles son los beneficios y la tarifa de la tarjeta Joven?",
+        "¿Qué incluye la Cuota Protegida y cuánto cuesta su prima?",
+        "Necesito los requisitos y la comisión de la cuenta de ahorros",
+    ],
+)
+def test_consulta_mixta_conserva_la_letra_t(pregunta: str) -> None:
+    """Una cifra del Tablero y una explicación de la Bóveda piden la ruta mixta."""
+    turno = clasificar(pregunta)
+
+    assert turno.letra == "T"
+    assert turno.motivo == "mixta"
+    assert es_consulta_mixta(pregunta) is True
+
+
+@pytest.mark.parametrize(
+    "pregunta",
+    [
+        "¿Qué beneficios tiene la Credencial Gold?",
+        "¿Cuánto cuesta un cheque de gerencia?",
+        "¿Qué ventajas ofrece la cuenta de nómina?",
+        "¿Cuál es la cuota de manejo de la tarjeta débito?",
+    ],
+)
+def test_una_sola_fuente_no_es_mixta(pregunta: str) -> None:
+    """Si la pregunta solo pide explicación o solo pide cifra, no es mixta."""
+    assert es_consulta_mixta(pregunta) is False
+    assert clasificar(pregunta).motivo != "mixta"
