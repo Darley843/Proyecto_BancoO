@@ -221,7 +221,9 @@ def fuentes_de_boveda(
             es None se devuelven todos los fragmentos (respuesta de demostración).
 
     Returns:
-        Una lista de objetos `{n, titulo, url, seccion, tipo, similitud}`.
+        Una lista de objetos `{n, titulo, url, seccion, tipo, similitud}`. Las
+        filas del Tablero (sección `tablero`) llevan `similitud` en None porque
+        no pasaron por la búsqueda vectorial.
     """
     permitidas = None if citadas is None else {url for url in citadas if url}
     fuentes: list[dict[str, Any]] = []
@@ -229,14 +231,17 @@ def fuentes_de_boveda(
         url = str(fragmento.get("url", ""))
         if permitidas is not None and url not in permitidas:
             continue
+        seccion = str(fragmento.get("seccion", ""))
         fuentes.append(
             {
                 "n": indice,
                 "titulo": str(fragmento.get("titulo", "")),
                 "url": url,
-                "seccion": str(fragmento.get("seccion", "")),
+                "seccion": seccion,
                 "tipo": str(fragmento.get("tipo", "pagina")),
-                "similitud": round(float(fragmento.get("puntaje", 0.0)), 4),
+                "similitud": None
+                if seccion == "tablero"
+                else round(float(fragmento.get("puntaje", 0.0)), 4),
             }
         )
     return fuentes
@@ -554,8 +559,10 @@ class ServicioPreguntas:
         fragmentos = list(estado.get("fragmentos") or [])
         respuesta = str(estado.get("respuesta", ""))
 
-        if self._ajustes.demo and letra == "B" and fragmentos:
-            principal = _fragmento_principal(fragmentos)
+        if self._ajustes.demo and fragmentos and (letra == "B" or ruta == "mixta"):
+            # En demo no hay modelo: la mixta muestra la fila del Tablero (la
+            # primera del estado) y la Bóveda, su fragmento más parecido.
+            principal = fragmentos[0] if ruta == "mixta" else _fragmento_principal(fragmentos)
             respuesta = _respuesta_demo(principal)
             fuentes = fuentes_de_boveda([principal], None)
         elif letra == "X":

@@ -928,10 +928,52 @@ def test_ruta_mixta_200(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None
     assert cuerpo["ruta"] == "mixta"
     assert cuerpo["motivo"] == "mixta"
     assert cuerpo["uso_modelo"] is True
-    assert {fuente["url"] for fuente in cuerpo["fuentes"]} == {URL, url_beneficios}
+    por_url = {fuente["url"]: fuente for fuente in cuerpo["fuentes"]}
+    assert set(por_url) == {URL, url_beneficios}
+    assert por_url[URL]["seccion"] == "tablero"
+    assert por_url[URL]["similitud"] is None
+    assert por_url[url_beneficios]["similitud"] == 0.82
     assert "37.300" in cuerpo["respuesta"]
     assert cuerpo["tokens_entrada"] == 180
     assert cuerpo["costo_usd"] > 0
+
+
+def test_ruta_mixta_en_demo_muestra_la_fila_del_tablero(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Sin modelo, la mixta enseña la cifra del Tablero y avisa que es demo."""
+    fila_gold = Fila(
+        concepto="Credencial Gold*",
+        categoria="tarifas",
+        valor="37.300",
+        moneda="COP",
+        recargos="",
+        periodicidad="mensual",
+        vigente_desde="2025-11-20",
+        origen="tarifario",
+        pagina="data/gold/documents/tarifas.md",
+        fuente=URL,
+    )
+    escenario = preparar(
+        monkeypatch,
+        tmp_path,
+        demo=True,
+        filas=[fila_gold],
+        fragmentos=[fragmento()],
+    )
+
+    respuesta = preguntar(
+        escenario.cliente,
+        "¿Qué beneficios tiene la Credencial Gold y cuánto cuesta su cuota de manejo?",
+        "hilo-mixto-demo",
+    )
+    cuerpo = respuesta.json()
+
+    assert respuesta.status_code == 200
+    assert cuerpo["ruta"] == "mixta"
+    assert "37.300" in cuerpo["respuesta"]
+    assert "Modo demo" in cuerpo["respuesta"]
+    assert cuerpo["fuentes"][0]["url"] == URL
 
 
 def test_cortesia_no_consume_tope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
