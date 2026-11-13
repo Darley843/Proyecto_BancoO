@@ -56,6 +56,7 @@ const TIPOS = {
   pdf: "PDF",
   video: "Video",
   "hecho verificado": "Hecho verificado",
+  prueba: "Documento de prueba",
 };
 
 /** Nombres visibles de las etapas que envía el streaming. */

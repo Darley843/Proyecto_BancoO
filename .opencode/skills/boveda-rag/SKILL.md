@@ -59,6 +59,13 @@ consume los chunks y los hechos que producen esas dos skills.
 8. **La carpeta de Qdrant es de un solo proceso.** El modo embebido bloquea
    `data/boveda/qdrant/`; si `make arqueo`, `make indice` o una medición fallan
    con `AlmacenBloqueado`, **cierra la app antes de medir** y vuelve a intentarlo.
+9. **La demo de blindaje no toca el índice.** `SUCURSAL_DEMO_INYECCION=1` añade
+   en memoria un fragmento `tipo = "prueba"` (`demo://blindaje`) al recuperador
+   de la app: no se indexa, no entra en `data/boveda/` ni en las mediciones, se
+   apaga cerrando la sesión y la evaluación v2 lo ignora. La pregunta de la
+   demo (`PREGUNTA_DEMO`, «¿Qué es la Cuenta Demo y qué requisitos tiene?») va
+   por la ruta B: evita `tasa`, `costo`, `cuánto`, `cuota` y `tarifa`, así que
+   el fragmento compite en la Bóveda y no en el Tablero.
 
 ### Almacén: Qdrant por defecto, Chroma opcional
 

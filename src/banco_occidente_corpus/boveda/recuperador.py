@@ -5,6 +5,11 @@ vez por búsqueda, y `puntaje` se calcula contra los vectores que ya están
 guardados en el índice, de modo que significa siempre `1 - distancia coseno`,
 también para los fragmentos que solo devolvió BM25. El módulo no hace red propia:
 embeddings y almacén se inyectan.
+
+`fragmentos_extra` permite añadir fragmentos que no están en el índice (la demo
+de blindaje del caso 5): su vector se calcula una vez al construir y
+`AlmacenConExtras` los hace competir por coseno con los guardados, sin escribir
+en Qdrant, Chroma ni en el JSONL.
 """
 
 from __future__ import annotations
@@ -12,8 +17,8 @@ from __future__ import annotations
 import math
 import re
 from collections.abc import Mapping, Sequence
-from dataclasses import replace
-from typing import Any
+from dataclasses import dataclass, replace
+from typing import Any, Protocol
 
 from langchain_classic.retrievers import EnsembleRetriever
 from langchain_community.retrievers import BM25Retriever
@@ -24,7 +29,7 @@ from langchain_core.retrievers import BaseRetriever
 
 from ..config import Config
 from ..texto import normalizar
-from .almacen import AlmacenVectorial, crear_almacen
+from .almacen import AlmacenVectorial, Coincidencia, crear_almacen
 from .configuracion import ConfiguracionRecuperacion, cargar_configuracion_recuperacion
 from .embeddings import crear_embeddings
 from .fragmentos import Alcance
@@ -33,6 +38,83 @@ from .tipos import Fragmento
 
 #: k mínimo con el que se consultan los recuperadores antes de fusionar.
 K_MINIMO: int = 5
+
+
+class AlmacenBusqueda(Protocol):
+    """Parte del almacén vectorial que necesita el recuperador: buscar y vectores."""
+
+    def buscar(
+        self,
+        vector: Sequence[float],
+        k: int = 5,
+        filtro: Mapping[str, Any] | None = None,
+    ) -> list[Coincidencia]:
+        """Devuelve las k coincidencias más cercanas por distancia coseno."""
+        ...
+
+    def vectores(self, ids: Sequence[str]) -> dict[str, list[float]]:
+        """Devuelve los vectores guardados de los ids originales que existan."""
+        ...
+
+
+@dataclass(frozen=True, slots=True)
+class VectorExtra:
+    """Fragmento que no vive en el índice, con su vector ya calculado."""
+
+    fragmento: Fragmento
+    vector: tuple[float, ...]
+
+
+class AlmacenConExtras:
+    """Consulta un almacén y hace competir vectores extra con los guardados.
+
+    Los vectores extra se ordenan por su coseno real junto a las coincidencias
+    del almacén y solo sobreviven si entran en el top k, igual que un fragmento
+    indexado. El almacén y el disco no se modifican: es una capa de lectura en
+    memoria, pensada para el fragmento de prueba de la demo de blindaje.
+    """
+
+    def __init__(self, base: AlmacenBusqueda, extras: Sequence[VectorExtra]) -> None:
+        """Guarda el almacén real y los vectores calculados fuera del índice."""
+        self._base = base
+        self._extras = tuple(extras)
+
+    def buscar(
+        self,
+        vector: Sequence[float],
+        k: int = 5,
+        filtro: Mapping[str, Any] | None = None,
+    ) -> list[Coincidencia]:
+        """Devuelve el top k fusionando el almacén con los vectores extra."""
+        if k <= 0:
+            raise ValueError("k debe ser mayor que cero")
+        if filtro:
+            coincidencias = list(self._base.buscar(vector, k=k, filtro=filtro))
+        else:
+            coincidencias = list(self._base.buscar(vector, k=k))
+        for extra in self._extras:
+            metadatos = _metadatos(extra.fragmento)
+            if filtro and any(metadatos.get(clave) != valor for clave, valor in filtro.items()):
+                continue
+            coincidencias.append(
+                Coincidencia(
+                    id=extra.fragmento.id,
+                    documento=extra.fragmento.texto,
+                    metadatos=metadatos,
+                    distancia=1.0 - _similitud_coseno(vector, extra.vector),
+                )
+            )
+        coincidencias.sort(key=lambda coincidencia: coincidencia.distancia)
+        return coincidencias[:k]
+
+    def vectores(self, ids: Sequence[str]) -> dict[str, list[float]]:
+        """Devuelve los vectores del almacén más los extra que estén en `ids`."""
+        guardados = self._base.vectores(ids)
+        pedidos = set(ids)
+        for extra in self._extras:
+            if extra.fragmento.id in pedidos:
+                guardados[extra.fragmento.id] = list(extra.vector)
+        return guardados
 
 
 class RecuperadorVectorial(BaseRetriever):
@@ -72,10 +154,12 @@ class RecuperadorHibrido:
 
     def __init__(
         self,
-        almacen: AlmacenVectorial,
+        almacen: AlmacenBusqueda,
         embeddings: Embeddings,
         fragmentos: Sequence[Fragmento],
         configuracion: ConfiguracionRecuperacion | None = None,
+        *,
+        fragmentos_extra: Sequence[Fragmento] = (),
     ) -> None:
         """Prepara los dos recuperadores y el conjunto de fragmentos del alcance.
 
@@ -84,18 +168,32 @@ class RecuperadorHibrido:
             embeddings: proveedor de embeddings (con o sin prefijos).
             fragmentos: fragmentos del alcance activo, fuente de BM25.
             configuracion: k y pesos; se cargan del TOML si falta.
+            fragmentos_extra: fragmentos que no están en el índice (demo de
+                blindaje). Su vector se calcula una sola vez aquí y entra en
+                ambas ramas como si estuvieran indexados.
         """
         if not fragmentos:
             raise ValueError("El recuperador necesita al menos un fragmento indexado")
         ajustes = configuracion or cargar_configuracion_recuperacion()
+        extras = tuple(fragmentos_extra)
+        todos = [*fragmentos, *extras]
         self._embeddings = embeddings
-        self._por_id = {fragmento.id: fragmento for fragmento in fragmentos}
+        self._por_id = {fragmento.id: fragmento for fragmento in todos}
         self._documentos = [
             Document(page_content=fragmento.texto, metadata=_metadatos(fragmento))
-            for fragmento in fragmentos
+            for fragmento in todos
         ]
         self._k = max(ajustes.k, K_MINIMO)
-        self._almacen = almacen
+        self._almacen: AlmacenBusqueda = almacen
+        if extras:
+            vectores = embeddings.embed_documents([extra.texto for extra in extras])
+            self._almacen = AlmacenConExtras(
+                almacen,
+                tuple(
+                    VectorExtra(fragmento=extra, vector=tuple(vector))
+                    for extra, vector in zip(extras, vectores, strict=True)
+                ),
+            )
         self._pesos = _normalizar_pesos(ajustes)
         self._bm25 = BM25Retriever.from_documents(
             self._documentos, k=self._k, preprocess_func=_tokenizar
@@ -183,6 +281,7 @@ def crear_recuperador(
     configuracion: ConfiguracionRecuperacion | None = None,
     embeddings: Embeddings | None = None,
     almacen: AlmacenVectorial | None = None,
+    fragmentos_extra: Sequence[Fragmento] = (),
 ) -> RecuperadorHibrido:
     """Construye el recuperador con los fragmentos y el índice del alcance.
 
@@ -192,6 +291,9 @@ def crear_recuperador(
         configuracion: k y pesos; se cargan del TOML si falta.
         embeddings: proveedor alternativo; por defecto Ollama.
         almacen: almacén alternativo; por defecto el motor de `[almacen].tipo`.
+        fragmentos_extra: fragmentos en memoria que no están en el índice; su
+            vector se calcula una vez y compite con los indexados sin escribir
+            en el almacén. La Sucursal lo usa solo para la demo de blindaje.
 
     Returns:
         Un `RecuperadorHibrido` listo para `buscar`.
@@ -203,7 +305,9 @@ def crear_recuperador(
     else:
         destino = almacen
     fragmentos = leer_fragmentos(config, alcance)
-    return RecuperadorHibrido(destino, proveedor, fragmentos, configuracion)
+    return RecuperadorHibrido(
+        destino, proveedor, fragmentos, configuracion, fragmentos_extra=fragmentos_extra
+    )
 
 
 def _tokenizar(texto: str) -> list[str]:
