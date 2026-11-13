@@ -27,6 +27,7 @@ from langchain_core.messages.utils import count_tokens_approximately
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
+from pydantic import ValidationError
 
 from ..asistente.contexto_prompt import CanalOficial
 from ..asistente.metricas import extraer_metricas
@@ -40,10 +41,8 @@ from ..asistente.validacion import (
     texto_de_contenido,
 )
 from ..boveda.tipos import Fragmento, Recuperador
-from ..tablero.consultas import (
-    concepto_sin_franquicia,
-    filas_para_plantilla,
-)
+from ..tablero.consultas import concepto_sin_franquicia
+from ..tablero.herramienta import crear_herramienta_tablero, filas_de_consulta
 from ..tablero.tipos import Fila
 from ..texto import normalizar
 from .digiturno import (
@@ -57,6 +56,9 @@ from .digiturno import (
 HISTORIAL_MAX_TOKENS = 1200
 #: Filas que la plantilla del Tablero puede listar sin volverse una tabla enorme.
 MAX_FILAS_TABLERO = 10
+#: Filas que se piden a la herramienta. Una más que el tope de la plantilla
+#: permite distinguir «justo el máximo» de «demasiadas y ambigua».
+FILAS_PARA_DECIDIR = MAX_FILAS_TABLERO + 1
 #: Tope de tokens de la reformulación. Una pregunta autónoma es corta y el
 #: razonamiento de DeepSeek Flash cabe de sobra en 512, igual que en el
 #: clasificador; el tope de `qa` (2000) es para una respuesta completa con citas.
@@ -196,6 +198,8 @@ def crear_grafo(
     constructor.add_node("digiturno", cast(Any, _nodo_digiturno(dependencias)))
     constructor.add_node("boveda", cast(Any, _nodo_boveda(dependencias)))
     constructor.add_node("tablero", cast(Any, _nodo_tablero(dependencias)))
+    constructor.add_node("mixto", cast(Any, _nodo_mixto(dependencias)))
+    constructor.add_node("cortesia", cast(Any, _nodo_cortesia(dependencias)))
     constructor.add_node("rechazo", cast(Any, _nodo_rechazo(dependencias)))
     constructor.add_node("redactar", cast(Any, _nodo_redactar(dependencias)))
 
@@ -204,7 +208,13 @@ def crear_grafo(
     constructor.add_conditional_edges(
         "digiturno",
         _ruta_digiturno,
-        {"X": "rechazo", "T": "tablero", "B": "boveda"},
+        {
+            "X": "rechazo",
+            "T": "tablero",
+            "B": "boveda",
+            "mixto": "mixto",
+            "cortesia": "cortesia",
+        },
     )
     constructor.add_conditional_edges(
         "boveda",
@@ -216,6 +226,12 @@ def crear_grafo(
         _ruta_tablero,
         {"redactar": "redactar", "boveda": "boveda"},
     )
+    constructor.add_conditional_edges(
+        "mixto",
+        _ruta_boveda,
+        {"redactar": "redactar", "rechazo": "rechazo"},
+    )
+    constructor.add_edge("cortesia", END)
     constructor.add_edge("rechazo", END)
     constructor.add_edge("redactar", END)
 
@@ -355,12 +371,19 @@ def _nodo_boveda(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal], 
 
 
 def _nodo_tablero(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal], dict[str, Any]]:
-    """Crea el nodo que responde con filas del Tablero o devuelve la ruta a B."""
+    """Crea el nodo que responde con filas del Tablero o devuelve la ruta a B.
+
+    La búsqueda se hace con la herramienta `consultar_tablero`, la misma que la
+    rúbrica pide como `@tool` con esquema Pydantic. Si la herramienta rechaza la
+    entrada (una consulta de menos de tres letras, por ejemplo), el nodo no
+    rompe el turno: pasa a la Bóveda como si no hubiera filas.
+    """
+    herramienta = crear_herramienta_tablero(dependencias.filas)
 
     def tablero(estado: EstadoSucursal) -> dict[str, Any]:
         consulta = estado.get("reformulada") or estado.get("pregunta", "")
-        filas = filas_para_plantilla(dependencias.filas, consulta)
-        guardadas = [asdict(fila) for fila in filas]
+        filas = _invocar_herramienta(herramienta, consulta)
+        guardadas = [fila.como_dict() for fila in filas]
         if filas and _es_consulta_generica(consulta):
             turno = dict(estado.get("turno", {}))
             turno["letra"] = "B"
@@ -382,6 +405,119 @@ def _nodo_tablero(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal],
         return {"filas": guardadas, "turno": turno}
 
     return tablero
+
+
+def _nodo_mixto(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal], dict[str, Any]]:
+    """Crea el nodo que combina el Tablero y la Bóveda en un solo turno.
+
+    Las filas del Tablero se convierten en fragmentos citables con la URL del
+    tarifario, delante de los fragmentos de la Bóveda. La redacción no distingue
+    unos de otros: recibe un solo bloque `<fragmentos>` y valida las citas de
+    las dos fuentes con las reglas de siempre.
+    """
+    herramienta = crear_herramienta_tablero(dependencias.filas)
+
+    def mixto(estado: EstadoSucursal) -> dict[str, Any]:
+        consulta = estado.get("reformulada") or estado.get("pregunta", "")
+        filas = _invocar_herramienta(herramienta, consulta)
+        recuperados = list(dependencias.recuperador.buscar(consulta, k=dependencias.k))
+        fragmentos = [fragmento_de_tablero(fila) for fila in filas] + recuperados
+        return {
+            "filas": [fila.como_dict() for fila in filas],
+            "fragmentos": [asdict(fragmento) for fragmento in fragmentos],
+        }
+
+    return mixto
+
+
+def _nodo_cortesia(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal], dict[str, Any]]:
+    """Crea el nodo que saluda sin buscar en la Bóveda ni en el Tablero."""
+
+    def cortesia(estado: EstadoSucursal) -> dict[str, Any]:
+        texto = texto_de_cortesia(dependencias.canal)
+        return {
+            "respuesta": texto,
+            "fuentes": [],
+            "uso": {"uso_modelo": False, "costo_usd": 0.0},
+            "avisos": ["cortesia"],
+            "messages": [AIMessage(content=texto)],
+        }
+
+    return cortesia
+
+
+def texto_de_cortesia(canal: CanalOficial | None) -> str:
+    """Arma el saludo con las capacidades del asistente y el canal oficial.
+
+    Args:
+        canal: canal oficial del contexto, si la capa Contexto está disponible.
+
+    Returns:
+        Un texto breve que no cita fuentes ni cifras: no hubo búsqueda.
+    """
+    lineas = [
+        "¡Hola! Soy el asistente informativo del Banco de Occidente.",
+        "Puedo ayudarte con información pública del banco: productos, requisitos, "
+        "canales, tarifas, coberturas y trámites.",
+    ]
+    if canal and canal.telefono:
+        lineas.append(
+            f"Para tu caso particular, la Línea de Servicio al Cliente es {canal.telefono}."
+        )
+    elif canal and canal.url:
+        lineas.append(f"Para tu caso particular, consulta los canales oficiales en {canal.url}.")
+    lineas.append("¿Qué te gustaría consultar?")
+    return "\n".join(lineas)
+
+
+def fragmento_de_tablero(fila: Fila) -> Fragmento:
+    """Convierte una fila del Tablero en un fragmento citable de la Bóveda.
+
+    La ruta mixta le entrega al modelo la cifra exacta con el mismo formato que
+    un fragmento: título, sección, línea ``Fuente:`` y texto. Así la respuesta
+    puede citarla con ``[n]``, `validar_citas` comprueba la URL y
+    `cifras_inventadas` acepta el valor del tarifario como cifra permitida.
+
+    Args:
+        fila: fila del Tablero con su valor y su trazabilidad.
+
+    Returns:
+        El fragmento sintético listo para `formatear_fragmentos`.
+    """
+    concepto = fila.concepto.strip()
+    texto = [f"Tarifa del Tablero: {concepto}"]
+    if fila.categoria:
+        texto.append(f"Categoría: {fila.categoria}")
+    valor = f"Valor: {fila.valor}"
+    if fila.moneda:
+        valor += f" {fila.moneda}"
+    if fila.periodicidad:
+        valor += f" ({fila.periodicidad})"
+    if fila.recargos:
+        valor += f". Recargos: {fila.recargos}"
+    texto.append(valor)
+    if fila.vigente_desde:
+        texto.append(f"Vigente desde: {fila.vigente_desde}")
+    cuerpo = "\n".join(texto)
+    return Fragmento(
+        id=f"tablero:{fila.pagina}:{concepto}",
+        texto=cuerpo,
+        url=fila.fuente,
+        titulo=concepto,
+        seccion="tablero",
+        encabezado="Tablero de tarifas",
+        tipo="pdf" if fila.origen == "tarifario" else "pagina",
+        tokens=max(1, len(cuerpo) // 4),
+    )
+
+
+def _invocar_herramienta(herramienta: Any, consulta: str) -> list[Fila]:
+    """Invoca `consultar_tablero` y devuelve las filas; una entrada inválida es vacío."""
+    try:
+        datos = herramienta.invoke({"consulta": consulta, "limite": FILAS_PARA_DECIDIR})
+    except (ValidationError, ValueError, TypeError):
+        return []
+    return [Fila(**fila) for fila in datos]
 
 
 def _nodo_rechazo(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal], dict[str, Any]]:
@@ -451,8 +587,17 @@ def _nodo_redactar(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal]
 
 
 def _ruta_digiturno(estado: EstadoSucursal) -> str:
-    """Devuelve la letra del turno como ruta del grafo."""
+    """Devuelve el destino del grafo: letra del turno o motivo especial.
+
+    La cortesía y la pregunta mixta no cambian la letra del contrato (siguen
+    siendo `B` y `T`): se reconocen por el motivo y toman un nodo propio.
+    """
     turno = estado.get("turno", {})
+    motivo = str(turno.get("motivo", ""))
+    if motivo.startswith("cortesia"):
+        return "cortesia"
+    if motivo.startswith("mixta"):
+        return "mixto"
     letra = str(turno.get("letra", "B"))
     return letra if letra in {"B", "T", "X"} else "B"
 
@@ -483,10 +628,11 @@ def tablero_responde_sin_modelo(filas: Sequence[Fila], consulta: str) -> bool:
     """Indica si el Tablero puede responder la consulta con plantilla.
 
     Replica la decisión del nodo `tablero` para que la API estime el gasto y el
-    tope con las mismas reglas: filas específicas, una a tres o del mismo
-    concepto, y que no sea una cuota genérica de «las tarjetas de crédito».
+    tope con las mismas reglas: usa la misma herramienta, con el mismo límite de
+    filas, y exige filas específicas, una a tres o del mismo concepto, y que no
+    sea una cuota genérica de «las tarjetas de crédito».
     """
-    encontradas = filas_para_plantilla(filas, consulta)
+    encontradas = filas_de_consulta(filas, consulta, limite=FILAS_PARA_DECIDIR)
     if not encontradas or _es_consulta_generica(consulta):
         return False
     return _puede_responder_tabla(encontradas)

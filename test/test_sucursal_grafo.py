@@ -19,8 +19,10 @@ from banco_occidente_corpus.sucursal.grafo import (
     DependenciasGrafo,
     crear_grafo,
     es_seguimiento,
+    fragmento_de_tablero,
     recortar_historial,
     responder_turno,
+    texto_de_cortesia,
 )
 from banco_occidente_corpus.tablero.tipos import Fila, leer_filas
 
@@ -531,3 +533,143 @@ def test_recortar_historial_respeta_el_presupuesto() -> None:
 def test_es_seguimiento(pregunta: str, esperado: bool) -> None:
     """Los prefijos y la longitud deciden si es un seguimiento."""
     assert es_seguimiento(pregunta) is esperado
+
+
+def test_saludo_responde_sin_buscar_ni_usar_modelo(tmp_path: Path) -> None:
+    """«Hola» no llama al recuperador, ni al Tablero, ni al modelo, y cuesta cero."""
+    modelo = ModeloEspia([])
+    grafo, dependencias = deps(
+        tmp_path,
+        modelo=modelo,
+        filas=[fila("Cuota de manejo tarjeta débito")],
+        fragmentos=[fragmento()],
+    )
+
+    estado = responder_turno(grafo, dependencias, "Hola", "t1")
+
+    assert estado["turno"]["letra"] == "B"
+    assert estado["turno"]["motivo"] == "cortesia"
+    assert estado["respuesta"].startswith("¡Hola!")
+    assert estado["fuentes"] == []
+    assert estado["uso"] == {"uso_modelo": False, "costo_usd": 0.0}
+    assert estado["avisos"] == ["cortesia"]
+    assert estado["filas"] == []
+    assert estado["fragmentos"] == []
+    assert dependencias.recuperador.consultas == []
+    assert modelo.llamadas == []
+
+
+def test_saludo_lista_capacidades_y_canal(tmp_path: Path) -> None:
+    """La cortesía explica qué puede hacer y recuerda el canal oficial."""
+    grafo, dependencias = deps(tmp_path, modelo=ModeloEspia([]))
+
+    estado = responder_turno(grafo, dependencias, "¿Qué puedes hacer?", "t1")
+
+    assert estado["turno"]["motivo"] == "cortesia"
+    assert "tarifas" in estado["respuesta"]
+    assert dependencias.canal is not None
+    assert dependencias.canal.telefono in estado["respuesta"]
+    assert estado["respuesta"] == texto_de_cortesia(dependencias.canal)
+
+
+def test_saludo_con_historial_no_reformula(tmp_path: Path) -> None:
+    """Un «gracias» después de una consulta no gasta la reformulación."""
+    modelo = ModeloEspia([respuesta_valida()])
+    grafo, dependencias = deps(tmp_path, modelo=modelo, fragmentos=[fragmento()])
+
+    responder_turno(grafo, dependencias, "¿Qué es la cuenta de ahorros?", "t1")
+    estado = responder_turno(grafo, dependencias, "muchas gracias", "t1")
+
+    assert estado["turno"]["motivo"] == "cortesia"
+    assert len(modelo.llamadas) == 1
+
+
+def test_ruta_mixta_combina_tablero_y_boveda(tmp_path: Path) -> None:
+    """Una pregunta mixta cita la cifra del Tablero y el beneficio de la Bóveda."""
+    url_beneficios = "https://www.bancodeoccidente.com.co/tarjetas-credito/credencial-gold"
+    beneficios = Fragmento(
+        id="frag:gold",
+        texto="La Credencial Gold ofrece acceso a salas VIP, seguros de viaje y descuentos.",
+        url=url_beneficios,
+        titulo="Credencial Gold",
+        seccion="oferta",
+        encabezado="Tarjetas de crédito",
+        tipo="pagina",
+        tokens=30,
+    )
+    respuesta = (
+        "La Credencial Gold ofrece acceso a salas VIP y seguros de viaje [2]. "
+        "Su cuota de manejo es de 37.300 COP (mensual) [1].\n\n"
+        f"Fuentes:\n- {URL}\n- {url_beneficios}"
+    )
+    modelo = ModeloEspia([respuesta])
+    grafo, dependencias = deps(
+        tmp_path,
+        modelo=modelo,
+        filas=[fila("Credencial Gold*", "37.300")],
+        fragmentos=[beneficios],
+    )
+
+    estado = responder_turno(
+        grafo,
+        dependencias,
+        "¿Qué beneficios tiene la Credencial Gold y cuánto cuesta su cuota de manejo?",
+        "t1",
+    )
+
+    assert estado["turno"]["letra"] == "T"
+    assert estado["turno"]["motivo"] == "mixta"
+    assert set(estado["fuentes"]) == {URL, url_beneficios}
+    assert "37.300" in estado["respuesta"]
+    assert estado["uso"]["uso_modelo"] is True
+    # La cifra entra al prompt como dato delimitado, no como instrucción.
+    sistema = modelo.llamadas[0][0].content
+    assert "<fragmentos>" in sistema
+    assert "37.300" in sistema
+    assert f"Fuente: {URL}" in sistema
+
+
+def test_ruta_mixta_sin_filas_usa_solo_la_boveda(tmp_path: Path) -> None:
+    """Si el Tablero no tiene la cifra, la mixta no inventa y responde con la Bóveda."""
+    modelo = ModeloEspia([respuesta_valida()])
+    grafo, dependencias = deps(tmp_path, modelo=modelo, filas=[], fragmentos=[fragmento()])
+
+    estado = responder_turno(
+        grafo,
+        dependencias,
+        "¿Qué beneficios tiene la Credencial Gold y cuánto cuesta su cuota de manejo?",
+        "t1",
+    )
+
+    assert estado["turno"]["motivo"] == "mixta"
+    assert estado["fuentes"] == [URL]
+    assert estado["filas"] == []
+
+
+def test_fragmento_de_tablero_conserva_valor_y_fuente() -> None:
+    """La fila convertida en fragmento lleva la cifra, la vigencia y su URL."""
+    original = fila("Credencial Gold*", "37.300")
+
+    sintetico = fragmento_de_tablero(original)
+
+    assert sintetico.url == URL
+    assert "37.300" in sintetico.texto
+    assert "COP" in sintetico.texto
+    assert sintetico.tipo == "pdf"
+    assert sintetico.seccion == "tablero"
+
+
+def test_cheque_de_gerencia_responde_34400_sin_modelo(tmp_path: Path) -> None:
+    """La cifra del tarifario sale del Tablero, con su fuente y sin modelo."""
+    modelo = ModeloEspia([])
+    grafo, dependencias = deps(tmp_path, modelo=modelo, filas=leer_filas(ARCHIVO_TABLERO))
+
+    estado = responder_turno(grafo, dependencias, "¿Cuánto cuesta un cheque de gerencia?", "t1")
+
+    assert estado["turno"]["letra"] == "T"
+    assert "34.400" in estado["respuesta"]
+    assert estado["uso"] == {"uso_modelo": False, "costo_usd": 0.0}
+    assert modelo.llamadas == []
+    assert estado["fuentes"] == [
+        "https://www.bancodeoccidente.com.co/documents/d/guest/tarifas-persona-1"
+    ]

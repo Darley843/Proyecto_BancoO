@@ -178,11 +178,16 @@ class PreguntarRequest(BaseModel):
 
 
 class PreguntarRespuesta(BaseModel):
-    """Turno atendido: ticket, ruta, respuesta, fuentes y costo."""
+    """Turno atendido: ticket, ruta, respuesta, fuentes y costo.
+
+    Las letras siguen siendo `B`, `T` y `X`; la ruta distingue además la
+    cortesía (`cortesia`, sin búsqueda) y la pregunta mixta (`mixta`, Tablero y
+    Bóveda en un solo turno).
+    """
 
     turno: Literal["B", "T", "X"]
     turno_numero: int
-    ruta: Literal["boveda", "tablero", "rechazo"]
+    ruta: Literal["boveda", "tablero", "rechazo", "cortesia", "mixta"]
     motivo: str
     uso_modelo: bool
     reformulada: str | None = None

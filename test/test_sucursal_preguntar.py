@@ -858,3 +858,131 @@ def test_construir_piezas_respeta_la_ruta_de_memoria(tmp_path: Path) -> None:
 
     assert ruta.exists()
     assert not (tmp_path / "data/asistente/memoria.sqlite").exists()
+
+
+def test_ruta_cortesia_200(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Un saludo responde con turno B, ruta cortesía, cero tokens y sin fuentes."""
+    escenario = preparar(monkeypatch, tmp_path, fragmentos=[fragmento()])
+
+    respuesta = preguntar(escenario.cliente, "Hola", "hilo-saludo")
+    cuerpo = respuesta.json()
+
+    assert respuesta.status_code == 200
+    assert cuerpo["turno"] == "B"
+    assert cuerpo["ruta"] == "cortesia"
+    assert cuerpo["motivo"] == "cortesia"
+    assert cuerpo["uso_modelo"] is False
+    assert cuerpo["tokens_entrada"] == 0
+    assert cuerpo["tokens_salida"] == 0
+    assert cuerpo["costo_usd"] == 0.0
+    assert cuerpo["fuentes"] == []
+    assert cuerpo["respuesta"].startswith("¡Hola!")
+    # No buscó en la Bóveda ni guardó la cortesía en la caché.
+    assert escenario.dependencias.recuperador.consultas == []
+    assert contar_cache(escenario) == 0
+
+
+def test_ruta_mixta_200(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """La ruta mixta entrega la cifra del Tablero y los beneficios de la Bóveda."""
+    url_beneficios = "https://www.bancodeoccidente.com.co/tarjetas-credito/credencial-gold"
+    beneficios = fragmento(
+        texto="La Credencial Gold ofrece salas VIP y seguros de viaje.",
+        url=url_beneficios,
+        titulo="Credencial Gold",
+    )
+    respuesta = (
+        "La Credencial Gold ofrece salas VIP y seguros de viaje [2]. "
+        "Su cuota de manejo es de 37.300 COP (mensual) [1].\n\n"
+        f"Fuentes:\n- {URL}\n- {url_beneficios}"
+    )
+    modelo = ModeloGuion([respuesta], usos=[uso_modelo(180, 60)])
+    fila_gold = Fila(
+        concepto="Credencial Gold*",
+        categoria="tarifas",
+        valor="37.300",
+        moneda="COP",
+        recargos="",
+        periodicidad="mensual",
+        vigente_desde="2025-11-20",
+        origen="tarifario",
+        pagina="data/gold/documents/tarifas.md",
+        fuente=URL,
+    )
+    escenario = preparar(
+        monkeypatch,
+        tmp_path,
+        modelo=modelo,
+        filas=[fila_gold],
+        fragmentos=[beneficios],
+    )
+
+    respuesta_http = preguntar(
+        escenario.cliente,
+        "¿Qué beneficios tiene la Credencial Gold y cuánto cuesta su cuota de manejo?",
+        "hilo-mixto",
+    )
+    cuerpo = respuesta_http.json()
+
+    assert respuesta_http.status_code == 200
+    assert cuerpo["turno"] == "T"
+    assert cuerpo["ruta"] == "mixta"
+    assert cuerpo["motivo"] == "mixta"
+    assert cuerpo["uso_modelo"] is True
+    por_url = {fuente["url"]: fuente for fuente in cuerpo["fuentes"]}
+    assert set(por_url) == {URL, url_beneficios}
+    assert por_url[URL]["seccion"] == "tablero"
+    assert por_url[URL]["similitud"] is None
+    assert por_url[url_beneficios]["similitud"] == 0.82
+    assert "37.300" in cuerpo["respuesta"]
+    assert cuerpo["tokens_entrada"] == 180
+    assert cuerpo["costo_usd"] > 0
+
+
+def test_ruta_mixta_en_demo_muestra_la_fila_del_tablero(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Sin modelo, la mixta enseña la cifra del Tablero y avisa que es demo."""
+    fila_gold = Fila(
+        concepto="Credencial Gold*",
+        categoria="tarifas",
+        valor="37.300",
+        moneda="COP",
+        recargos="",
+        periodicidad="mensual",
+        vigente_desde="2025-11-20",
+        origen="tarifario",
+        pagina="data/gold/documents/tarifas.md",
+        fuente=URL,
+    )
+    escenario = preparar(
+        monkeypatch,
+        tmp_path,
+        demo=True,
+        filas=[fila_gold],
+        fragmentos=[fragmento()],
+    )
+
+    respuesta = preguntar(
+        escenario.cliente,
+        "¿Qué beneficios tiene la Credencial Gold y cuánto cuesta su cuota de manejo?",
+        "hilo-mixto-demo",
+    )
+    cuerpo = respuesta.json()
+
+    assert respuesta.status_code == 200
+    assert cuerpo["ruta"] == "mixta"
+    assert "37.300" in cuerpo["respuesta"]
+    assert "Modo demo" in cuerpo["respuesta"]
+    assert cuerpo["fuentes"][0]["url"] == URL
+
+
+def test_cortesia_no_consume_tope(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Con el tope agotado, un saludo sigue respondiendo: no usa modelo."""
+    escenario = preparar(monkeypatch, tmp_path, fragmentos=[fragmento()])
+    escenario.gasto.sumar(1.0, 1000, llamadas=1)
+
+    respuesta = preguntar(escenario.cliente, "buenos días", "hilo-tope")
+
+    assert respuesta.status_code == 200
+    assert respuesta.json()["ruta"] == "cortesia"
+    assert respuesta.json()["costo_usd"] == 0.0

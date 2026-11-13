@@ -65,9 +65,11 @@ RUTA_MEMORIA = "data/asistente/memoria.sqlite"
 #: Ruta de la caché de respuestas.
 RUTA_CACHE = "data/asistente/cache.sqlite"
 #: Rutas que puede tomar un turno, en el orden en que se prueban en la caché.
-RUTAS: tuple[str, ...] = ("boveda", "tablero", "rechazo")
+RUTAS: tuple[str, ...] = ("boveda", "tablero", "rechazo", "mixta")
 #: Letra del turno a ruta descriptiva del contrato JSON.
 RUTA_POR_LETRA: dict[str, str] = {"B": "boveda", "T": "tablero", "X": "rechazo"}
+#: Motivos que cambian la ruta sin cambiar la letra del turno.
+RUTA_POR_MOTIVO: dict[str, str] = {"cortesia": "cortesia", "mixta": "mixta"}
 #: Campos del cuerpo que se guarda en la caché, sin los volátiles del turno.
 CAMPOS_PAYLOAD: frozenset[str] = frozenset(
     {
@@ -144,6 +146,24 @@ def ruta_de_letra(letra: str) -> str:
     return RUTA_POR_LETRA.get(letra, "boveda")
 
 
+def ruta_de_turno(letra: str, motivo: str = "") -> str:
+    """Resuelve la ruta del comprobante: el motivo manda sobre la letra.
+
+    La cortesía conserva la letra `B` y la pregunta mixta la letra `T` para no
+    tocar el contrato de letras; su motivo (`cortesia` o `mixta`) elige la ruta
+    que ve la Ventanilla.
+
+    Args:
+        letra: letra del turno (`B`, `T` o `X`).
+        motivo: motivo con el que el digiturno o el nodo ajustó el turno.
+
+    Returns:
+        La ruta descriptiva del contrato JSON.
+    """
+    prefijo = motivo.split(":", 1)[0]
+    return RUTA_POR_MOTIVO.get(prefijo, ruta_de_letra(letra))
+
+
 def requiere_modelo(
     pregunta: str,
     dependencias: DependenciasGrafo,
@@ -178,6 +198,10 @@ def requiere_modelo(
         clasificador=None,
         contador=ContadorTurnos(),
     )
+    if turno.motivo == "cortesia":
+        return False
+    if turno.motivo == "mixta":
+        return True
     if turno.letra == "X":
         return False
     if turno.letra == "T":
@@ -197,7 +221,9 @@ def fuentes_de_boveda(
             es None se devuelven todos los fragmentos (respuesta de demostración).
 
     Returns:
-        Una lista de objetos `{n, titulo, url, seccion, tipo, similitud}`.
+        Una lista de objetos `{n, titulo, url, seccion, tipo, similitud}`. Las
+        filas del Tablero (sección `tablero`) llevan `similitud` en None porque
+        no pasaron por la búsqueda vectorial.
     """
     permitidas = None if citadas is None else {url for url in citadas if url}
     fuentes: list[dict[str, Any]] = []
@@ -205,14 +231,17 @@ def fuentes_de_boveda(
         url = str(fragmento.get("url", ""))
         if permitidas is not None and url not in permitidas:
             continue
+        seccion = str(fragmento.get("seccion", ""))
         fuentes.append(
             {
                 "n": indice,
                 "titulo": str(fragmento.get("titulo", "")),
                 "url": url,
-                "seccion": str(fragmento.get("seccion", "")),
+                "seccion": seccion,
                 "tipo": str(fragmento.get("tipo", "pagina")),
-                "similitud": round(float(fragmento.get("puntaje", 0.0)), 4),
+                "similitud": None
+                if seccion == "tablero"
+                else round(float(fragmento.get("puntaje", 0.0)), 4),
             }
         )
     return fuentes
@@ -515,7 +544,8 @@ class ServicioPreguntas:
         """
         turno = estado.get("turno") or {}
         letra = str(turno.get("letra", "B"))
-        ruta = ruta_de_letra(letra)
+        motivo = str(turno.get("motivo", ""))
+        ruta = ruta_de_turno(letra, motivo)
         uso = estado.get("uso") or {}
         usos = list(estado.get("usos") or [])
         if not usos and uso:
@@ -529,12 +559,16 @@ class ServicioPreguntas:
         fragmentos = list(estado.get("fragmentos") or [])
         respuesta = str(estado.get("respuesta", ""))
 
-        if self._ajustes.demo and letra == "B" and fragmentos:
-            principal = _fragmento_principal(fragmentos)
+        if self._ajustes.demo and fragmentos and (letra == "B" or ruta == "mixta"):
+            # En demo no hay modelo: la mixta muestra la fila del Tablero (la
+            # primera del estado) y la Bóveda, su fragmento más parecido.
+            principal = fragmentos[0] if ruta == "mixta" else _fragmento_principal(fragmentos)
             respuesta = _respuesta_demo(principal)
             fuentes = fuentes_de_boveda([principal], None)
         elif letra == "X":
             fuentes = []
+        elif ruta == "mixta":
+            fuentes = fuentes_de_boveda(fragmentos, list(estado.get("fuentes") or []))
         elif letra == "T":
             fuentes = fuentes_de_tablero(list(estado.get("filas") or []))
         else:

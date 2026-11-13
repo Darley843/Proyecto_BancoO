@@ -46,6 +46,8 @@ const RUTAS = {
   boveda: "Bóveda",
   tablero: "Tablero",
   rechazo: "Rechazo",
+  cortesia: "Cortesía",
+  mixta: "Mixta (Tablero + Bóveda)",
 };
 
 /** Nombres legibles de los tipos de fuente. */
