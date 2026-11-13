@@ -2,7 +2,8 @@
  * Vista Arqueo · responsable: Anny (PR 18).
  *
  * Muestra `GET /api/arqueo` en modo de solo lectura: recuperación (hit@5,
- * MRR), evaluación v1/v2, McNemar entre versiones, comparación de pesos,
+ * MRR, recall@10 y nDCG@10), evaluación v1/v2, McNemar entre versiones,
+ * comparación de pesos,
  * sensibilidad de la revisión humana, costo, uso y avisos. La vista pinta lo
  * que llega: no recalcula p, no compara p con alfa, no decide significancia y
  * no inventa cifras. La frase del McNemar v1/v2 y la del escenario de
@@ -193,13 +194,33 @@ function crearRecuperacion(datos) {
     contenido.push(
       crearTabla(
         "Recuperación por configuración",
-        ["Configuración", "Prefijos", "Evaluables", "Aciertos", "hit@5", "Wilson 95 %", "MRR"],
+        [
+          "Configuración",
+          "Prefijos",
+          "Evaluables",
+          "Aciertos",
+          "hit@5",
+          "Wilson 95 %",
+          "MRR",
+          "recall@10",
+          "nDCG@10",
+        ],
         configuraciones.map(crearFilaConfiguracion),
         true,
       ),
       crearTabla(
         "Bóveda frente a Tablero",
-        ["Configuración", "hit@5 (todas)", "hit@5 (sin T)", "MRR (todas)", "MRR (sin T)"],
+        [
+          "Configuración",
+          "hit@5 (todas)",
+          "hit@5 (sin T)",
+          "MRR (todas)",
+          "MRR (sin T)",
+          "recall@10 (todas)",
+          "recall@10 (sin T)",
+          "nDCG@10 (todas)",
+          "nDCG@10 (sin T)",
+        ],
         configuraciones.map(crearFilaSinTablero),
         true,
       ),
@@ -208,7 +229,7 @@ function crearRecuperacion(datos) {
   contenido.push(
     crearTexto(
       "p",
-      "hit@5 mide si una URL esperada aparece entre los cinco primeros fragmentos; MRR, la posición de la primera. Wilson 95 % es el intervalo del hit@5. La ruta T responde desde el Tablero y se reporta aparte.",
+      "hit@5 mide si una URL esperada aparece entre los cinco primeros fragmentos; MRR, la posición de la primera. recall@10 es la proporción de fuentes esperadas encontradas en el top 10 y nDCG@10 pondera su posición. Wilson 95 % es el intervalo del hit@5. La ruta T responde desde el Tablero y se reporta aparte.",
       "arqueo__pista",
     ),
   );
@@ -232,6 +253,8 @@ function crearFilaConfiguracion(configuracion) {
     formatearNumero(configuracion.hit_at_5),
     formatearIntervalo(configuracion.intervalo95),
     formatearNumero(configuracion.mrr),
+    formatearNumero(configuracion.recall_at_10),
+    formatearNumero(configuracion.ndcg_at_10),
   ];
 }
 
@@ -249,6 +272,10 @@ function crearFilaSinTablero(configuracion) {
     formatearNumero(sinTablero.hit_at_5),
     formatearNumero(configuracion.mrr),
     formatearNumero(sinTablero.mrr),
+    formatearNumero(configuracion.recall_at_10),
+    formatearNumero(sinTablero.recall_at_10),
+    formatearNumero(configuracion.ndcg_at_10),
+    formatearNumero(sinTablero.ndcg_at_10),
   ];
 }
 

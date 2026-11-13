@@ -6,7 +6,7 @@ y el almacen vectorial es un doble en memoria.
 
 from __future__ import annotations
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, cast
 
@@ -29,11 +29,12 @@ from banco_occidente_corpus.arqueo.experimentos import (
     diferencias_vectorial_directo,
     etiqueta_pesos,
     ids_por_ruta,
+    medir_configuracion,
     normalizar_url,
     posicion_en_top,
     vectorial_directo,
 )
-from banco_occidente_corpus.arqueo.metricas import hit_at_k, mrr
+from banco_occidente_corpus.arqueo.metricas import K_RECALL, hit_at_k, mrr
 from banco_occidente_corpus.asistente.evaluacion import (
     Revision,
     cargar_preguntas,
@@ -86,7 +87,12 @@ class AlmacenFijo:
         """Registra que no se esperaba una insercion."""
         self.agregados += 1
 
-    def buscar(self, vector: Sequence[float], k: int = 5) -> list[Coincidencia]:
+    def buscar(
+        self,
+        vector: Sequence[float],
+        k: int = 5,
+        filtro: Mapping[str, Any] | None = None,
+    ) -> list[Coincidencia]:
         """Devuelve el orden fijo recortado a k."""
         self.busquedas += 1
         return self._coincidencias[:k]
@@ -102,6 +108,52 @@ class AlmacenFijo:
     def reiniciar(self) -> None:
         """Registra que no se esperaba un reinicio."""
         self.reinicios += 1
+
+    def cerrar(self) -> None:
+        """No hace nada: el doble vive en memoria y no tiene cliente que liberar."""
+
+
+class AlmacenPorVentana(AlmacenFijo):
+    """Almacen que devuelve un orden distinto segun la ventana pedida.
+
+    Con k=5 pone la URL esperada en la primera posicion; con k=10 devuelve solo
+    los diez distractores. Sirve para comprobar que hit@5 y MRR usan la busqueda
+    corta y recall@10/nDCG@10 la busqueda larga.
+    """
+
+    def __init__(self, esperada: Fragmento, distractores: Sequence[Fragmento]) -> None:
+        super().__init__([esperada, *distractores])
+        self._esperada = esperada
+        self._distractores = list(distractores)
+        self.ventanas: list[int] = []
+
+    def buscar(
+        self,
+        vector: Sequence[float],
+        k: int = 5,
+        filtro: Mapping[str, Any] | None = None,
+    ) -> list[Coincidencia]:
+        """Registra la ventana y devuelve el orden que corresponde a k."""
+        self.busquedas += 1
+        self.ventanas.append(k)
+        orden = [self._esperada, *self._distractores] if k <= 5 else self._distractores
+        return [
+            Coincidencia(
+                id=fragmento.id,
+                documento=fragmento.texto,
+                metadatos={
+                    "id": fragmento.id,
+                    "url": fragmento.url,
+                    "titulo": fragmento.titulo,
+                    "seccion": fragmento.seccion,
+                    "encabezado": fragmento.encabezado,
+                    "tipo": fragmento.tipo,
+                    "tokens": fragmento.tokens,
+                },
+                distancia=0.1 * posicion,
+            )
+            for posicion, fragmento in enumerate(orden, start=1)
+        ][:k]
 
 
 def fragmento(identificador: str, texto: str, url: str) -> Fragmento:
@@ -208,7 +260,7 @@ def test_seguimiento_sin_previa_falla(tmp_path: Path) -> None:
         cargar_preguntas_fase2(archivo)
 
 
-def test_previa_fuera_de_seguimiento_falla(tmp_path: Any) -> None:
+def test_previa_fuera_de_seguimiento_falla(tmp_path: Path) -> None:
     """Solo los seguimientos llevan previa."""
     # Arrange
     archivo = tmp_path / "preguntas.toml"
@@ -224,7 +276,7 @@ def test_previa_fuera_de_seguimiento_falla(tmp_path: Any) -> None:
         cargar_preguntas_fase2(archivo)
 
 
-def test_ids_repetidos_fallan(tmp_path: Any) -> None:
+def test_ids_repetidos_fallan(tmp_path: Path) -> None:
     """Dos preguntas no pueden compartir id."""
     # Arrange
     archivo = tmp_path / "preguntas.toml"
@@ -240,7 +292,7 @@ def test_ids_repetidos_fallan(tmp_path: Any) -> None:
         cargar_preguntas_fase2(archivo)
 
 
-def test_ruta_incompatible_con_el_tipo_falla(tmp_path: Any) -> None:
+def test_ruta_incompatible_con_el_tipo_falla(tmp_path: Path) -> None:
     """Una pregunta de tabla no puede apuntar a la Boveda."""
     # Arrange
     archivo = tmp_path / "preguntas.toml"
@@ -305,7 +357,7 @@ def test_barrido_mide_seis_configuraciones_sin_reindexar() -> None:
     assert barrido.por_defecto == "0.6/0.4"
     assert almacen.agregados == 0
     assert almacen.reinicios == 0
-    assert almacen.busquedas == len(PESOS_BARRIDO) * len(preguntas_de_prueba())
+    assert almacen.busquedas == 2 * len(PESOS_BARRIDO) * len(preguntas_de_prueba())
 
 
 def test_barrido_reutiliza_las_metricas_puras() -> None:
@@ -326,6 +378,42 @@ def test_barrido_reutiliza_las_metricas_puras() -> None:
     assert configuracion.metricas.evaluables == 5
     assert configuracion.metricas.aciertos == 4
     assert configuracion.metricas.intervalo95 is not None
+
+
+def test_hit_y_mrr_usan_la_busqueda_de_k_5_y_recall_la_de_k_10() -> None:
+    """hit@5 y MRR se calculan con la ventana de 5, no con la de 10."""
+    # Arrange
+    esperada = fragmento("frag:a", "texto de la fuente esperada", URL_A)
+    distractores = [
+        fragmento(
+            f"frag:d{posicion}",
+            f"texto del distractor {posicion}",
+            f"https://www.bancodeoccidente.com.co/d{posicion}",
+        )
+        for posicion in range(1, 11)
+    ]
+    almacen = AlmacenPorVentana(esperada, distractores)
+    preguntas = [pregunta(1, fuentes=(URL_A,))]
+
+    # Act
+    resultado = medir_configuracion(
+        almacen,
+        DeterministicFakeEmbedding(size=8),
+        [esperada, *distractores],
+        preguntas,
+        etiqueta="1/0",
+        vectorial=1.0,
+        bm25=0.0,
+        prefijos=True,
+        k=5,
+    )
+
+    # Assert
+    assert almacen.ventanas == [5, K_RECALL]
+    assert resultado.metricas.hit_at_5 == 1.0
+    assert resultado.metricas.mrr == 1.0
+    assert resultado.metricas.recall_at_10 == 0.0
+    assert resultado.metricas.ndcg_at_10 == 0.0
 
 
 def test_barrido_separa_boveda_tablero_y_no_indexadas() -> None:

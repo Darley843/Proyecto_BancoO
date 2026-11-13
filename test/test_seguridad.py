@@ -43,6 +43,8 @@ RUTAS_IGNORADAS: tuple[str, ...] = (
     "data/asistente/memoria.sqlite",
     "data/asistente/cache.sqlite",
     "data/asistente/gasto.sqlite",
+    "data/asistente/memoria_evaluacion_v2.sqlite",
+    "data/asistente/gasto_evaluacion_v2.sqlite",
 )
 
 #: Patrones de claves de API que no deben aparecer en archivos versionados.

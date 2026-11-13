@@ -87,7 +87,12 @@ class AlmacenFijo:
     ) -> None:
         """No inserta: el doble se construye con los fragmentos."""
 
-    def buscar(self, vector: Sequence[float], k: int = 5) -> list[Coincidencia]:
+    def buscar(
+        self,
+        vector: Sequence[float],
+        k: int = 5,
+        filtro: Mapping[str, Any] | None = None,
+    ) -> list[Coincidencia]:
         """Devuelve el orden fijo recortado a k."""
         return self._coincidencias[:k]
 
@@ -101,6 +106,9 @@ class AlmacenFijo:
 
     def reiniciar(self) -> None:
         """No hace nada."""
+
+    def cerrar(self) -> None:
+        """No hace nada: el doble vive en memoria y no tiene cliente que liberar."""
 
 
 def fragmentos_de_prueba() -> list[Fragmento]:
@@ -362,20 +370,39 @@ def test_sin_fechas_ni_rutas_absolutas() -> None:
 
 
 def test_markdown_repite_las_cifras_del_json() -> None:
-    """Cada hit@5, MRR e intervalo del JSON aparece en el Markdown."""
+    """Cada hit@5, MRR, recall@10, nDCG@10 e intervalo aparece en el Markdown."""
     # Act
     arqueo, texto, _ = corrida_de_prueba()
 
     # Assert
+    assert "recall@10" in texto
+    assert "nDCG@10" in texto
     for configuracion in arqueo["recuperacion"]:
         if configuracion["hit_at_5"] is not None:
             assert f"{configuracion['hit_at_5']:.4f}" in texto
         if configuracion["mrr"] is not None:
             assert f"{configuracion['mrr']:.4f}" in texto
+        if configuracion["recall_at_10"] is not None:
+            assert f"{configuracion['recall_at_10']:.4f}" in texto
+        if configuracion["ndcg_at_10"] is not None:
+            assert f"{configuracion['ndcg_at_10']:.4f}" in texto
         intervalo = configuracion["intervalo95"]
         if intervalo is not None:
             assert f"{intervalo[0]:.4f}" in texto
             assert f"{intervalo[1]:.4f}" in texto
+
+
+def test_json_incluye_recall_y_ndcg_en_todas_las_configuraciones() -> None:
+    """Las métricas nuevas están en el total, por tipo y sin el Tablero."""
+    # Act
+    arqueo, _, _ = corrida_de_prueba()
+
+    # Assert
+    for configuracion in arqueo["recuperacion"]:
+        assert {"recall_at_10", "ndcg_at_10"} <= set(configuracion)
+        assert {"recall_at_10", "ndcg_at_10"} <= set(configuracion["sin_tablero"])
+        for metricas in configuracion["por_tipo"].values():
+            assert {"recall_at_10", "ndcg_at_10"} <= set(metricas)
 
 
 def test_tabla_vectorial_frente_a_hibrido_tiene_una_fila_por_pregunta() -> None:

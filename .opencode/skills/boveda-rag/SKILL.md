@@ -1,6 +1,6 @@
 ---
 name: boveda-rag
-description: Opera, mide y diagnostica la Bóveda RAG de la Sucursal 1965; reconstruye el índice de Qdrant con Ollama, consulta el recuperador, mide hit@5 y MRR y diagnostica fallos de indexación o recuperación.
+description: Opera, mide y diagnostica la Bóveda RAG de la Sucursal 1965; reconstruye el índice de Qdrant con Ollama, consulta el recuperador, mide hit@5, MRR, recall@10 y nDCG@10 y diagnostica fallos de indexación o recuperación.
 ---
 
 # Bóveda RAG
@@ -140,10 +140,12 @@ El script usa `config/evaluacion/preguntas_fase2.toml` y evalúa solo las
 preguntas con `fuentes_esperadas`: **44 preguntas, 36 evaluables**. Para las de
 seguimiento une `previa` y `pregunta` en una sola consulta.
 
-Salida por tipo y total con `n`, `hit@5`, `MRR`, `hit@5` con 5 URL distintas y
-`MRR` con 5 URL distintas. El `hit@5` total incluye su intervalo de Wilson al
-95 %. El JSON por pregunta conserva `acierto` y `rr` para comparar dos corridas
-con McNemar.
+Salida por tipo y total con `n`, `hit@5`, `MRR`, `recall@10`, `nDCG@10`,
+`hit@5` con 5 URL distintas y `MRR` con 5 URL distintas. El `hit@5` total
+incluye su intervalo de Wilson al 95 %. El JSON por pregunta conserva `acierto`
+y `rr` para comparar dos corridas con McNemar, y añade `recall_at_10` y
+`ndcg_at_10`. `hit@5` y `MRR` usan una búsqueda de 5 resultados; `recall@10` y
+`nDCG@10`, una segunda búsqueda de 10, para no cambiar la fusión del híbrido.
 
 ## Diagnosticar
 

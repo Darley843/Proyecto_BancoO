@@ -7,12 +7,14 @@ Chroma se crea en `tmp_path`. No se llama a Ollama.
 from __future__ import annotations
 
 import json
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 import pytest
 from langchain_core.embeddings import DeterministicFakeEmbedding, Embeddings
 
+from banco_occidente_corpus.arqueo import experimentos as modulo_experimentos
 from banco_occidente_corpus.arqueo.experimentos import (
     NOMBRE_HUELLA,
     carpeta_sin_prefijos,
@@ -22,6 +24,7 @@ from banco_occidente_corpus.boveda.almacen import ChromaAlmacen
 from banco_occidente_corpus.boveda.configuracion import ConfiguracionEmbeddings
 from banco_occidente_corpus.boveda.fragmentos import ruta_fragmentos
 from banco_occidente_corpus.boveda.indice import (
+    ResumenIndice,
     construir_indice_en,
     leer_metadatos,
 )
@@ -238,6 +241,53 @@ def test_indice_sin_prefijos_se_reconstruye_si_falta_la_huella(tmp_path: Path) -
 
     # Assert
     assert len(espia.documentos) == 2
+
+
+class AlmacenQueCuentaCierre:
+    """Almacén mínimo que registra si el experimento lo cierra."""
+
+    def __init__(self) -> None:
+        """Inicializa el registro de cierre."""
+        self.cerrada = False
+
+    def cerrar(self) -> None:
+        """Marca el almacén como cerrado."""
+        self.cerrada = True
+
+
+def test_indice_sin_prefijos_cierra_el_almacen_que_abre(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """El almacén extra se cierra en finally aunque no lo reciba quien llama."""
+    config = make_config(tmp_path)
+    write_jsonl(ruta_fragmentos(config, "base"), [fila_fragmento("frag:a")])
+    espia = AlmacenQueCuentaCierre()
+    carpeta = carpeta_sin_prefijos(config)
+
+    def construir_falso(
+        _carpeta: Path,
+        fragmentos: Sequence[Fragmento],
+        **kwargs: object,
+    ) -> ResumenIndice:
+        """Devuelve el resumen sin abrir un almacén real."""
+        assert kwargs["almacen"] is espia
+        assert len(fragmentos) == 1
+        return ResumenIndice(
+            alcance="base",
+            modelo="nomic-embed-text-v2-moe",
+            prefijos=False,
+            fragmentos=1,
+            dimension=4,
+            ruta_metadatos=carpeta / "indice.json",
+            ruta_almacen=carpeta / "qdrant",
+        )
+
+    monkeypatch.setattr(modulo_experimentos, "crear_almacen_en", lambda *_args, **_kwargs: espia)
+    monkeypatch.setattr(modulo_experimentos, "construir_indice_en", construir_falso)
+
+    construir_indice_sin_prefijos(config, "base", embeddings=EspiaEmbeddings())
+
+    assert espia.cerrada is True
 
 
 def test_construir_indice_en_sin_config_mapa_no_escribe_el_mapa(tmp_path: Path) -> None:
