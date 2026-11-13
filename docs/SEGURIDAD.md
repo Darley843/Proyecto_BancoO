@@ -383,6 +383,43 @@ Get-ChildItem Env: | Where-Object Name -match 'LANGSMITH|LANGCHAIN'
 env | grep -E '^(LANGSMITH|LANGCHAIN)' || true
 ```
 
+### 5.1 Encendido solo para la demo
+
+La traza no la activa el grafo: la enciende la **sesión**, porque `langchain-core`
+lee esas variables del entorno y publica cada nodo del `StateGraph` con su
+latencia y sus tokens. El código, `config/` y la suite no las definen; la prueba
+`test/test_seguridad.py::test_nada_en_produccion_activa_langsmith` lo comprueba.
+
+Para una demo explícita, en una sesión corta de PowerShell:
+
+```powershell
+$env:LANGSMITH_TRACING = "true"
+$env:LANGSMITH_PROJECT = "sucursal-1965-demo"
+$env:LANGSMITH_API_KEY = Read-Host "Clave de LangSmith"
+uv run python app.py
+```
+
+`Read-Host` evita que la clave quede en el historial de la terminal; no se escribe
+en `config/`, ni en `.env`, ni con `setx`.
+
+**Qué sale de la máquina mientras está encendido.** La pregunta, los fragmentos
+recuperados, las filas del Tablero cuando la ruta es mixta, el nombre de cada
+nodo (`reformular`, `digiturno`, `boveda`, `tablero`, `mixto`, `cortesia`,
+`redactar`), la latencia y los tokens. No sale la clave de DeepSeek, ni el
+`thread_id` completo, ni las SQLite de `data/asistente/`.
+
+**Qué se revisa en la traza** (los cuatro casos del guion): memoria con reinicio,
+Store en un hilo nuevo, RAG con cita, Tablero y ruta mixta, saludo y blindaje.
+Cada caso debe mostrar su cadena de nodos y, en `redactar`, los tokens de la
+llamada a DeepSeek.
+
+Al terminar, apagar y confirmar que no quedó nada:
+
+```powershell
+Remove-Item Env:LANGSMITH_TRACING, Env:LANGSMITH_PROJECT, Env:LANGSMITH_API_KEY
+Get-ChildItem Env: | Where-Object Name -match 'LANGSMITH|LANGCHAIN'
+```
+
 Si alguna vez se necesitan trazas, usar un colector local o una sesión corta y
 explícita, y documentar que la pregunta y los fragmentos salen de la máquina.
 No se activan en CI ni en la suite.
