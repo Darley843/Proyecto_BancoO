@@ -32,7 +32,7 @@ from contextvars import ContextVar
 from dataclasses import dataclass, field
 from typing import Any, Literal
 
-from .preguntar import ErrorSucursal, PiezasGrafo, ruta_de_letra
+from .preguntar import ErrorSucursal, PiezasGrafo, ruta_de_turno
 
 #: Logger del streaming; igual que el servicio, nunca recibe la pregunta.
 LOGGER = logging.getLogger(__name__)
@@ -46,6 +46,8 @@ ETAPAS: dict[str, tuple[str, str]] = {
     "digiturno": ("router", "El Digiturno decide la ruta del turno…"),
     "boveda": ("buscando", "Buscando fragmentos en la Bóveda…"),
     "tablero": ("buscando", "Consultando el Tablero de tarifas…"),
+    "mixto": ("buscando", "Consultando el Tablero y la Bóveda a la vez…"),
+    "cortesia": ("redactando", "Respondiendo el saludo, sin buscar…"),
     "rechazo": ("redactando", "Preparando la respuesta fija…"),
     "redactar": ("redactando", "Redactando y validando la respuesta con sus citas…"),
 }
@@ -55,6 +57,8 @@ NOMBRES_RUTA: dict[str, str] = {
     "boveda": "Bóveda",
     "tablero": "Tablero",
     "rechazo": "Rechazo",
+    "cortesia": "Cortesía",
+    "mixta": "Mixta (Tablero + Bóveda)",
 }
 
 #: Mensaje genérico para un fallo inesperado; el detalle queda solo en el log.
@@ -226,6 +230,18 @@ def resumir_resultado(nodo: str, resultado: Mapping[str, Any]) -> tuple[str, dic
             "filas": total,
             "plantilla": False,
         }
+    if nodo == "mixto":
+        filas = len(resultado.get("filas") or [])
+        # El nodo pone las filas del Tablero como fragmentos citables delante de
+        # los de la Bóveda: la Bóveda aportó la diferencia.
+        fragmentos = max(len(resultado.get("fragmentos") or []) - filas, 0)
+        texto = (
+            f"El Tablero aportó {_contar(filas, 'fila', 'filas')} y la Bóveda "
+            f"{_contar(fragmentos, 'fragmento', 'fragmentos')}."
+        )
+        return texto, {"filas": filas, "fragmentos": fragmentos}
+    if nodo == "cortesia":
+        return "Saludo respondido sin búsqueda y sin modelo (0 tokens).", {}
     if nodo == "rechazo":
         return "Respuesta fija, sin modelo y sin búsqueda.", {}
     avisos = [str(aviso) for aviso in resultado.get("avisos") or []]
@@ -244,7 +260,7 @@ def _resumen_digiturno(resultado: Mapping[str, Any]) -> tuple[str, dict[str, Any
     letra = str(datos.get("letra", "B"))
     numero = datos.get("numero", "")
     motivo = str(datos.get("motivo", ""))
-    ruta = ruta_de_letra(letra)
+    ruta = ruta_de_turno(letra, motivo)
     nombre = NOMBRES_RUTA.get(ruta, ruta)
     texto = f"Turno {letra}-{numero}: ruta {nombre}"
     if motivo:

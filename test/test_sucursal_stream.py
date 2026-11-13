@@ -18,10 +18,12 @@ from test_sucursal_preguntar import (
     PREGUNTA_RECHAZO,
     PREGUNTA_TABLERO,
     RESPUESTA_BOVEDA,
+    URL,
     ModeloGuion,
     RecuperadorFalso,
     fragmento,
     preparar,
+    uso_modelo,
 )
 
 from banco_occidente_corpus.boveda.tipos import Fragmento
@@ -34,6 +36,7 @@ from banco_occidente_corpus.sucursal.transmision import (
     TransmisionTurno,
     evento_de_tarea,
 )
+from banco_occidente_corpus.tablero.tipos import Fila
 
 #: Campos que cambian en cada turno y no se comparan entre rutas.
 VOLATILES = {"turno_numero", "tiempo_s"}
@@ -138,6 +141,76 @@ def test_tablero_responde_con_plantilla_en_streaming(
     final = eventos[-1][1]
     assert final["turno"] == "T"
     assert final["uso_modelo"] is False
+
+
+def test_saludo_muestra_la_cortesia_sin_busqueda(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Un saludo pasa por el nodo de cortesía y nunca por la Bóveda (criterio 2.3)."""
+    escenario = preparar(monkeypatch, tmp_path, fragmentos=[fragmento()])
+
+    eventos = leer_eventos(preguntar_stream(escenario.cliente, "Hola", "hilo-hola").text)
+
+    nodos = [nodo for nodo, estado in etapas(eventos) if estado == "hecho"]
+    assert "boveda" not in nodos
+    assert "cortesia" in nodos
+    digiturno = [d for n, d in eventos if n == "etapa" and d["nodo"] == "digiturno"][-1]
+    assert digiturno["detalle"]["ruta"] == "cortesia"
+    assert "Cortesía" in digiturno["texto"]
+    cortesia = [d for n, d in eventos if n == "etapa" and d["nodo"] == "cortesia"][-1]
+    assert "0 tokens" in cortesia["texto"]
+    assert eventos[-1][1]["ruta"] == "cortesia"
+
+
+def test_pregunta_mixta_muestra_las_dos_fuentes(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """La ruta mixta avisa cuántas filas y fragmentos aportó cada fuente."""
+    url_beneficios = "https://www.bancodeoccidente.com.co/tarjetas-credito/credencial-gold"
+    beneficios = fragmento(
+        texto="La Credencial Gold ofrece salas VIP y seguros de viaje.",
+        url=url_beneficios,
+        titulo="Credencial Gold",
+    )
+    respuesta = (
+        "La Credencial Gold ofrece salas VIP y seguros de viaje [2]. "
+        "Su cuota de manejo es de 37.300 COP (mensual) [1].\n\n"
+        f"Fuentes:\n- {URL}\n- {url_beneficios}"
+    )
+    fila_gold = Fila(
+        concepto="Credencial Gold*",
+        categoria="tarifas",
+        valor="37.300",
+        moneda="COP",
+        recargos="",
+        periodicidad="mensual",
+        vigente_desde="2025-11-20",
+        origen="tarifario",
+        pagina="data/gold/documents/tarifas.md",
+        fuente=URL,
+    )
+    escenario = preparar(
+        monkeypatch,
+        tmp_path,
+        modelo=ModeloGuion([respuesta], usos=[uso_modelo(180, 60)]),
+        filas=[fila_gold],
+        fragmentos=[beneficios],
+    )
+
+    eventos = leer_eventos(
+        preguntar_stream(
+            escenario.cliente,
+            "¿Qué beneficios tiene la Credencial Gold y cuánto cuesta su cuota de manejo?",
+            "hilo-mixto",
+        ).text
+    )
+
+    digiturno = [d for n, d in eventos if n == "etapa" and d["nodo"] == "digiturno"][-1]
+    assert digiturno["detalle"]["ruta"] == "mixta"
+    mixto = [d for n, d in eventos if n == "etapa" and d["nodo"] == "mixto"][-1]
+    assert mixto["etapa"] == "buscando"
+    assert mixto["detalle"] == {"filas": 1, "fragmentos": 1}
+    assert eventos[-1][1]["ruta"] == "mixta"
 
 
 def test_final_igual_a_la_ruta_clasica(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -265,7 +338,7 @@ def test_sin_oyente_la_envoltura_usa_invoke() -> None:
 
 
 def test_evento_de_tarea_ignora_nodos_internos_y_errores() -> None:
-    """Solo los seis nodos públicos generan etapas; un nodo con error no."""
+    """Solo los nodos públicos generan etapas; un nodo con error no."""
     assert evento_de_tarea({"name": "__start__", "input": {}}) is None
     assert evento_de_tarea({"name": "boveda", "error": "x", "result": None}) is None
     inicio = evento_de_tarea({"name": "digiturno", "input": {}})
