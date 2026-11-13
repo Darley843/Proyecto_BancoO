@@ -657,3 +657,19 @@ def test_fragmento_de_tablero_conserva_valor_y_fuente() -> None:
     assert "COP" in sintetico.texto
     assert sintetico.tipo == "pdf"
     assert sintetico.seccion == "tablero"
+
+
+def test_cheque_de_gerencia_responde_34400_sin_modelo(tmp_path: Path) -> None:
+    """La cifra del tarifario sale del Tablero, con su fuente y sin modelo."""
+    modelo = ModeloEspia([])
+    grafo, dependencias = deps(tmp_path, modelo=modelo, filas=leer_filas(ARCHIVO_TABLERO))
+
+    estado = responder_turno(grafo, dependencias, "¿Cuánto cuesta un cheque de gerencia?", "t1")
+
+    assert estado["turno"]["letra"] == "T"
+    assert "34.400" in estado["respuesta"]
+    assert estado["uso"] == {"uso_modelo": False, "costo_usd": 0.0}
+    assert modelo.llamadas == []
+    assert estado["fuentes"] == [
+        "https://www.bancodeoccidente.com.co/documents/d/guest/tarifas-persona-1"
+    ]
