@@ -18,14 +18,15 @@ import math
 from collections.abc import Callable, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from langchain_core.embeddings import Embeddings
 from sklearn.decomposition import PCA
 
 from ..config import Config
-from .fragmentos import Alcance
+from .fragmentos import ALCANCES, Alcance
+from .rutas import carpeta_boveda
 from .tipos import Fragmento, Recuperador
 
 #: Nombre del archivo del mapa dentro de `data/boveda/`.
@@ -170,12 +171,45 @@ def leer_proyeccion(mapa: dict[str, Any]) -> Proyeccion | None:
         return None
 
 
+def _metadatos_indice(config: Config) -> dict[str, Any] | None:
+    """Lee `indice.json`; devuelve None si falta o no se puede interpretar."""
+    from .indice import leer_metadatos
+
+    try:
+        return leer_metadatos(carpeta_boveda(config))
+    except (OSError, ValueError):
+        return None
+
+
+def _alcance_indice(config: Config) -> Alcance:
+    """Devuelve el alcance declarado en `indice.json`, o `base` si no consta."""
+    metadatos = _metadatos_indice(config) or {}
+    alcance = metadatos.get("alcance")
+    return cast(Alcance, alcance) if alcance in ALCANCES else "base"
+
+
+def _mapa_desactualizado(config: Config, mapa: dict[str, Any]) -> bool:
+    """Indica si el mapa guardado quedó de un índice anterior.
+
+    Compara el número de puntos con el de `indice.json` y el alcance declarado.
+    Si no hay metadatos legibles, no se puede afirmar que el mapa esté viejo.
+    """
+    metadatos = _metadatos_indice(config)
+    if metadatos is None:
+        return False
+    declarados = metadatos.get("fragmentos")
+    puntos = mapa.get("puntos")
+    if isinstance(declarados, int) and isinstance(puntos, list) and len(puntos) != declarados:
+        return True
+    return metadatos.get("alcance") != mapa.get("alcance") and metadatos.get("alcance") is not None
+
+
 class ServicioMapa:
     """Responde el mapa de la API: puntos, pregunta proyectada y top del recuperador.
 
     Los embeddings y el recuperador se crean la primera vez que llega una
-    pregunta, no al arrancar la app. Si falta `mapa.json` pero el índice existe,
-    lo calcula una vez leyendo los vectores del almacén y lo escribe.
+    pregunta, no al arrancar la app. Si falta `mapa.json` o quedó de un índice
+    anterior, lo calcula una vez leyendo los vectores del almacén y lo escribe.
     """
 
     def __init__(
@@ -197,24 +231,31 @@ class ServicioMapa:
         self._config = config
         self._fabrica_embeddings = embeddings or _embeddings_por_defecto
         self._fabrica_recuperador = recuperador or (lambda: _recuperador_por_defecto(config))
-        self._fabrica_vectores = vectores or (lambda: leer_vectores_indexados(config))
+        self._fabrica_vectores = vectores or (
+            lambda: leer_vectores_indexados(config, _alcance_indice(config))
+        )
         self._embeddings: Embeddings | None = None
         self._recuperador: Recuperador | None = None
 
     def mapa(self) -> dict[str, Any] | None:
-        """Devuelve el mapa guardado o lo calcula una vez desde el índice.
+        """Devuelve el mapa guardado o lo recalcula cuando no corresponde al índice.
+
+        Un `mapa.json` con otro número de puntos (o de otro alcance) quedó de un
+        índice anterior: se reconstruye desde los vectores actuales y se
+        sobrescribe. Si la reconstrucción no es posible, se conserva el mapa
+        guardado para no dejar la vista vacía.
 
         Returns:
-            El mapa, o None si no hay índice del que calcularlo.
+            El mapa, o None si no hay índice ni mapa del que partir.
         """
         guardado = leer_mapa(self._config)
-        if guardado is not None:
+        if guardado is not None and not _mapa_desactualizado(self._config, guardado):
             return guardado
         try:
             fragmentos, vectores = self._fabrica_vectores()
-            mapa = construir_mapa(fragmentos, vectores)
+            mapa = construir_mapa(fragmentos, vectores, alcance=_alcance_indice(self._config))
         except (FileNotFoundError, ValueError, RuntimeError, ImportError):
-            return None
+            return guardado
         escribir_mapa(self._config, mapa)
         return mapa
 

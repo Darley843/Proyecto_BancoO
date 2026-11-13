@@ -12,6 +12,7 @@ original viaja en el payload.
 
 from __future__ import annotations
 
+import os
 import shutil
 import threading
 import uuid
@@ -531,14 +532,15 @@ class QdrantAlmacen:
                 self._coleccion_lista = False
 
     def cerrar(self) -> None:
-        """Cierra el cliente y libera el bloqueo de la carpeta."""
+        """Suelta este consumidor; el cliente se cierra cuando ya nadie lo usa.
+
+        Los almacenes persistentes se comparten por carpeta dentro del proceso
+        (ver `crear_almacen_en_ruta`). Por eso cerrar solo libera el cliente y el
+        bloqueo de la carpeta cuando el último consumidor lo suelta; los demás
+        siguen trabajando con la misma instancia.
+        """
         with self._candado:
-            if self._cliente is not None:
-                cerrar = getattr(self._cliente, "close", None)
-                if cerrar is not None:
-                    cerrar()
-                self._cliente = None
-            self._coleccion_lista = False
+            _soltar_compartido(self)
 
     def __enter__(self) -> QdrantAlmacen:
         """Abre la colección al entrar en un bloque `with`."""
@@ -548,6 +550,15 @@ class QdrantAlmacen:
     def __exit__(self, *_: object) -> None:
         """Cierra el cliente al salir del bloque `with`."""
         self.cerrar()
+
+    def _cerrar_cliente(self) -> None:
+        """Cierra el cliente sin tocar el registro de almacenes compartidos."""
+        if self._cliente is not None:
+            cerrar = getattr(self._cliente, "close", None)
+            if cerrar is not None:
+                cerrar()
+            self._cliente = None
+        self._coleccion_lista = False
 
     def _abrir(self) -> Any:
         """Abre el cliente de Qdrant, traduciendo el bloqueo de la carpeta."""
@@ -603,7 +614,7 @@ class QdrantAlmacen:
             if cliente.collection_exists(self._nombre):
                 cliente.delete_collection(self._nombre)
         else:
-            self.cerrar()
+            self._cerrar_cliente()
             shutil.rmtree(self._ruta, ignore_errors=True)
             cliente = self._abrir()
         self._crear_coleccion(cliente, dimension)
@@ -676,11 +687,21 @@ def crear_almacen_en_ruta(
     dimension: int = DIMENSION_POR_DEFECTO,
     cliente: Any | None = None,
 ) -> AlmacenVectorial:
-    """Crea el almacén en una ruta concreta, ya sea de Qdrant o de Chroma."""
+    """Crea el almacén en una ruta concreta, ya sea de Qdrant o de Chroma.
+
+    En Qdrant persistente la misma carpeta resuelta devuelve siempre el mismo
+    `QdrantAlmacen` dentro del proceso: el modo local de Qdrant admite un solo
+    cliente por carpeta y la app necesita que el recuperador y el mapa
+    compartan ese cliente. `cerrar` no lo libera hasta que el último
+    consumidor lo suelta. Un cliente inyectado (pruebas) o el modo en memoria
+    conservan el comportamiento anterior, con una instancia por llamada.
+    """
     if tipo == "chroma":
         if ruta is None:
             raise ValueError("Chroma necesita una ruta en disco")
         return ChromaAlmacen(ruta)
+    if ruta is not None and cliente is None:
+        return _adquirir_qdrant(ruta, dimension=dimension)
     return QdrantAlmacen(ruta, dimension=dimension, cliente=cliente)
 
 
@@ -689,6 +710,56 @@ def cerrar_almacen(almacen: AlmacenVectorial) -> None:
     cerrar = getattr(almacen, "cerrar", None)
     if cerrar is not None:
         cerrar()
+
+
+@dataclass(slots=True)
+class _Compartido:
+    """Entrada del registro: el almacén de una carpeta y sus consumidores."""
+
+    almacen: QdrantAlmacen
+    usuarios: int = 1
+
+
+#: Un solo Qdrant embebido por carpeta: su modo local no admite dos clientes.
+_REGISTRO_CANDADO = threading.RLock()
+_REGISTRO_QDRANT: dict[Path, _Compartido] = {}
+
+
+def _clave_compartida(ruta: Path) -> Path:
+    """Normaliza una carpeta para que dos rutas relativas apunten al mismo almacén."""
+    resuelta = ruta.resolve()
+    return Path(os.path.normcase(str(resuelta)))
+
+
+def _adquirir_qdrant(ruta: Path, *, dimension: int) -> QdrantAlmacen:
+    """Devuelve el almacén compartido de la carpeta, creándolo la primera vez."""
+    clave = _clave_compartida(ruta)
+    with _REGISTRO_CANDADO:
+        entrada = _REGISTRO_QDRANT.get(clave)
+        if entrada is None:
+            almacen = QdrantAlmacen(ruta.resolve(), dimension=dimension)
+            _REGISTRO_QDRANT[clave] = _Compartido(almacen)
+            return almacen
+        entrada.usuarios += 1
+        return entrada.almacen
+
+
+def _soltar_compartido(almacen: QdrantAlmacen) -> None:
+    """Resta un consumidor y cierra el cliente cuando ya no queda ninguno.
+
+    El cierre ocurre dentro del candado del registro para que ningún otro hilo
+    cree un almacén nuevo sobre la misma carpeta mientras se libera el bloqueo.
+    """
+    with _REGISTRO_CANDADO:
+        for clave, entrada in list(_REGISTRO_QDRANT.items()):
+            if entrada.almacen is not almacen:
+                continue
+            entrada.usuarios -= 1
+            if entrada.usuarios > 0:
+                return
+            del _REGISTRO_QDRANT[clave]
+            break
+        almacen._cerrar_cliente()
 
 
 def _payload(

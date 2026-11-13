@@ -15,7 +15,11 @@ from typing import Any
 import pytest
 from langchain_core.embeddings import DeterministicFakeEmbedding
 
-from banco_occidente_corpus.boveda.almacen import crear_almacen
+from banco_occidente_corpus.boveda.almacen import (
+    cerrar_almacen,
+    crear_almacen,
+    crear_almacen_en_ruta,
+)
 from banco_occidente_corpus.boveda.configuracion import ConfiguracionEmbeddings
 from banco_occidente_corpus.boveda.fragmentos import ruta_fragmentos
 from banco_occidente_corpus.boveda.indice import construir_indice
@@ -27,6 +31,7 @@ from banco_occidente_corpus.boveda.mapa import (
     leer_vectores_indexados,
     ruta_mapa,
 )
+from banco_occidente_corpus.boveda.recuperador import crear_recuperador
 from banco_occidente_corpus.boveda.tipos import Fragmento
 from banco_occidente_corpus.config import Config, Paths
 from banco_occidente_corpus.utils import write_jsonl
@@ -180,13 +185,17 @@ def preparar_indice(tmp_path: Path) -> tuple[Config, list[Fragmento]]:
     config = make_config(tmp_path)
     fragmentos = fragmentos_de_prueba()
     write_jsonl(ruta_fragmentos(config, "base"), [asdict(f) for f in fragmentos])
-    construir_indice(
-        config,
-        "base",
-        configuracion=ConfiguracionEmbeddings(prefijos=True),
-        embeddings=DeterministicFakeEmbedding(size=16),
-        almacen=crear_almacen(config),
-    )
+    almacen = crear_almacen(config)
+    try:
+        construir_indice(
+            config,
+            "base",
+            configuracion=ConfiguracionEmbeddings(prefijos=True),
+            embeddings=DeterministicFakeEmbedding(size=16),
+            almacen=almacen,
+        )
+    finally:
+        cerrar_almacen(almacen)
     return config, fragmentos
 
 
@@ -272,3 +281,76 @@ def test_mapa_sin_proyeccion_pide_reindexar(tmp_path: Path) -> None:
     assert mapa is not None
     with pytest.raises(ValueError, match="make indice"):
         servicio.ubicar(mapa, "pregunta")
+
+
+def test_recuperador_y_mapa_comparten_el_almacen_de_qdrant(tmp_path: Path) -> None:
+    """El recuperador y el mapa conviven en el mismo proceso sobre la misma carpeta."""
+    config, fragmentos = preparar_indice(tmp_path)
+    recuperador = crear_recuperador(
+        config,
+        "base",
+        embeddings=DeterministicFakeEmbedding(size=16),
+    )
+    servicio = ServicioMapa(config)
+    ruta_mapa(config).unlink()
+
+    # El mapa abre el almacén para releer los vectores mientras el recuperador
+    # ya lo tiene abierto: con dos clientes Qdrant bloquearía la carpeta.
+    recalculado = servicio.mapa()
+    encontrados = recuperador.buscar("cuota de manejo", k=2)
+
+    assert recalculado is not None
+    assert len(recalculado["puntos"]) == len(fragmentos)
+    assert encontrados
+    assert len(encontrados) == 2
+
+
+def test_mapa_con_conteo_distinto_al_indice_se_recalcula(tmp_path: Path) -> None:
+    """Un mapa de un índice anterior se reemplaza por el del índice actual."""
+    config, fragmentos = preparar_indice(tmp_path)
+    viejo = leer_mapa(config)
+    assert viejo is not None
+    viejo["puntos"] = viejo["puntos"][:3]
+    ruta_mapa(config).write_text(json.dumps(viejo), encoding="utf-8")
+
+    recalculado = ServicioMapa(config).mapa()
+
+    assert recalculado is not None
+    assert [punto["id"] for punto in recalculado["puntos"]] == [f.id for f in fragmentos]
+    guardado = leer_mapa(config)
+    assert guardado is not None
+    assert len(guardado["puntos"]) == len(fragmentos)
+
+
+def test_mapa_al_dia_no_relee_el_indice(tmp_path: Path) -> None:
+    """Si el conteo coincide con `indice.json`, no se vuelve a ajustar el PCA."""
+
+    def no_debe_leerse() -> tuple[list[Fragmento], list[list[float]]]:
+        """Falla si el servicio intenta recalcular un mapa que ya está al día."""
+        raise AssertionError("El mapa al día no debe recalcularse")
+
+    config, _ = preparar_indice(tmp_path)
+
+    assert ServicioMapa(config, vectores=no_debe_leerse).mapa() is not None
+
+
+def test_almacen_compartido_se_cierra_con_el_ultimo_consumidor(tmp_path: Path) -> None:
+    """Dos consumidores de la misma carpeta reciben la misma instancia y cliente."""
+    primero = crear_almacen_en_ruta(tmp_path / "qdrant")
+    segundo = crear_almacen_en_ruta(tmp_path / "qdrant")
+    assert primero is segundo
+    try:
+        primero.agregar(["frag:a"], [[1.0, 0.0]], ["a"], [{"seccion": "oferta"}])
+
+        cerrar_almacen(primero)
+
+        assert segundo.contar() == 1
+        assert segundo.vectores(["frag:a"])["frag:a"] == pytest.approx([1.0, 0.0])
+    finally:
+        cerrar_almacen(segundo)
+
+    nuevo = crear_almacen_en_ruta(tmp_path / "qdrant")
+    try:
+        assert nuevo is not primero
+    finally:
+        cerrar_almacen(nuevo)
