@@ -33,6 +33,8 @@ _CONTRARIOS: tuple[tuple[str, str], ...] = (
 )
 #: Nombres de producto que deben aparecer en la fila cuando la consulta los pide.
 _DISTINTIVOS = frozenset({"black", "gold", "platinum", "clasica", "joven", "business", "viajera"})
+#: Sustantivos que introducen el nombre de un producto en la consulta.
+_PRODUCTOS = frozenset({"cuenta", "tarjeta", "producto", "plan", "paquete"})
 #: Palabras que no distinguen una tarifa: artículos, preposiciones y muletillas.
 _VACIAS = frozenset(
     [
@@ -230,6 +232,8 @@ def buscar_filas(filas: Sequence[Fila], consulta: str, categoria: str | None = N
         Las filas con más coincidencias, en el orden original.
     """
     terminos = _terminos(consulta)
+    if _nombra_producto_desconocido(filas, consulta):
+        return []
     objetivo = normalizar(categoria) if categoria else ""
     elegibles = [fila for fila in filas if not objetivo or objetivo in normalizar(fila.categoria)]
     if not terminos:
@@ -322,6 +326,40 @@ def _raiz(palabra: str) -> str:
         if palabra.endswith(sufijo) and len(palabra) - len(sufijo) >= 4:
             return palabra[: -len(sufijo)]
     return palabra
+
+
+def _nombra_producto_desconocido(filas: Sequence[Fila], consulta: str) -> bool:
+    """Indica si la consulta nombra un producto que no existe en el Tablero.
+
+    «Cuota de manejo de la Cuenta Demo» no se puede responder con la cuota de
+    la tarjeta débito: «demo» no aparece en ninguna fila. Sin este guardia, la
+    búsqueda premia las palabras que sí coinciden (`cuota`, `manejo`, `cuenta`)
+    y devuelve una cifra exacta de otro producto. Es mejor no responder desde
+    el Tablero y dejar que la Bóveda conteste o use la frase fija.
+
+    Args:
+        filas: catálogo completo del Tablero.
+        consulta: pregunta o términos del cliente.
+
+    Returns:
+        True si la consulta pide un producto cuyo nombre no está en el catálogo.
+    """
+    palabras = _PALABRA.findall(normalizar(consulta))
+    vocabulario = {
+        _raiz(palabra)
+        for fila in filas
+        for palabra in _PALABRA.findall(normalizar(f"{fila.concepto} {fila.categoria}"))
+    }
+    for indice, palabra in enumerate(palabras):
+        if palabra not in _PRODUCTOS:
+            continue
+        for siguiente in palabras[indice + 1 : indice + 3]:
+            if siguiente in _VACIAS or siguiente in _PREGUNTA:
+                continue
+            if _raiz(siguiente) not in vocabulario:
+                return True
+            break
+    return False
 
 
 #: Raíces de los nombres de producto que se exigen en la fila.

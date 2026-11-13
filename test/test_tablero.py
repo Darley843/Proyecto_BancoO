@@ -413,6 +413,20 @@ def test_filas_para_plantilla_sin_producto_distintivo_no_inventa() -> None:
     assert filas_para_plantilla(filas, "¿Cuál es la cuota de la Platinum?") == []
 
 
+def test_filas_para_plantilla_no_responde_un_producto_inexistente() -> None:
+    """«Cuenta Demo» no está en el tarifario: no se responde con la cuota de débito."""
+    filas = [fila("Cuota de Manejo Tarjeta Débito", "16.700")]
+
+    assert filas_para_plantilla(filas, "¿Cuál es la cuota de manejo de la Cuenta Demo?") == []
+
+
+def test_filas_para_plantilla_sigue_respondiendo_una_cuenta_conocida() -> None:
+    """El guardia no bloquea un producto que sí existe en el Tablero."""
+    filas = [fila("Cuenta Activa", "34.500")]
+
+    assert filas_para_plantilla(filas, "¿Cuánto cuesta la Cuenta Activa?") == filas
+
+
 def test_concepto_sin_franquicia_quita_el_sufijo() -> None:
     """El concepto base sirve para reconocer filas del mismo producto."""
     assert concepto_sin_franquicia("Gastos médicos (Mastercard)") == "gastos medicos"

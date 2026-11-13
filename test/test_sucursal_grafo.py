@@ -673,3 +673,21 @@ def test_cheque_de_gerencia_responde_34400_sin_modelo(tmp_path: Path) -> None:
     assert estado["fuentes"] == [
         "https://www.bancodeoccidente.com.co/documents/d/guest/tarifas-persona-1"
     ]
+
+
+def test_cuenta_demo_no_responde_con_la_cuota_de_debito(tmp_path: Path) -> None:
+    """Un producto que no existe en el tarifario no hereda la cifra de otro."""
+    modelo = ModeloEspia([])
+    grafo, dependencias = deps(tmp_path, modelo=modelo, filas=leer_filas(ARCHIVO_TABLERO))
+
+    estado = responder_turno(
+        grafo,
+        dependencias,
+        "¿Cuál es la cuota de manejo de la Cuenta Demo?",
+        "t1",
+    )
+
+    assert estado["turno"]["letra"] == "B"
+    assert estado["respuesta"] == respuesta_sin_datos(dependencias.canal)
+    assert "16.700" not in estado["respuesta"]
+    assert modelo.llamadas == []
