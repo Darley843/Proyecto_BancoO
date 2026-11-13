@@ -87,7 +87,8 @@
           0.5893,
           0.8625
         ],
-        "mrr": 0.5769,
+        "mrr": 0.5792,
+        "ndcg_at_10": 0.6473,
         "pesos": {
           "bm25": 0.0,
           "vectorial": 1.0
@@ -102,14 +103,18 @@
               0.3862,
               0.7969
             ],
-            "mrr": 0.4694
+            "mrr": 0.4741,
+            "ndcg_at_10": 0.5425,
+            "recall_at_10": 0.7037
           },
           "fuera": {
             "aciertos": 0,
             "evaluables": 0,
             "hit_at_5": null,
             "intervalo95": null,
-            "mrr": null
+            "mrr": null,
+            "ndcg_at_10": null,
+            "recall_at_10": null
           },
           "seguimiento": {
             "aciertos": 4,
@@ -119,7 +124,9 @@
               0.3,
               0.9032
             ],
-            "mrr": 0.4306
+            "mrr": 0.4306,
+            "ndcg_at_10": 0.544,
+            "recall_at_10": 0.8333
           },
           "tabla": {
             "aciertos": 12,
@@ -129,10 +136,13 @@
               0.7575,
               1.0
             ],
-            "mrr": 0.8111
+            "mrr": 0.8111,
+            "ndcg_at_10": 0.8561,
+            "recall_at_10": 1.0
           }
         },
         "prefijos": true,
+        "recall_at_10": 0.8241,
         "sin_tablero": {
           "aciertos": 14,
           "evaluables": 22,
@@ -141,7 +151,9 @@
             0.4295,
             0.8027
           ],
-          "mrr": 0.4902
+          "mrr": 0.4939,
+          "ndcg_at_10": 0.5575,
+          "recall_at_10": 0.7121
         }
       },
       {
@@ -154,6 +166,7 @@
           0.6801
         ],
         "mrr": 0.3866,
+        "ndcg_at_10": 0.4487,
         "pesos": {
           "bm25": 1.0,
           "vectorial": 0.0
@@ -168,14 +181,18 @@
               0.1628,
               0.5625
             ],
-            "mrr": 0.1574
+            "mrr": 0.1574,
+            "ndcg_at_10": 0.2383,
+            "recall_at_10": 0.4444
           },
           "fuera": {
             "aciertos": 0,
             "evaluables": 0,
             "hit_at_5": null,
             "intervalo95": null,
-            "mrr": null
+            "mrr": null,
+            "ndcg_at_10": null,
+            "recall_at_10": null
           },
           "seguimiento": {
             "aciertos": 3,
@@ -185,7 +202,9 @@
               0.1876,
               0.8124
             ],
-            "mrr": 0.2917
+            "mrr": 0.2917,
+            "ndcg_at_10": 0.3436,
+            "recall_at_10": 0.5
           },
           "tabla": {
             "aciertos": 10,
@@ -195,10 +214,13 @@
               0.552,
               0.953
             ],
-            "mrr": 0.7778
+            "mrr": 0.7778,
+            "ndcg_at_10": 0.8168,
+            "recall_at_10": 0.9167
           }
         },
         "prefijos": true,
+        "recall_at_10": 0.6111,
         "sin_tablero": {
           "aciertos": 9,
           "evaluables": 22,
@@ -207,7 +229,9 @@
             0.2326,
             0.6127
           ],
-          "mrr": 0.2083
+          "mrr": 0.2083,
+          "ndcg_at_10": 0.2887,
+          "recall_at_10": 0.5
         }
       },
       {
@@ -220,6 +244,7 @@
           0.6801
         ],
         "mrr": 0.4231,
+        "ndcg_at_10": 0.51,
         "pesos": {
           "bm25": 0.8,
           "vectorial": 0.2
@@ -234,14 +259,18 @@
               0.1628,
               0.5625
             ],
-            "mrr": 0.2241
+            "mrr": 0.2241,
+            "ndcg_at_10": 0.3553,
+            "recall_at_10": 0.4444
           },
           "fuera": {
             "aciertos": 0,
             "evaluables": 0,
             "hit_at_5": null,
             "intervalo95": null,
-            "mrr": null
+            "mrr": null,
+            "ndcg_at_10": null,
+            "recall_at_10": null
           },
           "seguimiento": {
             "aciertos": 3,
@@ -251,7 +280,9 @@
               0.1876,
               0.8124
             ],
-            "mrr": 0.2833
+            "mrr": 0.2833,
+            "ndcg_at_10": 0.3274,
+            "recall_at_10": 0.5
           },
           "tabla": {
             "aciertos": 10,
@@ -261,10 +292,13 @@
               0.552,
               0.953
             ],
-            "mrr": 0.7917
+            "mrr": 0.7917,
+            "ndcg_at_10": 0.8333,
+            "recall_at_10": 0.9167
           }
         },
         "prefijos": true,
+        "recall_at_10": 0.6111,
         "sin_tablero": {
           "aciertos": 9,
           "evaluables": 22,
@@ -273,7 +307,9 @@
             0.2326,
             0.6127
           ],
-          "mrr": 0.2606
+          "mrr": 0.2606,
+          "ndcg_at_10": 0.38,
+          "recall_at_10": 0.5
         }
       },
       {
@@ -286,6 +322,7 @@
           0.6801
         ],
         "mrr": 0.4231,
+        "ndcg_at_10": 0.5192,
         "pesos": {
           "bm25": 0.6,
           "vectorial": 0.4
@@ -300,14 +337,18 @@
               0.1628,
               0.5625
             ],
-            "mrr": 0.2241
+            "mrr": 0.2241,
+            "ndcg_at_10": 0.3664,
+            "recall_at_10": 0.4444
           },
           "fuera": {
             "aciertos": 0,
             "evaluables": 0,
             "hit_at_5": null,
             "intervalo95": null,
-            "mrr": null
+            "mrr": null,
+            "ndcg_at_10": null,
+            "recall_at_10": null
           },
           "seguimiento": {
             "aciertos": 3,
@@ -317,7 +358,9 @@
               0.1876,
               0.8124
             ],
-            "mrr": 0.2833
+            "mrr": 0.2833,
+            "ndcg_at_10": 0.3274,
+            "recall_at_10": 0.5
           },
           "tabla": {
             "aciertos": 10,
@@ -327,10 +370,13 @@
               0.552,
               0.953
             ],
-            "mrr": 0.7917
+            "mrr": 0.7917,
+            "ndcg_at_10": 0.8442,
+            "recall_at_10": 0.9167
           }
         },
         "prefijos": true,
+        "recall_at_10": 0.6111,
         "sin_tablero": {
           "aciertos": 9,
           "evaluables": 22,
@@ -339,7 +385,9 @@
             0.2326,
             0.6127
           ],
-          "mrr": 0.2606
+          "mrr": 0.2606,
+          "ndcg_at_10": 0.3891,
+          "recall_at_10": 0.5
         }
       },
       {
@@ -352,6 +400,7 @@
           0.8625
         ],
         "mrr": 0.5838,
+        "ndcg_at_10": 0.6362,
         "pesos": {
           "bm25": 0.4,
           "vectorial": 0.6
@@ -366,14 +415,18 @@
               0.3862,
               0.7969
             ],
-            "mrr": 0.4833
+            "mrr": 0.4833,
+            "ndcg_at_10": 0.5184,
+            "recall_at_10": 0.7037
           },
           "fuera": {
             "aciertos": 0,
             "evaluables": 0,
             "hit_at_5": null,
             "intervalo95": null,
-            "mrr": null
+            "mrr": null,
+            "ndcg_at_10": null,
+            "recall_at_10": null
           },
           "seguimiento": {
             "aciertos": 4,
@@ -383,7 +436,9 @@
               0.3,
               0.9032
             ],
-            "mrr": 0.3194
+            "mrr": 0.3194,
+            "ndcg_at_10": 0.4563,
+            "recall_at_10": 0.8333
           },
           "tabla": {
             "aciertos": 12,
@@ -393,10 +448,13 @@
               0.7575,
               1.0
             ],
-            "mrr": 0.8667
+            "mrr": 0.8667,
+            "ndcg_at_10": 0.9028,
+            "recall_at_10": 1.0
           }
         },
         "prefijos": true,
+        "recall_at_10": 0.8241,
         "sin_tablero": {
           "aciertos": 14,
           "evaluables": 22,
@@ -405,7 +463,9 @@
             0.4295,
             0.8027
           ],
-          "mrr": 0.4712
+          "mrr": 0.4712,
+          "ndcg_at_10": 0.5159,
+          "recall_at_10": 0.7121
         }
       },
       {
@@ -418,6 +478,7 @@
           0.8625
         ],
         "mrr": 0.5653,
+        "ndcg_at_10": 0.6259,
         "pesos": {
           "bm25": 0.2,
           "vectorial": 0.8
@@ -432,14 +493,18 @@
               0.3862,
               0.7969
             ],
-            "mrr": 0.4463
+            "mrr": 0.4463,
+            "ndcg_at_10": 0.4979,
+            "recall_at_10": 0.7037
           },
           "fuera": {
             "aciertos": 0,
             "evaluables": 0,
             "hit_at_5": null,
             "intervalo95": null,
-            "mrr": null
+            "mrr": null,
+            "ndcg_at_10": null,
+            "recall_at_10": null
           },
           "seguimiento": {
             "aciertos": 4,
@@ -449,7 +514,9 @@
               0.3,
               0.9032
             ],
-            "mrr": 0.3194
+            "mrr": 0.3194,
+            "ndcg_at_10": 0.4563,
+            "recall_at_10": 0.8333
           },
           "tabla": {
             "aciertos": 12,
@@ -459,10 +526,13 @@
               0.7575,
               1.0
             ],
-            "mrr": 0.8667
+            "mrr": 0.8667,
+            "ndcg_at_10": 0.9028,
+            "recall_at_10": 1.0
           }
         },
         "prefijos": true,
+        "recall_at_10": 0.8241,
         "sin_tablero": {
           "aciertos": 14,
           "evaluables": 22,
@@ -471,7 +541,9 @@
             0.4295,
             0.8027
           ],
-          "mrr": 0.4409
+          "mrr": 0.4409,
+          "ndcg_at_10": 0.4991,
+          "recall_at_10": 0.7121
         }
       },
       {
@@ -484,6 +556,7 @@
           0.8625
         ],
         "mrr": 0.6176,
+        "ndcg_at_10": 0.6416,
         "pesos": {
           "bm25": 0.4,
           "vectorial": 0.6
@@ -498,14 +571,18 @@
               0.3862,
               0.7969
             ],
-            "mrr": 0.4389
+            "mrr": 0.4389,
+            "ndcg_at_10": 0.4928,
+            "recall_at_10": 0.6852
           },
           "fuera": {
             "aciertos": 0,
             "evaluables": 0,
             "hit_at_5": null,
             "intervalo95": null,
-            "mrr": null
+            "mrr": null,
+            "ndcg_at_10": null,
+            "recall_at_10": null
           },
           "seguimiento": {
             "aciertos": 4,
@@ -515,7 +592,9 @@
               0.3,
               0.9032
             ],
-            "mrr": 0.5833
+            "mrr": 0.5833,
+            "ndcg_at_10": 0.5555,
+            "recall_at_10": 0.8333
           },
           "tabla": {
             "aciertos": 12,
@@ -525,10 +604,13 @@
               0.7575,
               1.0
             ],
-            "mrr": 0.9028
+            "mrr": 0.9028,
+            "ndcg_at_10": 0.9077,
+            "recall_at_10": 1.0
           }
         },
         "prefijos": false,
+        "recall_at_10": 0.8148,
         "sin_tablero": {
           "aciertos": 14,
           "evaluables": 22,
@@ -537,7 +619,9 @@
             0.4295,
             0.8027
           ],
-          "mrr": 0.4955
+          "mrr": 0.4955,
+          "ndcg_at_10": 0.5117,
+          "recall_at_10": 0.697
         }
       }
     ],
@@ -555,7 +639,7 @@
       "medido": {
         "1/0": {
           "hit_at_5": 0.75,
-          "mrr": 0.5769
+          "mrr": 0.5792
         },
         "por_defecto": {
           "hit_at_5": 0.75,

@@ -105,6 +105,16 @@ def test_vista_muestra_recuperacion_y_evaluacion() -> None:
     assert "Bóveda frente a Tablero" in codigo
 
 
+def test_vista_muestra_recall_y_ndcg_en_la_tabla_de_recuperacion() -> None:
+    """La tabla de recuperación incluye recall@10 y nDCG@10 del JSON."""
+    codigo = leer_vista()
+
+    for clave in ("recall_at_10", "ndcg_at_10"):
+        assert clave in codigo, clave
+    assert "recall@10" in codigo
+    assert "nDCG@10" in codigo
+
+
 def test_vista_muestra_mcnemar_v1_v2_con_sus_campos() -> None:
     """La tabla de McNemar incluye b, c, n, p, p mínimo, alfa y excluidos."""
     codigo = leer_vista()

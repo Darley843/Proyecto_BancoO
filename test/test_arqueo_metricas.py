@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import math
 import unicodedata
 from typing import Any
 
@@ -9,6 +10,7 @@ import pytest
 
 from banco_occidente_corpus.arqueo.metricas import (
     ALFA,
+    K_RECALL,
     TARIFAS_DEEPSEEK_FLASH,
     TARIFAS_DEEPSEEK_FLASH_PICO,
     ResumenUso,
@@ -20,7 +22,9 @@ from banco_occidente_corpus.arqueo.metricas import (
     intervalo_wilson,
     mcnemar,
     mrr,
+    ndcg_at_k,
     p_minimo_mcnemar,
+    recall_at_k,
     resumen_uso,
 )
 
@@ -180,6 +184,135 @@ def test_mrr_usa_la_primera_url_esperada_que_aparece() -> None:
 
     # Assert
     assert rango == pytest.approx(1 / 2)
+
+
+def test_recall_y_ndcg_con_una_fuente_en_posiciones_1_3_y_fuera_del_top() -> None:
+    """Una sola fuente en la posicion 1, en la 3 y en la 11 dan 1, 0,5 y 0."""
+    # Arrange
+    en_uno = [[URL_A]]
+    en_tres = [[URL_X, URL_Y, URL_A]]
+    fuera = [[*[f"u{posicion}" for posicion in range(1, 11)], URL_A]]
+    esperadas = [[URL_A]]
+
+    # Act
+    recall_uno = recall_at_k(en_uno, esperadas, k=K_RECALL)
+    ndcg_uno = ndcg_at_k(en_uno, esperadas, k=K_RECALL)
+    recall_tres = recall_at_k(en_tres, esperadas, k=K_RECALL)
+    ndcg_tres = ndcg_at_k(en_tres, esperadas, k=K_RECALL)
+    recall_fuera = recall_at_k(fuera, esperadas, k=K_RECALL)
+    ndcg_fuera = ndcg_at_k(fuera, esperadas, k=K_RECALL)
+
+    # Assert
+    assert recall_uno == 1.0
+    assert ndcg_uno == 1.0
+    assert recall_tres == 1.0
+    assert ndcg_tres == pytest.approx(0.5)
+    assert recall_fuera == 0.0
+    assert ndcg_fuera == 0.0
+
+
+def test_recall_y_ndcg_con_dos_fuentes_en_posiciones_distintas() -> None:
+    """Dos esperadas en las posiciones 2 y 4 dan recall 1 y su nDCG exacto."""
+    # Arrange
+    recuperadas = [[URL_X, URL_A, URL_Y, URL_B]]
+    esperadas = [[URL_A, URL_B]]
+    dcg = 1 / math.log2(3) + 1 / math.log2(5)
+    idcg = 1 + 1 / math.log2(3)
+
+    # Act
+    recall = recall_at_k(recuperadas, esperadas, k=K_RECALL)
+    ndcg = ndcg_at_k(recuperadas, esperadas, k=K_RECALL)
+
+    # Assert
+    assert recall == 1.0
+    assert ndcg == pytest.approx(dcg / idcg)
+
+
+def test_ndcg_descuenta_la_mitad_de_las_fuentes_no_encontradas() -> None:
+    """Con dos esperadas y solo una en la posicion 2, recall baja a 0,5."""
+    # Arrange
+    recuperadas = [[URL_X, URL_A]]
+    esperadas = [[URL_A, URL_B]]
+
+    # Act
+    recall = recall_at_k(recuperadas, esperadas, k=K_RECALL)
+    ndcg = ndcg_at_k(recuperadas, esperadas, k=K_RECALL)
+
+    # Assert
+    assert recall == 0.5
+    assert ndcg == pytest.approx((1 / math.log2(3)) / (1 + 1 / math.log2(3)))
+
+
+def test_recall_y_ndcg_cuentan_una_url_repetida_solo_la_primera_vez() -> None:
+    """Tres apariciones de la misma fuente en el top 10 valen como una sola."""
+    # Arrange
+    recuperadas = [[URL_X, URL_A, URL_A, URL_A]]
+    esperadas = [[URL_A]]
+
+    # Act
+    recall = recall_at_k(recuperadas, esperadas, k=K_RECALL)
+    ndcg = ndcg_at_k(recuperadas, esperadas, k=K_RECALL)
+
+    # Assert
+    assert recall == 1.0
+    assert ndcg == pytest.approx(1 / math.log2(3))
+
+
+def test_recall_y_ndcg_comparan_urls_exactamente() -> None:
+    """Una barra final no cuenta como la URL esperada."""
+    # Arrange
+    recuperadas = [[URL_A + "/"]]
+    esperadas = [[URL_A]]
+
+    # Act
+    recall = recall_at_k(recuperadas, esperadas, k=K_RECALL)
+    ndcg = ndcg_at_k(recuperadas, esperadas, k=K_RECALL)
+
+    # Assert
+    assert recall == 0.0
+    assert ndcg == 0.0
+
+
+def test_recall_y_ndcg_sin_preguntas_evaluables_devuelven_none() -> None:
+    """Las preguntas sin fuentes esperadas no entran en el promedio."""
+    # Arrange
+    recuperadas = [[URL_A], []]
+    esperadas = [[], []]
+
+    # Act
+    recall = recall_at_k(recuperadas, esperadas)
+    ndcg = ndcg_at_k(recuperadas, esperadas)
+
+    # Assert
+    assert recall is None
+    assert ndcg is None
+
+
+@pytest.mark.parametrize("k", [0, -1])
+def test_recall_y_ndcg_exigen_k_positivo(k: int) -> None:
+    """k debe ser mayor que cero en recall@k y nDCG@k."""
+    # Arrange
+    recuperadas = [[URL_A]]
+    esperadas = [[URL_A]]
+
+    # Act / Assert
+    with pytest.raises(ValueError):
+        recall_at_k(recuperadas, esperadas, k=k)
+    with pytest.raises(ValueError):
+        ndcg_at_k(recuperadas, esperadas, k=k)
+
+
+def test_recall_y_ndcg_exigen_listas_del_mismo_largo() -> None:
+    """Las listas paralelas deben tener el mismo numero de preguntas."""
+    # Arrange
+    recuperadas = [[URL_A]]
+    esperadas: list[list[str]] = []
+
+    # Act / Assert
+    with pytest.raises(ValueError):
+        recall_at_k(recuperadas, esperadas)
+    with pytest.raises(ValueError):
+        ndcg_at_k(recuperadas, esperadas)
 
 
 def test_acierta_terminos_ignora_mayusculas() -> None:

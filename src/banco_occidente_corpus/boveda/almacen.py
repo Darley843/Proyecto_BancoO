@@ -12,6 +12,8 @@ original viaja en el payload.
 
 from __future__ import annotations
 
+import atexit
+import contextlib
 import os
 import shutil
 import threading
@@ -760,6 +762,26 @@ def _soltar_compartido(almacen: QdrantAlmacen) -> None:
             del _REGISTRO_QDRANT[clave]
             break
         almacen._cerrar_cliente()
+
+
+def _cerrar_registro() -> None:
+    """Cierra al apagar los almacenes compartidos que sigan abiertos.
+
+    Es la red de seguridad para procesos que terminan sin soltar el último
+    consumidor, por ejemplo un script de medición que falla a mitad. Se ejecuta
+    con `atexit`, antes de que Python empiece a apagar el intérprete: ahí
+    `import` todavía funciona, mientras que cerrar un `QdrantClient` desde su
+    `__del__` durante el apagado deja un `ImportError` en la salida.
+    """
+    with _REGISTRO_CANDADO:
+        entradas = list(_REGISTRO_QDRANT.values())
+        _REGISTRO_QDRANT.clear()
+    for entrada in entradas:
+        with contextlib.suppress(Exception):
+            entrada.almacen._cerrar_cliente()
+
+
+atexit.register(_cerrar_registro)
 
 
 def _payload(

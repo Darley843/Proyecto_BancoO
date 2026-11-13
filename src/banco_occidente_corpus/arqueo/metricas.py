@@ -2,7 +2,8 @@
 
 Reutiliza ``asistente.metricas.leer_uso`` para no duplicar la lectura de tokens
 ni el respaldo sobre ``response_metadata.token_usage``. Las URL se comparan
-exactamente, igual que en ``test/test_preguntas_fase2.py``.
+exactamente, igual que en ``test/test_preguntas_fase2.py``. Incluye hit@k, MRR,
+recall@k y nDCG@k con relevancia binaria por URL.
 """
 
 from __future__ import annotations
@@ -18,6 +19,9 @@ from ..texto import normalizar
 
 #: Nivel de significancia usado en el informe del Arqueo.
 ALFA: float = 0.05
+
+#: Ventana de recall@k y nDCG@k del Arqueo y de la skill boveda-rag.
+K_RECALL: int = 10
 
 
 @dataclass(frozen=True, slots=True)
@@ -136,6 +140,98 @@ def mrr(
             if url in esperadas_set:
                 suma += 1.0 / posicion
                 break
+    return suma / evaluables if evaluables else None
+
+
+def _relevancias(
+    recuperadas_q: Sequence[str],
+    esperadas_q: Sequence[str],
+    k: int,
+) -> list[int]:
+    """Devuelve la ganancia binaria de cada posicion del top k.
+
+    Una URL esperada aporta 1 en su primera aparicion; si se repite mas adelante
+    dentro del top k, aporta 0. Las URL esperadas se comparan exactamente y se
+    deduplican, igual que en ``hit_at_k`` y ``mrr``.
+    """
+    esperadas_set = set(esperadas_q)
+    vistas: set[str] = set()
+    relevancias: list[int] = []
+    for url in recuperadas_q[:k]:
+        relevante = url in esperadas_set and url not in vistas
+        relevancias.append(1 if relevante else 0)
+        vistas.add(url)
+    return relevancias
+
+
+def recall_at_k(
+    recuperadas: Sequence[Sequence[str]],
+    esperadas: Sequence[Sequence[str]],
+    k: int = K_RECALL,
+) -> float | None:
+    """Proporcion de fuentes esperadas encontradas en el top k.
+
+    La relevancia es binaria y por URL: cada fuente esperada aporta 1 si
+    aparece al menos una vez entre las k primeras. Las URL se comparan
+    exactamente y las esperadas se deduplican. Solo cuentan las preguntas con
+    ``esperadas`` no vacia. Devuelve ``None`` si no hay preguntas evaluables y
+    lanza ``ValueError`` si ``k`` no es positivo.
+
+    Formula, con ``E_q`` el conjunto de fuentes esperadas y ``r_i`` la ganancia
+    de la posicion ``i``::
+
+        recall@k(q) = sum(r_i, i=1..k) / |E_q|
+    """
+    if k <= 0:
+        raise ValueError("k debe ser mayor que cero")
+    evaluables = 0
+    suma = 0.0
+    for recuperadas_q, esperadas_q in _pares(recuperadas, esperadas):
+        if not esperadas_q:
+            continue
+        evaluables += 1
+        encontradas = sum(_relevancias(recuperadas_q, esperadas_q, k))
+        suma += encontradas / len(set(esperadas_q))
+    return suma / evaluables if evaluables else None
+
+
+def ndcg_at_k(
+    recuperadas: Sequence[Sequence[str]],
+    esperadas: Sequence[Sequence[str]],
+    k: int = K_RECALL,
+) -> float | None:
+    """nDCG@k con ganancia binaria por URL y descuento ``log2(posicion + 1)``.
+
+    Cada URL esperada aporta ganancia 1 en su primera aparicion dentro del top
+    k; una repeticion posterior aporta 0. Las URL se comparan exactamente y las
+    esperadas se deduplican. El ideal usa una ganancia 1 por cada fuente
+    esperada distinta, hasta ``k``. Solo cuentan las preguntas con ``esperadas``
+    no vacia. Devuelve ``None`` si no hay preguntas evaluables y lanza
+    ``ValueError`` si ``k`` no es positivo.
+
+    Formulas, con ``r_i`` la ganancia de la posicion ``i`` y ``n_q`` el numero
+    de fuentes esperadas distintas::
+
+        DCG@k(q)  = sum(r_i / log2(i + 1), i=1..k)
+        IDCG@k(q) = sum(1 / log2(j + 1), j=1..min(n_q, k))
+        nDCG@k(q) = DCG@k(q) / IDCG@k(q)
+    """
+    if k <= 0:
+        raise ValueError("k debe ser mayor que cero")
+    evaluables = 0
+    suma = 0.0
+    for recuperadas_q, esperadas_q in _pares(recuperadas, esperadas):
+        if not esperadas_q:
+            continue
+        evaluables += 1
+        relevancias = _relevancias(recuperadas_q, esperadas_q, k)
+        dcg = sum(
+            ganancia / math.log2(posicion + 1)
+            for posicion, ganancia in enumerate(relevancias, start=1)
+        )
+        ideales = min(len(set(esperadas_q)), k)
+        idcg = sum(1.0 / math.log2(posicion + 1) for posicion in range(1, ideales + 1))
+        suma += dcg / idcg
     return suma / evaluables if evaluables else None
 
 

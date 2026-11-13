@@ -657,6 +657,8 @@ def _resultado_json(configuracion: ResultadoConfiguracion) -> dict[str, Any]:
         "por_defecto": configuracion.por_defecto,
         "hit_at_5": _redondear(configuracion.metricas.hit_at_5),
         "mrr": _redondear(configuracion.metricas.mrr),
+        "recall_at_10": _redondear(configuracion.metricas.recall_at_10),
+        "ndcg_at_10": _redondear(configuracion.metricas.ndcg_at_10),
         "evaluables": configuracion.metricas.evaluables,
         "aciertos": configuracion.metricas.aciertos,
         "intervalo95": _intervalo_json(configuracion.metricas.intervalo95),
@@ -674,6 +676,8 @@ def _metricas_json(metricas: MetricasRecuperacion) -> dict[str, Any]:
         "aciertos": metricas.aciertos,
         "hit_at_5": _redondear(metricas.hit_at_5),
         "mrr": _redondear(metricas.mrr),
+        "recall_at_10": _redondear(metricas.recall_at_10),
+        "ndcg_at_10": _redondear(metricas.ndcg_at_10),
         "intervalo95": _intervalo_json(metricas.intervalo95),
     }
 
@@ -956,6 +960,14 @@ def render_markdown(arqueo: Mapping[str, Any], ficha: FichaCorrida) -> str:
         "- **hit@5**: proporcion de preguntas con al menos una URL esperada entre los "
         "cinco primeros fragmentos. Solo cuentan las preguntas con fuente.",
         "- **MRR**: media del inverso de la posicion de la primera URL esperada.",
+        "- **recall@10**: proporcion de fuentes esperadas distintas que aparecen en "
+        "el top 10. Cada pregunta con fuente pesa lo mismo.",
+        "- **nDCG@10**: ganancia binaria por URL con descuento `log2(posicion + 1)`; "
+        "una URL repetida cuenta solo la primera vez y el ideal usa las fuentes "
+        "esperadas hasta 10.",
+        "- **Dos busquedas**: hit@5 y MRR usan una busqueda de 5 resultados; "
+        "recall@10 y nDCG@10 usan otra de 10. No se reutiliza la busqueda larga "
+        "porque en el hibrido cambiaria la fusion de `EnsembleRetriever`.",
         "- **Wilson 95 %**: intervalo de confianza del hit@5; con 36 preguntas es ancho y "
         "no conviene leer diferencias pequenas como mejoras.",
         "- **Comparacion principal**: fijada de antemano, pesos por defecto frente a "
@@ -966,8 +978,9 @@ def render_markdown(arqueo: Mapping[str, Any], ficha: FichaCorrida) -> str:
         "",
         "## Recuperacion por configuracion",
         "",
-        "| Configuracion | Prefijos | Evaluables | Aciertos | hit@5 | Wilson 95 % | MRR |",
-        "|---|---|---:|---:|---:|---|---:|",
+        "| Configuracion | Prefijos | Evaluables | Aciertos | hit@5 | Wilson 95 % | MRR | "
+        "recall@10 | nDCG@10 |",
+        "|---|---|---:|---:|---:|---|---:|---:|---:|",
     ]
     for configuracion in arqueo["recuperacion"]:
         etiqueta = configuracion["etiqueta"]
@@ -978,37 +991,43 @@ def render_markdown(arqueo: Mapping[str, Any], ficha: FichaCorrida) -> str:
             f"| {etiqueta} | {_si_no(configuracion['prefijos'])} | "
             f"{configuracion['evaluables']} | {configuracion['aciertos']} | "
             f"{_num(configuracion['hit_at_5'])} | {_rango(intervalo)} | "
-            f"{_num(configuracion['mrr'])} |"
+            f"{_num(configuracion['mrr'])} | {_num(configuracion['recall_at_10'])} | "
+            f"{_num(configuracion['ndcg_at_10'])} |"
         )
 
     lineas += [
         "",
         "## Por tipo de pregunta",
         "",
-        "| Configuracion | Tipo | Evaluables | hit@5 | MRR |",
-        "|---|---|---:|---:|---:|",
+        "| Configuracion | Tipo | Evaluables | hit@5 | MRR | recall@10 | nDCG@10 |",
+        "|---|---|---:|---:|---:|---:|---:|",
     ]
     for configuracion in arqueo["recuperacion"]:
         for tipo, metricas in configuracion["por_tipo"].items():
             lineas.append(
                 f"| {configuracion['etiqueta']} | {tipo} | {metricas['evaluables']} | "
-                f"{_num(metricas['hit_at_5'])} | {_num(metricas['mrr'])} |"
+                f"{_num(metricas['hit_at_5'])} | {_num(metricas['mrr'])} | "
+                f"{_num(metricas['recall_at_10'])} | {_num(metricas['ndcg_at_10'])} |"
             )
 
     lineas += [
         "",
         "## Boveda frente a Tablero",
         "",
-        "hit@5 con las 36 evaluables y sin las preguntas de ruta T:",
+        "hit@5, MRR, recall@10 y nDCG@10 con las 36 evaluables y sin las preguntas de ruta T:",
         "",
-        "| Configuracion | hit@5 (36) | hit@5 (sin T) | MRR (36) | MRR (sin T) |",
-        "|---|---:|---:|---:|---:|",
+        "| Configuracion | hit@5 (36) | hit@5 (sin T) | MRR (36) | MRR (sin T) | "
+        "recall@10 (36) | recall@10 (sin T) | nDCG@10 (36) | nDCG@10 (sin T) |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|---:|",
     ]
     for configuracion in arqueo["recuperacion"]:
+        sin_tablero = configuracion["sin_tablero"]
         lineas.append(
             f"| {configuracion['etiqueta']} | {_num(configuracion['hit_at_5'])} | "
-            f"{_num(configuracion['sin_tablero']['hit_at_5'])} | "
-            f"{_num(configuracion['mrr'])} | {_num(configuracion['sin_tablero']['mrr'])} |"
+            f"{_num(sin_tablero['hit_at_5'])} | {_num(configuracion['mrr'])} | "
+            f"{_num(sin_tablero['mrr'])} | {_num(configuracion['recall_at_10'])} | "
+            f"{_num(sin_tablero['recall_at_10'])} | {_num(configuracion['ndcg_at_10'])} | "
+            f"{_num(sin_tablero['ndcg_at_10'])} |"
         )
 
     principal = arqueo["mcnemar_pesos"]
@@ -1170,6 +1189,9 @@ def render_markdown(arqueo: Mapping[str, Any], ficha: FichaCorrida) -> str:
         "- `hit_at_5` y `mrr` comparan las URL exactamente. El script del anexo A "
         "normalizaba minusculas y barra final; el JSON informa en `avisos` si esa regla "
         "cambia algun resultado.",
+        "- `recall_at_10` y `ndcg_at_10` comparan las URL exactamente, deduplican las "
+        "fuentes esperadas y una URL repetida en el top 10 solo cuenta en su primera "
+        "aparicion. Se miden con una busqueda separada de 10 resultados.",
         "- `EnsembleRetriever` deduplica por `page_content`. Si dos fragmentos comparten "
         "texto, `1/0` puede devolver menos de cinco resultados que una busqueda vectorial "
         "directa; la diferencia se cuenta, no se corrige en el recuperador.",

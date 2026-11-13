@@ -4,10 +4,10 @@ Reporte reproducible de recuperacion, evaluacion y costo de la fase 2. Se genera
 
 ## Ficha de corrida
 
-- Commit: `3295903`.
+- Commit: `c4800af`.
 - Alcance del indice: `base`.
-- Indice con prefijos: `data/boveda/indice.json` con modelo `nomic-embed-text-v2-moe`, prefijos si, 874 fragmentos y dimension 768.
-- Indice sin prefijos: `data/boveda/experimentos/sin_prefijos/indice.json` con 874 fragmentos y dimension 768.
+- Indice con prefijos: `data/boveda/indice.json` con modelo `nomic-embed-text-v2-moe`, prefijos si, 869 fragmentos y dimension 768.
+- Indice sin prefijos: `data/boveda/experimentos/sin_prefijos/indice.json` con 869 fragmentos y dimension 768.
 - Configuracion: `k=5`, pesos por defecto `0.6/0.4`, confianza `0.95` para los intervalos de Wilson.
 - Preguntas: 44 (alcance 20, tabla 12, seguimiento 6, fuera 6); 36 con fuente; 22 evaluables de la Boveda (ruta B) y 14 del Tablero (ruta T).
 
@@ -17,68 +17,71 @@ Este es el formato de corrida que puede reutilizar la skill `boveda-rag`: commit
 
 - **hit@5**: proporcion de preguntas con al menos una URL esperada entre los cinco primeros fragmentos. Solo cuentan las preguntas con fuente.
 - **MRR**: media del inverso de la posicion de la primera URL esperada.
+- **recall@10**: proporcion de fuentes esperadas distintas que aparecen en el top 10. Cada pregunta con fuente pesa lo mismo.
+- **nDCG@10**: ganancia binaria por URL con descuento `log2(posicion + 1)`; una URL repetida cuenta solo la primera vez y el ideal usa las fuentes esperadas hasta 10.
+- **Dos busquedas**: hit@5 y MRR usan una busqueda de 5 resultados; recall@10 y nDCG@10 usan otra de 10. No se reutiliza la busqueda larga porque en el hibrido cambiaria la fusion de `EnsembleRetriever`.
 - **Wilson 95 %**: intervalo de confianza del hit@5; con 36 preguntas es ancho y no conviene leer diferencias pequenas como mejoras.
 - **Comparacion principal**: fijada de antemano, pesos por defecto frente a `1/0` sobre las preguntas de ruta B, con McNemar exacto. Las demas configuraciones son exploratorias: no se declara ganador por significancia.
 - **Ruta T**: la respuesta real viene del Tablero, no de la Boveda; su hit@5 se reporta aparte para no atribuir a la Boveda lo que resuelve el Tablero.
 
 ## Recuperacion por configuracion
 
-| Configuracion | Prefijos | Evaluables | Aciertos | hit@5 | Wilson 95 % | MRR |
-|---|---|---:|---:|---:|---|---:|
-| 1/0 | si | 36 | 27 | 0.7500 | 0.5893 a 0.8625 | 0.5769 |
-| 0/1 | si | 36 | 19 | 0.5278 | 0.3701 a 0.6801 | 0.3866 |
-| 0.2/0.8 | si | 36 | 19 | 0.5278 | 0.3701 a 0.6801 | 0.4231 |
-| 0.4/0.6 | si | 36 | 19 | 0.5278 | 0.3701 a 0.6801 | 0.4231 |
-| 0.6/0.4 (por defecto) | si | 36 | 27 | 0.7500 | 0.5893 a 0.8625 | 0.5838 |
-| 0.8/0.2 | si | 36 | 27 | 0.7500 | 0.5893 a 0.8625 | 0.5653 |
-| 0.6/0.4 sin prefijos | no | 36 | 27 | 0.7500 | 0.5893 a 0.8625 | 0.6176 |
+| Configuracion | Prefijos | Evaluables | Aciertos | hit@5 | Wilson 95 % | MRR | recall@10 | nDCG@10 |
+|---|---|---:|---:|---:|---|---:|---:|---:|
+| 1/0 | si | 36 | 27 | 0.7500 | 0.5893 a 0.8625 | 0.5792 | 0.8241 | 0.6473 |
+| 0/1 | si | 36 | 19 | 0.5278 | 0.3701 a 0.6801 | 0.3866 | 0.6111 | 0.4487 |
+| 0.2/0.8 | si | 36 | 19 | 0.5278 | 0.3701 a 0.6801 | 0.4231 | 0.6111 | 0.5100 |
+| 0.4/0.6 | si | 36 | 19 | 0.5278 | 0.3701 a 0.6801 | 0.4231 | 0.6111 | 0.5192 |
+| 0.6/0.4 (por defecto) | si | 36 | 27 | 0.7500 | 0.5893 a 0.8625 | 0.5838 | 0.8241 | 0.6362 |
+| 0.8/0.2 | si | 36 | 27 | 0.7500 | 0.5893 a 0.8625 | 0.5653 | 0.8241 | 0.6259 |
+| 0.6/0.4 sin prefijos | no | 36 | 27 | 0.7500 | 0.5893 a 0.8625 | 0.6176 | 0.8148 | 0.6416 |
 
 ## Por tipo de pregunta
 
-| Configuracion | Tipo | Evaluables | hit@5 | MRR |
-|---|---|---:|---:|---:|
-| 1/0 | alcance | 18 | 0.6111 | 0.4694 |
-| 1/0 | tabla | 12 | 1.0000 | 0.8111 |
-| 1/0 | seguimiento | 6 | 0.6667 | 0.4306 |
-| 1/0 | fuera | 0 | — | — |
-| 0/1 | alcance | 18 | 0.3333 | 0.1574 |
-| 0/1 | tabla | 12 | 0.8333 | 0.7778 |
-| 0/1 | seguimiento | 6 | 0.5000 | 0.2917 |
-| 0/1 | fuera | 0 | — | — |
-| 0.2/0.8 | alcance | 18 | 0.3333 | 0.2241 |
-| 0.2/0.8 | tabla | 12 | 0.8333 | 0.7917 |
-| 0.2/0.8 | seguimiento | 6 | 0.5000 | 0.2833 |
-| 0.2/0.8 | fuera | 0 | — | — |
-| 0.4/0.6 | alcance | 18 | 0.3333 | 0.2241 |
-| 0.4/0.6 | tabla | 12 | 0.8333 | 0.7917 |
-| 0.4/0.6 | seguimiento | 6 | 0.5000 | 0.2833 |
-| 0.4/0.6 | fuera | 0 | — | — |
-| 0.6/0.4 | alcance | 18 | 0.6111 | 0.4833 |
-| 0.6/0.4 | tabla | 12 | 1.0000 | 0.8667 |
-| 0.6/0.4 | seguimiento | 6 | 0.6667 | 0.3194 |
-| 0.6/0.4 | fuera | 0 | — | — |
-| 0.8/0.2 | alcance | 18 | 0.6111 | 0.4463 |
-| 0.8/0.2 | tabla | 12 | 1.0000 | 0.8667 |
-| 0.8/0.2 | seguimiento | 6 | 0.6667 | 0.3194 |
-| 0.8/0.2 | fuera | 0 | — | — |
-| 0.6/0.4 sin prefijos | alcance | 18 | 0.6111 | 0.4389 |
-| 0.6/0.4 sin prefijos | tabla | 12 | 1.0000 | 0.9028 |
-| 0.6/0.4 sin prefijos | seguimiento | 6 | 0.6667 | 0.5833 |
-| 0.6/0.4 sin prefijos | fuera | 0 | — | — |
+| Configuracion | Tipo | Evaluables | hit@5 | MRR | recall@10 | nDCG@10 |
+|---|---|---:|---:|---:|---:|---:|
+| 1/0 | alcance | 18 | 0.6111 | 0.4741 | 0.7037 | 0.5425 |
+| 1/0 | tabla | 12 | 1.0000 | 0.8111 | 1.0000 | 0.8561 |
+| 1/0 | seguimiento | 6 | 0.6667 | 0.4306 | 0.8333 | 0.5440 |
+| 1/0 | fuera | 0 | — | — | — | — |
+| 0/1 | alcance | 18 | 0.3333 | 0.1574 | 0.4444 | 0.2383 |
+| 0/1 | tabla | 12 | 0.8333 | 0.7778 | 0.9167 | 0.8168 |
+| 0/1 | seguimiento | 6 | 0.5000 | 0.2917 | 0.5000 | 0.3436 |
+| 0/1 | fuera | 0 | — | — | — | — |
+| 0.2/0.8 | alcance | 18 | 0.3333 | 0.2241 | 0.4444 | 0.3553 |
+| 0.2/0.8 | tabla | 12 | 0.8333 | 0.7917 | 0.9167 | 0.8333 |
+| 0.2/0.8 | seguimiento | 6 | 0.5000 | 0.2833 | 0.5000 | 0.3274 |
+| 0.2/0.8 | fuera | 0 | — | — | — | — |
+| 0.4/0.6 | alcance | 18 | 0.3333 | 0.2241 | 0.4444 | 0.3664 |
+| 0.4/0.6 | tabla | 12 | 0.8333 | 0.7917 | 0.9167 | 0.8442 |
+| 0.4/0.6 | seguimiento | 6 | 0.5000 | 0.2833 | 0.5000 | 0.3274 |
+| 0.4/0.6 | fuera | 0 | — | — | — | — |
+| 0.6/0.4 | alcance | 18 | 0.6111 | 0.4833 | 0.7037 | 0.5184 |
+| 0.6/0.4 | tabla | 12 | 1.0000 | 0.8667 | 1.0000 | 0.9028 |
+| 0.6/0.4 | seguimiento | 6 | 0.6667 | 0.3194 | 0.8333 | 0.4563 |
+| 0.6/0.4 | fuera | 0 | — | — | — | — |
+| 0.8/0.2 | alcance | 18 | 0.6111 | 0.4463 | 0.7037 | 0.4979 |
+| 0.8/0.2 | tabla | 12 | 1.0000 | 0.8667 | 1.0000 | 0.9028 |
+| 0.8/0.2 | seguimiento | 6 | 0.6667 | 0.3194 | 0.8333 | 0.4563 |
+| 0.8/0.2 | fuera | 0 | — | — | — | — |
+| 0.6/0.4 sin prefijos | alcance | 18 | 0.6111 | 0.4389 | 0.6852 | 0.4928 |
+| 0.6/0.4 sin prefijos | tabla | 12 | 1.0000 | 0.9028 | 1.0000 | 0.9077 |
+| 0.6/0.4 sin prefijos | seguimiento | 6 | 0.6667 | 0.5833 | 0.8333 | 0.5555 |
+| 0.6/0.4 sin prefijos | fuera | 0 | — | — | — | — |
 
 ## Boveda frente a Tablero
 
-hit@5 con las 36 evaluables y sin las preguntas de ruta T:
+hit@5, MRR, recall@10 y nDCG@10 con las 36 evaluables y sin las preguntas de ruta T:
 
-| Configuracion | hit@5 (36) | hit@5 (sin T) | MRR (36) | MRR (sin T) |
-|---|---:|---:|---:|---:|
-| 1/0 | 0.7500 | 0.6364 | 0.5769 | 0.4902 |
-| 0/1 | 0.5278 | 0.4091 | 0.3866 | 0.2083 |
-| 0.2/0.8 | 0.5278 | 0.4091 | 0.4231 | 0.2606 |
-| 0.4/0.6 | 0.5278 | 0.4091 | 0.4231 | 0.2606 |
-| 0.6/0.4 | 0.7500 | 0.6364 | 0.5838 | 0.4712 |
-| 0.8/0.2 | 0.7500 | 0.6364 | 0.5653 | 0.4409 |
-| 0.6/0.4 sin prefijos | 0.7500 | 0.6364 | 0.6176 | 0.4955 |
+| Configuracion | hit@5 (36) | hit@5 (sin T) | MRR (36) | MRR (sin T) | recall@10 (36) | recall@10 (sin T) | nDCG@10 (36) | nDCG@10 (sin T) |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| 1/0 | 0.7500 | 0.6364 | 0.5792 | 0.4939 | 0.8241 | 0.7121 | 0.6473 | 0.5575 |
+| 0/1 | 0.5278 | 0.4091 | 0.3866 | 0.2083 | 0.6111 | 0.5000 | 0.4487 | 0.2887 |
+| 0.2/0.8 | 0.5278 | 0.4091 | 0.4231 | 0.2606 | 0.6111 | 0.5000 | 0.5100 | 0.3800 |
+| 0.4/0.6 | 0.5278 | 0.4091 | 0.4231 | 0.2606 | 0.6111 | 0.5000 | 0.5192 | 0.3891 |
+| 0.6/0.4 | 0.7500 | 0.6364 | 0.5838 | 0.4712 | 0.8241 | 0.7121 | 0.6362 | 0.5159 |
+| 0.8/0.2 | 0.7500 | 0.6364 | 0.5653 | 0.4409 | 0.8241 | 0.7121 | 0.6259 | 0.4991 |
+| 0.6/0.4 sin prefijos | 0.7500 | 0.6364 | 0.6176 | 0.4955 | 0.8148 | 0.6970 | 0.6416 | 0.5117 |
 
 ## Comparacion principal: pesos por defecto frente a 1/0
 
@@ -107,7 +110,7 @@ Posicion 1 a 5 de la primera URL esperada en el top 5; `—` significa que no ap
 | 9 | alcance | B | si | 1 | 1 | igual |
 | 10 | alcance | B | si | — | — | igual (fuera) |
 | 11 | alcance | B | si | 1 | 1 | igual |
-| 12 | alcance | B | si | 4 | 1 | gana hibrido |
+| 12 | alcance | B | si | 3 | 1 | gana hibrido |
 | 13 | alcance | B | si | — | — | igual (fuera) |
 | 14 | alcance | B | — | — | — | igual (fuera) |
 | 15 | alcance | B | si | 5 | 5 | igual |
@@ -191,7 +194,7 @@ Referencia medida por el grupo con el script del anexo A sobre 36 preguntas con 
 
 | Configuracion | hit@5 esperado | hit@5 medido | MRR esperado | MRR medido |
 |---|---:|---:|---:|---:|
-| 1/0 | 0.6400 | 0.7500 | 0.5200 | 0.5769 |
+| 1/0 | 0.6400 | 0.7500 | 0.5200 | 0.5792 |
 | por_defecto | 0.6400 | 0.7500 | 0.4800 | 0.5838 |
 
 Diferencias por normalizacion de URL y por deduplicacion de texto se reportan como avisos del JSON y en la seccion de limites.
@@ -203,6 +206,7 @@ Diferencias por normalizacion de URL y por deduplicacion de texto se reportan co
 - El acierto se mide por URL, no por fragmento: una pregunta cuenta como acierto si aparece la pagina esperada aunque el fragmento con el dato no este en el top 5 (por ejemplo, la pregunta 7 y el fragmento de la fundacion en 1965).
 - El set no nombra el banco en sus preguntas. La prueba de robustez del #85 (indice de 893 fragmentos) mostro que agregar la marca a la consulta baja el hit@5 de 0.75 a 0.53 (McNemar p de 0.02).
 - `hit_at_5` y `mrr` comparan las URL exactamente. El script del anexo A normalizaba minusculas y barra final; el JSON informa en `avisos` si esa regla cambia algun resultado.
+- `recall_at_10` y `ndcg_at_10` comparan las URL exactamente, deduplican las fuentes esperadas y una URL repetida en el top 10 solo cuenta en su primera aparicion. Se miden con una busqueda separada de 10 resultados.
 - `EnsembleRetriever` deduplica por `page_content`. Si dos fragmentos comparten texto, `1/0` puede devolver menos de cinco resultados que una busqueda vectorial directa; la diferencia se cuenta, no se corrige en el recuperador.
 - `citas_correctas` no se compara entre versiones: v1 usa el campo `fuente` de `resultados.jsonl`, que registra una sola URL por respuesta, y v2 usa la lista `metricas["fuentes"]` con todas las URL citadas.
 - El barrido tiene en la practica dos estados. `EnsembleRetriever` fusiona por rangos reciprocos (peso / (posicion + 60)): con esa constante el orden depende sobre todo de que peso supera 0.5, no de su valor exacto. Dentro de cada lado (peso vectorial menor o mayor que 0.5) el hit@5 casi no cambia; lo que cambia es el orden dentro del top 5, que se ve en el MRR.

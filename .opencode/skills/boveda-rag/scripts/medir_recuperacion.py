@@ -1,4 +1,7 @@
-"""Mide hit@5 y MRR de la Bóveda sobre el set de preguntas de fase 2.
+"""Mide hit@5, MRR, recall@10 y nDCG@10 de la Bóveda sobre las preguntas de fase 2.
+
+hit@5 y MRR usan una búsqueda de 5 resultados; recall@10 y nDCG@10 usan una
+segunda búsqueda de 10, para no cambiar la fusión del recuperador híbrido.
 
 Uso:
     uv run python .opencode/skills/boveda-rag/scripts/medir_recuperacion.py
@@ -32,9 +35,20 @@ from typing import Any
 
 import httpx
 from langchain_core.documents import Document
+from langchain_core.embeddings import Embeddings
 
-from banco_occidente_corpus.arqueo.metricas import hit_at_k, mrr
-from banco_occidente_corpus.boveda.almacen import crear_almacen
+from banco_occidente_corpus.arqueo.metricas import (
+    K_RECALL,
+    hit_at_k,
+    mrr,
+    ndcg_at_k,
+    recall_at_k,
+)
+from banco_occidente_corpus.boveda.almacen import (
+    AlmacenVectorial,
+    cerrar_almacen,
+    crear_almacen,
+)
 from banco_occidente_corpus.boveda.configuracion import (
     ConfiguracionRecuperacion,
     cargar_configuracion_recuperacion,
@@ -72,6 +86,18 @@ Recuperar = Callable[[str, int], Sequence[str]]
 
 
 @dataclass(frozen=True, slots=True)
+class RecuperadorAbierto:
+    """Recuperador de la medición y el almacén que hay que cerrar al terminar."""
+
+    recuperar: Recuperar
+    almacen: AlmacenVectorial
+
+    def cerrar(self) -> None:
+        """Cierra el almacén abierto por `construir_recuperador`."""
+        cerrar_almacen(self.almacen)
+
+
+@dataclass(frozen=True, slots=True)
 class Pregunta:
     """Pregunta evaluable con sus fuentes esperadas."""
 
@@ -92,6 +118,8 @@ class Resultado:
     distintas: tuple[str, ...]
     acierto: bool
     rr: float
+    recall_at_10: float
+    ndcg_at_10: float
     acierto_distintas: bool
     rr_distintas: float
 
@@ -234,12 +262,16 @@ def evaluar(
     con_marca: bool = False,
     sin_marca: bool = False,
 ) -> list[Resultado]:
-    """Recupera y puntúa cada pregunta con `hit_at_k` y `mrr` del Arqueo.
+    """Recupera y puntúa cada pregunta con las métricas del Arqueo.
 
-    Con `con_marca`, inyecta la marca antes de buscar; con `sin_marca`, la
-    limpia. Si se activan ambos, primero se inyecta y después se retira.
+    hit@5 y MRR se calculan con una búsqueda de `k` resultados; recall@10 y
+    nDCG@10, con otra búsqueda de `K_RECALL`, para no alterar la fusión del
+    recuperador híbrido. Con `con_marca`, inyecta la marca antes de buscar; con
+    `sin_marca`, la limpia. Si se activan ambos, primero se inyecta y después se
+    retira.
     """
     resultados: list[Resultado] = []
+    limite_recall = max(k, K_RECALL)
     for pregunta in preguntas:
         consulta = consulta_de(pregunta)
         if con_marca:
@@ -247,6 +279,7 @@ def evaluar(
         if sin_marca:
             consulta = limpiar_marca(consulta)
         recuperadas = tuple(recuperar(consulta, k))
+        recuperadas_recall = tuple(recuperar(consulta, limite_recall))
         distintas = urls_distintas(recuperadas, k)
         esperadas = [pregunta.fuentes_esperadas]
         resultados.append(
@@ -257,6 +290,8 @@ def evaluar(
                 distintas=distintas,
                 acierto=bool(hit_at_k([recuperadas], esperadas, k)),
                 rr=float(mrr([recuperadas], esperadas, k) or 0.0),
+                recall_at_10=float(recall_at_k([recuperadas_recall], esperadas, K_RECALL) or 0.0),
+                ndcg_at_10=float(ndcg_at_k([recuperadas_recall], esperadas, K_RECALL) or 0.0),
                 acierto_distintas=bool(hit_at_k([distintas], esperadas, k)),
                 rr_distintas=float(mrr([distintas], esperadas, k) or 0.0),
             )
@@ -265,7 +300,7 @@ def evaluar(
 
 
 def resumir(resultados: Sequence[Resultado], k: int = K_POR_DEFECTO) -> dict[str, Any]:
-    """Agrega hit@k y MRR por tipo y en total, con el intervalo de Wilson."""
+    """Agrega hit@k, MRR, recall@10 y nDCG@10 por tipo y en total."""
     tipos = sorted({resultado.pregunta.tipo for resultado in resultados})
     grupos: dict[str, list[Resultado]] = {"total": list(resultados)}
     for tipo in tipos:
@@ -280,6 +315,8 @@ def resumir(resultados: Sequence[Resultado], k: int = K_POR_DEFECTO) -> dict[str
             "n": len(grupo),
             "hit_at_k": _redondear(hit_at_k(recuperadas, esperadas, k)),
             "mrr": _redondear(mrr(recuperadas, esperadas, k)),
+            "recall_at_10": _redondear(_promedio([resultado.recall_at_10 for resultado in grupo])),
+            "ndcg_at_10": _redondear(_promedio([resultado.ndcg_at_10 for resultado in grupo])),
             "hit_at_k_distintas": _redondear(hit_at_k(distintas, esperadas, k)),
             "mrr_distintas": _redondear(mrr(distintas, esperadas, k)),
         }
@@ -303,15 +340,18 @@ def formatear(resumen: dict[str, Any]) -> str:
     """Devuelve la tabla legible de la medición."""
     k = int(resumen["k"])
     lineas = [
-        f"{'Tipo':<12} {'n':>4} {f'hit@{k}':>8} {'MRR':>8} {f'hit@{k}*':>9} {'MRR*':>8}",
-        "-" * 56,
+        f"{'Tipo':<12} {'n':>4} {f'hit@{k}':>8} {'MRR':>8} {'recall@10':>10} "
+        f"{'nDCG@10':>9} {f'hit@{k}*':>9} {'MRR*':>8}",
+        "-" * 87,
     ]
     orden = ["total", *sorted(resumen["por_tipo"])]
     for nombre in orden:
         fila = resumen["total"] if nombre == "total" else resumen["por_tipo"][nombre]
         lineas.append(
             f"{nombre:<12} {fila['n']:>4} {_texto(fila['hit_at_k']):>8} "
-            f"{_texto(fila['mrr']):>8} {_texto(fila['hit_at_k_distintas']):>9} "
+            f"{_texto(fila['mrr']):>8} {_texto(fila['recall_at_10']):>10} "
+            f"{_texto(fila['ndcg_at_10']):>9} "
+            f"{_texto(fila['hit_at_k_distintas']):>9} "
             f"{_texto(fila['mrr_distintas']):>8}"
         )
     inferior, superior = resumen["intervalo_wilson_95"]
@@ -349,6 +389,8 @@ def guardar_salida(
             "distintas": list(resultado.distintas),
             "acierto": resultado.acierto,
             "rr": round(resultado.rr, 6),
+            "recall_at_10": round(resultado.recall_at_10, 6),
+            "ndcg_at_10": round(resultado.ndcg_at_10, 6),
             "acierto_distintas": resultado.acierto_distintas,
             "rr_distintas": round(resultado.rr_distintas, 6),
         }
@@ -370,16 +412,19 @@ def guardar_salida(
     )
 
 
-def construir_recuperador(
+def _crear_recuperador_ventana(
     config: Config,
     modo: str,
     alcance: Alcance,
-    k: int,
+    ventana: int,
+    *,
+    almacen: AlmacenVectorial,
+    embeddings: Embeddings,
 ) -> Recuperar:
-    """Devuelve la función de recuperación del modo pedido.
+    """Devuelve la función de recuperación para una ventana de resultados.
 
-    Raises:
-        FileNotFoundError: si falta el índice o los fragmentos del alcance.
+    Recibe el almacén y los embeddings ya abiertos para no abrir dos veces el
+    índice persistente al construir la ventana corta y la larga.
     """
     if modo == "hibrido":
         ajustes = cargar_configuracion_recuperacion()
@@ -387,24 +432,21 @@ def construir_recuperador(
             config,
             alcance,
             configuracion=ConfiguracionRecuperacion(
-                k=k,
+                k=ventana,
                 peso_vectorial=ajustes.peso_vectorial,
                 peso_bm25=ajustes.peso_bm25,
             ),
+            embeddings=embeddings,
+            almacen=almacen,
         )
         return lambda consulta, limite: [
             fragmento.url for fragmento in recuperador.buscar(consulta, limite)
         ]
 
-    if not ruta_almacen(config).exists():
-        raise FileNotFoundError(
-            f"No hay índice en {ruta_almacen(config)}: ejecuta `make indice` antes de medir."
-        )
-    comprobar_almacen(config)
     vectorial = RecuperadorVectorial(
-        almacen=crear_almacen(config),
-        embeddings=crear_embeddings(),
-        k=k,
+        almacen=almacen,
+        embeddings=embeddings,
+        k=ventana,
     )
 
     def recuperar(consulta: str, limite: int) -> list[str]:
@@ -413,6 +455,63 @@ def construir_recuperador(
         return [str(documento.metadata.get("url", "")) for documento in documentos]
 
     return recuperar
+
+
+def construir_recuperador(
+    config: Config,
+    modo: str,
+    alcance: Alcance,
+    k: int,
+) -> RecuperadorAbierto:
+    """Devuelve la función de recuperación con una ventana corta y otra larga.
+
+    hit@5 y MRR llaman con ``k``; recall@10 y nDCG@10 llaman con
+    ``max(k, K_RECALL)``. Se construyen dos recuperadores, uno por ventana, para
+    no alterar la fusión del híbrido. El almacén queda abierto mientras dure la
+    medición y lo cierra quien recibe el resultado (ver `RecuperadorAbierto`).
+
+    Raises:
+        FileNotFoundError: si falta el índice o los fragmentos del alcance.
+    """
+    if not ruta_almacen(config).exists():
+        raise FileNotFoundError(
+            f"No hay índice en {ruta_almacen(config)}: ejecuta `make indice` antes de medir."
+        )
+    comprobar_almacen(config)
+    almacen = crear_almacen(config)
+    try:
+        embeddings = crear_embeddings()
+        corta = _crear_recuperador_ventana(
+            config,
+            modo,
+            alcance,
+            k,
+            almacen=almacen,
+            embeddings=embeddings,
+        )
+        larga = _crear_recuperador_ventana(
+            config,
+            modo,
+            alcance,
+            K_RECALL,
+            almacen=almacen,
+            embeddings=embeddings,
+        )
+    except Exception:
+        cerrar_almacen(almacen)
+        raise
+
+    def recuperar(consulta: str, limite: int) -> list[str]:
+        """Elige la búsqueda corta o la larga según el límite pedido."""
+        usar_larga = limite > k and limite >= K_RECALL
+        return larga(consulta, limite) if usar_larga else corta(consulta, limite)
+
+    return RecuperadorAbierto(recuperar=recuperar, almacen=almacen)
+
+
+def _promedio(valores: Sequence[float]) -> float | None:
+    """Promedia una lista de métricas; devuelve `None` si está vacía."""
+    return sum(valores) / len(valores) if valores else None
 
 
 def _redondear(valor: float | None) -> float | None:
@@ -474,7 +573,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     _configurar_salida()
     parser = argparse.ArgumentParser(
         prog="medir_recuperacion.py",
-        description="Mide hit@k y MRR de la Bóveda sobre las preguntas de fase 2.",
+        description=(
+            "Mide hit@k, MRR, recall@10 y nDCG@10 de la Bóveda sobre las preguntas de fase 2."
+        ),
     )
     parser.add_argument("--hibrido", action="store_true", help="usa el recuperador híbrido")
     parser.add_argument(
@@ -487,7 +588,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         action="store_true",
         help="retira las menciones de la marca de la consulta antes de buscar",
     )
-    parser.add_argument("--k", type=int, default=K_POR_DEFECTO, help="fragmentos a recuperar")
+    parser.add_argument(
+        "--k",
+        type=int,
+        default=K_POR_DEFECTO,
+        help=(
+            f"ventana de hit@k y MRR; recall@10 y nDCG@10 usan siempre una búsqueda de {K_RECALL}"
+        ),
+    )
     parser.add_argument(
         "--alcance",
         choices=("base", "completo"),
@@ -534,16 +642,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     else:
         print(f"Modo: solo vectorial (k={args.k})", flush=True)
 
+    abierto: RecuperadorAbierto | None = None
     try:
         preguntas = cargar_preguntas(args.preguntas)
         if not preguntas:
             print("Error: no hay preguntas con fuentes esperadas.", file=sys.stderr)
             return 1
         config = load_config()
-        recuperar = construir_recuperador(config, modo, args.alcance, args.k)
+        abierto = construir_recuperador(config, modo, args.alcance, args.k)
         resultados = evaluar(
             preguntas,
-            recuperar,
+            abierto.recuperar,
             args.k,
             con_marca=args.con_marca,
             sin_marca=args.sin_marca,
@@ -551,6 +660,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     except (FileNotFoundError, ValueError, RuntimeError, httpx.HTTPError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
+    finally:
+        if abierto is not None:
+            abierto.cerrar()
 
     resumen = resumir(resultados, args.k)
     print(formatear(resumen))

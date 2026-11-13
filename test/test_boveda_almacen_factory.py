@@ -12,8 +12,10 @@ from langchain_core.embeddings import DeterministicFakeEmbedding
 from banco_occidente_corpus.boveda.almacen import (
     ChromaAlmacen,
     QdrantAlmacen,
+    cerrar_almacen,
     crear_almacen,
     crear_almacen_en,
+    crear_almacen_en_ruta,
 )
 from banco_occidente_corpus.boveda.configuracion import (
     ConfiguracionAlmacen,
@@ -191,6 +193,28 @@ def test_construir_indice_cierra_el_almacen_creado(
 
     assert falso.reinicios == 1
     assert falso.cerrada is True
+
+
+def test_cerrar_registro_suelta_los_almacenes_abiertos(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """La red de atexit cierra el registro y libera la carpeta para otro consumidor."""
+    from banco_occidente_corpus.boveda import almacen as modulo
+
+    monkeypatch.setattr(modulo, "_REGISTRO_QDRANT", {})
+    ruta = tmp_path / "qdrant"
+    abierto = crear_almacen_en_ruta(ruta)
+    abierto.agregar(["frag:a"], [[1.0, 0.0]], ["a"], [{"seccion": "oferta"}])
+
+    modulo._cerrar_registro()
+
+    assert modulo._REGISTRO_QDRANT == {}
+    reabierto = crear_almacen_en_ruta(ruta)
+    try:
+        assert reabierto is not abierto
+        assert reabierto.contar() == 1
+    finally:
+        cerrar_almacen(reabierto)
 
 
 def test_solo_almacen_importa_los_clientes_vectoriales() -> None:

@@ -42,7 +42,7 @@ from ..asistente.evaluacion import (
 )
 from ..asistente.qa import RespuestaQA
 from ..asistente.validacion import es_sin_datos, extraer_urls_texto, separar_fuentes
-from ..boveda.almacen import AlmacenVectorial
+from ..boveda.almacen import AlmacenVectorial, cerrar_almacen, crear_almacen_en
 from ..boveda.configuracion import (
     ConfiguracionEmbeddings,
     ConfiguracionRecuperacion,
@@ -63,12 +63,15 @@ from ..boveda.rutas import NOMBRE_METADATOS, TipoAlmacen, ruta_almacen_en
 from ..boveda.tipos import Fragmento
 from ..config import PROJECT_ROOT, Config
 from .metricas import (
+    K_RECALL,
     ResultadoMcNemar,
     citas_correctas,
     hit_at_k,
     intervalo_wilson,
     mcnemar,
     mrr,
+    ndcg_at_k,
+    recall_at_k,
     resumen_uso,
 )
 
@@ -170,13 +173,15 @@ class DetallePregunta:
 
 @dataclass(frozen=True, slots=True)
 class MetricasRecuperacion:
-    """hit@5, MRR e intervalo de Wilson de un conjunto de preguntas."""
+    """hit@5, MRR, recall@10, nDCG@10 e intervalo de Wilson."""
 
     evaluables: int
     aciertos: int
     hit_at_5: float | None
     mrr: float | None
     intervalo95: tuple[float, float] | None
+    recall_at_10: float | None = None
+    ndcg_at_10: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -374,8 +379,16 @@ def _metricas(
     esperadas: Sequence[Sequence[str]],
     *,
     k: int = K_POR_DEFECTO,
+    recuperadas_recall: Sequence[Sequence[str]] | None = None,
 ) -> MetricasRecuperacion:
-    """Calcula hit@5, MRR, aciertos e intervalo para listas ya emparejadas."""
+    """Calcula hit@5, MRR, recall@10 y nDCG@10 de listas ya emparejadas.
+
+    ``recuperadas`` es la busqueda de ``k`` resultados que alimenta hit@5 y
+    MRR. ``recuperadas_recall`` es la busqueda separada de ``K_RECALL``
+    resultados; si falta, se reutiliza ``recuperadas`` para no duplicar la
+    busqueda en las pruebas unitarias.
+    """
+    largas = recuperadas if recuperadas_recall is None else recuperadas_recall
     evaluables = sum(1 for fuentes in esperadas if fuentes)
     aciertos = sum(
         1
@@ -388,10 +401,12 @@ def _metricas(
         hit_at_5=hit_at_k(recuperadas, esperadas, k=k),
         mrr=mrr(recuperadas, esperadas, k=k),
         intervalo95=intervalo_wilson(aciertos, evaluables),
+        recall_at_10=recall_at_k(largas, esperadas, k=K_RECALL),
+        ndcg_at_10=ndcg_at_k(largas, esperadas, k=K_RECALL),
     )
 
 
-def _recuperar(
+def _recuperar_ventana(
     almacen: AlmacenVectorial,
     embeddings: Embeddings,
     fragmentos: Sequence[Fragmento],
@@ -401,7 +416,7 @@ def _recuperar(
     bm25: float,
     k: int,
 ) -> dict[int, tuple[str, ...]]:
-    """Recupera el top k de cada pregunta con una configuracion de pesos."""
+    """Recupera el top k de cada pregunta con una ventana y unos pesos."""
     recuperador = RecuperadorHibrido(
         almacen,
         embeddings,
@@ -416,8 +431,46 @@ def _recuperar(
     }
 
 
+def _recuperar(
+    almacen: AlmacenVectorial,
+    embeddings: Embeddings,
+    fragmentos: Sequence[Fragmento],
+    preguntas: Sequence[PreguntaFase2],
+    *,
+    vectorial: float,
+    bm25: float,
+    k: int,
+) -> tuple[dict[int, tuple[str, ...]], dict[int, tuple[str, ...]]]:
+    """Hace dos busquedas: una de ``k`` y otra de ``K_RECALL`` resultados.
+
+    hit@5 y MRR se calculan solo con la primera, para no alterar la fusion de
+    ``EnsembleRetriever``. recall@10 y nDCG@10 usan la segunda. Devuelve
+    ``(cortas, largas)`` con las URL de cada pregunta.
+    """
+    cortas = _recuperar_ventana(
+        almacen,
+        embeddings,
+        fragmentos,
+        preguntas,
+        vectorial=vectorial,
+        bm25=bm25,
+        k=k,
+    )
+    largas = _recuperar_ventana(
+        almacen,
+        embeddings,
+        fragmentos,
+        preguntas,
+        vectorial=vectorial,
+        bm25=bm25,
+        k=K_RECALL,
+    )
+    return cortas, largas
+
+
 def _resultado(
     recuperadas: Mapping[int, tuple[str, ...]],
+    recuperadas_recall: Mapping[int, tuple[str, ...]],
     preguntas: Sequence[PreguntaFase2],
     *,
     etiqueta: str,
@@ -430,7 +483,13 @@ def _resultado(
     """Agrega las metricas de una configuracion a partir de lo recuperado."""
     esperadas = [list(pregunta.fuentes_esperadas) for pregunta in preguntas]
     obtenidas = [list(recuperadas[pregunta.id]) for pregunta in preguntas]
-    metricas = _metricas(obtenidas, esperadas, k=k)
+    obtenidas_recall = [list(recuperadas_recall[pregunta.id]) for pregunta in preguntas]
+    metricas = _metricas(
+        obtenidas,
+        esperadas,
+        k=k,
+        recuperadas_recall=obtenidas_recall,
+    )
 
     por_tipo: dict[str, MetricasRecuperacion] = {}
     for tipo in TIPOS:
@@ -439,6 +498,7 @@ def _resultado(
             [obtenidas[posicion] for posicion in indices],
             [esperadas[posicion] for posicion in indices],
             k=k,
+            recuperadas_recall=[obtenidas_recall[posicion] for posicion in indices],
         )
 
     indices_sin_tablero = [
@@ -448,6 +508,7 @@ def _resultado(
         [obtenidas[posicion] for posicion in indices_sin_tablero],
         [esperadas[posicion] for posicion in indices_sin_tablero],
         k=k,
+        recuperadas_recall=[obtenidas_recall[posicion] for posicion in indices_sin_tablero],
     )
 
     return ResultadoConfiguracion(
@@ -497,10 +558,12 @@ def medir_configuracion(
 ) -> ResultadoConfiguracion:
     """Mide una configuracion aislada sobre un indice ya construido.
 
-    Sirve para el indice extra sin prefijos, que se mide con los pesos por
-    defecto y no forma parte del barrido principal.
+    Hace las mismas dos busquedas que el barrido: ``k`` para hit@5 y MRR, y
+    ``K_RECALL`` para recall@10 y nDCG@10. Sirve para el indice extra sin
+    prefijos, que se mide con los pesos por defecto y no forma parte del barrido
+    principal.
     """
-    recuperadas = _recuperar(
+    recuperadas, recuperadas_recall = _recuperar(
         almacen,
         embeddings,
         fragmentos,
@@ -511,6 +574,7 @@ def medir_configuracion(
     )
     return _resultado(
         recuperadas,
+        recuperadas_recall,
         preguntas,
         etiqueta=etiqueta,
         vectorial=vectorial,
@@ -530,7 +594,12 @@ def barrer_pesos(
     configuracion: ConfiguracionRecuperacion | None = None,
     k: int = K_POR_DEFECTO,
 ) -> Barrido:
-    """Mide hit@5 y MRR de cada configuracion sobre el mismo indice.
+    """Mide hit@5, MRR, recall@10 y nDCG@10 de cada configuracion.
+
+    Hace dos busquedas por pregunta y configuracion: una de ``k`` resultados
+    para hit@5 y MRR, y otra de ``K_RECALL`` para recall@10 y nDCG@10. No
+    reutiliza la busqueda larga para hit@5 porque en el hibrido cambiaria la
+    fusion de ``EnsembleRetriever``.
 
     No reconstruye el indice: reutiliza el almacen y los fragmentos recibidos.
     Si la configuracion por defecto del TOML ya esta en el barrido, se marca esa
@@ -557,6 +626,7 @@ def barrer_pesos(
 
     urls_indexadas = {fragmento.url for fragmento in fragmentos}
     recuperadas: dict[str, dict[int, tuple[str, ...]]] = {}
+    recuperadas_recall: dict[str, dict[int, tuple[str, ...]]] = {}
     resultados: list[ResultadoConfiguracion] = []
     etiqueta_defecto = ""
     for vectorial, bm25 in pares:
@@ -566,7 +636,7 @@ def barrer_pesos(
         es_defecto = (vectorial, bm25) == defecto
         if es_defecto:
             etiqueta_defecto = etiqueta
-        recuperadas[etiqueta] = _recuperar(
+        recuperadas[etiqueta], recuperadas_recall[etiqueta] = _recuperar(
             almacen,
             embeddings,
             fragmentos,
@@ -578,6 +648,7 @@ def barrer_pesos(
         resultados.append(
             _resultado(
                 recuperadas[etiqueta],
+                recuperadas_recall[etiqueta],
                 preguntas,
                 etiqueta=etiqueta,
                 vectorial=vectorial,
@@ -723,15 +794,22 @@ def construir_indice_sin_prefijos(
         )
 
     proveedor = embeddings or crear_embeddings(ajustes)
-    resumen = construir_indice_en(
-        carpeta,
-        fragmentos,
-        alcance=alcance,
-        ajustes=ajustes,
-        embeddings=proveedor,
-        almacen=almacen,
-        tipo_almacen=tipo,
-    )
+    destino = almacen if almacen is not None else crear_almacen_en(carpeta, tipo)
+    try:
+        resumen = construir_indice_en(
+            carpeta,
+            fragmentos,
+            alcance=alcance,
+            ajustes=ajustes,
+            embeddings=proveedor,
+            almacen=destino,
+            tipo_almacen=tipo,
+        )
+    finally:
+        if almacen is None:
+            # El almacén que abre esta función se cierra aquí, también si la
+            # construcción falla o quien llama no lo recibe.
+            cerrar_almacen(destino)
     _escribir_huella(carpeta, huella)
     return resumen
 

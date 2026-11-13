@@ -10,6 +10,7 @@ from pathlib import Path
 from types import ModuleType
 
 import pytest
+from langchain_core.embeddings import DeterministicFakeEmbedding
 
 from banco_occidente_corpus.boveda.almacen import QdrantAlmacen
 from banco_occidente_corpus.boveda.fragmentos import (
@@ -144,6 +145,83 @@ def test_consulta_de_une_previa_y_pregunta(medir: ModuleType) -> None:
         == "¿Qué tarjetas de crédito ofrece? ¿Y cuál es su cuota de manejo?"
     )
     assert medir.consulta_de(autonoma) == autonoma.pregunta
+
+
+def test_evaluar_usa_una_busqueda_de_5_para_hit_y_mrr(medir: ModuleType) -> None:
+    """hit@5 y MRR salen de la búsqueda de 5, no de la búsqueda de 10."""
+    # Arrange
+    url = "https://www.bancodeoccidente.com.co/ayuda"
+    pregunta = medir.Pregunta(
+        id=3,
+        tipo="alcance",
+        pregunta="¿Cuál es la línea de atención telefónica?",
+        previa="",
+        fuentes_esperadas=(url,),
+    )
+    limites: list[int] = []
+
+    def recuperar(consulta: str, limite: int) -> list[str]:
+        """Devuelve la fuente solo en la búsqueda corta."""
+        limites.append(limite)
+        if limite == 5:
+            return [url]
+        return [f"https://ejemplo.com/{posicion}" for posicion in range(10)]
+
+    # Act
+    resultados = medir.evaluar([pregunta], recuperar, k=5)
+    resumen = medir.resumir(resultados, k=5)
+
+    # Assert
+    assert limites == [5, medir.K_RECALL]
+    assert resultados[0].acierto is True
+    assert resultados[0].rr == 1.0
+    assert resultados[0].recall_at_10 == 0.0
+    assert resultados[0].ndcg_at_10 == 0.0
+    assert resumen["total"]["hit_at_k"] == 1.0
+    assert resumen["total"]["mrr"] == 1.0
+    assert resumen["total"]["recall_at_10"] == 0.0
+    assert resumen["total"]["ndcg_at_10"] == 0.0
+
+
+class AlmacenEspia:
+    """Almacén mínimo que registra si la medición lo cierra."""
+
+    def __init__(self) -> None:
+        """Inicializa el registro de cierre."""
+        self.cerrada = False
+
+    def cerrar(self) -> None:
+        """Marca el almacén como cerrado."""
+        self.cerrada = True
+
+
+def test_main_cierra_el_almacen_aunque_falle_la_evaluacion(
+    medir: ModuleType,
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """El almacén de la medición se cierra en `finally`, no al apagar Python."""
+    # Arrange
+    espia = AlmacenEspia()
+    (tmp_path / "qdrant").mkdir()
+    monkeypatch.setattr(medir, "_configurar_salida", lambda: None)
+    monkeypatch.setattr(medir, "ruta_almacen", lambda _config: tmp_path / "qdrant")
+    monkeypatch.setattr(medir, "comprobar_almacen", lambda _config: None)
+    monkeypatch.setattr(medir, "crear_almacen", lambda _config: espia)
+    monkeypatch.setattr(medir, "crear_embeddings", lambda: DeterministicFakeEmbedding(size=4))
+
+    def fallar(*_args: object, **_kwargs: object) -> list[object]:
+        """Simula un fallo durante la evaluación."""
+        raise ValueError("fallo simulado")
+
+    monkeypatch.setattr(medir, "evaluar", fallar)
+
+    # Act
+    codigo = medir.main(["--preguntas", str(PREGUNTAS)])
+
+    # Assert
+    assert codigo == 1
+    assert espia.cerrada is True
 
 
 @pytest.mark.parametrize(
