@@ -379,3 +379,110 @@ def test_pesos_no_normalizados_se_aceptan() -> None:
 
     assert len(resultados) == 2
     assert all(math.isfinite(resultado.puntaje) for resultado in resultados)
+
+
+# ------------------------------------------------- fragmentos fuera del índice
+
+#: Vector unitario de la consulta y de los documentos que deben parecerse.
+UNO = [1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+#: Vector ortogonal: su coseno con la consulta es cero.
+ORTOGONAL = [0.0, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+
+
+class EmbeddingsFijos(Embeddings):
+    """Proveedor que devuelve vectores constantes para controlar el coseno."""
+
+    def __init__(self, consulta: Sequence[float], documentos: Sequence[float]) -> None:
+        """Guarda el vector de la consulta y el de los documentos."""
+        self._consulta = list(consulta)
+        self._documentos = list(documentos)
+
+    def embed_documents(self, texts: list[str]) -> list[list[float]]:
+        """Devuelve el mismo vector para cada texto recibido."""
+        return [list(self._documentos) for _ in texts]
+
+    def embed_query(self, text: str) -> list[float]:
+        """Devuelve el vector fijo de la consulta."""
+        return list(self._consulta)
+
+
+def extra(texto: str = "tasa de la Cuenta Demo") -> Fragmento:
+    """Construye un fragmento de prueba que no vive en el índice."""
+    return Fragmento(
+        id="frag:prueba",
+        texto=texto,
+        url="demo://blindaje",
+        titulo="Documento de prueba de seguridad",
+        seccion="productos",
+        encabezado="Cuenta Demo",
+        tipo="prueba",
+        tokens=8,
+    )
+
+
+def test_extra_entra_por_la_parte_vectorial() -> None:
+    """Un fragmento fuera del índice compite por coseno con los guardados."""
+    base = fragmento("A", "cuota de manejo de la tarjeta de credito")
+    recuperador = RecuperadorHibrido(
+        AlmacenFalso([coincidencia(base, 0.9)], [base]),
+        EmbeddingsFijos(UNO, UNO),
+        [base],
+        ConfiguracionRecuperacion(k=5, peso_vectorial=1.0, peso_bm25=0.0),
+        fragmentos_extra=[extra()],
+    )
+
+    resultados = recuperador.buscar("tasa de la cuenta demo", k=2)
+
+    assert resultados[0].id == "frag:prueba"
+    assert resultados[0].puntaje == pytest.approx(1.0)
+
+
+def test_extra_solo_sobrevive_si_entra_en_el_top_k() -> None:
+    """Con un coseno peor que el del almacén, el extra queda fuera del top k."""
+    base = fragmento("A", "cuota de manejo de la tarjeta de credito")
+    recuperador = RecuperadorHibrido(
+        AlmacenFalso([coincidencia(base, 0.4)], [base]),
+        EmbeddingsFijos(UNO, ORTOGONAL),
+        [base],
+        ConfiguracionRecuperacion(k=5, peso_vectorial=1.0, peso_bm25=0.0),
+        fragmentos_extra=[extra()],
+    )
+
+    resultados = recuperador.buscar("tasa de la cuenta demo", k=1)
+
+    assert [resultado.id for resultado in resultados] == ["A"]
+
+
+def test_extra_entra_por_bm25() -> None:
+    """El texto del extra también se indexa en BM25 y puede ganar por términos."""
+    base = fragmento("A", "cuota de manejo de la tarjeta de credito")
+    recuperador = RecuperadorHibrido(
+        AlmacenFalso([], [base]),
+        EmbeddingsFijos(UNO, UNO),
+        [base],
+        ConfiguracionRecuperacion(k=5, peso_vectorial=0.0, peso_bm25=1.0),
+        fragmentos_extra=[extra()],
+    )
+
+    resultados = recuperador.buscar("cuenta demo", k=2)
+
+    assert resultados[0].id == "frag:prueba"
+
+
+def test_vector_del_extra_se_calcula_una_sola_vez() -> None:
+    """El vector del extra se pide al construir y no se repite en cada búsqueda."""
+    base = fragmento("A", "cuota de manejo de la tarjeta de credito")
+    embeddings = EmbeddingsContador()
+    recuperador = RecuperadorHibrido(
+        AlmacenFalso([coincidencia(base, 0.1)], [base]),
+        embeddings,
+        [base],
+        ConfiguracionRecuperacion(k=5, peso_vectorial=0.6, peso_bm25=0.4),
+        fragmentos_extra=[extra()],
+    )
+
+    recuperador.buscar("cuenta demo", k=2)
+    recuperador.buscar("cuenta demo", k=2)
+
+    assert embeddings.documentos == 1
+    assert embeddings.consultas == 2

@@ -358,6 +358,7 @@ def _crear_servicio_evaluacion(config: Config) -> ServicioPreguntas:
             config,
             ajustes,
             ruta_memoria=config.paths.root / RUTA_MEMORIA_V2,
+            inyeccion=False,
         ),
     )
 

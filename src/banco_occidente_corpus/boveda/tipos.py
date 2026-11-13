@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal, Protocol, runtime_checkable
 
-TipoFragmento = Literal["pagina", "pdf", "video", "hecho verificado"]
+#: Tipos de fragmento. ``prueba`` solo existe en memoria para la demo de
+#: blindaje del caso 5: nunca se escribe en el JSONL de fragmentos ni en el índice.
+TipoFragmento = Literal["pagina", "pdf", "video", "hecho verificado", "prueba"]
 
 
 @dataclass(frozen=True, slots=True)

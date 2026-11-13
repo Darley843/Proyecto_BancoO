@@ -12,6 +12,7 @@ from langchain_core.messages import AIMessage, BaseMessage
 
 from banco_occidente_corpus.asistente import modelo as modulo_modelo
 from banco_occidente_corpus.asistente.metricas import leer_uso
+from banco_occidente_corpus.sucursal.demo_inyeccion import PREGUNTA_DEMO
 from banco_occidente_corpus.sucursal.digiturno import (
     INSTRUCCION_DUDA,
     MAX_TOKENS_CLASIFICADOR,
@@ -209,6 +210,14 @@ def test_abrir_cuenta_de_nomina_sigue_en_boveda() -> None:
     turno = clasificar("¿cómo abro mi cuenta de nómina?")
 
     assert turno.letra == "B"
+
+
+def test_pregunta_de_la_demo_va_a_la_boveda() -> None:
+    """La demo del caso 5 va por B: no lleva palabras que despierten el Tablero."""
+    turno = clasificar(PREGUNTA_DEMO)
+
+    assert turno.letra == "B"
+    assert turno.motivo == "defecto"
 
 
 def test_duda_sin_modelo_usa_la_ruta_por_defecto() -> None:

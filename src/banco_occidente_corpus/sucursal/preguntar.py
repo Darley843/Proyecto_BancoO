@@ -40,6 +40,7 @@ from ..contexto import RutasContexto
 from ..tablero.tipos import leer_filas, ruta_tablero
 from .ajustes import ConfiguracionSucursal, tope_efectivo
 from .costo import CacheRespuestas, GastoDiario, costo_de_uso, tarifas_para
+from .demo_inyeccion import fragmento_de_prueba, inyeccion_activa
 from .digiturno import (
     ContadorTurnos,
     cargar_configuracion_digiturno,
@@ -285,6 +286,7 @@ def construir_piezas(
     crear_modelo_chat: Callable[[], BaseChatModel] | None = None,
     crear_recuperador_boveda: Callable[[], Recuperador] | None = None,
     ruta_memoria: Path | None = None,
+    inyeccion: bool | None = None,
 ) -> PiezasGrafo:
     """Construye dependencias y grafo una sola vez, sin red si se inyectan dobles.
 
@@ -301,6 +303,8 @@ def construir_piezas(
         ruta_memoria: archivo SQLite del `checkpointer`; por defecto el de la
             Ventanilla (`data/asistente/memoria.sqlite`). La evaluación v2 usa
             uno propio para no mezclar sus hilos con la conversación real.
+        inyeccion: True añade el fragmento de prueba de la demo de blindaje;
+            False lo excluye siempre. Si falta, decide `SUCURSAL_DEMO_INYECCION`.
 
     Returns:
         Las piezas listas para atender preguntas.
@@ -315,7 +319,8 @@ def construir_piezas(
         modelo = fabrica_modelo()
         clasificador = clasificador_deepseek(modelo)
 
-    fabrica_recuperador = crear_recuperador_boveda or _fabrica_recuperador(config)
+    inyectar = inyeccion_activa() if inyeccion is None else inyeccion
+    fabrica_recuperador = crear_recuperador_boveda or _fabrica_recuperador(config, inyectar)
     dependencias = DependenciasGrafo(
         recuperador=fabrica_recuperador(),
         filas=leer_filas(ruta_tablero(config)),
@@ -620,12 +625,19 @@ def _crear_modelo_qa() -> BaseChatModel:
     return crear_modelo_para("qa")
 
 
-def _fabrica_recuperador(config: Config) -> Callable[[], Recuperador]:
-    """Devuelve la fábrica del recuperador híbrido real sobre el alcance base."""
+def _fabrica_recuperador(config: Config, inyectar: bool = False) -> Callable[[], Recuperador]:
+    """Devuelve la fábrica del recuperador híbrido real sobre el alcance base.
+
+    Args:
+        config: configuración con las rutas del corpus.
+        inyectar: True añade el fragmento de prueba de la demo de blindaje, solo
+            en memoria; False deja el recuperador como el de siempre.
+    """
 
     def construir() -> Recuperador:
         """Construye el recuperador con los embeddings y el índice configurados."""
-        return crear_recuperador(config, "base")
+        extras = (fragmento_de_prueba(),) if inyectar else ()
+        return crear_recuperador(config, "base", fragmentos_extra=extras)
 
     return construir
 

@@ -3,8 +3,9 @@
 El prompt v2 recibe los fragmentos recuperados entre ``<fragmentos>`` y
 ``</fragmentos>``, numerados ``[n]``. La respuesta cita cada dato con su número
 y cierra con una lista ``Fuentes:`` con las URL exactas de los fragmentos
-citados. Este módulo arma ese bloque, valida las citas y reutiliza las
-comprobaciones atómicas de :mod:`banco_occidente_corpus.asistente.validacion`
+citados. Este módulo arma ese bloque, sanea las órdenes que traigan los
+fragmentos, valida las citas y reutiliza las comprobaciones atómicas de
+:mod:`banco_occidente_corpus.asistente.validacion`
 para la frase fija, las cifras, la fuga del prompt, la PII y el tope de
 palabras. No hace peticiones de red ni escribe en el corpus.
 """
@@ -46,6 +47,32 @@ if TYPE_CHECKING:
 _ETIQUETA_FRAGMENTOS = re.compile(r"<\s*(?P<cierre>/?)\s*fragmentos\s*>", re.IGNORECASE)
 _CITA = re.compile(r"\[(\d+)\]")
 
+#: Marca que sustituye a una oración con una orden dirigida al asistente.
+MARCA_INSTRUCCION = "[instrucción eliminada]"
+#: Frases de inyección conocidas; se comparan sin distinguir mayúsculas y con
+#: clases de acentos para no depender de cómo escriba la tilde el documento.
+#: Los patrones son deliberadamente estrechos: `\b` evita coincidencias dentro
+#: de palabras («pignorada», «revelados») y cada rama exige el cierre de la
+#: cláusula o un rol concreto, para no borrar prosa legítima del banco. La
+#: contrapartida está documentada en `docs/SEGURIDAD.md` §3.1.
+_INSTRUCCIONES = re.compile(
+    r"(?:"
+    r"\b(?:ignor[aáe]|olvid[aáe])\s+(?:todas\s+)?(?:las\s+)?"
+    r"(?:instrucciones|reglas|indicaciones)"
+    r"(?:\s+(?:anteriores|previas|del\s+sistema))?(?=\s*(?:[.,;:!?…]|y\b|$))"
+    r"|\bignor[aáe]\s+(?:tus|mis|estas|esas)\s+(?:instrucciones|reglas)"
+    r"|\b(?:revela|muestra|repite|imprime|dime)\s+(?:tu|tus|el|los|este|estas)\s+"
+    r"(?:prompt|instrucciones)"
+    r"|\bact[uú]a\s+como\s+(?:si\s+fueras\s+)?"
+    r"(?:un\s+|una\s+|otro\s+|otra\s+|el\s+|la\s+)?"
+    r"(?:asistente|chatbot|bot|inteligencia\s+artificial|ia|chatgpt|dan|"
+    r"modelo\s+de\s+lenguaje)"
+    r")",
+    re.IGNORECASE,
+)
+#: Corte entre oraciones: punto, cierre o salto, seguidos de espacio.
+_ORACION = re.compile(r"(?<=[.!?…])\s+")
+
 #: Avisos que obligan a reemplazar la respuesta por la frase fija.
 _BLOQUEANTES = ("sin_citas", "cita_inexistente", "fuente_inventada")
 
@@ -77,21 +104,72 @@ def _neutralizar(texto: str) -> str:
     return _ETIQUETA_FRAGMENTOS.sub(lambda match: f"‹{match.group('cierre')}fragmentos›", texto)
 
 
+def sanear_instrucciones(texto: str) -> str:
+    """Sustituye las oraciones con órdenes dirigidas al asistente.
+
+    Trabaja línea por línea y, dentro de cada línea, oración por oración: si una
+    oración contiene una frase de inyección conocida («ignora las instrucciones
+    anteriores», «revela tu prompt», «actúa como otro asistente», con variantes
+    de mayúsculas y tildes) se reemplaza completa por
+    ``[instrucción eliminada]``. Un texto sin esas frases queda idéntico.
+
+    Args:
+        texto: texto del fragmento recuperado.
+
+    Returns:
+        El texto saneado, con las oraciones sospechosas reemplazadas.
+    """
+    if not _INSTRUCCIONES.search(texto):
+        return texto
+    lineas: list[str] = []
+    for linea in texto.split("\n"):
+        if not _INSTRUCCIONES.search(linea):
+            lineas.append(linea)
+            continue
+        lineas.append(
+            " ".join(
+                MARCA_INSTRUCCION if _INSTRUCCIONES.search(oracion) else oracion
+                for oracion in _ORACION.split(linea)
+            )
+        )
+    return "\n".join(lineas)
+
+
+def avisos_instrucciones(fragmentos: Sequence[Fragmento]) -> list[str]:
+    """Lista los fragmentos que traían una instrucción y se sanearon.
+
+    El aviso no bloquea la respuesta: la orden ya no llegó al modelo. Sirve para
+    dejar rastro en el comprobante de que el fragmento pedía otra cosa.
+
+    Args:
+        fragmentos: fragmentos recuperados, en el orden en que los verá el modelo.
+
+    Returns:
+        Avisos ``fragmento_con_instrucciones: [n]`` con el número del bloque.
+    """
+    return [
+        f"fragmento_con_instrucciones: [{indice}]"
+        for indice, fragmento in enumerate(fragmentos, start=1)
+        if _INSTRUCCIONES.search(fragmento.texto)
+    ]
+
+
 def formatear_fragmentos(fragmentos: Sequence[Fragmento]) -> str:
     """Arma el bloque ``<fragmentos>`` numerado que recibe el prompt v2.
 
     Cada fragmento conserva su título, su sección y su línea ``Fuente:`` para
     que el número ``[n]`` sea rastreable. El texto se neutraliza para que un
-    fragmento no pueda cerrar el bloque y colar instrucciones fuera de él.
+    fragmento no pueda cerrar el bloque y colar instrucciones fuera de él, y se
+    sanean las órdenes conocidas antes de enviarlo al modelo.
     """
     bloques = [
         "\n".join(
             (
-                f"[{indice}] {_neutralizar(fragmento.titulo)}",
-                f"Sección: {_neutralizar(fragmento.seccion)}",
+                f"[{indice}] {_neutralizar(sanear_instrucciones(fragmento.titulo))}",
+                f"Sección: {_neutralizar(sanear_instrucciones(fragmento.seccion))}",
                 f"Fuente: {fragmento.url}",
                 "",
-                _neutralizar(fragmento.texto),
+                _neutralizar(sanear_instrucciones(fragmento.texto)),
             )
         )
         for indice, fragmento in enumerate(fragmentos, start=1)
@@ -249,27 +327,28 @@ class ContextoRag:
     ) -> RespuestaCitas:
         """Valida citas, cifras, fuga, PII y tope sobre la salida del modelo."""
         metricas = metricas or {}
+        avisos_fragmentos = avisos_instrucciones(self.fragmentos)
         texto = limpiar_respuesta(crudo)
         if not texto or es_sin_datos(texto):
-            return self._fallback(("sin_datos",), metricas, crudo)
+            return self._fallback(("sin_datos", *avisos_fragmentos), metricas, crudo)
 
         texto, recortado = limitar_resumen(texto, LIMITE_QA)
         resultado = validar_citas(texto, self.fragmentos, canal=self.canal)
         if resultado.sin_datos:
-            return self._fallback(resultado.avisos, metricas, crudo)
+            return self._fallback((*resultado.avisos, *avisos_fragmentos), metricas, crudo)
 
         texto = resultado.texto
         if cifras_inventadas(
             _cuerpo_sin_citas(texto),
             cifras_contexto=cifras_duras(self.texto),
         ):
-            return self._fallback(("cifra_inventada",), metricas, crudo)
+            return self._fallback(("cifra_inventada", *avisos_fragmentos), metricas, crudo)
         if detectar_fuga_prompt(texto):
-            return self._fallback(("fuga_prompt",), metricas, crudo)
+            return self._fallback(("fuga_prompt", *avisos_fragmentos), metricas, crudo)
         if detectar_pii(texto, permitidos=self.permitidos):
-            return self._fallback(("pii_en_respuesta",), metricas, crudo)
+            return self._fallback(("pii_en_respuesta", *avisos_fragmentos), metricas, crudo)
 
-        avisos = list(resultado.avisos)
+        avisos = [*resultado.avisos, *avisos_fragmentos]
         if recortado:
             avisos.append("recortado")
         if FRASE_SIN_DATOS.casefold() in texto.casefold():
