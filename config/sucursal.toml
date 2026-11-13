@@ -22,6 +22,11 @@ k = 5
 peso_vectorial = 0.6
 peso_bm25 = 0.4
 
+[almacen]
+# Motor del índice vectorial: qdrant (embebido en data/boveda/qdrant, sin servidor)
+# o chroma (opción de compatibilidad). El índice declara su motor en indice.json.
+tipo = "qdrant"
+
 [digiturno]
 # Palabras que mandan la pregunta al Tablero (ruta T); se comparan sin tildes.
 palabras_tarifas = [

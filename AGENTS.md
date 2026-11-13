@@ -98,7 +98,9 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | `.../news.py` | Noticias: hechos oficiales, prensa curada, Gold e índice |
 | `.../boveda/fragmentos.py` | Fragmentos deterministas desde chunks y hechos (sin red) |
 | `.../boveda/embeddings.py` | Embeddings locales con Ollama, prefijos y `timeout` |
-| `.../boveda/almacen.py` | Chroma persistente en `data/boveda/` con distancia coseno |
+| `.../boveda/almacen.py` | Qdrant local y Chroma opcional en `data/boveda/` con distancia coseno |
+| `.../boveda/rutas.py` | Rutas y nombres de los almacenes de la Bóveda |
+| `.../boveda/migracion.py` | Copia el índice de Chroma a Qdrant sin recalcular embeddings |
 | `.../boveda/indice.py` | Índice por alcance (`base`/`completo`) y `indice.json` |
 | `.../boveda/recuperador.py` | Recuperación híbrida vectorial + BM25 con pesos |
 | `.../boveda/mapa.py` | Mapa PCA 2D de 0 a 100 y proyección de la pregunta |
@@ -148,7 +150,7 @@ REJECT if:
 - `extract.py` hace peticiones de red: debe recibir HTML ya descargado.
 - Hay secretos, tokens o claves en el código, o se lee un archivo `.env`.
 - Se versiona el índice vectorial o una base SQLite del asistente: `data/boveda/`
-  (Chroma, `indice.json`, `mapa.json`, fragmentos) o `data/asistente/`
+  (Qdrant, Chroma opcional, `indice.json`, `mapa.json`, fragmentos) o `data/asistente/`
   (`memoria.sqlite`, `cache.sqlite`, `gasto.sqlite`). Se regeneran con
   `make indice` o se crean al preguntar; `.gitignore` los excluye y
   `test/test_seguridad.py::test_indice_y_sqlite_fuera_de_git` lo comprueba.

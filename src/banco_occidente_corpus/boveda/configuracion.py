@@ -11,13 +11,18 @@ import os
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 from urllib.parse import urlsplit
 
 from ..config import PROJECT_ROOT
+from .rutas import TipoAlmacen
 
 #: Ruta por defecto de la configuración de la Sucursal.
 RUTA_CONFIG: Path = PROJECT_ROOT / "config" / "sucursal.toml"
+#: Almacén vectorial por defecto: Qdrant embebido en `data/boveda/qdrant`.
+TIPO_ALMACEN_POR_DEFECTO: TipoAlmacen = "qdrant"
+#: Tipos de almacén que reconoce la fábrica.
+TIPOS_ALMACEN: tuple[str, ...] = ("qdrant", "chroma")
 #: Modelo de embeddings servido por Ollama.
 MODELO_POR_DEFECTO: str = "nomic-embed-text-v2-moe"
 #: URL local de Ollama (escucha en 127.0.0.1, no en 0.0.0.0).
@@ -57,6 +62,13 @@ class ConfiguracionRecuperacion:
     k: int = K_POR_DEFECTO
     peso_vectorial: float = PESO_VECTORIAL_POR_DEFECTO
     peso_bm25: float = PESO_BM25_POR_DEFECTO
+
+
+@dataclass(frozen=True, slots=True)
+class ConfiguracionAlmacen:
+    """Motor del índice vectorial: Qdrant por defecto o Chroma."""
+
+    tipo: TipoAlmacen = TIPO_ALMACEN_POR_DEFECTO
 
 
 def normalizar_base_url(valor: str) -> str:
@@ -192,3 +204,29 @@ def cargar_configuracion_recuperacion(ruta: Path | None = None) -> Configuracion
         peso_vectorial=pesos["peso_vectorial"],
         peso_bm25=pesos["peso_bm25"],
     )
+
+
+def cargar_configuracion_almacen(ruta: Path | None = None) -> ConfiguracionAlmacen:
+    """Carga `[almacen]` de `config/sucursal.toml`.
+
+    Args:
+        ruta: archivo TOML alternativo; por defecto `config/sucursal.toml`.
+
+    Returns:
+        El motor del índice; `qdrant` si la tabla o la clave faltan.
+
+    Raises:
+        ValueError: si `almacen.tipo` no es un texto o no es un motor conocido.
+    """
+    archivo = RUTA_CONFIG if ruta is None else ruta
+    datos: dict[str, Any] = {}
+    if archivo.exists():
+        with archivo.open("rb") as fh:
+            datos = dict(tomllib.load(fh).get("almacen", {}))
+
+    tipo = datos.get("tipo", TIPO_ALMACEN_POR_DEFECTO)
+    if not isinstance(tipo, str) or tipo.strip() not in TIPOS_ALMACEN:
+        raise ValueError(
+            f"almacen.tipo debe ser uno de {', '.join(TIPOS_ALMACEN)}; se leyó {tipo!r}"
+        )
+    return ConfiguracionAlmacen(tipo=cast(TipoAlmacen, tipo.strip()))

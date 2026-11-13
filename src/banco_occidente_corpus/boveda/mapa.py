@@ -1,7 +1,7 @@
 """Mapa 2D de la Bóveda: PCA de los vectores del índice y proyección de la pregunta.
 
 `make indice` llama a `construir_mapa` con los mismos vectores que inserta en
-Chroma y escribe `data/boveda/mapa.json`. El archivo guarda, además de un punto
+el almacén vectorial y escribe `data/boveda/mapa.json`. El archivo guarda, además de un punto
 por fragmento, la transformación (media, componentes, mínimo y rango) para
 ubicar después cualquier pregunta en el mismo plano, sin volver a ajustar PCA.
 
@@ -175,7 +175,7 @@ class ServicioMapa:
 
     Los embeddings y el recuperador se crean la primera vez que llega una
     pregunta, no al arrancar la app. Si falta `mapa.json` pero el índice existe,
-    lo calcula una vez leyendo los vectores de Chroma y lo escribe.
+    lo calcula una vez leyendo los vectores del almacén y lo escribe.
     """
 
     def __init__(
@@ -241,34 +241,26 @@ class ServicioMapa:
 def leer_vectores_indexados(
     config: Config, alcance: Alcance = "base"
 ) -> tuple[list[Fragmento], list[list[float]]]:
-    """Lee de Chroma los vectores de los fragmentos del alcance, en su orden.
+    """Lee del índice los vectores de los fragmentos del alcance, en su orden.
 
     Raises:
         FileNotFoundError: si no existe el índice persistente.
         ValueError: si al índice le faltan vectores de algún fragmento.
     """
-    from .indice import leer_fragmentos, ruta_almacen
+    from .almacen import cerrar_almacen, crear_almacen
+    from .indice import comprobar_almacen, leer_fragmentos, ruta_almacen
 
     ruta = ruta_almacen(config)
     if not ruta.exists():
         raise FileNotFoundError(f"No hay índice en {ruta}: ejecuta `make indice`.")
+    comprobar_almacen(config)
     fragmentos = leer_fragmentos(config, alcance)
 
-    import chromadb
-
-    from .almacen import COLECCION_POR_DEFECTO
-
-    coleccion = chromadb.PersistentClient(path=str(ruta)).get_collection(COLECCION_POR_DEFECTO)
-    resultado: dict[str, Any] = dict(
-        coleccion.get(ids=[f.id for f in fragmentos], include=["embeddings"])
-    )
-    identificadores = list(resultado.get("ids") or [])
-    crudos = resultado.get("embeddings")
-    embeddings = np.asarray([] if crudos is None else crudos, dtype=float)
-    por_id = {
-        str(identificador): [float(valor) for valor in fila]
-        for identificador, fila in zip(identificadores, embeddings.tolist(), strict=True)
-    }
+    almacen = crear_almacen(config)
+    try:
+        por_id = almacen.vectores([fragmento.id for fragmento in fragmentos])
+    finally:
+        cerrar_almacen(almacen)
     faltan = [f.id for f in fragmentos if f.id not in por_id]
     if faltan:
         raise ValueError(f"Al índice le faltan {len(faltan)} vectores: ejecuta `make indice`.")

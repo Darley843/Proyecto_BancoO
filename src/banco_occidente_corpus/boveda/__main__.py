@@ -16,6 +16,7 @@ from .indice import (
     formatear_duracion,
     formatear_resumen_indice,
 )
+from .migracion import formatear_resumen_migracion, migrar_a_qdrant
 
 
 def _crear_parser() -> argparse.ArgumentParser:
@@ -37,13 +38,17 @@ def _crear_parser() -> argparse.ArgumentParser:
     )
     indice = subcomandos.add_parser(
         "indice",
-        help="vectoriza los fragmentos con Ollama y reconstruye el índice Chroma",
+        help="vectoriza los fragmentos con Ollama y reconstruye el índice configurado",
     )
     indice.add_argument(
         "--alcance",
         choices=ALCANCES,
         default="base",
         help="alcance del índice: base (por defecto) o completo",
+    )
+    subcomandos.add_parser(
+        "migrar-qdrant",
+        help="copia el índice de Chroma a Qdrant sin recalcular embeddings",
     )
     return parser
 
@@ -85,6 +90,9 @@ def main(argv: Sequence[str] | None = None) -> int:
             resumen_indice = construir_indice(config, args.alcance, progreso=avisar)
             print(formatear_resumen_indice(resumen_indice))
             print(f"Tiempo total: {formatear_duracion(time.monotonic() - inicio)}")
+            return 0
+        if args.comando == "migrar-qdrant":
+            print(formatear_resumen_migracion(migrar_a_qdrant(config)))
             return 0
     except TiempoAgotadoEmbeddings as error:
         print(_mensaje_tiempo_agotado(error), file=sys.stderr)

@@ -441,6 +441,7 @@ def test_indice_escribe_metadatos_y_reinicia(tmp_path: Path) -> None:
         "alcance": "base",
         "fragmentos": 2,
         "dimension": 6,
+        "almacen": "qdrant",
     }
     assert almacen.reinicios == 1
     assert almacen.ids == ["frag:a", "frag:b"]

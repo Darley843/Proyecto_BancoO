@@ -92,7 +92,7 @@ descarga masiva de PDF, transcripción de vídeo.
 | **LLM del asistente** | `langchain-deepseek` (`ChatDeepSeek`) + `langchain-core`; `pydantic` para la salida estructurada |
 | **Modelo** | `deepseek-flash` (DeepSeek-V4.1-Flash), `DEEPSEEK_API_KEY` solo desde el entorno; `.env` prohibido |
 | **Embeddings** | `langchain-ollama` contra Ollama local (`nomic-embed-text-v2-moe`); sin clave, sin costo y sin salida a internet |
-| **Índice vectorial** | `langchain-chroma` (Chroma persistente en `data/boveda/`, métrica coseno) |
+| **Índice vectorial** | `qdrant-client` (Qdrant local en `data/boveda/qdrant`, métrica coseno); Chroma opcional con `[almacen] tipo = "chroma"` |
 | **Recuperación híbrida** | `langchain-classic` (`EnsembleRetriever`) + `langchain-community` (`BM25Retriever`) + `rank-bm25` |
 | **Agente** | `langgraph` + `langgraph-checkpoint-sqlite` (memoria por `thread_id` en `data/asistente/`) |
 | **API** | `fastapi` + `uvicorn[standard]`, solo en `127.0.0.1:8000` |
@@ -186,7 +186,7 @@ ProyectoAvance1/
 │   ├── boveda/           # BÓVEDA: fragmentos, embeddings, índice y recuperación
 │   │   ├── fragmentos.py # fragmentos deterministas desde chunks y hechos
 │   │   ├── embeddings.py # Ollama local con prefijos de tarea
-│   │   ├── almacen.py    # Chroma persistente con métrica coseno
+│   │   ├── almacen.py    # Qdrant local y Chroma opcional, con métrica coseno
 │   │   ├── indice.py     # índice por alcance + indice.json
 │   │   ├── recuperador.py # híbrido vectorial + BM25 con puntaje coseno
 │   │   └── mapa.py       # PCA 2D (0–100) del índice y proyección de la pregunta
@@ -221,7 +221,7 @@ ProyectoAvance1/
 │   ├── contexto/         # Contexto (VERSIONADO) → prompt del asistente + manifest
 │   ├── knowledge/        # Knowledge (VERSIONADO) → entidades, hechos, relaciones
 │   └── evaluacion/       # EVALUACIÓN (VERSIONADO) → resultados v2 y arqueo.json
-├── data/boveda/          # BÓVEDA (ignorado) → Chroma, fragmentos e indice.json
+├── data/boveda/          # BÓVEDA (ignorado) → Qdrant, fragmentos e indice.json
 ├── data/estructurados/   # TABLERO (VERSIONADO) → tablero.csv
 ├── scripts/
 │   ├── tasks.py          # tareas del Makefile portables (Windows/Unix)
@@ -660,6 +660,7 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 | 2026-11-07 | La Bóveda vectoriza la consulta una sola vez por búsqueda y toma el `puntaje` de los vectores ya guardados en Chroma (#90) | `buscar` hacía tres peticiones a Ollama por pregunta (~1 s extra): una en el recuperador vectorial, otra repetida para el `puntaje` y otra para recalcular el top 5. El orden lo sigue decidiendo `EnsembleRetriever` (RRF sin cambios); los fragmentos que solo aporta BM25 leen su vector del índice, así que `puntaje` sigue siendo 1 - coseno sin llamar al modelo |
 | 2026-11-13 | Módulo 2: cortesía en el digiturno (`motivo=cortesia`, letra `B`), Tablero como `@tool` y ruta mixta (`mixta`, letra `T`) | La rúbrica no acepta un router que busque siempre: «hola», «buenos días» y «gracias» se responden sin recuperador, sin Tablero y sin modelo, con 0 tokens y sin fuentes. El Tablero expone `consultar_tablero` con `args_schema=ConsultaTablero` (Pydantic) y el nodo lo invoca como herramienta; la ruta mixta convierte las filas en fragmentos citables con la URL del tarifario, así el modelo combina las dos fuentes y `validar_citas` comprueba ambas. No se añade una cuarta letra al contrato: el motivo elige el nodo y la ruta del comprobante |
 | 2026-11-13 | LangSmith se enciende solo en la sesión de demo, nunca desde código ni `config/` | Las trazas envían la pregunta, los fragmentos y las filas del Tablero a un servicio externo. `langchain-core` lee `LANGSMITH_TRACING`, `LANGSMITH_API_KEY` y `LANGSMITH_PROJECT` del entorno; el repositorio no las escribe y `test_seguridad.py` lo comprueba. El procedimiento y el apagado están en `docs/SEGURIDAD.md` §5.1 |
+| 2026-11-13 | La Bóveda usa Qdrant local por defecto (`data/boveda/qdrant`) y conserva Chroma con `[almacen] tipo`; `indice.json` declara `almacen` y `make migrar-qdrant` copia sin recalcular embeddings | El Módulo 2 pide Qdrant con colección, payload y filtros. El modo embebido evita un servidor y su cierre explícito libera la carpeta; un índice sin el campo `almacen` se interpreta como el motor configurado. La colección declara HNSW, pero el modo embebido busca de forma exacta; con este corpus es más precisa y el ANN real requiere servidor |
 
 ## 12. Configuración local (no trackear)
 

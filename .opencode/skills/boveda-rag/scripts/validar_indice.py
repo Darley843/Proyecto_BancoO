@@ -1,12 +1,12 @@
-"""Valida que `data/boveda/indice.json` coincida con la colección real de Chroma.
+"""Valida que `data/boveda/indice.json` coincida con la colección real del almacén.
 
 Uso:
     uv run python .opencode/skills/boveda-rag/scripts/validar_indice.py
 
-Comprueba el conteo de fragmentos, la métrica coseno, la dimensión de 768, el
-modelo de embeddings y la bandera de prefijos. Sale con código 1 si falta el
-índice o si alguna comprobación no coincide. No escribe en `data/boveda/` ni
-hace peticiones de red.
+Comprueba el tipo de almacén, la colección, el conteo de fragmentos, la métrica
+coseno, la dimensión de 768, el modelo de embeddings y la bandera de prefijos.
+Sale con código 1 si falta el índice o si alguna comprobación no coincide. No
+crea la colección, no escribe en `data/boveda/` y no hace peticiones de red.
 """
 
 from __future__ import annotations
@@ -22,9 +22,19 @@ from typing import Any
 from banco_occidente_corpus.boveda.almacen import (
     COLECCION_POR_DEFECTO,
     METRICA_POR_DEFECTO,
+    AlmacenBloqueado,
+    AlmacenVectorial,
+    cerrar_almacen,
+    crear_almacen_en_ruta,
 )
 from banco_occidente_corpus.boveda.configuracion import (
+    cargar_configuracion_almacen,
     cargar_configuracion_embeddings,
+)
+from banco_occidente_corpus.boveda.rutas import (
+    NOMBRE_METADATOS,
+    TipoAlmacen,
+    ruta_almacen_en,
 )
 from banco_occidente_corpus.config import PROJECT_ROOT
 
@@ -32,10 +42,6 @@ from banco_occidente_corpus.config import PROJECT_ROOT
 DIMENSION_ESPERADA: int = 768
 #: Carpeta por defecto del índice no versionado.
 CARPETA_BOVEDA: Path = PROJECT_ROOT / "data" / "boveda"
-#: Nombre del archivo de metadatos del índice.
-NOMBRE_METADATOS: str = "indice.json"
-#: Nombre de la carpeta persistente de Chroma.
-NOMBRE_ALMACEN: str = "chroma"
 #: Alcances admitidos por `boveda/indice.py`.
 ALCANCES: frozenset[str] = frozenset({"base", "completo"})
 
@@ -68,44 +74,40 @@ def leer_metadatos(ruta: Path) -> dict[str, Any]:
     return datos
 
 
-def abrir_coleccion(ruta: Path) -> Any | None:
-    """Abre la colección existente de Chroma en modo lectura.
+def abrir_almacen(ruta: Path, tipo: TipoAlmacen) -> AlmacenVectorial | None:
+    """Abre la colección existente en modo lectura, sin crearla.
 
-    Devuelve `None` si la carpeta no existe, si Chroma no puede abrirla o si la
-    colección `boveda` no está creada. No crea una colección vacía.
+    Devuelve `None` si la carpeta no existe, si el motor no puede abrirla o si la
+    colección `boveda` no está creada. Propaga `AlmacenBloqueado` para que el
+    mensaje de la app en marcha llegue intacto.
     """
     if not ruta.exists():
         return None
     try:
-        import chromadb
-
-        cliente = chromadb.PersistentClient(path=str(ruta))
-        return cliente.get_collection(
-            name=COLECCION_POR_DEFECTO,
-            embedding_function=None,
-        )
+        almacen = crear_almacen_en_ruta(ruta, tipo)
+        if not almacen.existe():
+            cerrar_almacen(almacen)
+            return None
+        return almacen
+    except AlmacenBloqueado:
+        raise
     except Exception:
         return None
 
 
-def contar_coleccion(coleccion: Any) -> int:
+def contar_coleccion(almacen: AlmacenVectorial) -> int:
     """Devuelve el número de vectores almacenados en la colección."""
-    return int(coleccion.count())
+    return int(almacen.contar())
 
 
-def metrica_coleccion(coleccion: Any) -> str:
-    """Devuelve la métrica declarada por la colección (`hnsw:space`)."""
-    metadatos = getattr(coleccion, "metadata", None) or {}
-    return str(metadatos.get("hnsw:space", ""))
+def metrica_coleccion(almacen: AlmacenVectorial) -> str:
+    """Devuelve la métrica de distancia declarada por la colección."""
+    return almacen.metrica_almacenada()
 
 
-def dimension_coleccion(coleccion: Any) -> int:
-    """Devuelve la dimensión del primer vector almacenado, o 0 si está vacía."""
-    resultado = coleccion.get(limit=1, include=["embeddings"])
-    vectores = resultado.get("embeddings")
-    if vectores is None or len(vectores) == 0:
-        return 0
-    return len(vectores[0])
+def dimension_coleccion(almacen: AlmacenVectorial) -> int:
+    """Devuelve la dimensión de los vectores almacenados, o 0 si está vacía."""
+    return int(almacen.dimension_almacenada())
 
 
 def revisar_indice(
@@ -116,6 +118,8 @@ def revisar_indice(
     dimension: int,
     modelo_config: str,
     prefijos_config: bool,
+    tipo_almacen: TipoAlmacen,
+    nombres_coleccion: Sequence[str],
 ) -> list[Comprobacion]:
     """Compara los metadatos del índice con la colección y la configuración."""
     esperados = {"modelo", "prefijos", "alcance", "fragmentos", "dimension"}
@@ -129,6 +133,21 @@ def revisar_indice(
             detalle=f"faltan: {', '.join(faltantes)}" if faltantes else "",
         )
     ]
+
+    declarado = metadatos.get("almacen")
+    comprobaciones.append(
+        Comprobacion(
+            nombre="almacen declarado",
+            obtenido=str(declarado) if declarado is not None else "sin declarar",
+            esperado=tipo_almacen,
+            ok=declarado is None or declarado == tipo_almacen,
+            detalle=(
+                "un indice.json anterior a la migración se acepta como compatible"
+                if declarado is None
+                else "el índice declara otro motor; ejecuta `make migrar-qdrant`"
+            ),
+        )
+    )
 
     alcance = str(metadatos.get("alcance", ""))
     comprobaciones.append(
@@ -192,13 +211,22 @@ def revisar_indice(
         )
     )
 
+    colecciones = ", ".join(nombres_coleccion) or "ninguna"
     comprobaciones.append(
         Comprobacion(
-            nombre="metrica de Chroma",
+            nombre=f"coleccion de {tipo_almacen}",
+            obtenido=colecciones,
+            esperado=COLECCION_POR_DEFECTO,
+            ok=COLECCION_POR_DEFECTO in nombres_coleccion,
+        )
+    )
+    comprobaciones.append(
+        Comprobacion(
+            nombre=f"metrica de {tipo_almacen}",
             obtenido=metrica,
             esperado=METRICA_POR_DEFECTO,
             ok=metrica == METRICA_POR_DEFECTO,
-            detalle="la colección debe declarar hnsw:space=cosine",
+            detalle="la colección debe declarar distancia coseno",
         )
     )
     return comprobaciones
@@ -207,12 +235,17 @@ def revisar_indice(
 def comprobar(
     ruta_indice: Path | None = None,
     ruta_almacen: Path | None = None,
+    *,
+    tipo: TipoAlmacen | None = None,
+    almacen: AlmacenVectorial | None = None,
 ) -> tuple[list[Comprobacion], dict[str, Any]]:
     """Ejecuta todas las comprobaciones sobre el índice indicado.
 
     Args:
         ruta_indice: ruta de `indice.json`; por defecto `data/boveda/indice.json`.
-        ruta_almacen: ruta de Chroma; por defecto `data/boveda/chroma`.
+        ruta_almacen: ruta de la carpeta del almacén; por defecto la configurada.
+        tipo: `qdrant` o `chroma`; si falta, se lee `[almacen].tipo`.
+        almacen: almacén ya abierto (pruebas); si falta, se abre en modo lectura.
 
     Returns:
         Las comprobaciones y los metadatos leídos.
@@ -220,29 +253,39 @@ def comprobar(
     Raises:
         FileNotFoundError: si falta el archivo de metadatos o la colección.
         ValueError: si el archivo de metadatos no tiene la forma esperada.
+        AlmacenBloqueado: si otro proceso tiene abierta la carpeta de Qdrant.
     """
+    motor: TipoAlmacen = tipo or cargar_configuracion_almacen().tipo
     indice = CARPETA_BOVEDA / NOMBRE_METADATOS if ruta_indice is None else ruta_indice
-    almacen = CARPETA_BOVEDA / NOMBRE_ALMACEN if ruta_almacen is None else ruta_almacen
+    ubicacion = ruta_almacen_en(CARPETA_BOVEDA, motor) if ruta_almacen is None else ruta_almacen
     metadatos = leer_metadatos(indice)
-    coleccion = abrir_coleccion(almacen)
-    if coleccion is None:
+    abierto = almacen is None
+    destino = abrir_almacen(ubicacion, motor) if abierto else almacen
+    if destino is None:
         raise FileNotFoundError(
-            f"No hay colección en {almacen}: ejecuta `make indice` o `make indice-completo`."
+            f"No hay colección de {motor} en {ubicacion}: ejecuta `make indice` "
+            "o `make indice-completo`."
         )
 
-    ajustes = cargar_configuracion_embeddings()
-    comprobaciones = revisar_indice(
-        metadatos,
-        conteo=contar_coleccion(coleccion),
-        metrica=metrica_coleccion(coleccion),
-        dimension=dimension_coleccion(coleccion),
-        modelo_config=ajustes.modelo,
-        prefijos_config=ajustes.prefijos,
-    )
+    try:
+        ajustes = cargar_configuracion_embeddings()
+        comprobaciones = revisar_indice(
+            metadatos,
+            conteo=contar_coleccion(destino),
+            metrica=metrica_coleccion(destino),
+            dimension=dimension_coleccion(destino),
+            modelo_config=ajustes.modelo,
+            prefijos_config=ajustes.prefijos,
+            tipo_almacen=motor,
+            nombres_coleccion=[destino.coleccion],
+        )
+    finally:
+        if abierto and destino is not None:
+            cerrar_almacen(destino)
     return comprobaciones, metadatos
 
 
-def formatear(comprobaciones: Sequence[Comprobacion]) -> str:
+def formatear(comprobaciones: Sequence[Comprobacion], tipo: str = "") -> str:
     """Devuelve el texto legible de las comprobaciones."""
     lineas = ["Comprobación del índice de la Bóveda:", ""]
     for item in comprobaciones:
@@ -253,6 +296,7 @@ def formatear(comprobaciones: Sequence[Comprobacion]) -> str:
         lineas.append(linea)
     fallos = [item for item in comprobaciones if not item.ok]
     lineas.append("")
+    motor = tipo or "el almacén"
     if fallos:
         lineas.append(
             f"RESULTADO: FALLA ({len(fallos)} de {len(comprobaciones)} comprobaciones). "
@@ -261,7 +305,7 @@ def formatear(comprobaciones: Sequence[Comprobacion]) -> str:
     else:
         lineas.append(
             f"RESULTADO: OK ({len(comprobaciones)} comprobaciones). "
-            "El índice coincide con Chroma y con la configuración."
+            f"El índice coincide con {motor} y con la configuración."
         )
     return "\n".join(lineas)
 
@@ -277,19 +321,38 @@ def main(argv: Sequence[str] | None = None) -> int:
     _configurar_salida()
     parser = argparse.ArgumentParser(
         prog="validar_indice.py",
-        description="Valida data/boveda/indice.json contra la colección de Chroma.",
+        description="Valida data/boveda/indice.json contra la colección del almacén.",
     )
     parser.add_argument("--indice", type=Path, default=None, help="ruta de indice.json")
-    parser.add_argument("--almacen", type=Path, default=None, help="ruta de la carpeta Chroma")
+    parser.add_argument(
+        "--almacen",
+        type=Path,
+        default=None,
+        help="ruta de la carpeta del almacén (qdrant o chroma)",
+    )
+    parser.add_argument(
+        "--tipo",
+        choices=("qdrant", "chroma"),
+        default=None,
+        help="motor del índice; por defecto el de config/sucursal.toml",
+    )
     args = parser.parse_args(argv)
 
     try:
-        comprobaciones, _ = comprobar(args.indice, args.almacen)
+        comprobaciones, _ = comprobar(
+            args.indice,
+            args.almacen,
+            tipo=args.tipo,
+        )
+    except AlmacenBloqueado as error:
+        print(f"Error: {error}", file=sys.stderr)
+        return 1
     except (FileNotFoundError, ValueError) as error:
         print(f"Error: {error}", file=sys.stderr)
         return 1
 
-    print(formatear(comprobaciones))
+    motor = args.tipo or cargar_configuracion_almacen().tipo
+    print(formatear(comprobaciones, motor))
     return 0 if all(item.ok for item in comprobaciones) else 1
 
 

@@ -1,7 +1,7 @@
 """Pruebas sin red del mapa PCA de la Bóveda (PR 11, tareas 14.1 y 14.2).
 
 Ninguna prueba llama a Ollama: los vectores salen de `DeterministicFakeEmbedding`
-y Chroma se instancia en `tmp_path`.
+y el almacén se instancia en `tmp_path`.
 """
 
 from __future__ import annotations
@@ -15,10 +15,10 @@ from typing import Any
 import pytest
 from langchain_core.embeddings import DeterministicFakeEmbedding
 
-from banco_occidente_corpus.boveda.almacen import ChromaAlmacen
+from banco_occidente_corpus.boveda.almacen import crear_almacen
 from banco_occidente_corpus.boveda.configuracion import ConfiguracionEmbeddings
 from banco_occidente_corpus.boveda.fragmentos import ruta_fragmentos
-from banco_occidente_corpus.boveda.indice import construir_indice, ruta_almacen
+from banco_occidente_corpus.boveda.indice import construir_indice
 from banco_occidente_corpus.boveda.mapa import (
     ServicioMapa,
     construir_mapa,
@@ -176,7 +176,7 @@ def test_mapa_rechaza_vectores_nulos() -> None:
 
 
 def preparar_indice(tmp_path: Path) -> tuple[Config, list[Fragmento]]:
-    """Escribe fragmentos y construye un índice Chroma real en tmp_path."""
+    """Escribe fragmentos y construye un índice real en tmp_path."""
     config = make_config(tmp_path)
     fragmentos = fragmentos_de_prueba()
     write_jsonl(ruta_fragmentos(config, "base"), [asdict(f) for f in fragmentos])
@@ -185,7 +185,7 @@ def preparar_indice(tmp_path: Path) -> tuple[Config, list[Fragmento]]:
         "base",
         configuracion=ConfiguracionEmbeddings(prefijos=True),
         embeddings=DeterministicFakeEmbedding(size=16),
-        almacen=ChromaAlmacen(ruta_almacen(config)),
+        almacen=crear_almacen(config),
     )
     return config, fragmentos
 
@@ -201,7 +201,7 @@ def test_make_indice_regenera_el_mapa(tmp_path: Path) -> None:
     assert leer_proyeccion(mapa) is not None
 
 
-def test_mapa_ausente_se_calcula_una_vez_desde_chroma(tmp_path: Path) -> None:
+def test_mapa_ausente_se_calcula_una_vez_desde_el_indice(tmp_path: Path) -> None:
     """Si falta mapa.json, el servicio lo recalcula con los vectores de Chroma y lo escribe."""
     config, fragmentos = preparar_indice(tmp_path)
     original = leer_mapa(config)
