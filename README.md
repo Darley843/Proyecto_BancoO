@@ -554,6 +554,13 @@ regenera con `make gold`. Contrato completo en [`CONSTITUTION.md`](./CONSTITUTIO
 no forma parte de `make all`, `make gold`, `make deliver`, `make docs`, `make docs-finanzas`,
 `make videos` ni `make media`; la curaduría vive en `data/noticias/prensa.yaml`.
 
+## Cómo contribuir
+
+- Cada cambio va en una rama (`feat/`, `fix/`, `docs/`, `refactor/`, `test/`, `chore/`) y en un pull request que usa la plantilla [`.github/PULL_REQUEST_TEMPLATE.md`](./.github/PULL_REQUEST_TEMPLATE.md).
+- Para que GitHub la cargue, abre el PR sin `--body`: `gh pr create --base main --title "..."` abre el editor con la plantilla para completarla.
+- Los commits siguen Conventional Commits en español y GGA los revisa antes de cada commit.
+- Cada PR necesita la aprobación de alguien distinto de quien subió el último commit.
+
 ## Documentación
 
 [`CONSTITUTION.md`](./CONSTITUTION.md) (verdad central) · [`docs/ESTANDAR.md`](./docs/ESTANDAR.md)
