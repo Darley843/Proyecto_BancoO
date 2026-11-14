@@ -7,13 +7,13 @@
   "quality": "showcase",
   "specification": {
     "path": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\arquitectura.json",
-    "sha256": "8fff439e7be5ebdf754b827eac019a9de82757b9f05886d0cf245903ea2ca86e",
-    "bytes": 6026
+    "sha256": "d2e156731e236e5eb180e321a2eb2c7dbecf4e8e7edf20cb4a7a3560d8771cf5",
+    "bytes": 7314
   },
   "artifact": {
     "path": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\arquitectura.html",
-    "sha256": "b6dcd54fcfcbe2ba78bfe83e5b657e24df9684a3de7654538640b94ec508033c",
-    "bytes": 852307
+    "sha256": "a16b321994e02e1db7711b4152dd0e402a8f61449a7c88ee7d3248b46b974531",
+    "bytes": 858126
   },
   "gates": {
     "validate": "pass",
@@ -43,7 +43,7 @@
     "noticeText": null
   },
   "visualReview": "not-requested",
-  "durationMs": 4259,
+  "durationMs": 4425,
   "browserCheck": {
     "requested": true,
     "ran": true

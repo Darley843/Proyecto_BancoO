@@ -10,7 +10,7 @@
       "url": "https://github.com/Darley843/Proyecto_BancoO",
       "provider": "github",
       "link_mode": "web",
-      "revision": "429f0e0f8318e384ff77821bf04cdeddd2a5cc3d"
+      "revision": "45d0878247d9682f2336bd5068feae1aea49f1c8"
     }
   },
   "components": [
@@ -36,11 +36,11 @@
       "id": "grafo",
       "type": "backend",
       "label": "Grafo LangGraph",
-      "sublabel": "router · 5 rutas",
+      "sublabel": "router · 6 rutas",
       "pos": [538, 280],
       "size": [160, 66],
       "sources": [
-        { "path": "src/banco_occidente_corpus/sucursal/grafo.py", "line": 197, "end_line": 236, "label": "nodos y rutas" }
+        { "path": "src/banco_occidente_corpus/sucursal/grafo.py", "line": 239, "end_line": 262, "label": "nodos y rutas" }
       ]
     },
     {
@@ -88,14 +88,37 @@
       ]
     },
     {
+      "id": "langsmith",
+      "type": "external",
+      "label": "LangSmith",
+      "sublabel": "trazas · opcional",
+      "pos": [348, 105],
+      "size": [150, 66],
+      "sources": [
+        { "path": "docs/SEGURIDAD.md", "line": 449, "end_line": 460, "label": "encendido por entorno" }
+      ]
+    },
+    {
+      "id": "perfil",
+      "type": "database",
+      "label": "Store de perfil",
+      "sublabel": "perfil.sqlite · por usuario",
+      "pos": [348, 455],
+      "size": [150, 66],
+      "sources": [
+        { "path": "src/banco_occidente_corpus/sucursal/preguntar.py", "line": 370, "end_line": 383, "label": "SqliteStore" },
+        { "path": "src/banco_occidente_corpus/sucursal/perfil.py", "line": 341, "end_line": 353, "label": "namespace del perfil" }
+      ]
+    },
+    {
       "id": "sqlite",
       "type": "database",
       "label": "SQLite",
-      "sublabel": "memoria.sqlite · checkpointer",
+      "sublabel": "memoria.sqlite · por hilo",
       "pos": [548, 455],
       "size": [140, 66],
       "sources": [
-        { "path": "src/banco_occidente_corpus/sucursal/grafo.py", "line": 190, "end_line": 192, "label": "SqliteSaver" }
+        { "path": "src/banco_occidente_corpus/sucursal/grafo.py", "line": 225, "end_line": 227, "label": "SqliteSaver" }
       ]
     },
     {
@@ -130,7 +153,9 @@
     { "from": "boveda", "to": "qdrant", "label": "top-k", "variant": "default" },
     { "from": "boveda", "to": "ollama", "label": "embeddings", "variant": "dashed" },
     { "from": "grafo", "to": "deepseek", "label": "chat model", "variant": "dashed" },
-    { "from": "grafo", "to": "sqlite", "label": "checkpoint", "variant": "default" },
+    { "from": "grafo", "to": "sqlite", "label": "checkpoint · hilo", "variant": "default" },
+    { "from": "grafo", "to": "perfil", "label": "perfil · largo plazo", "variant": "default", "fromSide": "bottom", "toSide": "top" },
+    { "from": "grafo", "to": "langsmith", "label": "trazas (opcional)", "variant": "dashed" },
     { "from": "tablero", "to": "tablero_csv", "label": "filas", "variant": "default" }
   ],
   "cards": [
@@ -142,6 +167,7 @@
         "B → Bóveda: RAG sobre los fragmentos de Gold",
         "T → Tablero: 1–3 filas, respuesta con plantilla",
         "Mixta → Tablero + Bóveda: la cifra y su explicación en un turno",
+        "Perfil → memoria de largo plazo: nombre y empresa del cliente",
         "X → rechazo: si el dato no está, no se inventa"
       ]
     },
@@ -149,18 +175,19 @@
       "dot": "emerald",
       "title": "Todo local salvo el modelo",
       "items": [
-        "FastAPI, Qdrant, el CSV y SQLite viven en el equipo",
+        "FastAPI, Qdrant, el CSV y las dos SQLite viven en el equipo",
         "Ollama en 127.0.0.1:11434 calcula los embeddings",
         "DeepSeek solo recibe la pregunta y los fragmentos elegidos"
       ]
     },
     {
       "dot": "amber",
-      "title": "Memoria y respuesta",
+      "title": "Memoria en dos plazos",
       "items": [
-        "SqliteSaver (memoria.sqlite) aísla cada sesión por thread_id",
-        "El grafo recorta el historial antes de redactar",
-        "La respuesta cita la fuente Gold o la fila del Tablero"
+        "Checkpointer: memoria.sqlite guarda el hilo completo por thread_id",
+        "Store: perfil.sqlite guarda nombre y empresa por usuario, en su namespace",
+        "El perfil no llega al modelo, a la caché ni al checkpointer",
+        "Se borra con «olvida mi perfil»"
       ]
     },
     {
@@ -169,7 +196,8 @@
       "items": [
         "SSE en /api/preguntar/stream: una etapa por nodo, sin la pregunta",
         "GET /health responde 200 con índice o en demo; 503 si falta el índice",
-        "Ctrl + C cierra en segundos aunque haya un stream abierto y deja libre el puerto"
+        "Ctrl + C cierra en segundos aunque haya un stream abierto y deja libre el puerto",
+        "LangSmith traza el turno solo si se activa por variables; por defecto está apagado"
       ]
     }
   ]

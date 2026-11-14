@@ -10,7 +10,7 @@
       "url": "https://github.com/Darley843/Proyecto_BancoO",
       "provider": "github",
       "link_mode": "web",
-      "revision": "429f0e0f8318e384ff77821bf04cdeddd2a5cc3d"
+      "revision": "45d0878247d9682f2336bd5068feae1aea49f1c8"
     }
   },
   "stages": [
@@ -132,6 +132,18 @@
       ]
     },
     {
+      "id": "perfil",
+      "type": "database",
+      "label": "Store de perfil",
+      "sublabel": "perfil.sqlite · por usuario",
+      "stage": 3,
+      "row": 2,
+      "sources": [
+        { "path": "src/banco_occidente_corpus/sucursal/preguntar.py", "line": 370, "end_line": 383, "label": "SqliteStore" },
+        { "path": "src/banco_occidente_corpus/sucursal/perfil.py", "line": 341, "end_line": 353, "label": "namespace del perfil" }
+      ]
+    },
+    {
       "id": "recuperador",
       "type": "backend",
       "label": "Recuperador híbrido",
@@ -216,6 +228,7 @@
       "title": "Fronteras del dato",
       "items": [
         "Qdrant y el CSV viven en el equipo; el índice no se versiona y el CSV sí",
+        "El perfil del cliente vive en data/asistente/perfil.sqlite: local, fuera de Git y nunca entra al índice",
         "DeepSeek solo recibe la pregunta y los fragmentos recuperados",
         "Si el dato no está, el grafo responde la frase fija y no inventa una cifra"
       ]

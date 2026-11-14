@@ -6,11 +6,11 @@
   "status": "pass",
   "visualReview": "not-requested",
   "provenance": "current",
-  "deliveryReceiptId": "e714645a-48c7-4804-bede-368a7f0d90d8",
+  "deliveryReceiptId": "e2f3b280-6db9-488a-8c5e-dc762c60f08a",
   "artifact": {
     "path": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\datos.html",
-    "sha256": "a6bcc245803f5bf374569843adf244469f640269247bb4747975e987afac926d",
-    "bytes": 853884
+    "sha256": "84ff8608c1e281371abe0b012f7ad401f9bd9b2e0211c7932ee3d19f38653b21",
+    "bytes": 855808
   },
   "state": {
     "detail": "read",
