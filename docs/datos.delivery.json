@@ -1,17 +1,17 @@
 {
   "schemaVersion": 1,
-  "receiptId": "03b63a74-6c9d-4461-b83b-2f261f89ccba",
+  "receiptId": "e714645a-48c7-4804-bede-368a7f0d90d8",
   "status": "current",
   "command": "deliver",
   "type": "dataflow",
   "input": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\datos.json",
   "output": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\datos.html",
   "specification": {
-    "sha256": "c2f313aa213defdd55acb9bed0084a7b29679446cc7e5ae055106056b945b61f",
-    "bytes": 7653
+    "sha256": "6e28e32458e2a3d1a961ea00d4f7e7980c79a4c3d0580df0cd9fdd2a81c97a52",
+    "bytes": 7661
   },
   "artifact": {
-    "sha256": "feedc73aa746cb44b5e6b4e6ae47b832df63e6d1ca3525b534b2b1edb5a93127",
-    "bytes": 853864
+    "sha256": "a6bcc245803f5bf374569843adf244469f640269247bb4747975e987afac926d",
+    "bytes": 853884
   }
 }

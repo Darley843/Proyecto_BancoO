@@ -6,11 +6,11 @@
   "status": "pass",
   "visualReview": "not-requested",
   "provenance": "current",
-  "deliveryReceiptId": "73f5126f-8a60-4ada-98ac-ecc43e434934",
+  "deliveryReceiptId": "561f8f2c-f298-4187-92ed-bbf5beb4693b",
   "artifact": {
     "path": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\arquitectura.html",
-    "sha256": "a9d273d167e13c2435cfd9e1456d5e6b3993e3a12e55bb90587d20465ce7f159",
-    "bytes": 851295
+    "sha256": "b6dcd54fcfcbe2ba78bfe83e5b657e24df9684a3de7654538640b94ec508033c",
+    "bytes": 852307
   },
   "state": {
     "detail": "read",
@@ -52,16 +52,14 @@
           "viewBoxHeight": 589
         },
         "viewBoxWidth": 1170,
-        "minimumProjectedNodeTextPx": 8,
-        "minimumProjectedNonEdgeTextPx": 9,
+        "minimumProjectedNodeTextPx": 7.5,
+        "minimumProjectedNonEdgeTextPx": 7.5,
         "minimumProjectedEdgeTextPx": 8,
-        "minimumProjectedNodeText": "HTTP :8000",
-        "minimumProjectedNodeTextDetail": "edge",
+        "minimumProjectedNodeText": "memoria.sqlite · checkpointer",
+        "minimumProjectedNodeTextDetail": "context",
         "minimumProjectedNodeTextOwner": {
-          "kind": "edge",
-          "id": null,
-          "from": "navegador",
-          "to": "fastapi"
+          "kind": "node",
+          "id": "sqlite"
         },
         "minimumRequiredNodeTextPx": 6,
         "readabilityOk": true,
@@ -104,16 +102,14 @@
           "viewBoxHeight": 589
         },
         "viewBoxWidth": 1170,
-        "minimumProjectedNodeTextPx": 8,
-        "minimumProjectedNonEdgeTextPx": 9,
+        "minimumProjectedNodeTextPx": 7.5,
+        "minimumProjectedNonEdgeTextPx": 7.5,
         "minimumProjectedEdgeTextPx": 8,
-        "minimumProjectedNodeText": "HTTP :8000",
-        "minimumProjectedNodeTextDetail": "edge",
+        "minimumProjectedNodeText": "memoria.sqlite · checkpointer",
+        "minimumProjectedNodeTextDetail": "context",
         "minimumProjectedNodeTextOwner": {
-          "kind": "edge",
-          "id": null,
-          "from": "navegador",
-          "to": "fastapi"
+          "kind": "node",
+          "id": "sqlite"
         },
         "minimumRequiredNodeTextPx": 6,
         "readabilityOk": true,
@@ -156,16 +152,14 @@
           "viewBoxHeight": 589
         },
         "viewBoxWidth": 1170,
-        "minimumProjectedNodeTextPx": 8,
-        "minimumProjectedNonEdgeTextPx": 9,
+        "minimumProjectedNodeTextPx": 7.5,
+        "minimumProjectedNonEdgeTextPx": 7.5,
         "minimumProjectedEdgeTextPx": 8,
-        "minimumProjectedNodeText": "HTTP :8000",
-        "minimumProjectedNodeTextDetail": "edge",
+        "minimumProjectedNodeText": "memoria.sqlite · checkpointer",
+        "minimumProjectedNodeTextDetail": "context",
         "minimumProjectedNodeTextOwner": {
-          "kind": "edge",
-          "id": null,
-          "from": "navegador",
-          "to": "fastapi"
+          "kind": "node",
+          "id": "sqlite"
         },
         "minimumRequiredNodeTextPx": 6,
         "readabilityOk": true,
@@ -208,16 +202,14 @@
           "viewBoxHeight": 589
         },
         "viewBoxWidth": 1170,
-        "minimumProjectedNodeTextPx": 8,
-        "minimumProjectedNonEdgeTextPx": 9,
+        "minimumProjectedNodeTextPx": 7.5,
+        "minimumProjectedNonEdgeTextPx": 7.5,
         "minimumProjectedEdgeTextPx": 8,
-        "minimumProjectedNodeText": "HTTP :8000",
-        "minimumProjectedNodeTextDetail": "edge",
+        "minimumProjectedNodeText": "memoria.sqlite · checkpointer",
+        "minimumProjectedNodeTextDetail": "context",
         "minimumProjectedNodeTextOwner": {
-          "kind": "edge",
-          "id": null,
-          "from": "navegador",
-          "to": "fastapi"
+          "kind": "node",
+          "id": "sqlite"
         },
         "minimumRequiredNodeTextPx": 6,
         "readabilityOk": true,
@@ -313,16 +305,14 @@
           "viewBoxHeight": 589
         },
         "viewBoxWidth": 1170,
-        "minimumProjectedNodeTextPx": 8,
-        "minimumProjectedNonEdgeTextPx": 9,
+        "minimumProjectedNodeTextPx": 7.5,
+        "minimumProjectedNonEdgeTextPx": 7.5,
         "minimumProjectedEdgeTextPx": 8,
-        "minimumProjectedNodeText": "HTTP :8000",
-        "minimumProjectedNodeTextDetail": "edge",
+        "minimumProjectedNodeText": "memoria.sqlite · checkpointer",
+        "minimumProjectedNodeTextDetail": "context",
         "minimumProjectedNodeTextOwner": {
-          "kind": "edge",
-          "id": null,
-          "from": "navegador",
-          "to": "fastapi"
+          "kind": "node",
+          "id": "sqlite"
         },
         "minimumRequiredNodeTextPx": 6,
         "readabilityOk": true,
@@ -365,16 +355,14 @@
           "viewBoxHeight": 589
         },
         "viewBoxWidth": 1170,
-        "minimumProjectedNodeTextPx": 8,
-        "minimumProjectedNonEdgeTextPx": 9,
+        "minimumProjectedNodeTextPx": 7.5,
+        "minimumProjectedNonEdgeTextPx": 7.5,
         "minimumProjectedEdgeTextPx": 8,
-        "minimumProjectedNodeText": "HTTP :8000",
-        "minimumProjectedNodeTextDetail": "edge",
+        "minimumProjectedNodeText": "memoria.sqlite · checkpointer",
+        "minimumProjectedNodeTextDetail": "context",
         "minimumProjectedNodeTextOwner": {
-          "kind": "edge",
-          "id": null,
-          "from": "navegador",
-          "to": "fastapi"
+          "kind": "node",
+          "id": "sqlite"
         },
         "minimumRequiredNodeTextPx": 6,
         "readabilityOk": true,
@@ -417,16 +405,14 @@
           "viewBoxHeight": 589
         },
         "viewBoxWidth": 1170,
-        "minimumProjectedNodeTextPx": 8,
-        "minimumProjectedNonEdgeTextPx": 9,
+        "minimumProjectedNodeTextPx": 7.5,
+        "minimumProjectedNonEdgeTextPx": 7.5,
         "minimumProjectedEdgeTextPx": 8,
-        "minimumProjectedNodeText": "HTTP :8000",
-        "minimumProjectedNodeTextDetail": "edge",
+        "minimumProjectedNodeText": "memoria.sqlite · checkpointer",
+        "minimumProjectedNodeTextDetail": "context",
         "minimumProjectedNodeTextOwner": {
-          "kind": "edge",
-          "id": null,
-          "from": "navegador",
-          "to": "fastapi"
+          "kind": "node",
+          "id": "sqlite"
         },
         "minimumRequiredNodeTextPx": 6,
         "readabilityOk": true,
@@ -469,16 +455,14 @@
           "viewBoxHeight": 589
         },
         "viewBoxWidth": 1170,
-        "minimumProjectedNodeTextPx": 8,
-        "minimumProjectedNonEdgeTextPx": 9,
+        "minimumProjectedNodeTextPx": 7.5,
+        "minimumProjectedNonEdgeTextPx": 7.5,
         "minimumProjectedEdgeTextPx": 8,
-        "minimumProjectedNodeText": "HTTP :8000",
-        "minimumProjectedNodeTextDetail": "edge",
+        "minimumProjectedNodeText": "memoria.sqlite · checkpointer",
+        "minimumProjectedNodeTextDetail": "context",
         "minimumProjectedNodeTextOwner": {
-          "kind": "edge",
-          "id": null,
-          "from": "navegador",
-          "to": "fastapi"
+          "kind": "node",
+          "id": "sqlite"
         },
         "minimumRequiredNodeTextPx": 6,
         "readabilityOk": true,
@@ -526,16 +510,14 @@
           "viewBoxHeight": 589
         },
         "viewBoxWidth": 1170,
-        "minimumProjectedNodeTextPx": 8,
-        "minimumProjectedNonEdgeTextPx": 9,
+        "minimumProjectedNodeTextPx": 7.5,
+        "minimumProjectedNonEdgeTextPx": 7.5,
         "minimumProjectedEdgeTextPx": 8,
-        "minimumProjectedNodeText": "HTTP :8000",
-        "minimumProjectedNodeTextDetail": "edge",
+        "minimumProjectedNodeText": "memoria.sqlite · checkpointer",
+        "minimumProjectedNodeTextDetail": "context",
         "minimumProjectedNodeTextOwner": {
-          "kind": "edge",
-          "id": null,
-          "from": "navegador",
-          "to": "fastapi"
+          "kind": "node",
+          "id": "sqlite"
         },
         "minimumRequiredNodeTextPx": 6,
         "readabilityOk": true,
@@ -578,16 +560,14 @@
           "viewBoxHeight": 589
         },
         "viewBoxWidth": 1170,
-        "minimumProjectedNodeTextPx": 8,
-        "minimumProjectedNonEdgeTextPx": 9,
+        "minimumProjectedNodeTextPx": 7.5,
+        "minimumProjectedNonEdgeTextPx": 7.5,
         "minimumProjectedEdgeTextPx": 8,
-        "minimumProjectedNodeText": "HTTP :8000",
-        "minimumProjectedNodeTextDetail": "edge",
+        "minimumProjectedNodeText": "memoria.sqlite · checkpointer",
+        "minimumProjectedNodeTextDetail": "context",
         "minimumProjectedNodeTextOwner": {
-          "kind": "edge",
-          "id": null,
-          "from": "navegador",
-          "to": "fastapi"
+          "kind": "node",
+          "id": "sqlite"
         },
         "minimumRequiredNodeTextPx": 6,
         "readabilityOk": true,
@@ -630,16 +610,14 @@
           "viewBoxHeight": 589
         },
         "viewBoxWidth": 1170,
-        "minimumProjectedNodeTextPx": 8,
-        "minimumProjectedNonEdgeTextPx": 9,
+        "minimumProjectedNodeTextPx": 7.5,
+        "minimumProjectedNonEdgeTextPx": 7.5,
         "minimumProjectedEdgeTextPx": 8,
-        "minimumProjectedNodeText": "HTTP :8000",
-        "minimumProjectedNodeTextDetail": "edge",
+        "minimumProjectedNodeText": "memoria.sqlite · checkpointer",
+        "minimumProjectedNodeTextDetail": "context",
         "minimumProjectedNodeTextOwner": {
-          "kind": "edge",
-          "id": null,
-          "from": "navegador",
-          "to": "fastapi"
+          "kind": "node",
+          "id": "sqlite"
         },
         "minimumRequiredNodeTextPx": 6,
         "readabilityOk": true,
@@ -682,16 +660,14 @@
           "viewBoxHeight": 589
         },
         "viewBoxWidth": 1170,
-        "minimumProjectedNodeTextPx": 8,
-        "minimumProjectedNonEdgeTextPx": 9,
+        "minimumProjectedNodeTextPx": 7.5,
+        "minimumProjectedNonEdgeTextPx": 7.5,
         "minimumProjectedEdgeTextPx": 8,
-        "minimumProjectedNodeText": "HTTP :8000",
-        "minimumProjectedNodeTextDetail": "edge",
+        "minimumProjectedNodeText": "memoria.sqlite · checkpointer",
+        "minimumProjectedNodeTextDetail": "context",
         "minimumProjectedNodeTextOwner": {
-          "kind": "edge",
-          "id": null,
-          "from": "navegador",
-          "to": "fastapi"
+          "kind": "node",
+          "id": "sqlite"
         },
         "minimumRequiredNodeTextPx": 6,
         "readabilityOk": true,

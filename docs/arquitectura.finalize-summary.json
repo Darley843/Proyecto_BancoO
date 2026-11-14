@@ -7,13 +7,13 @@
   "quality": "showcase",
   "specification": {
     "path": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\arquitectura.json",
-    "sha256": "a8a3782fab811330fb5f48a0205721919af87bac04c1ec692228b1aa89fcf34d",
-    "bytes": 5344
+    "sha256": "8fff439e7be5ebdf754b827eac019a9de82757b9f05886d0cf245903ea2ca86e",
+    "bytes": 6026
   },
   "artifact": {
     "path": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\arquitectura.html",
-    "sha256": "a9d273d167e13c2435cfd9e1456d5e6b3993e3a12e55bb90587d20465ce7f159",
-    "bytes": 851295
+    "sha256": "b6dcd54fcfcbe2ba78bfe83e5b657e24df9684a3de7654538640b94ec508033c",
+    "bytes": 852307
   },
   "gates": {
     "validate": "pass",
@@ -37,13 +37,13 @@
     "installedVersion": "3.2.0",
     "availableVersion": "3.2.0",
     "releaseNotes": null,
-    "checkedAt": "2026-11-05T23:56:47.183Z",
-    "source": "network",
+    "checkedAt": "2026-11-14T00:45:09.894Z",
+    "source": "cache",
     "noticeRequired": false,
     "noticeText": null
   },
   "visualReview": "not-requested",
-  "durationMs": 2189,
+  "durationMs": 4259,
   "browserCheck": {
     "requested": true,
     "ran": true
