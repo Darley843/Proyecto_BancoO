@@ -8,6 +8,7 @@ y cierra con el mismo cuerpo que `POST /api/preguntar`.
 from __future__ import annotations
 
 import json
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -34,6 +35,7 @@ from banco_occidente_corpus.sucursal.transmision import (
     GrafoConAvance,
     MensajeTurno,
     TransmisionTurno,
+    cerrar_transmisiones,
     evento_de_tarea,
 )
 from banco_occidente_corpus.tablero.tipos import Fila
@@ -409,3 +411,36 @@ def test_streaming_muestra_la_etapa_de_perfil(
     assert final["uso_modelo"] is False
     assert final["fuentes"] == []
     assert "Carvajal" not in json.dumps(perfil, ensure_ascii=False)
+
+
+def test_cerrar_transmisiones_suelta_al_generador_sse() -> None:
+    """El apagado corta un turno en curso en lugar de esperar al modelo."""
+    suelta = threading.Event()
+
+    def atender() -> dict[str, Any]:
+        """Se queda como un turno esperando la respuesta del modelo."""
+        suelta.wait(10)
+        return {}
+
+    transmision = TransmisionTurno(atender).iniciar()
+    cerrar_transmisiones()
+
+    assert list(transmision.eventos_sse()) == []
+    suelta.set()
+
+
+def test_cerrar_una_transmision_terminada_no_falla() -> None:
+    """Cerrar después del final es inocuo: el apagado puede repetirse."""
+
+    def atender() -> dict[str, Any]:
+        """Termina enseguida, como una cortesía."""
+        return {"respuesta": "Hola."}
+
+    transmision = TransmisionTurno(atender).iniciar()
+    assert transmision.siguiente() is not None
+    assert transmision.siguiente() is None
+
+    transmision.cerrar()
+    transmision.cerrar()
+
+    assert list(transmision.eventos_sse()) == []

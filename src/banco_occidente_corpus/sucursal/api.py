@@ -60,6 +60,16 @@ class EstadoRespuesta(BaseModel):
     modelo_embeddings: str
 
 
+class SaludRespuesta(BaseModel):
+    """Chequeo de salud: sin red, sin claves y sin datos de clientes."""
+
+    estado: Literal["ok", "degradado"]
+    indice_listo: bool
+    fragmentos_indexados: int
+    modelo_embeddings: str
+    modo_demo: bool
+
+
 class FilaTablero(BaseModel):
     """Una fila del Tablero con su trazabilidad."""
 
@@ -413,6 +423,31 @@ def _fabrica_piezas(config: Config, ajustes: ConfiguracionSucursal) -> Callable[
     return construir
 
 
+def salud_operativa(config: Config, ajustes: ConfiguracionSucursal) -> SaludRespuesta:
+    """Calcula la salud operativa leyendo `indice.json`, sin tocar la red.
+
+    El chequeo no llama a Ollama ni a DeepSeek: solo mira si hay índice, que es
+    lo que separa una Sucursal que responde de una que no. En modo demo se
+    declara `ok` aunque falte el índice, porque el demo no lo necesita.
+
+    Args:
+        config: configuración con las rutas del corpus.
+        ajustes: parámetros de la Sucursal, con el modo demo.
+
+    Returns:
+        `ok` si hay índice o se está en modo demo; `degradado` si no.
+    """
+    indice = leer_indice(config)
+    listo = indice is not None
+    return SaludRespuesta(
+        estado="ok" if listo or ajustes.demo else "degradado",
+        indice_listo=listo,
+        fragmentos_indexados=int(indice.get("fragmentos", 0)) if indice else 0,
+        modelo_embeddings=str(indice.get("modelo", "")) if indice else "",
+        modo_demo=ajustes.demo,
+    )
+
+
 def _error_de_mensaje(mensaje: MensajeTurno) -> JSONResponse:
     """Devuelve el error del streaming con su estado HTTP y el JSON del contrato."""
     return JSONResponse(status_code=mensaje.estado_http, content=mensaje.datos)
@@ -451,4 +486,4 @@ def _indexacion(config: Config) -> IndexacionRespuesta:
 
 
 # Reexportado para que las pruebas puedan construir filas sin importar el módulo.
-__all__ = ["Fila", "crear_router"]
+__all__ = ["Fila", "SaludRespuesta", "crear_router", "salud_operativa"]
