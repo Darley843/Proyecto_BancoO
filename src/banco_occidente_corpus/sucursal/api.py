@@ -171,23 +171,25 @@ class FuenteRespuesta(BaseModel):
 
 
 class PreguntarRequest(BaseModel):
-    """Pregunta que envía la Ventanilla junto con su hilo de conversación."""
+    """Pregunta que envía la Ventanilla junto con su hilo y su perfil."""
 
     pregunta: str = ""
     thread_id: str = ""
+    perfil_id: str = ""
 
 
 class PreguntarRespuesta(BaseModel):
     """Turno atendido: ticket, ruta, respuesta, fuentes y costo.
 
     Las letras siguen siendo `B`, `T` y `X`; la ruta distingue además la
-    cortesía (`cortesia`, sin búsqueda) y la pregunta mixta (`mixta`, Tablero y
-    Bóveda en un solo turno).
+    cortesía (`cortesia`, sin búsqueda), la pregunta mixta (`mixta`, Tablero y
+    Bóveda en un solo turno) y la memoria de perfil (`perfil`, sin búsqueda ni
+    modelo).
     """
 
     turno: Literal["B", "T", "X"]
     turno_numero: int
-    ruta: Literal["boveda", "tablero", "rechazo", "cortesia", "mixta"]
+    ruta: Literal["boveda", "tablero", "rechazo", "cortesia", "mixta", "perfil"]
     motivo: str
     uso_modelo: bool
     reformulada: str | None = None
@@ -350,7 +352,11 @@ def crear_router(
         """
         peticion = datos or PreguntarRequest()
         try:
-            respuesta = servicio.preguntar(peticion.pregunta, peticion.thread_id)
+            respuesta = servicio.preguntar(
+                peticion.pregunta,
+                peticion.thread_id,
+                peticion.perfil_id,
+            )
         except ErrorSucursal as error:
             return _error(error)
         return PreguntarRespuesta.model_validate(respuesta)
@@ -377,7 +383,11 @@ def crear_router(
 
         def atender() -> dict[str, Any]:
             """Atiende el turno y valida el cuerpo con el contrato de la API."""
-            respuesta = servicio.preguntar(peticion.pregunta, peticion.thread_id)
+            respuesta = servicio.preguntar(
+                peticion.pregunta,
+                peticion.thread_id,
+                peticion.perfil_id,
+            )
             return PreguntarRespuesta.model_validate(respuesta).model_dump(mode="json")
 
         transmision = TransmisionTurno(atender).iniciar()

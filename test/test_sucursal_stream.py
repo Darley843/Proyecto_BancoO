@@ -57,9 +57,17 @@ def leer_eventos(texto: str) -> list[tuple[str, dict[str, Any]]]:
     return eventos
 
 
-def preguntar_stream(cliente: TestClient, pregunta: str, hilo: str = "ses-1") -> Any:
+def preguntar_stream(
+    cliente: TestClient,
+    pregunta: str,
+    hilo: str = "ses-1",
+    perfil_id: str = "",
+) -> Any:
     """Envía una pregunta a la ruta de streaming y devuelve la respuesta HTTP."""
-    return cliente.post("/api/preguntar/stream", json={"pregunta": pregunta, "thread_id": hilo})
+    cuerpo: dict[str, str] = {"pregunta": pregunta, "thread_id": hilo}
+    if perfil_id:
+        cuerpo["perfil_id"] = perfil_id
+    return cliente.post("/api/preguntar/stream", json=cuerpo)
 
 
 def etapas(eventos: list[tuple[str, dict[str, Any]]]) -> list[tuple[str, str]]:
@@ -371,3 +379,33 @@ def test_transmision_entrega_el_error_del_servicio() -> None:
         "error": {"codigo": "tope_alcanzado", "mensaje": "Se alcanzó el tope."}
     }
     assert transmision.siguiente() is None
+
+
+def test_streaming_muestra_la_etapa_de_perfil(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """El nodo perfil se ve como etapa `memoria` y cierra con ruta perfil."""
+    escenario = preparar(monkeypatch, tmp_path)
+
+    respuesta = preguntar_stream(
+        escenario.cliente,
+        "trabajo en Carvajal",
+        "hilo-perfil-stream",
+        "ana",
+    )
+    eventos = leer_eventos(respuesta.text)
+
+    assert respuesta.status_code == 200
+    assert ("perfil", "en_curso") in etapas(eventos)
+    assert ("perfil", "hecho") in etapas(eventos)
+    perfil = [datos for nombre, datos in eventos if nombre == "etapa" and datos["nodo"] == "perfil"]
+    assert perfil[-1]["etapa"] == "memoria"
+    assert perfil[-1]["detalle"] == {"perfil": True, "guardado": True}
+
+    final = eventos[-1][1]
+    assert final["ruta"] == "perfil"
+    assert final["turno"] == "B"
+    assert final["uso_modelo"] is False
+    assert final["fuentes"] == []
+    assert "Carvajal" not in json.dumps(perfil, ensure_ascii=False)

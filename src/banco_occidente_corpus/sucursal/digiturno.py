@@ -1,11 +1,11 @@
 """Digiturno de la Sucursal: reglas primero y modelo solo para dudas.
 
 El orden es fijo y se detiene en la primera coincidencia: datos personales,
-fuera de alcance, cortesía, identidad, pregunta mixta, palabras de tarifas y,
-solo si sigue dudoso, una clasificación con DeepSeek a temperatura 0. La
-cortesía no gasta búsqueda ni tokens, y la pregunta mixta pide a la vez una
-cifra del Tablero y una explicación de la Bóveda. La pregunta no se guarda en
-ningún sitio.
+fuera de alcance, intención de perfil, cortesía, identidad, pregunta mixta,
+palabras de tarifas y, solo si sigue dudoso, una clasificación con DeepSeek a
+temperatura 0. La cortesía no gasta búsqueda ni tokens, la pregunta mixta pide
+a la vez una cifra del Tablero y una explicación de la Bóveda, y el perfil
+conserva la letra del residual. La pregunta no se guarda en ningún sitio.
 """
 
 from __future__ import annotations
@@ -27,6 +27,7 @@ from ..asistente.metricas import extraer_metricas
 from ..asistente.validacion import detectar_pii, sanear_pregunta
 from ..config import PROJECT_ROOT
 from ..texto import normalizar
+from .perfil import detectar_intencion
 from .tipos import Letra, Turno
 
 #: Configuración de la fase 2 (embeddings, recuperación y digiturno).
@@ -311,10 +312,11 @@ def clasificar(
 ) -> Turno:
     """Asigna un turno a la pregunta siguiendo el orden de reglas.
 
-    El orden es: datos personales, fuera de alcance, cortesía, identidad,
-    pregunta mixta, tarifas y clasificador. La cortesía responde directo y la
-    mixta conserva la letra `T` con motivo `mixta` para que el grafo consulte
-    las dos fuentes sin cambiar el contrato de letras.
+    El orden es: datos personales, fuera de alcance, perfil, cortesía,
+    identidad, pregunta mixta, tarifas y clasificador. La cortesía responde
+    directo, la mixta conserva la letra `T` con motivo `mixta` y el perfil puro
+    usa `B` con motivo `perfil`; el mixto conserva la letra del residual y su
+    motivo empieza por `perfil:`. Así no se añade una letra al contrato.
 
     Args:
         pregunta: texto del cliente.
@@ -349,16 +351,62 @@ def clasificar(
         if re.search(patron, normalizado):
             return Turno(numero=numero, letra="X", motivo="fuera_alcance")
 
+    # El perfil se decide despues de PII y de fuera de alcance, pero antes de
+    # cortesia, identidad y tarifas: «me llamo Ana, ¿qué es un CDT?» debe
+    # guardar y dejar la pregunta residual para su ruta normal.
+    intencion = detectar_intencion(texto)
+    if intencion is not None:
+        if not intencion.resto:
+            return Turno(numero=numero, letra="B", motivo="perfil")
+        residual = _clasificar_reglas(
+            intencion.resto,
+            numero=numero,
+            configuracion=ajustes,
+            clasificador=clasificador,
+            registrar_uso=registrar_uso,
+        )
+        return Turno(
+            numero=numero,
+            letra=residual.letra,
+            motivo=f"perfil:{residual.motivo}",
+            motivo_residual=residual.motivo,
+        )
+
+    return _clasificar_reglas(
+        texto,
+        numero=numero,
+        configuracion=ajustes,
+        clasificador=clasificador,
+        registrar_uso=registrar_uso,
+    )
+
+
+def _clasificar_reglas(
+    texto: str,
+    *,
+    numero: int,
+    configuracion: ConfiguracionDigiturno,
+    clasificador: Clasificador | None,
+    registrar_uso: RegistradorUso | None,
+) -> Turno:
+    """Aplica cortesia, identidad, mixta, tarifas y clasificador a un texto.
+
+    La PII y el fuera de alcance ya se comprobaron antes. Se usa tambien con la
+    pregunta residual de un mensaje mixto, para no volver a detectar el perfil
+    ni consumir dos numeros de turno.
+    """
+    normalizado = normalizar(texto)
+
     if es_cortesia(texto):
         return Turno(numero=numero, letra="B", motivo="cortesia")
 
     if any(re.search(patron, normalizado) for patron in PATRONES_IDENTIDAD):
         return Turno(numero=numero, letra="B", motivo="identidad")
 
-    if es_consulta_mixta(texto, ajustes):
+    if es_consulta_mixta(texto, configuracion):
         return Turno(numero=numero, letra="T", motivo="mixta")
 
-    if any(_contiene(normalizado, palabra) for palabra in ajustes.palabras_tarifas):
+    if any(_contiene(normalizado, palabra) for palabra in configuracion.palabras_tarifas):
         return Turno(numero=numero, letra="T", motivo="tarifas")
 
     if clasificador is not None:

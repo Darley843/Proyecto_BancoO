@@ -1,9 +1,10 @@
-"""Grafo de la Sucursal: digiturno, Bóveda, Tablero y redacción con memoria.
+"""Grafo de la Sucursal: digiturno, perfil, Bóveda, Tablero y redacción.
 
 El estado viaja entre nodos como datos serializables (diccionarios) para que el
-checkpointer SQLite no dependa de tipos propios. La memoria se aísla por
-`thread_id`, el historial se recorta antes de cada llamada al modelo y la
-pregunta con datos personales se rechaza antes de entrar al grafo.
+checkpointer SQLite no dependa de tipos propios. La memoria corta se aísla por
+`thread_id`; la memoria de perfil usa el store de LangGraph con un namespace
+propio y nunca pasa por la caché. El historial se recorta antes de cada llamada
+al modelo y la pregunta con datos personales se rechaza antes de entrar al grafo.
 """
 
 from __future__ import annotations
@@ -24,9 +25,12 @@ from langchain_core.messages import (
     trim_messages,
 )
 from langchain_core.messages.utils import count_tokens_approximately
+from langgraph.channels import UntrackedValue
 from langgraph.checkpoint.sqlite import SqliteSaver
 from langgraph.graph import END, START, StateGraph
 from langgraph.graph.message import add_messages
+from langgraph.runtime import Runtime
+from langgraph.store.base import BaseStore
 from pydantic import ValidationError
 
 from ..asistente.contexto_prompt import CanalOficial
@@ -50,6 +54,14 @@ from .digiturno import (
     ConfiguracionDigiturno,
     ContadorTurnos,
     clasificar,
+)
+from .perfil import (
+    MENSAJE_PERFIL_BORRADO,
+    MENSAJE_PERFIL_INACTIVO,
+    AlmacenPerfil,
+    confirmacion_perfil,
+    detectar_intencion,
+    respuesta_perfil,
 )
 
 #: Tokens de historial que se conservan antes de llamar al modelo.
@@ -107,11 +119,30 @@ class EstadoSucursal(TypedDict, total=False):
     turno: dict[str, Any]
     filas: list[dict[str, str]]
     fragmentos: list[dict[str, Any]]
-    respuesta: str
+    # La respuesta y la confirmación pueden repetir nombre o empresa: se
+    # devuelven al servicio, pero no se escriben en el checkpoint.
+    respuesta: Annotated[str, UntrackedValue]
     fuentes: list[str]
     uso: dict[str, Any]
     usos: list[dict[str, Any]]
     avisos: list[str]
+    perfil: str
+    perfil_tocado: bool
+    perfil_modificado: bool
+    confirmacion_perfil: Annotated[str, UntrackedValue]
+
+
+@dataclass(frozen=True, slots=True)
+class ContextoSucursal:
+    """Contexto de ejecución que no forma parte del checkpoint.
+
+    ``pregunta_original`` solo vive en memoria mientras corre el turno; permite
+    que el nodo ``perfil`` extraiga nombre y empresa sin guardar el mensaje
+    original en el estado persistido.
+    """
+
+    perfil: str = ""
+    pregunta_original: str = ""
 
 
 @dataclass(frozen=True, slots=True)
@@ -177,12 +208,16 @@ def recortar_historial(mensajes: Sequence[BaseMessage], max_tokens: int) -> list
 def crear_grafo(
     dependencias: DependenciasGrafo,
     ruta_memoria: Path,
+    *,
+    store: BaseStore | None = None,
 ) -> Any:
-    """Compila el grafo con memoria SQLite en `ruta_memoria`.
+    """Compila el grafo con memoria SQLite y el store de largo plazo.
 
     Args:
         dependencias: recuperador, modelo, filas del Tablero y canal.
         ruta_memoria: archivo SQLite del checkpointer.
+        store: store de LangGraph para el perfil. Si falta se usa uno en memoria,
+            que es lo que necesitan las pruebas que no inyectan `SqliteStore`.
 
     Returns:
         La aplicación compilada de LangGraph.
@@ -190,12 +225,20 @@ def crear_grafo(
     ruta_memoria.parent.mkdir(parents=True, exist_ok=True)
     conexion = sqlite3.connect(str(ruta_memoria), check_same_thread=False)
     checkpointer = SqliteSaver(conexion)
+    if store is None:
+        from langgraph.store.memory import InMemoryStore
+
+        store = InMemoryStore()
 
     # `ty` no reconoce el TypedDict con `add_messages` como StateLike; el cast
     # mantiene el tipado en el resto del módulo sin relajar el estado en runtime.
-    constructor = StateGraph(cast(Any, EstadoSucursal))
+    constructor = StateGraph(
+        cast(Any, EstadoSucursal),
+        context_schema=cast(Any, ContextoSucursal),
+    )
     constructor.add_node("reformular", cast(Any, _nodo_reformular(dependencias)))
     constructor.add_node("digiturno", cast(Any, _nodo_digiturno(dependencias)))
+    constructor.add_node("perfil", cast(Any, _nodo_perfil(dependencias)))
     constructor.add_node("boveda", cast(Any, _nodo_boveda(dependencias)))
     constructor.add_node("tablero", cast(Any, _nodo_tablero(dependencias)))
     constructor.add_node("mixto", cast(Any, _nodo_mixto(dependencias)))
@@ -214,6 +257,19 @@ def crear_grafo(
             "B": "boveda",
             "mixto": "mixto",
             "cortesia": "cortesia",
+            "perfil": "perfil",
+        },
+    )
+    constructor.add_conditional_edges(
+        "perfil",
+        _ruta_despues_de_perfil,
+        {
+            "fin": END,
+            "boveda": "boveda",
+            "tablero": "tablero",
+            "mixto": "mixto",
+            "cortesia": "cortesia",
+            "rechazo": "rechazo",
         },
     )
     constructor.add_conditional_edges(
@@ -235,7 +291,7 @@ def crear_grafo(
     constructor.add_edge("rechazo", END)
     constructor.add_edge("redactar", END)
 
-    return constructor.compile(checkpointer=checkpointer)
+    return constructor.compile(checkpointer=checkpointer, store=store)
 
 
 def responder_turno(
@@ -243,6 +299,7 @@ def responder_turno(
     dependencias: DependenciasGrafo,
     pregunta: str,
     thread_id: str,
+    perfil: str = "",
 ) -> dict[str, Any]:
     """Ejecuta un turno, rechazando la PII antes de entrar a la memoria.
 
@@ -251,6 +308,8 @@ def responder_turno(
         dependencias: mismas dependencias usadas al compilar.
         pregunta: texto del cliente.
         thread_id: identificador de la conversación.
+        perfil: hash del identificador de perfil, o vacío si la memoria de
+            perfil no está activa en esta conversación.
 
     Returns:
         El estado final del turno.
@@ -271,10 +330,20 @@ def responder_turno(
             "messages": [],
         }
 
+    # La memoria del hilo no conserva el mensaje original de un turno de
+    # perfil. En el mixto solo entra el residual; en el perfil puro, nada. Así
+    # una reformulación posterior nunca recibe el nombre ni la empresa.
+    intencion = detectar_intencion(limpia)
+    if intencion is not None:
+        mensajes = [HumanMessage(content=intencion.resto)] if perfil and intencion.resto else []
+    else:
+        mensajes = [HumanMessage(content=limpia)]
+
+    pregunta_estado = intencion.resto if intencion is not None else limpia
     return grafo.invoke(
         {
-            "messages": [HumanMessage(content=limpia)],
-            "pregunta": limpia,
+            "messages": mensajes,
+            "pregunta": pregunta_estado,
             "reformulada": "",
             "turno": {},
             "filas": [],
@@ -284,8 +353,13 @@ def responder_turno(
             "uso": {},
             "usos": [],
             "avisos": [],
+            "perfil": perfil,
+            "perfil_tocado": intencion is not None,
+            "perfil_modificado": False,
+            "confirmacion_perfil": "",
         },
         config={"configurable": {"thread_id": thread_id}},
+        context=ContextoSucursal(perfil=perfil, pregunta_original=limpia),
     )
 
 
@@ -318,6 +392,10 @@ def _nodo_reformular(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursa
 
     def reformular(estado: EstadoSucursal) -> dict[str, Any]:
         pregunta = estado.get("pregunta", "")
+        # Un turno de perfil no se reformula: el mensaje original contiene
+        # nombre o empresa y no debe llegar al modelo por el historial.
+        if estado.get("perfil_tocado"):
+            return {"reformulada": pregunta}
         historial = list(estado.get("messages", []))[:-1]
         if not historial or not es_seguimiento(pregunta) or dependencias.modelo is None:
             return {"reformulada": pregunta}
@@ -340,11 +418,19 @@ def _nodo_reformular(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursa
     return reformular
 
 
-def _nodo_digiturno(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal], dict[str, Any]]:
+def _nodo_digiturno(dependencias: DependenciasGrafo) -> Callable[..., dict[str, Any]]:
     """Crea el nodo que asigna el turno con el digiturno."""
 
-    def digiturno(estado: EstadoSucursal) -> dict[str, Any]:
+    def digiturno(
+        estado: EstadoSucursal,
+        *,
+        runtime: Runtime[ContextoSucursal],
+    ) -> dict[str, Any]:
         consulta = estado.get("reformulada") or estado.get("pregunta", "")
+        if estado.get("perfil_tocado"):
+            # El estado guarda solo el residual; el mensaje original viaja en
+            # el contexto de ejecución para que el digiturno lo clasifique.
+            consulta = runtime.context.pregunta_original or consulta
         usos = list(estado.get("usos") or [])
         turno = clasificar(
             consulta,
@@ -357,6 +443,120 @@ def _nodo_digiturno(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal
         return {"turno": asdict(turno), "usos": usos}
 
     return digiturno
+
+
+def _nodo_perfil(
+    dependencias: DependenciasGrafo,
+) -> Callable[..., dict[str, Any]]:
+    """Crea el nodo que guarda, consulta o borra la memoria de perfil.
+
+    El nodo recibe el `Runtime` con el `store` que LangGraph inyecta desde
+    `compile(checkpointer=..., store=...)` y el mensaje original en el contexto
+    de ejecución; no abre archivos ni lee el original del estado persistido. Si
+    la conversación no trae `perfil_id`, responde el mensaje de memoria inactiva
+    sin guardar nada. Si el mensaje trae PII, tampoco guarda.
+    """
+
+    def perfil(
+        estado: EstadoSucursal,
+        *,
+        runtime: Runtime[ContextoSucursal],
+    ) -> dict[str, Any]:
+        pregunta = runtime.context.pregunta_original
+        intencion = detectar_intencion(pregunta)
+        turno = dict(estado.get("turno", {}))
+        if intencion is None:
+            return {"perfil_tocado": True}
+
+        deteccion = detectar_pii(pregunta, permitidos=dependencias.permitidos)
+        if deteccion is not None:
+            texto = mensaje_pii(deteccion.categoria, dependencias.canal)
+            turno["letra"] = "X"
+            turno["motivo"] = f"pii:{deteccion.categoria}"
+            return {
+                "turno": turno,
+                "respuesta": texto,
+                "fuentes": [dependencias.canal.url]
+                if dependencias.canal and dependencias.canal.url
+                else [],
+                "uso": {"uso_modelo": False, "costo_usd": 0.0},
+                "avisos": ["pii_bloqueada"],
+                "messages": [AIMessage(content=texto)],
+                "perfil_tocado": True,
+                "perfil_modificado": False,
+            }
+
+        identificador = runtime.context.perfil
+        if not identificador or runtime.store is None:
+            return _respuesta_perfil_inactiva(turno)
+
+        almacen = AlmacenPerfil(runtime.store)
+        datos = almacen.leer(identificador)
+        guardados = [dato.campo for dato in intencion.guardar]
+        if intencion.borrar:
+            almacen.borrar(identificador)
+            datos = {}
+            guardados = []
+        elif guardados:
+            datos = almacen.guardar(
+                identificador,
+                {dato.campo: dato.valor for dato in intencion.guardar},
+            )
+        modificado = intencion.borrar or bool(guardados)
+
+        prefijo = ""
+        if intencion.borrar:
+            prefijo = MENSAJE_PERFIL_BORRADO
+        else:
+            partes: list[str] = []
+            if guardados:
+                partes.append(confirmacion_perfil(datos, guardados))
+            if intencion.consultar:
+                partes.append(respuesta_perfil(datos, intencion.consultar))
+            prefijo = " ".join(parte for parte in partes if parte)
+
+        if intencion.resto:
+            motivo_residual = str(turno.get("motivo_residual") or "defecto")
+            turno["motivo"] = f"perfil:{motivo_residual}"
+            return {
+                "turno": turno,
+                "confirmacion_perfil": prefijo,
+                "reformulada": intencion.resto,
+                "perfil_tocado": True,
+                "perfil_modificado": modificado,
+                "avisos": ["perfil"],
+            }
+
+        texto = prefijo or respuesta_perfil(datos, intencion.consultar)
+        turno["motivo"] = "perfil"
+        # Sin AIMessage: la respuesta puede repetir nombre o empresa y no debe
+        # quedar en el historial que luego recibe una reformulación.
+        return {
+            "turno": turno,
+            "respuesta": texto,
+            "fuentes": [],
+            "uso": {"uso_modelo": False, "costo_usd": 0.0},
+            "avisos": ["perfil"],
+            "perfil_tocado": True,
+            "perfil_modificado": modificado,
+        }
+
+    return perfil
+
+
+def _respuesta_perfil_inactiva(turno: dict[str, Any]) -> dict[str, Any]:
+    """Arma la respuesta corta de una conversación sin `perfil_id`."""
+    turno["letra"] = "B"
+    turno["motivo"] = "perfil"
+    return {
+        "turno": turno,
+        "respuesta": MENSAJE_PERFIL_INACTIVO,
+        "fuentes": [],
+        "uso": {"uso_modelo": False, "costo_usd": 0.0},
+        "avisos": ["perfil_inactivo"],
+        "perfil_tocado": True,
+        "perfil_modificado": False,
+    }
 
 
 def _nodo_boveda(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal], dict[str, Any]]:
@@ -594,12 +794,28 @@ def _ruta_digiturno(estado: EstadoSucursal) -> str:
     """
     turno = estado.get("turno", {})
     motivo = str(turno.get("motivo", ""))
+    if motivo == "perfil" or motivo.startswith("perfil:"):
+        return "perfil"
     if motivo.startswith("cortesia"):
         return "cortesia"
     if motivo.startswith("mixta"):
         return "mixto"
     letra = str(turno.get("letra", "B"))
     return letra if letra in {"B", "T", "X"} else "B"
+
+
+def _ruta_despues_de_perfil(estado: EstadoSucursal) -> str:
+    """Decide si el perfil ya respondió o si sigue la pregunta residual."""
+    if estado.get("respuesta"):
+        return "fin"
+    turno = estado.get("turno", {})
+    motivo = str(turno.get("motivo_residual", ""))
+    if motivo.startswith("cortesia"):
+        return "cortesia"
+    if motivo.startswith("mixta"):
+        return "mixto"
+    letra = str(turno.get("letra", "B"))
+    return {"X": "rechazo", "T": "tablero", "B": "boveda"}.get(letra, "boveda")
 
 
 def _ruta_boveda(estado: EstadoSucursal) -> str:

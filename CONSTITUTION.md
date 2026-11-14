@@ -52,7 +52,10 @@ oferta, presencia digital y datos duros.
 - **No** captura zonas privadas, transaccionales o tras login
   (`/portaltransaccional/`, `/icbs-web/`, `/AjaxTx`, `/wps/`).
 - **No** almacena datos personales de clientes ni de empleados (Ley 1581 de
-  2012 — Habeas Data).
+  2012 — Habeas Data). Excepción acotada: la memoria de perfil guarda solo el
+  nombre y la empresa que el usuario declara en el chat, en un store local
+  (`data/asistente/perfil.sqlite`), aislado por un `perfil_id` hasheado, sin
+  caché, logs ni envío al modelo, y con borrado explícito («olvida mi perfil»).
 - **No** sustituye la revisión humana: la clasificación por secciones y el
   checklist son heurísticas verificables, no verdad legal.
 - **No** versiona Bronze ni Silver (son reproducibles y pesados); Gold **sí** se
@@ -661,6 +664,7 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 | 2026-11-13 | Módulo 2: cortesía en el digiturno (`motivo=cortesia`, letra `B`), Tablero como `@tool` y ruta mixta (`mixta`, letra `T`) | La rúbrica no acepta un router que busque siempre: «hola», «buenos días» y «gracias» se responden sin recuperador, sin Tablero y sin modelo, con 0 tokens y sin fuentes. El Tablero expone `consultar_tablero` con `args_schema=ConsultaTablero` (Pydantic) y el nodo lo invoca como herramienta; la ruta mixta convierte las filas en fragmentos citables con la URL del tarifario, así el modelo combina las dos fuentes y `validar_citas` comprueba ambas. No se añade una cuarta letra al contrato: el motivo elige el nodo y la ruta del comprobante |
 | 2026-11-13 | LangSmith se enciende solo en la sesión de demo, nunca desde código ni `config/` | Las trazas envían la pregunta, los fragmentos y las filas del Tablero a un servicio externo. `langchain-core` lee `LANGSMITH_TRACING`, `LANGSMITH_API_KEY` y `LANGSMITH_PROJECT` del entorno; el repositorio no las escribe y `test_seguridad.py` lo comprueba. El procedimiento y el apagado están en `docs/SEGURIDAD.md` §5.1 |
 | 2026-11-13 | La Bóveda usa Qdrant local por defecto (`data/boveda/qdrant`) y conserva Chroma con `[almacen] tipo`; `indice.json` declara `almacen` y `make migrar-qdrant` copia sin recalcular embeddings | El Módulo 2 pide Qdrant con colección, payload y filtros. El modo embebido evita un servidor y su cierre explícito libera la carpeta; un índice sin el campo `almacen` se interpreta como el motor configurado. La colección declara HNSW, pero el modo embebido busca de forma exacta; con este corpus es más precisa y el ANN real requiere servidor |
+| 2026-11-13 | Memoria de perfil de largo plazo (`perfil`) sobre el store de LangGraph: `SqliteStore` en `data/asistente/perfil.sqlite`, namespace `("perfil", sha256(perfil_id))`, solo nombre y empresa | El usuario puede preguntar «¿dónde trabajo?» en otro hilo y recibir su dato. Se mantiene el contrato de letras B/T/X (la ruta `perfil` va por motivo), la ruta no usa caché ni modelo y solo el residual de un mensaje mixto llega a DeepSeek. El `perfil_id` es una credencial local aleatoria; el valor crudo no se guarda en el estado, la caché ni los logs, y «olvida mi perfil» borra el documento |
 
 ## 12. Configuración local (no trackear)
 
@@ -673,7 +677,9 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 ## 13. Ética y legalidad
 
 - Solo información **pública**; se respeta `robots.txt` y los términos de uso.
-- Nada de datos personales (Ley 1581 de 2012).
+- Nada de datos personales (Ley 1581 de 2012), salvo el nombre y la empresa que
+  el usuario declara para su memoria de perfil local; ver §1 y
+  [`docs/SEGURIDAD.md`](./docs/SEGURIDAD.md) §3.2.
 - Sin martilleo: 1.5 s entre peticiones y pausas periódicas.
 - El corpus se usa con fines académicos y se cita la fuente en cada documento
   (`fuente` en el frontmatter).

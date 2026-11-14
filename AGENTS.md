@@ -21,7 +21,12 @@ Taller 1 del curso TAAML (UAO). Antes de tocar código, lee
    decisión nuestra, no una directiva del sitio. No subas el ritmo para
    "terminar rápido".
 5. **Sin datos personales.** Nada de zonas tras login ni información de
-   clientes (Ley 1581 de 2012).
+   clientes (Ley 1581 de 2012). **Excepción acotada:** la memoria de perfil
+   (`sucursal/perfil.py`) guarda solo el nombre y la empresa que el usuario
+   declara, en `data/asistente/perfil.sqlite` (local, ignorado por Git), bajo un
+   `perfil_id` aleatorio y hasheado. No se cachea, no se registra en logs y
+   nunca se envía al modelo; se borra con «olvida mi perfil». No cubre datos de
+   terceros, documentos, teléfonos, correos ni información de clientes.
 6. **Commits:** Conventional Commits en español (`feat:`, `fix:`, `docs:`,
    `test:`, `chore:`). La CI y los hooks deben quedar en verde.
 
@@ -113,6 +118,7 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | `.../arqueo/cache_embeddings.py` | Caché de embeddings para las corridas del Arqueo |
 | `.../sucursal/tipos.py` | Turno y letras B/T/X |
 | `.../sucursal/digiturno.py` | Reglas de enrutamiento y clasificación de dudas |
+| `.../sucursal/perfil.py` | Memoria de perfil (nombre y empresa) sobre el store de LangGraph |
 | `.../sucursal/grafo.py` | StateGraph con memoria, rutas y redacción |
 | `.../sucursal/ajustes.py` | Tope de gasto, TTL y modo demo |
 | `.../sucursal/costo.py` | Tarifas valle/pico, gasto diario y caché |

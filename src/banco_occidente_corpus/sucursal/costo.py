@@ -139,10 +139,18 @@ class CacheRespuestas:
             )
 
     @staticmethod
-    def clave(pregunta: str, ruta: str, version: str) -> str:
-        """Devuelve la clave estable `sha256(pregunta normalizada|ruta|versión)`."""
+    def clave(pregunta: str, ruta: str, version: str, perfil_id: str = "") -> str:
+        """Devuelve la clave estable `sha256(pregunta normalizada|ruta|versión)`.
+
+        ``perfil_id`` se añade solo cuando no está vacío. La ruta de perfil no
+        usa la caché; este parámetro es una defensa para que un cambio futuro no
+        pueda servir la respuesta de un perfil a otro.
+        """
         limpia = " ".join(re.sub(r"[^\w\s]", " ", normalizar(pregunta)).split())
         material = f"{limpia}|{ruta}|{version}"
+        if perfil_id:
+            huella = hashlib.sha256(perfil_id.encode("utf-8")).hexdigest()
+            material = f"{material}|{huella}"
         return hashlib.sha256(material.encode("utf-8")).hexdigest()
 
     def obtener(self, clave: str) -> dict[str, Any] | None:
