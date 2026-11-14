@@ -71,6 +71,8 @@ package = true
 [tool.ruff]
 line-length = 100
 target-version = "py313"
+# Skill de terceros: vendor de jan-project-standard, no se reformatea ni se lintea.
+extend-exclude = [".opencode/skills/polanco-standard-auditor"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "C4", "PTH"]
