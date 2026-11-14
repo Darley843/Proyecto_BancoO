@@ -72,6 +72,13 @@ const ETAPAS = {
   redactando: "Redacción",
 };
 
+/**
+ * Patrón de la negrita de Markdown: `**texto**`, sin asteriscos por dentro.
+ *
+ * Los asteriscos sueltos, sin pareja, no coinciden y se muestran tal cual.
+ */
+const PATRON_NEGRITA = /\*\*([^*]+)\*\*/g;
+
 /** Patrón de un UUID, para reutilizar solo hilos con forma válida. */
 const PATRON_UUID =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -910,9 +917,14 @@ function crearTurno(turno) {
     datos.respuesta,
     "La sucursal no devolvió texto.",
   );
-  articulo.append(crearTexto("p", textoRespuesta, "ventanilla__respuesta"));
+  articulo.append(
+    crearTextoConNegrita("p", textoRespuesta, "ventanilla__respuesta"),
+  );
 
-  const escuchar = crearBotonEscuchar(textoRespuesta, etiquetaTurno(datos));
+  const escuchar = crearBotonEscuchar(
+    textoSinNegrita(textoRespuesta),
+    etiquetaTurno(datos),
+  );
   if (escuchar) {
     const pie = document.createElement("div");
     pie.className = "ventanilla__turno-pie";
@@ -990,6 +1002,58 @@ function rotuloTipo(tipo) {
  */
 function textoODefecto(valor, defecto = "—") {
   return typeof valor === "string" && valor.trim() ? valor : defecto;
+}
+
+/**
+ * Crea un elemento con el texto de la respuesta y sus negritas de Markdown.
+ *
+ * Solo cambia `**texto**` por un `<strong>`; el resto queda igual, con sus
+ * saltos de línea y sus citas `[n]`. Nunca se inyecta HTML: cada trozo entra
+ * como nodo de texto o como elemento creado con el DOM.
+ *
+ * @param {string} etiqueta Etiqueta HTML del contenedor, por ejemplo `p`.
+ * @param {string} texto Texto de la respuesta.
+ * @param {string} [clase] Clases CSS opcionales.
+ * @returns {HTMLElement} El elemento con el texto y sus negritas.
+ */
+function crearTextoConNegrita(etiqueta, texto, clase = "") {
+  const elemento = document.createElement(etiqueta);
+  if (clase) {
+    elemento.className = clase;
+  }
+  agregarTextoConNegrita(elemento, texto);
+  return elemento;
+}
+
+/**
+ * Reparte un texto entre nodos de texto y `<strong>` según sus `**negritas**`.
+ *
+ * `split` con un grupo de captura devuelve trozos alternos: los pares son
+ * texto plano y los impares son el contenido de una negrita.
+ *
+ * @param {HTMLElement} contenedor Elemento donde se agrega el texto.
+ * @param {string} texto Texto con posibles negritas de Markdown.
+ * @returns {void}
+ */
+function agregarTextoConNegrita(contenedor, texto) {
+  const partes = texto.split(PATRON_NEGRITA);
+  partes.forEach((parte, indice) => {
+    if (indice % 2 === 1) {
+      contenedor.append(crearTexto("strong", parte));
+    } else if (parte) {
+      contenedor.append(document.createTextNode(parte));
+    }
+  });
+}
+
+/**
+ * Quita las marcas de negrita de Markdown para leer el texto en voz alta.
+ *
+ * @param {string} texto Texto con posibles `**negritas**`.
+ * @returns {string} El mismo texto, solo con el contenido de las negritas.
+ */
+function textoSinNegrita(texto) {
+  return texto.replace(PATRON_NEGRITA, "$1");
 }
 
 /**

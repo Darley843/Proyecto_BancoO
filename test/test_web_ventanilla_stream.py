@@ -110,6 +110,36 @@ def test_ventanilla_persiste_y_envia_el_perfil_id() -> None:
     assert 'memoria: "Perfil"' in codigo
 
 
+def test_la_negrita_de_markdown_se_pinta_con_el_dom() -> None:
+    """La respuesta cambia `**texto**` por `<strong>` sin usar `innerHTML`.
+
+    Es el punto donde se pinta la respuesta, tanto en el turno normal como en
+    el evento `final` del streaming, y el botón «Escuchar» lee el texto sin los
+    asteriscos.
+    """
+    codigo = leer("vistas/ventanilla.js")
+    crear = bloque_funcion(codigo, "crearTextoConNegrita")
+    agregar = bloque_funcion(codigo, "agregarTextoConNegrita")
+
+    assert r"const PATRON_NEGRITA = /\*\*([^*]+)\*\*/g;" in codigo
+    assert "document.createElement(etiqueta)" in crear
+    assert "agregarTextoConNegrita(elemento, texto)" in crear
+    assert "texto.split(PATRON_NEGRITA)" in agregar
+    assert 'crearTexto("strong", parte)' in agregar
+    assert "document.createTextNode(parte)" in agregar
+    for bloque in (crear, agregar):
+        assert "innerHTML" not in bloque
+    assert "innerHTML" not in codigo
+
+    turno = bloque_funcion(codigo, "crearTurno")
+    assert 'crearTextoConNegrita("p", textoRespuesta, "ventanilla__respuesta")' in turno
+    assert "textoSinNegrita(textoRespuesta)" in turno
+    assert "crearBotonEscuchar(" in turno
+
+    sin_asteriscos = bloque_funcion(codigo, "textoSinNegrita")
+    assert 'texto.replace(PATRON_NEGRITA, "$1")' in sin_asteriscos
+
+
 def test_estilos_del_avance() -> None:
     """El avance tiene estilos con variables y respeta el movimiento reducido."""
     css = leer("estilos.css")
