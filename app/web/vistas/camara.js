@@ -151,7 +151,7 @@ function crearIndexacion(indexacion, numero) {
   item.append(
     crearTexto(
       "p",
-      "Convierte los fragmentos de Gold en vectores con Ollama y los guarda en Chroma para que la Bóveda los busque.",
+      "Convierte los fragmentos de Gold en vectores con Ollama y los guarda en Qdrant para que la Bóveda los busque.",
       "camara__pista",
     ),
   );

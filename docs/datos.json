@@ -10,7 +10,7 @@
       "url": "https://github.com/Darley843/Proyecto_BancoO",
       "provider": "github",
       "link_mode": "web",
-      "revision": "56dc48a36d71d0f245e8a8fcb95b1b4c6ab5818c"
+      "revision": "45d0878247d9682f2336bd5068feae1aea49f1c8"
     }
   },
   "stages": [
@@ -121,14 +121,26 @@
       ]
     },
     {
-      "id": "chroma",
+      "id": "qdrant",
       "type": "database",
-      "label": "Chroma",
-      "sublabel": "data/boveda · coseno",
+      "label": "Qdrant",
+      "sublabel": "data/boveda/qdrant · coseno",
       "stage": 3,
       "row": 1,
       "sources": [
-        { "path": "src/banco_occidente_corpus/boveda/almacen.py", "line": 65, "end_line": 109, "label": "ChromaAlmacen" }
+        { "path": "src/banco_occidente_corpus/boveda/almacen.py", "line": 321, "end_line": 353, "label": "QdrantAlmacen" }
+      ]
+    },
+    {
+      "id": "perfil",
+      "type": "database",
+      "label": "Store de perfil",
+      "sublabel": "perfil.sqlite · por usuario",
+      "stage": 3,
+      "row": 2,
+      "sources": [
+        { "path": "src/banco_occidente_corpus/sucursal/preguntar.py", "line": 370, "end_line": 383, "label": "SqliteStore" },
+        { "path": "src/banco_occidente_corpus/sucursal/perfil.py", "line": 341, "end_line": 353, "label": "namespace del perfil" }
       ]
     },
     {
@@ -182,8 +194,8 @@
     { "from": "gold", "to": "chunks", "label": "Markdown + metadatos", "variant": "emphasis" },
     { "from": "chunks", "to": "fragmentos", "label": "chunks + hechos", "variant": "emphasis" },
     { "from": "fragmentos", "to": "ollama", "label": "texto", "variant": "emphasis" },
-    { "from": "ollama", "to": "chroma", "label": "vectores", "variant": "emphasis" },
-    { "from": "chroma", "to": "recuperador", "label": "top-k", "variant": "emphasis" },
+    { "from": "ollama", "to": "qdrant", "label": "vectores", "variant": "emphasis" },
+    { "from": "qdrant", "to": "recuperador", "label": "top-k", "variant": "emphasis" },
     { "from": "recuperador", "to": "deepseek", "label": "pregunta + fragmentos", "variant": "emphasis" },
     { "from": "deepseek", "to": "respuesta_rag", "label": "texto + citas", "variant": "emphasis" },
     { "from": "pdf_tarifario", "to": "filas_tarifario", "label": "líneas", "variant": "default" },
@@ -198,7 +210,7 @@
       "title": "RAG citado",
       "items": [
         "Gold se parte en chunks y se agrupa en fragmentos con sus metadatos",
-        "Ollama vectoriza; Chroma guarda el índice local y el recuperador mezcla vectorial + BM25",
+        "Ollama vectoriza; Qdrant guarda el índice local y el recuperador mezcla vectorial + BM25",
         "DeepSeek redacta solo con los fragmentos elegidos y la respuesta valida cada cita [n]"
       ]
     },
@@ -215,7 +227,8 @@
       "dot": "amber",
       "title": "Fronteras del dato",
       "items": [
-        "Chroma y el CSV viven en el equipo; el índice no se versiona y el CSV sí",
+        "Qdrant y el CSV viven en el equipo; el índice no se versiona y el CSV sí",
+        "El perfil del cliente vive en data/asistente/perfil.sqlite: local, fuera de Git y nunca entra al índice",
         "DeepSeek solo recibe la pregunta y los fragmentos recuperados",
         "Si el dato no está, el grafo responde la frase fija y no inventa una cifra"
       ]

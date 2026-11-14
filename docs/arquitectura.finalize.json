@@ -5,16 +5,16 @@
   "status": "pass",
   "type": "architecture",
   "quality": "showcase",
-  "startedAt": "2026-11-05T23:56:47.026Z",
+  "startedAt": "2026-11-14T01:54:11.572Z",
   "specification": {
     "path": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\arquitectura.json",
-    "sha256": "a8a3782fab811330fb5f48a0205721919af87bac04c1ec692228b1aa89fcf34d",
-    "bytes": 5344
+    "sha256": "d2e156731e236e5eb180e321a2eb2c7dbecf4e8e7edf20cb4a7a3560d8771cf5",
+    "bytes": 7314
   },
   "artifact": {
     "path": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\arquitectura.html",
-    "sha256": "a9d273d167e13c2435cfd9e1456d5e6b3993e3a12e55bb90587d20465ce7f159",
-    "bytes": 851295
+    "sha256": "a16b321994e02e1db7711b4152dd0e402a8f61449a7c88ee7d3248b46b974531",
+    "bytes": 858126
   },
   "stages": {
     "validate": {
@@ -40,8 +40,8 @@
         "ok": true,
         "command": "validate",
         "specification": {
-          "sha256": "a8a3782fab811330fb5f48a0205721919af87bac04c1ec692228b1aa89fcf34d",
-          "bytes": 5344
+          "sha256": "d2e156731e236e5eb180e321a2eb2c7dbecf4e8e7edf20cb4a7a3560d8771cf5",
+          "bytes": 7314
         },
         "validation": {
           "checksPassed": 9,
@@ -56,7 +56,7 @@
     "deliver": {
       "status": "pass",
       "exitCode": 0,
-      "durationMs": 497,
+      "durationMs": 1405,
       "command": [
         "C:\\Program Files\\nodejs\\node.exe",
         "C:\\Users\\DarleyIdarraga\\.agents\\skills\\archify\\bin\\archify.mjs",
@@ -72,19 +72,19 @@
       ],
       "receipt": {
         "schemaVersion": 1,
-        "receiptId": "73f5126f-8a60-4ada-98ac-ecc43e434934",
+        "receiptId": "c23ed3ca-3e2e-4480-b40d-ef5779136e38",
         "ok": true,
         "command": "deliver",
         "type": "architecture",
         "input": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\arquitectura.json",
         "output": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\arquitectura.html",
         "specification": {
-          "sha256": "a8a3782fab811330fb5f48a0205721919af87bac04c1ec692228b1aa89fcf34d",
-          "bytes": 5344
+          "sha256": "d2e156731e236e5eb180e321a2eb2c7dbecf4e8e7edf20cb4a7a3560d8771cf5",
+          "bytes": 7314
         },
         "artifact": {
-          "sha256": "a9d273d167e13c2435cfd9e1456d5e6b3993e3a12e55bb90587d20465ce7f159",
-          "bytes": 851295
+          "sha256": "a16b321994e02e1db7711b4152dd0e402a8f61449a7c88ee7d3248b46b974531",
+          "bytes": 858126
         },
         "validation": {
           "checksPassed": 9,
@@ -97,8 +97,8 @@
         "evidence": {
           "verified": true,
           "repository": "https://github.com/Darley843/Proyecto_BancoO",
-          "revision": "e152f5315683d8d5cfe8ce3a56991be2c5e7580f",
-          "references": 10
+          "revision": "45d0878247d9682f2336bd5068feae1aea49f1c8",
+          "references": 14
         },
         "update": {
           "status": "unavailable",
@@ -116,7 +116,7 @@
     "check": {
       "status": "pass",
       "exitCode": 0,
-      "durationMs": 144,
+      "durationMs": 746,
       "command": [
         "C:\\Program Files\\nodejs\\node.exe",
         "C:\\Users\\DarleyIdarraga\\.agents\\skills\\archify\\bin\\archify.mjs",
@@ -128,8 +128,8 @@
         "ok": true,
         "file": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\arquitectura.html",
         "artifact": {
-          "sha256": "a9d273d167e13c2435cfd9e1456d5e6b3993e3a12e55bb90587d20465ce7f159",
-          "bytes": 851295
+          "sha256": "a16b321994e02e1db7711b4152dd0e402a8f61449a7c88ee7d3248b46b974531",
+          "bytes": 858126
         },
         "checks": [
           {
@@ -196,16 +196,16 @@
             "containerBorderRuns": 0,
             "labelRouteClearanceIssues": 0,
             "labelCanvasOverflowIssues": 0,
-            "minLabelRouteClearance": 31.1,
+            "minLabelRouteClearance": 5.1,
             "desktopReadabilityIssues": 0,
             "viewportHeightIssues": 0,
             "minProjectedNodeTextPx": 7.5,
-            "maxBends": 1,
+            "maxBends": 2,
             "routesOverSuggestedBends": 0,
             "maxStretch": 1,
             "routesOverSuggestedStretch": 0,
-            "minSegmentPx": 58,
-            "minInteriorSegmentPx": null,
+            "minSegmentPx": 24,
+            "minInteriorSegmentPx": 188,
             "shortSegmentCount": 0,
             "shortEndpointSegmentCount": 0,
             "shortInteriorSegmentCount": 0,
@@ -252,18 +252,18 @@
             },
             "minimumSourceTextPx": 8,
             "minimumProjectedTextPx": 7.5,
-            "semanticTextCount": 29
+            "semanticTextCount": 35
           },
           "issues": []
         },
         "provenance": "current",
-        "deliveryReceiptId": "73f5126f-8a60-4ada-98ac-ecc43e434934"
+        "deliveryReceiptId": "c23ed3ca-3e2e-4480-b40d-ef5779136e38"
       }
     },
     "browser-check": {
       "status": "pass",
       "exitCode": 0,
-      "durationMs": 1191,
+      "durationMs": 1195,
       "command": [
         "C:\\Program Files\\nodejs\\node.exe",
         "C:\\Users\\DarleyIdarraga\\.agents\\skills\\archify\\bin\\archify.mjs",
@@ -281,11 +281,11 @@
         "status": "pass",
         "visualReview": "not-requested",
         "provenance": "current",
-        "deliveryReceiptId": "73f5126f-8a60-4ada-98ac-ecc43e434934",
+        "deliveryReceiptId": "c23ed3ca-3e2e-4480-b40d-ef5779136e38",
         "artifact": {
           "path": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\arquitectura.html",
-          "sha256": "a9d273d167e13c2435cfd9e1456d5e6b3993e3a12e55bb90587d20465ce7f159",
-          "bytes": 851295
+          "sha256": "a16b321994e02e1db7711b4152dd0e402a8f61449a7c88ee7d3248b46b974531",
+          "bytes": 858126
         },
         "state": {
           "detail": "read",
@@ -328,7 +328,7 @@
               },
               "viewBoxWidth": 1170,
               "minimumProjectedNodeTextPx": 8,
-              "minimumProjectedNonEdgeTextPx": 9,
+              "minimumProjectedNonEdgeTextPx": 8.7,
               "minimumProjectedEdgeTextPx": 8,
               "minimumProjectedNodeText": "HTTP :8000",
               "minimumProjectedNodeTextDetail": "edge",
@@ -380,7 +380,7 @@
               },
               "viewBoxWidth": 1170,
               "minimumProjectedNodeTextPx": 8,
-              "minimumProjectedNonEdgeTextPx": 9,
+              "minimumProjectedNonEdgeTextPx": 8.7,
               "minimumProjectedEdgeTextPx": 8,
               "minimumProjectedNodeText": "HTTP :8000",
               "minimumProjectedNodeTextDetail": "edge",
@@ -432,7 +432,7 @@
               },
               "viewBoxWidth": 1170,
               "minimumProjectedNodeTextPx": 8,
-              "minimumProjectedNonEdgeTextPx": 9,
+              "minimumProjectedNonEdgeTextPx": 8.7,
               "minimumProjectedEdgeTextPx": 8,
               "minimumProjectedNodeText": "HTTP :8000",
               "minimumProjectedNodeTextDetail": "edge",
@@ -484,7 +484,7 @@
               },
               "viewBoxWidth": 1170,
               "minimumProjectedNodeTextPx": 8,
-              "minimumProjectedNonEdgeTextPx": 9,
+              "minimumProjectedNonEdgeTextPx": 8.7,
               "minimumProjectedEdgeTextPx": 8,
               "minimumProjectedNodeText": "HTTP :8000",
               "minimumProjectedNodeTextDetail": "edge",
@@ -589,7 +589,7 @@
               },
               "viewBoxWidth": 1170,
               "minimumProjectedNodeTextPx": 8,
-              "minimumProjectedNonEdgeTextPx": 9,
+              "minimumProjectedNonEdgeTextPx": 8.7,
               "minimumProjectedEdgeTextPx": 8,
               "minimumProjectedNodeText": "HTTP :8000",
               "minimumProjectedNodeTextDetail": "edge",
@@ -641,7 +641,7 @@
               },
               "viewBoxWidth": 1170,
               "minimumProjectedNodeTextPx": 8,
-              "minimumProjectedNonEdgeTextPx": 9,
+              "minimumProjectedNonEdgeTextPx": 8.7,
               "minimumProjectedEdgeTextPx": 8,
               "minimumProjectedNodeText": "HTTP :8000",
               "minimumProjectedNodeTextDetail": "edge",
@@ -693,7 +693,7 @@
               },
               "viewBoxWidth": 1170,
               "minimumProjectedNodeTextPx": 8,
-              "minimumProjectedNonEdgeTextPx": 9,
+              "minimumProjectedNonEdgeTextPx": 8.7,
               "minimumProjectedEdgeTextPx": 8,
               "minimumProjectedNodeText": "HTTP :8000",
               "minimumProjectedNodeTextDetail": "edge",
@@ -745,7 +745,7 @@
               },
               "viewBoxWidth": 1170,
               "minimumProjectedNodeTextPx": 8,
-              "minimumProjectedNonEdgeTextPx": 9,
+              "minimumProjectedNonEdgeTextPx": 8.7,
               "minimumProjectedEdgeTextPx": 8,
               "minimumProjectedNodeText": "HTTP :8000",
               "minimumProjectedNodeTextDetail": "edge",
@@ -802,7 +802,7 @@
               },
               "viewBoxWidth": 1170,
               "minimumProjectedNodeTextPx": 8,
-              "minimumProjectedNonEdgeTextPx": 9,
+              "minimumProjectedNonEdgeTextPx": 8.7,
               "minimumProjectedEdgeTextPx": 8,
               "minimumProjectedNodeText": "HTTP :8000",
               "minimumProjectedNodeTextDetail": "edge",
@@ -854,7 +854,7 @@
               },
               "viewBoxWidth": 1170,
               "minimumProjectedNodeTextPx": 8,
-              "minimumProjectedNonEdgeTextPx": 9,
+              "minimumProjectedNonEdgeTextPx": 8.7,
               "minimumProjectedEdgeTextPx": 8,
               "minimumProjectedNodeText": "HTTP :8000",
               "minimumProjectedNodeTextDetail": "edge",
@@ -906,7 +906,7 @@
               },
               "viewBoxWidth": 1170,
               "minimumProjectedNodeTextPx": 8,
-              "minimumProjectedNonEdgeTextPx": 9,
+              "minimumProjectedNonEdgeTextPx": 8.7,
               "minimumProjectedEdgeTextPx": 8,
               "minimumProjectedNodeText": "HTTP :8000",
               "minimumProjectedNodeTextDetail": "edge",
@@ -958,7 +958,7 @@
               },
               "viewBoxWidth": 1170,
               "minimumProjectedNodeTextPx": 8,
-              "minimumProjectedNonEdgeTextPx": 9,
+              "minimumProjectedNonEdgeTextPx": 8.7,
               "minimumProjectedEdgeTextPx": 8,
               "minimumProjectedNodeText": "HTTP :8000",
               "minimumProjectedNodeTextDetail": "edge",
@@ -1007,15 +1007,15 @@
     "browserCheckReceipt": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\arquitectura.browser-check.json"
   },
   "visualReview": "not-requested",
-  "finishedAt": "2026-11-05T23:56:49.216Z",
-  "durationMs": 2189,
+  "finishedAt": "2026-11-14T01:54:15.998Z",
+  "durationMs": 4425,
   "update": {
     "status": "current",
     "installedVersion": "3.2.0",
     "availableVersion": "3.2.0",
     "releaseNotes": null,
-    "checkedAt": "2026-11-05T23:56:47.183Z",
-    "source": "network",
+    "checkedAt": "2026-11-14T00:45:09.894Z",
+    "source": "cache",
     "noticeRequired": false,
     "noticeText": null
   }

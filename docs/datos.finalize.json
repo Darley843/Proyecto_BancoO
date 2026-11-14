@@ -5,16 +5,16 @@
   "status": "pass",
   "type": "dataflow",
   "quality": "showcase",
-  "startedAt": "2026-11-06T22:51:08.538Z",
+  "startedAt": "2026-11-14T01:54:20.495Z",
   "specification": {
     "path": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\datos.json",
-    "sha256": "c2f313aa213defdd55acb9bed0084a7b29679446cc7e5ae055106056b945b61f",
-    "bytes": 7653
+    "sha256": "3e2a0a099cba70cd791b3051faf71503d0289af918d2068cf597d7012903e752",
+    "bytes": 8240
   },
   "artifact": {
     "path": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\datos.html",
-    "sha256": "feedc73aa746cb44b5e6b4e6ae47b832df63e6d1ca3525b534b2b1edb5a93127",
-    "bytes": 853864
+    "sha256": "84ff8608c1e281371abe0b012f7ad401f9bd9b2e0211c7932ee3d19f38653b21",
+    "bytes": 855808
   },
   "stages": {
     "validate": {
@@ -40,8 +40,8 @@
         "ok": true,
         "command": "validate",
         "specification": {
-          "sha256": "c2f313aa213defdd55acb9bed0084a7b29679446cc7e5ae055106056b945b61f",
-          "bytes": 7653
+          "sha256": "3e2a0a099cba70cd791b3051faf71503d0289af918d2068cf597d7012903e752",
+          "bytes": 8240
         },
         "validation": {
           "checksPassed": 9,
@@ -56,7 +56,7 @@
     "deliver": {
       "status": "pass",
       "exitCode": 0,
-      "durationMs": 553,
+      "durationMs": 1396,
       "command": [
         "C:\\Program Files\\nodejs\\node.exe",
         "C:\\Users\\DarleyIdarraga\\.agents\\skills\\archify\\bin\\archify.mjs",
@@ -72,19 +72,19 @@
       ],
       "receipt": {
         "schemaVersion": 1,
-        "receiptId": "03b63a74-6c9d-4461-b83b-2f261f89ccba",
+        "receiptId": "e2f3b280-6db9-488a-8c5e-dc762c60f08a",
         "ok": true,
         "command": "deliver",
         "type": "dataflow",
         "input": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\datos.json",
         "output": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\datos.html",
         "specification": {
-          "sha256": "c2f313aa213defdd55acb9bed0084a7b29679446cc7e5ae055106056b945b61f",
-          "bytes": 7653
+          "sha256": "3e2a0a099cba70cd791b3051faf71503d0289af918d2068cf597d7012903e752",
+          "bytes": 8240
         },
         "artifact": {
-          "sha256": "feedc73aa746cb44b5e6b4e6ae47b832df63e6d1ca3525b534b2b1edb5a93127",
-          "bytes": 853864
+          "sha256": "84ff8608c1e281371abe0b012f7ad401f9bd9b2e0211c7932ee3d19f38653b21",
+          "bytes": 855808
         },
         "validation": {
           "checksPassed": 9,
@@ -97,8 +97,8 @@
         "evidence": {
           "verified": true,
           "repository": "https://github.com/Darley843/Proyecto_BancoO",
-          "revision": "56dc48a36d71d0f245e8a8fcb95b1b4c6ab5818c",
-          "references": 16
+          "revision": "45d0878247d9682f2336bd5068feae1aea49f1c8",
+          "references": 18
         },
         "update": {
           "status": "unavailable",
@@ -116,7 +116,7 @@
     "check": {
       "status": "pass",
       "exitCode": 0,
-      "durationMs": 150,
+      "durationMs": 741,
       "command": [
         "C:\\Program Files\\nodejs\\node.exe",
         "C:\\Users\\DarleyIdarraga\\.agents\\skills\\archify\\bin\\archify.mjs",
@@ -128,8 +128,8 @@
         "ok": true,
         "file": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\datos.html",
         "artifact": {
-          "sha256": "feedc73aa746cb44b5e6b4e6ae47b832df63e6d1ca3525b534b2b1edb5a93127",
-          "bytes": 853864
+          "sha256": "84ff8608c1e281371abe0b012f7ad401f9bd9b2e0211c7932ee3d19f38653b21",
+          "bytes": 855808
         },
         "checks": [
           {
@@ -204,7 +204,7 @@
             "routesOverSuggestedBends": 0,
             "maxStretch": 1,
             "routesOverSuggestedStretch": 0,
-            "minSegmentPx": 44.5,
+            "minSegmentPx": 38,
             "minInteriorSegmentPx": 105,
             "shortSegmentCount": 0,
             "shortEndpointSegmentCount": 0,
@@ -241,18 +241,18 @@
             },
             "minimumSourceTextPx": 7,
             "minimumProjectedTextPx": 6.095505617977528,
-            "semanticTextCount": 40
+            "semanticTextCount": 42
           },
           "issues": []
         },
         "provenance": "current",
-        "deliveryReceiptId": "03b63a74-6c9d-4461-b83b-2f261f89ccba"
+        "deliveryReceiptId": "e2f3b280-6db9-488a-8c5e-dc762c60f08a"
       }
     },
     "browser-check": {
       "status": "pass",
       "exitCode": 0,
-      "durationMs": 1553,
+      "durationMs": 1305,
       "command": [
         "C:\\Program Files\\nodejs\\node.exe",
         "C:\\Users\\DarleyIdarraga\\.agents\\skills\\archify\\bin\\archify.mjs",
@@ -270,11 +270,11 @@
         "status": "pass",
         "visualReview": "not-requested",
         "provenance": "current",
-        "deliveryReceiptId": "03b63a74-6c9d-4461-b83b-2f261f89ccba",
+        "deliveryReceiptId": "e2f3b280-6db9-488a-8c5e-dc762c60f08a",
         "artifact": {
           "path": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\datos.html",
-          "sha256": "feedc73aa746cb44b5e6b4e6ae47b832df63e6d1ca3525b534b2b1edb5a93127",
-          "bytes": 853864
+          "sha256": "84ff8608c1e281371abe0b012f7ad401f9bd9b2e0211c7932ee3d19f38653b21",
+          "bytes": 855808
         },
         "state": {
           "detail": "read",
@@ -972,14 +972,14 @@
     "browserCheckReceipt": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1\\docs\\datos.browser-check.json"
   },
   "visualReview": "not-requested",
-  "finishedAt": "2026-11-06T22:51:11.157Z",
-  "durationMs": 2619,
+  "finishedAt": "2026-11-14T01:54:24.974Z",
+  "durationMs": 4478,
   "update": {
     "status": "current",
     "installedVersion": "3.2.0",
     "availableVersion": "3.2.0",
     "releaseNotes": null,
-    "checkedAt": "2026-11-06T22:49:45.896Z",
+    "checkedAt": "2026-11-14T00:45:09.894Z",
     "source": "cache",
     "noticeRequired": false,
     "noticeText": null

@@ -236,14 +236,14 @@ ollama pull nomic-embed-text-v2-moe     # una sola vez
 make fragmentos                          # data/boveda/fragmentos_base.jsonl (sin red)
 make indice                              # indexa web + PDF de producto + hechos
 make indice-completo                     # añade el resto de PDF y los videos
-make migrar-qdrant                       # copia un índice Chroma existente a Qdrant
+make migrar-qdrant                       # copia un índice Chroma existente a Qdrant (compatibilidad)
 ```
 
 | Pieza | Dónde | Qué hace |
 |---|---|---|
 | Fragmentos | `boveda/fragmentos.py` | Fusiona chunks hasta 80 tokens, limita a 400 y parte tablas largas por filas |
 | Embeddings | `boveda/embeddings.py` | `nomic-embed-text-v2-moe` con `base_url` explícito y prefijos de tarea |
-| Índice | `boveda/almacen.py` | Qdrant local en `data/boveda/qdrant`, colección `boveda` y coseno; Chroma opcional con `[almacen] tipo` |
+| Índice | `boveda/almacen.py` | Qdrant local en `data/boveda/qdrant`, colección `boveda` y coseno; Chroma queda solo como compatibilidad con `[almacen] tipo` |
 | Recuperación | `boveda/recuperador.py` | Híbrido vectorial + BM25 con pesos de `config/sucursal.toml` |
 | Mapa | `boveda/mapa.py` | PCA 2D de los vectores, normalizado de 0 a 100; se regenera en `make indice` |
 
@@ -259,12 +259,16 @@ letra:
 | Letra | Ruta |
 |---|---|
 | `B` | Bóveda: consulta general |
+| `B` · motivo `cortesia` | Cortesía: saludo, gracias o identidad, sin recuperador ni modelo (0 tokens) |
 | `T` | Tablero: tarifas, cuotas, coberturas o carencias |
+| `T` · motivo `mixta` | Mixta: la cifra del Tablero y la explicación de la Bóveda en el mismo turno |
 | `X` | Rechazo: datos personales o fuera de alcance |
 
-Las reglas van antes que el modelo (PII → fuera de alcance → tarifas → duda →
-`B`), se configuran en `[digiturno]` de `config/sucursal.toml` y el modelo solo
-se usa para dudas, a temperatura 0. El turno no persiste la pregunta.
+Las reglas van antes que el modelo (PII → fuera de alcance → cortesía →
+identidad → mixta → tarifas → duda → `B`), se configuran en `[digiturno]` de
+`config/sucursal.toml` y el modelo solo se usa para dudas, a temperatura 0. La
+cortesía no gasta búsqueda ni tokens y la mixta cita las dos fuentes: el turno
+no persiste la pregunta.
 
 ### Tablero de tasas
 
@@ -296,8 +300,14 @@ Esos datos no llegan al modelo, a la caché ni al checkpointer.
 ### API local y variables
 
 `make app` levanta la API y la app web solo en `http://127.0.0.1:8000` (nunca
-`0.0.0.0`). Endpoints: `/api/estado`, `POST /api/preguntar`, `POST /api/preguntar/stream`, `/api/tablero`,
+`0.0.0.0`). Endpoints: `GET /health`, `/api/estado`, `POST /api/preguntar`,
+`POST /api/preguntar/stream` (SSE con una etapa por nodo), `/api/tablero`,
 `/api/boveda/mapa`, `/api/pipeline`, `/api/arqueo` y `/api/vestibulo`.
+
+`GET /health` responde 200 cuando hay índice o se está en modo demo y 503 cuando
+falta el índice; no llama a Ollama ni a DeepSeek y no publica claves ni rutas.
+`Ctrl + C` cierra en pocos segundos aunque quede una ventana con el streaming
+abierto: uvicorn espera como máximo 5 s por las conexiones y suelta el puerto.
 
 | Variable | Para qué |
 |---|---|
@@ -305,17 +315,40 @@ Esos datos no llegan al modelo, a la caché ni al checkpointer.
 | `OLLAMA_HOST` / `OLLAMA_BASE_URL` | respaldo de la URL de embeddings; lo normal es `config/sucursal.toml` |
 | `SUCURSAL_DEMO=1` | modo demo: sin DeepSeek, costo cero y sin escritura de gasto |
 | `SUCURSAL_TOPE_USD` | sobrescribe el tope diario de `[sucursal]` para la sesión |
+| `LANGSMITH_TRACING`, `LANGSMITH_API_KEY`, `LANGSMITH_PROJECT` | trazas opcionales en LangSmith; apagadas por defecto |
 
 El gasto (`data/asistente/gasto.sqlite`) y la caché
 (`data/asistente/cache.sqlite`) no se versionan.
+
+### Trazas con LangSmith (opcional)
+
+LangSmith es el observador externo del grafo y del modelo: cada turno aparece
+como una traza con los nodos, la recuperación y la llamada a DeepSeek. Está
+**apagado por defecto** y el código no lo activa ni lee `.env`: se enciende solo
+para la sesión, exportando las tres variables antes de `make app`.
+
+```powershell
+# encender solo esta sesión
+$env:LANGSMITH_TRACING = "true"
+$env:LANGSMITH_PROJECT = "sucursal-1965-demo"
+$env:LANGSMITH_API_KEY = Read-Host "Clave de LangSmith"
+
+# apagar al terminar
+Remove-Item Env:LANGSMITH_TRACING, Env:LANGSMITH_PROJECT, Env:LANGSMITH_API_KEY
+```
+
+Con las trazas encendidas, la pregunta y los fragmentos salen del equipo hacia
+LangSmith; `docs/SEGURIDAD.md` §5.1 explica el encendido, el apagado y las
+pruebas que impiden activarlo sin querer.
 
 ### Preguntar
 
 `POST /api/preguntar` recibe la pregunta y el hilo de la Ventanilla. El grafo, el
 recuperador y el modelo se construyen en la primera pregunta del proceso, no al
 importar `app.py`. El Digiturno decide la letra: `B` (Bóveda), `T` (Tablero con
-plantilla) o `X` (rechazo). El campo `ruta` distingue además `cortesia`,
-`mixta` y `perfil`; las letras no cambian.
+plantilla) o `X` (rechazo). El campo `ruta` distingue además `cortesia` (sin
+búsqueda ni modelo), `mixta` (Tablero + Bóveda en el mismo turno) y `perfil`
+(memoria del cliente); las letras no cambian.
 
 ```bash
 curl -s http://127.0.0.1:8000/api/preguntar \

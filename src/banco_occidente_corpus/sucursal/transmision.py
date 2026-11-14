@@ -280,6 +280,11 @@ def _resumen_digiturno(resultado: Mapping[str, Any]) -> tuple[str, dict[str, Any
     return f"{texto}.", {"letra": letra, "ruta": ruta, "motivo": motivo}
 
 
+#: Transmisiones abiertas, para cortarlas cuando el servidor se apaga.
+_TRANSMISIONES: set[TransmisionTurno] = set()
+_CANDADO_TRANSMISIONES = threading.Lock()
+
+
 class TransmisionTurno:
     """Ejecuta un turno en un hilo aparte y entrega sus mensajes en orden."""
 
@@ -295,9 +300,20 @@ class TransmisionTurno:
         self._hilo = threading.Thread(target=self._trabajar, name="turno-stream", daemon=True)
 
     def iniciar(self) -> TransmisionTurno:
-        """Arranca el hilo de trabajo y devuelve la misma transmisión."""
+        """Arranca el hilo de trabajo, registra la transmisión y la devuelve."""
+        with _CANDADO_TRANSMISIONES:
+            _TRANSMISIONES.add(self)
         self._hilo.start()
         return self
+
+    def cerrar(self) -> None:
+        """Pide terminar: el generador SSE suelta el turno sin esperar el final.
+
+        Es la vía del apagado en proceso. La cola recibe el centinela ``None``
+        que `eventos_sse` ya interpreta como fin, así que una petición abierta
+        deja de retener la conexión.
+        """
+        self._cola.put(None)
 
     def siguiente(self) -> MensajeTurno | None:
         """Espera el siguiente mensaje; None significa que la transmisión terminó."""
@@ -343,7 +359,17 @@ class TransmisionTurno:
             )
         finally:
             _OYENTE.reset(token)
+            with _CANDADO_TRANSMISIONES:
+                _TRANSMISIONES.discard(self)
             self._cola.put(None)
+
+
+def cerrar_transmisiones() -> None:
+    """Corta las transmisiones abiertas para que el apagado no espere al cliente."""
+    with _CANDADO_TRANSMISIONES:
+        abiertas = list(_TRANSMISIONES)
+    for transmision in abiertas:
+        transmision.cerrar()
 
 
 def error_como_mensaje(error: ErrorSucursal) -> MensajeTurno:
