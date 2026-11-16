@@ -23,9 +23,12 @@ from banco_occidente_corpus.tablero.tasas import (
     Usura,
     UsuraSinCertificar,
     cargar_config_tasas,
+    describir_tasa,
+    es_spread,
     escribir_tabla,
     filas_desde_texto,
     leer_tabla,
+    tasas_fijas,
     validar_coherencia_tasas,
     validar_filas,
     validar_usura,
@@ -367,6 +370,75 @@ def test_coherencia_entre_mv_y_ea(filas_muestra: list[FilaTasa]) -> None:
     assert "libre_inversion" in str(error.value)
 
 
+def test_tipo_tasa_distingue_spreads_de_tasas(filas_muestra: list[FilaTasa]) -> None:
+    """Cada fila declara si es tasa fija o spread, y el JSONL lo conserva."""
+    ipc = [fila for fila in filas_muestra if fila.segmento == "IPC"]
+    ibr = [fila for fila in filas_muestra if fila.segmento == "IBR a 30 días"]
+    assert ipc and ibr
+    assert {fila.tipo_tasa for fila in ipc} == {"spread_ipc"}
+    assert {fila.tipo_tasa for fila in ibr} == {"spread_ibr"}
+    assert all(
+        fila.tipo_tasa == "fija"
+        for fila in filas_muestra
+        if fila.segmento not in {"IPC", "IBR a 30 días"}
+    )
+    assert sum(1 for fila in filas_muestra if es_spread(fila)) == 8
+
+    crudo = [fila.como_dict() for fila in filas_muestra]
+    assert {fila["tipo_tasa"] for fila in crudo} == {"fija", "spread_ipc", "spread_ibr"}
+
+
+def test_las_consultas_de_tasa_dejan_fuera_los_spreads(filas_muestra: list[FilaTasa]) -> None:
+    """`tasas_fijas` es el punto de partida de toda consulta de «la tasa»."""
+    fijas = tasas_fijas(filas_muestra)
+    assert len(fijas) == len(filas_muestra) - 8
+    assert all(fila.tipo_tasa == "fija" for fila in fijas)
+    assert any(fila.producto == "cdt" for fila in fijas)
+
+
+def test_usura_no_valida_los_spreads(filas_muestra: list[FilaTasa]) -> None:
+    """Un spread sobre IPC o IBR no es crédito y no se compara con la usura."""
+    sin_excepciones = Usura(
+        tasa_ea=Decimal("0.2834"),
+        vigencia_desde=date(2026, 11, 1),
+        vigencia_hasta=date(2026, 11, 30),
+        fuente="https://www.superfinanciera.gov.co/",
+        resolucion="Resolución 1707 de 2026",
+        exceptuados=frozenset(),
+    )
+    spread_ipc = _buscar(filas_muestra, "cdt", "IPC", 360).model_copy(
+        update={"tasa_ea_desde": Decimal("0.99"), "tasa_ea_hasta": Decimal("0.99")}
+    )
+    spread_ibr = _buscar(filas_muestra, "cdt", "IBR a 30 días", 360).model_copy(
+        update={"tasa_ea_desde": Decimal("0.99"), "tasa_ea_hasta": Decimal("0.99")}
+    )
+    validar_usura([spread_ipc, spread_ibr], sin_excepciones)
+
+    fija = _buscar(filas_muestra, "libre_inversion").model_copy(
+        update={"tasa_ea_hasta": Decimal("0.99")}
+    )
+    with pytest.raises(TasaSobreUsura):
+        validar_usura([fija], sin_excepciones)
+
+
+def test_coherencia_no_evalua_los_spreads(filas_muestra: list[FilaTasa]) -> None:
+    """Un spread no tiene M.V. y no entra en la equivalencia M.V./E.A."""
+    spread = _buscar(filas_muestra, "cdt", "IPC", 360).model_copy(
+        update={"tasa_mv_desde": Decimal("0.50"), "tasa_mv_hasta": Decimal("0.50")}
+    )
+    validar_coherencia_tasas([spread])
+
+
+def test_los_spreads_se_muestran_como_puntos_sobre_el_indice(filas_muestra: list[FilaTasa]) -> None:
+    """La presentación distingue «IPC + puntos» e «IBR + puntos» de una tasa."""
+    assert describir_tasa(_buscar(filas_muestra, "cdt", "IPC", 360)) == "IPC + 3,20 puntos"
+    assert describir_tasa(_buscar(filas_muestra, "cdt", "IBR a 30 días", 1080)) == (
+        "IBR + 0,35 puntos"
+    )
+    assert describir_tasa(_buscar(filas_muestra, "libre_inversion")) == "20,56–28,17 % E.A."
+    assert describir_tasa(_buscar(filas_muestra, "tarjeta_credito", "Pesos")) == "28,19 % E.A."
+
+
 def test_config_tasas_certifica_la_usura_del_periodo() -> None:
     """`config/tasas.toml` registra la usura de consumo y ordinario de noviembre."""
     config = cargar_config_tasas()
@@ -392,6 +464,12 @@ def test_tabla_gold_versionada_cumple_la_usura() -> None:
     assert filas, "falta la tabla Gold de tasas de la vigencia"
     assert {fila.producto for fila in filas} == PRODUCTOS_ESPERADOS
     assert {fila.sha256_pdf for fila in filas} == {config.sha256}
+    assert {fila.tipo_tasa for fila in filas if fila.producto == "cdt"} == {
+        "fija",
+        "spread_ipc",
+        "spread_ibr",
+    }
+    assert sum(1 for fila in filas if es_spread(fila)) == 8
     validar_filas(filas)
     validar_usura(filas, config.usura)
     validar_coherencia_tasas(filas)

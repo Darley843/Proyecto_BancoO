@@ -464,10 +464,12 @@ data/gold/tasas/tasas-personas-<AAAA-MM>.jsonl  GOLD    tasas por vigencia
 config/tasas.toml                               FUENTE  usura certificada y archivos
 ```
 
-Cada fila tiene doce campos: `producto`, `segmento`, `plazo_dias`,
+Cada fila tiene trece campos: `producto`, `segmento`, `tipo_tasa`, `plazo_dias`,
 `tasa_ea_desde`, `tasa_ea_hasta`, `tasa_mv_desde`, `tasa_mv_hasta`,
 `vigencia_desde`, `vigencia_hasta`, `fuente`, `sha256_pdf` y
 `fecha_extraccion`. Las tasas son decimales entre 0 y 1; las fechas, ISO 8601.
+`tipo_tasa` vale `fija`, `spread_ipc` o `spread_ibr`: un spread sobre un índice
+no es una tasa.
 
 Reglas:
 
@@ -482,7 +484,10 @@ Reglas:
    crédito.
 4. Donde el PDF publica M.V. y E.A., la M.V. debe cumplir
    `(1 + E.A.) ** (1/12) - 1` con tolerancia de 0,01 puntos porcentuales.
-5. Se regenera con `uv run python -m banco_occidente_corpus.tablero.tasas`; no
+5. Un `spread_ipc` o `spread_ibr` no entra en la validación de usura ni en la
+   equivalencia M.V./E.A., y no lo devuelve ninguna consulta de «la tasa» del
+   producto: se presenta como «IPC + X puntos» o «IBR + X puntos».
+6. Se regenera con `uv run python -m banco_occidente_corpus.tablero.tasas`; no
    se edita a mano y no ejecuta `corpus docs extract`.
 
 ### Capa Contexto (prompt del asistente)

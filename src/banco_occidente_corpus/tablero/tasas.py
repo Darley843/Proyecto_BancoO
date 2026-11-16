@@ -13,7 +13,10 @@ colocación. La tarjeta de crédito no publica M.V. sino «n.v.», así que su
 El CDT se desagrega por plazo y por rango de monto, con el plazo en días como
 campo propio. Su tabla de largo plazo publica dos componentes variables por
 plazo —IPC (% E.A.) e IBR (% sobre IBR a 30 días)— que se guardan tal como se
-imprimen, cada una en su segmento y sin convertirlas a una tasa fija.
+imprimen, con `tipo_tasa` en `spread_ipc` o `spread_ibr`. Un spread no es una
+tasa: no se valida contra la usura ni contra la equivalencia M.V./E.A., no
+entra en las consultas que devuelven «la tasa» del producto y se presenta
+siempre como «IPC + X puntos» o «IBR + X puntos».
 
 Antes de publicar, `validar_usura` recorre todas las filas de crédito y rechaza
 la que supere la usura certificada en `config/tasas.toml`. Vivienda no se valida
@@ -37,7 +40,7 @@ from dataclasses import dataclass
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -151,6 +154,9 @@ class FilaTasa(BaseModel):
 
     producto: str
     segmento: str | None = None
+    #: Naturaleza de la cifra: tasa fija o spread sobre IPC o sobre IBR. Solo
+    #: `fija` es una tasa y solo ella entra en usura, coherencia y consultas.
+    tipo_tasa: Literal["fija", "spread_ipc", "spread_ibr"] = "fija"
     #: Plazo del CDT en días (30 por mes y 360 por año); el resto de productos
     #: no publica plazo y lo deja vacío.
     plazo_dias: int | None = Field(default=None, ge=1)
@@ -169,6 +175,7 @@ class FilaTasa(BaseModel):
         return {
             "producto": self.producto,
             "segmento": self.segmento,
+            "tipo_tasa": self.tipo_tasa,
             "plazo_dias": self.plazo_dias,
             "tasa_ea_desde": float(self.tasa_ea_desde),
             "tasa_ea_hasta": float(self.tasa_ea_hasta),
@@ -478,7 +485,7 @@ def validar_usura(filas: Iterable[FilaTasa], usura: Usura) -> None:
             f"no hay usura certificada entre {usura.vigencia_desde} y {usura.vigencia_hasta}"
         )
     for fila in filas:
-        if fila.producto in usura.exceptuados:
+        if fila.tipo_tasa != "fija" or fila.producto in usura.exceptuados:
             continue
         if fila.tasa_ea_hasta > usura.tasa_ea:
             raise TasaSobreUsura(
@@ -504,6 +511,8 @@ def validar_coherencia_tasas(
         TasaIncoherente: si una M.V. publicada no corresponde a su E.A.
     """
     for fila in filas:
+        if fila.tipo_tasa != "fija":
+            continue
         if fila.tasa_mv_desde is None or fila.tasa_mv_hasta is None:
             continue
         for etiqueta, ea, mv in (
@@ -516,6 +525,66 @@ def validar_coherencia_tasas(
                     f"{fila.producto} ({fila.segmento or 'sin segmento'}) {etiqueta}: "
                     f"E.A. {ea:%} equivale a {mensual:.4%} mensual y la M.V. publica {mv:%}"
                 )
+
+
+def es_spread(fila: FilaTasa) -> bool:
+    """Indica si la cifra de la fila es un spread sobre IPC o sobre IBR.
+
+    Args:
+        fila: fila de la tabla Gold.
+
+    Returns:
+        True si la fila no es una tasa fija.
+    """
+    return fila.tipo_tasa != "fija"
+
+
+def tasas_fijas(filas: Iterable[FilaTasa]) -> list[FilaTasa]:
+    """Filtra las filas que son tasas fijas y deja fuera los spreads.
+
+    Toda consulta que devuelva «la tasa» de un producto (por ejemplo
+    `tasa_vigente` o `tasas_producto`) debe partir de esta lista: un spread
+    sobre IPC o IBR no es una tasa y no se puede comparar con una usura ni
+    presentar como porcentaje E.A.
+
+    Args:
+        filas: filas de la tabla Gold.
+
+    Returns:
+        Las filas con `tipo_tasa="fija"`, en el orden recibido.
+    """
+    return [fila for fila in filas if not es_spread(fila)]
+
+
+def describir_tasa(fila: FilaTasa) -> str:
+    """Presenta una cifra de la tabla como tasa o como spread, sin confundirlas.
+
+    Args:
+        fila: fila de la tabla Gold.
+
+    Returns:
+        `«24,31 % E.A.»` para una tasa fija, `«IPC + 3,20 puntos»` para un
+        spread sobre IPC y `«IBR + 0,20 puntos»` para un spread sobre IBR.
+    """
+    if fila.tipo_tasa == "spread_ipc":
+        return f"IPC + {_puntos(fila)} puntos"
+    if fila.tipo_tasa == "spread_ibr":
+        return f"IBR + {_puntos(fila)} puntos"
+    if fila.tasa_ea_desde == fila.tasa_ea_hasta:
+        return f"{_porcentaje(fila.tasa_ea_desde)} % E.A."
+    return f"{_porcentaje(fila.tasa_ea_desde)}–{_porcentaje(fila.tasa_ea_hasta)} % E.A."
+
+
+def _porcentaje(valor: Decimal) -> str:
+    """Formatea un decimal como porcentaje con dos decimales y coma."""
+    return f"{valor * 100:.2f}".replace(".", ",")
+
+
+def _puntos(fila: FilaTasa) -> str:
+    """Formatea el spread en puntos porcentuales, con coma decimal."""
+    if fila.tasa_ea_desde == fila.tasa_ea_hasta:
+        return _porcentaje(fila.tasa_ea_desde)
+    return f"{_porcentaje(fila.tasa_ea_desde)}–{_porcentaje(fila.tasa_ea_hasta)}"
 
 
 def escribir_tabla(ruta: Path, filas: Iterable[FilaTasa]) -> int:
@@ -820,10 +889,26 @@ def _filas_cdt_largo(lineas: Sequence[str], meta: _Metadatos) -> list[FilaTasa]:
         ipc = _porcentajes(encontrado.group("ipc"))
         ibr = _porcentajes(encontrado.group("ibr"))
         if ipc:
-            filas.append(_nueva_fila(meta, "cdt", "IPC", (ipc[0], ipc[0]), plazo_dias=plazo))
+            filas.append(
+                _nueva_fila(
+                    meta,
+                    "cdt",
+                    "IPC",
+                    (ipc[0], ipc[0]),
+                    plazo_dias=plazo,
+                    tipo_tasa="spread_ipc",
+                )
+            )
         if ibr:
             filas.append(
-                _nueva_fila(meta, "cdt", "IBR a 30 días", (ibr[0], ibr[0]), plazo_dias=plazo)
+                _nueva_fila(
+                    meta,
+                    "cdt",
+                    "IBR a 30 días",
+                    (ibr[0], ibr[0]),
+                    plazo_dias=plazo,
+                    tipo_tasa="spread_ibr",
+                )
             )
     return filas
 
@@ -859,6 +944,7 @@ def _nueva_fila(
     mv: tuple[Decimal, Decimal] | None = None,
     vigencia: tuple[date, date] | None = None,
     plazo_dias: int | None = None,
+    tipo_tasa: Literal["fija", "spread_ipc", "spread_ibr"] = "fija",
 ) -> FilaTasa:
     """Arma una fila de la tabla con la trazabilidad de la extracción.
 
@@ -870,6 +956,7 @@ def _nueva_fila(
         mv: rango de tasa mensual vencida, si el PDF lo publica.
         vigencia: vigencia publicada; por defecto la de la fuente.
         plazo_dias: plazo del CDT en días, si el producto lo publica.
+        tipo_tasa: tasa fija o spread sobre IPC o IBR.
 
     Returns:
         La fila lista para publicar.
@@ -878,6 +965,7 @@ def _nueva_fila(
     return FilaTasa(
         producto=producto,
         segmento=segmento,
+        tipo_tasa=tipo_tasa,
         plazo_dias=plazo_dias,
         tasa_ea_desde=ea[0],
         tasa_ea_hasta=ea[1],
@@ -1036,6 +1124,7 @@ def _clave_fila(fila: FilaTasa) -> tuple[object, ...]:
     return (
         fila.producto,
         fila.segmento,
+        fila.tipo_tasa,
         fila.plazo_dias,
         fila.tasa_ea_desde,
         fila.tasa_ea_hasta,
@@ -1053,6 +1142,7 @@ def _orden(fila: FilaTasa) -> tuple[object, ...]:
     """Clave de orden determinista de la tabla Gold."""
     return (
         fila.producto,
+        fila.tipo_tasa,
         fila.segmento or "",
         fila.plazo_dias or 0,
         fila.vigencia_desde,

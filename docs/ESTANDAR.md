@@ -130,11 +130,12 @@ del Gold de páginas:
 data/gold/tasas/tasas-personas-<AAAA-MM>.jsonl
 ```
 
-Cada fila tiene doce campos: `producto`, `segmento`, `plazo_dias`,
+Cada fila tiene trece campos: `producto`, `segmento`, `tipo_tasa`, `plazo_dias`,
 `tasa_ea_desde`, `tasa_ea_hasta`, `tasa_mv_desde`, `tasa_mv_hasta`,
 `vigencia_desde`, `vigencia_hasta`, `fuente`, `sha256_pdf` y
 `fecha_extraccion`. Las tasas son decimales entre 0 y 1 y las fechas, ISO 8601;
-`plazo_dias` solo se llena cuando el producto publica plazo (CDT).
+`plazo_dias` solo se llena cuando el producto publica plazo (CDT) y `tipo_tasa`
+distingue `fija` de `spread_ipc` y `spread_ibr`.
 
 - Una fila por producto, segmento y plazo. La mora, las comisiones, los
   descuentos y los seguros no entran como tasas de colocación.
@@ -145,6 +146,9 @@ Cada fila tiene doce campos: `producto`, `segmento`, `plazo_dias`,
   no son crédito.
 - Donde el PDF publica M.V. y E.A., la M.V. debe cumplir
   `(1 + E.A.) ** (1/12) - 1` con tolerancia de 0,01 puntos porcentuales.
+- Un spread sobre IPC o IBR no es una tasa: queda fuera de la usura, de la
+  equivalencia M.V./E.A. y de las consultas de «la tasa» del producto, y se
+  presenta como «IPC + X puntos» o «IBR + X puntos».
 
 ## 5. Entorno con uv
 
