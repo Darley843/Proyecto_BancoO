@@ -422,6 +422,50 @@ una prueba lo detecte: las pruebas cubren las líneas reales conocidas, no todas
 las variantes futuras. Hasta que falle una pregunta de tabla, el valor incorrecto
 se publicaría igual.
 
+### 3.9 Canal de WhatsApp: firma, repetición, PII, inyección y token
+
+**Qué puede pasar.** El webhook es público: cualquiera que conozca la URL puede
+enviar un `POST` que parezca de Meta. Sin verificación se podría inyectar un
+turno, repetir un mensaje ya respondido para duplicar envíos, dejar el número de
+teléfono en los logs, colar instrucciones en el texto del usuario o exponer el
+token de la app en un error.
+
+**Mitigaciones.**
+
+- **Firma.** Cada `POST` se valida con `X-Hub-Signature-256`: HMAC-SHA256 del
+  cuerpo crudo con `WHATSAPP_APP_SECRET`, comparado con `hmac.compare_digest`.
+  Una firma ausente o inválida responde 401 y no encola nada. La firma se calcula
+  sobre el cuerpo original, no sobre el JSON reserializado.
+- **Repetición.** El id de mensaje se registra antes de procesar y se descarta si
+  ya existe; el registro vive en `data/asistente/whatsapp.sqlite`, así que
+  sobrevive a un reinicio. Los envíos usan una clave idempotente por mensaje y
+  hash de respuesta para que un fallo entre el envío y la marca no duplique.
+- **PII.** El número se convierte en `usuario_id = HMAC-SHA256(número, sal)` y el
+  valor en claro solo existe en memoria; el esquema no tiene columnas para
+  número, nombre ni texto. El perfil (nombre y rol) vive fuera de Git y no se
+  envía al modelo. El consentimiento de la Ley 1581 se pide en el primer mensaje.
+- **Inyección.** El texto del usuario y los fragmentos son datos: se neutralizan,
+  se envuelven antes del prompt y nunca se interpretan como instrucciones del
+  sistema. La ruta no se elige con su contenido.
+- **Token.** `WHATSAPP_ACCESS_TOKEN` y el App Secret se leen solo del entorno; no
+  se escriben en `config/`, ni en logs, ni en la base. Un fallo de Meta se
+  registra con el código HTTP, nunca con la cabecera `Authorization`.
+
+**Superficie.** El webhook responde 200 en cuanto la firma y el id son válidos y
+procesa en segundo plano con una cola de un trabajador: ni Meta reintenta por
+timeout ni dos turnos del mismo usuario se pisan.
+
+**Verificación.** Llega con las tareas 2.1–2.3 y 2.7–2.8:
+`test/test_canal_firma.py` (firma válida, inválida, ausente y cuerpo alterado),
+`test/test_canal_almacen.py` (deduplicación persistente) y
+`test/test_canal_consentimiento.py`. La comprobación de que el cliente de Meta
+declara `timeout` y no desactiva TLS se añade junto con `canal/envio.py`;
+`test/test_seguridad.py::test_ningun_cliente_http_desactiva_la_verificacion_tls`
+ya vigila lo segundo en todo `src/`.
+
+**Residual.** El túnel HTTPS es externo y cambia de URL; mientras esté abierto,
+la superficie pública es la de Meta. Se apaga al terminar cada ensayo.
+
 ## 4. Por qué no usamos `.env` ni `python-dotenv`
 
 El ejemplo de la clase usa `python-dotenv` y un archivo `.env`; este proyecto
