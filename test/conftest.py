@@ -12,12 +12,31 @@ llame a Ollama, a DeepSeek o al sitio del banco no puede pasar por accidente.
 from __future__ import annotations
 
 import ipaddress
+import os
 import socket
 
 import pytest
 
 #: Puertos locales de servicios reales que ninguna prueba debe usar (Ollama).
 PUERTOS_PROHIBIDOS: frozenset[int] = frozenset({11434})
+
+#: Variables con las que LangChain y LangGraph envían trazas a LangSmith.
+#: `make check` corre en la sesión del desarrollador y la demo las enciende a
+#: mano (docs/SEGURIDAD.md §5.1); la suite las neutraliza antes de importar
+#: LangChain para no exportar trazas ni salir de loopback al terminar.
+VARIABLES_DE_TRAZAS: tuple[str, ...] = (
+    "LANGSMITH_TRACING",
+    "LANGSMITH_API_KEY",
+    "LANGSMITH_PROJECT",
+    "LANGSMITH_ENDPOINT",
+    "LANGCHAIN_TRACING_V2",
+    "LANGCHAIN_API_KEY",
+    "LANGCHAIN_PROJECT",
+    "LANGCHAIN_ENDPOINT",
+)
+
+for _variable in VARIABLES_DE_TRAZAS:
+    os.environ.pop(_variable, None)
 
 
 def _es_loopback(direccion: object) -> bool:

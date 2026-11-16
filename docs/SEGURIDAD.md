@@ -473,6 +473,11 @@ La traza no la activa el grafo: la enciende la **sesión**, porque `langchain-co
 lee esas variables del entorno y publica cada nodo del `StateGraph` con su
 latencia y sus tokens. El código, `config/` y la suite no las definen; la prueba
 `test/test_seguridad.py::test_nada_en_produccion_activa_langsmith` lo comprueba.
+Además, `test/conftest.py` las **borra al arrancar**, de modo que `make check`
+corre sin trazas aunque la terminal venga de una demo encendida; sin esa limpieza
+LangChain exporta desde un hilo de fondo al terminar las pruebas, cuando la
+guardia de red ya no actúa. `test_seguridad.py::test_la_suite_corre_sin_trazas_de_langsmith`
+lo comprueba.
 
 Para una demo explícita, en una sesión corta de PowerShell:
 
