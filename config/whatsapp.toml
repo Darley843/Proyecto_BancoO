@@ -1,0 +1,26 @@
+# Configuración del canal de WhatsApp (sin secretos).
+#
+# Los tokens y la sal viven en el entorno, nunca aquí:
+#   WHATSAPP_VERIFY_TOKEN, WHATSAPP_APP_SECRET, WHATSAPP_ACCESS_TOKEN,
+#   WHATSAPP_PHONE_NUMBER_ID, WHATSAPP_ID_SALT y WHATSAPP_MODO.
+
+[canal]
+version_api = "v23.0"
+modo = "falso"  # falso | real
+pais_por_defecto = "57"
+version_aviso = "2026-11"
+limite_intentos_roba = 20
+retencion_dias = 30
+
+[autorizados]
+# Huellas HMAC-SHA256 de los cinco números de prueba, en hexadecimal.
+# Se generan con `WHATSAPP_ID_SALT` y se sustituyen antes de la prueba real;
+# estos cinco valores son marcadores de ejemplo y no corresponden a ningún
+# número.
+huellas = [
+  "0000000000000000000000000000000000000000000000000000000000000001",
+  "0000000000000000000000000000000000000000000000000000000000000002",
+  "0000000000000000000000000000000000000000000000000000000000000003",
+  "0000000000000000000000000000000000000000000000000000000000000004",
+  "0000000000000000000000000000000000000000000000000000000000000005",
+]

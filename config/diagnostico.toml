@@ -1,0 +1,21 @@
+# Diagnóstico financiero: umbrales del semáforo y catálogo de productos.
+#
+# Los umbrales son la razón de endeudamiento (cuotas actuales más cuota nueva
+# sobre el ingreso mensual). Se ajustan sin tocar código; los valores de
+# partida son 0,30 y 0,40.
+
+[umbrales]
+verde_hasta = 0.30
+amarillo_hasta = 0.40
+
+[productos]
+libre_inversion = "Libre inversión"
+compra_cartera = "Compra de cartera"
+credito_rotativo = "Crédito rotativo"
+libranza = "Libranza"
+vehiculo_nuevo = "Vehículo nuevo"
+vehiculo_usado = "Vehículo usado"
+vivienda = "Vivienda"
+tarjeta_credito = "Tarjeta de crédito"
+ahorro = "Ahorro"
+cdt = "CDT"
