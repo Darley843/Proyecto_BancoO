@@ -1,7 +1,8 @@
-"""API local de la Sucursal: estado, Tablero, Bóveda, pipeline, Arqueo y Vestíbulo.
+"""API local de la Sucursal: estado, Tablero, Bóveda, pipeline, Arqueo, Vestíbulo y operación.
 
 Los endpoints de datos solo leen artefactos ya construidos (`tablero.csv`,
-`indice.json`, `mapa.json`, `arqueo.json`, `config/vestibulo.toml`).
+`indice.json`, `mapa.json`, `arqueo.json`, `config/vestibulo.toml` y, en solo
+lectura, las bases del canal de WhatsApp para `GET /api/operacion`).
 `POST /api/preguntar` delega en `sucursal.preguntar`, que construye el grafo y sus
 dependencias la primera vez que se pregunta y no al importar este módulo.
 `POST /api/preguntar/stream` atiende el mismo turno con el mismo servicio, pero
@@ -30,6 +31,7 @@ from ..tablero.consultas import buscar_filas
 from ..tablero.tipos import Fila, leer_filas, ruta_tablero
 from .ajustes import ConfiguracionSucursal, tope_efectivo
 from .costo import CacheRespuestas, GastoDiario
+from .operacion import OperacionRespuesta, resumen_operacion
 from .preguntar import (
     ErrorSucursal,
     PiezasGrafo,
@@ -235,7 +237,7 @@ def crear_router(
             lee `data/boveda/mapa.json` y usa Ollama y el recuperador real.
 
     Returns:
-        El router con los ocho endpoints de la Sucursal.
+        El router con los nueve endpoints de la Sucursal.
     """
     router = APIRouter(prefix="/api")
     fabrica = piezas or _fabrica_piezas(config, ajustes)
@@ -346,6 +348,11 @@ def crear_router(
         with ruta.open("rb") as fh:
             datos = tomllib.load(fh)
         return VestibuloRespuesta(hitos=[HitoRespuesta(**hito) for hito in datos.get("hito", [])])
+
+    @router.get("/operacion", response_model=OperacionRespuesta)
+    def operacion() -> OperacionRespuesta:
+        """Devuelve el resumen de operación del canal, sin datos personales."""
+        return resumen_operacion(config.paths.root)
 
     @router.post("/preguntar", response_model=PreguntarRespuesta)
     def preguntar(
