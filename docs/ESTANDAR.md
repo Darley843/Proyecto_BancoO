@@ -121,6 +121,31 @@ documento_titulo: Informe Final Octubre 2026
 - `healthcheck.py` exige `fecha_publicacion`, `tipo`, `origen`, `medio` y
   `resumen`, detecta ids duplicados y valida el documento enlazado.
 
+### Tabla Gold de tasas
+
+El PDF de tasas de personas se publica como tabla Gold por vigencia, separada
+del Gold de páginas:
+
+```text
+data/gold/tasas/tasas-personas-<AAAA-MM>.jsonl
+```
+
+Cada fila tiene doce campos: `producto`, `segmento`, `plazo_dias`,
+`tasa_ea_desde`, `tasa_ea_hasta`, `tasa_mv_desde`, `tasa_mv_hasta`,
+`vigencia_desde`, `vigencia_hasta`, `fuente`, `sha256_pdf` y
+`fecha_extraccion`. Las tasas son decimales entre 0 y 1 y las fechas, ISO 8601;
+`plazo_dias` solo se llena cuando el producto publica plazo (CDT).
+
+- Una fila por producto, segmento y plazo. La mora, las comisiones, los
+  descuentos y los seguros no entran como tasas de colocación.
+- La tabla se reescribe completa cuando cambia el `sha256` del PDF y se
+  regenera con `uv run python -m banco_occidente_corpus.tablero.tasas`.
+- Ninguna tasa de crédito puede superar la usura de `config/tasas.toml`;
+  vivienda no se valida contra la usura de consumo y ordinario, y ahorro y CDT
+  no son crédito.
+- Donde el PDF publica M.V. y E.A., la M.V. debe cumplir
+  `(1 + E.A.) ** (1/12) - 1` con tolerancia de 0,01 puntos porcentuales.
+
 ## 5. Entorno con uv
 
 | Regla de la clase | Implementación |

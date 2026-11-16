@@ -452,6 +452,39 @@ Reglas:
 
 Comandos: `make docs`, `make videos`, `make media`.
 
+### Tabla Gold de tasas (versionada)
+
+El PDF de tasas de personas se estructura en una tabla Gold por vigencia; no
+pasa por `make gold` ni se mezcla con las páginas Gold.
+
+```text
+data/raw/documents/<sha>.pdf                    BRONZE  PDF tal como se descargó
+data/raw/documents_capture.jsonl                        url, sha256, fecha y archivo
+data/gold/tasas/tasas-personas-<AAAA-MM>.jsonl  GOLD    tasas por vigencia
+config/tasas.toml                               FUENTE  usura certificada y archivos
+```
+
+Cada fila tiene doce campos: `producto`, `segmento`, `plazo_dias`,
+`tasa_ea_desde`, `tasa_ea_hasta`, `tasa_mv_desde`, `tasa_mv_hasta`,
+`vigencia_desde`, `vigencia_hasta`, `fuente`, `sha256_pdf` y
+`fecha_extraccion`. Las tasas son decimales entre 0 y 1; las fechas, ISO 8601.
+
+Reglas:
+
+1. Una fila por producto y segmento, y por plazo cuando el producto lo publica
+   (CDT). La mora, las comisiones, los descuentos y las tablas de seguros no se
+   registran como tasas de colocación.
+2. La tabla se versiona por vigencia y se reescribe completa si cambia el
+   `sha256` del PDF: no se acumulan filas duplicadas.
+3. Ninguna tasa E.A. de crédito puede superar la usura de `config/tasas.toml`;
+   sin certificación la extracción falla con `usura_sin_certificar`. Vivienda no
+   se valida contra la usura de consumo y ordinario; ahorro y CDT no son
+   crédito.
+4. Donde el PDF publica M.V. y E.A., la M.V. debe cumplir
+   `(1 + E.A.) ** (1/12) - 1` con tolerancia de 0,01 puntos porcentuales.
+5. Se regenera con `uv run python -m banco_occidente_corpus.tablero.tasas`; no
+   se edita a mano y no ejecuta `corpus docs extract`.
+
 ### Capa Contexto (prompt del asistente)
 
 Sobre Gold se deriva el **prompt de sistema** del asistente Q&A:
