@@ -2,7 +2,7 @@
  * Sucursal 1965 · armazón de la app web.
  *
  * Responsabilidades (OpenSpec sucursal-1965, decisión 15):
- * - enrutar entre las seis vistas de la sucursal con el hash de la URL;
+ * - enrutar entre las ocho vistas de la sucursal con el hash de la URL;
  * - decidir si los datos salen de la API local o de `datos-ejemplo/`;
  * - pintar el encabezado común: saldo del día, sello de modo y tema.
  *
@@ -13,7 +13,16 @@
 import { crearTexto, formatearUsd } from "./comun.js";
 
 /** Vistas de la sucursal, en el orden de la navegación. */
-const VISTAS = ["vestibulo", "ventanilla", "boveda", "tablero", "camara", "arqueo"];
+const VISTAS = [
+  "vestibulo",
+  "ventanilla",
+  "boveda",
+  "tablero",
+  "camara",
+  "arqueo",
+  "operacion",
+  "roba",
+];
 
 /** Vista que se abre cuando la URL no indica ninguna. */
 const VISTA_INICIAL = "vestibulo";
@@ -30,6 +39,13 @@ const ENDPOINTS = {
   pipeline: "/api/pipeline",
   arqueo: "/api/arqueo",
   vestibulo: "/api/vestibulo",
+  operacion: "/api/operacion",
+  roba: "/api/roba",
+  // Acciones de Roba la Bóveda: no tienen archivo de ejemplo porque en la
+  // maqueta la terminal queda en pausa.
+  roba_intento: "/api/roba/intento",
+  roba_reiniciar: "/api/roba/reiniciar",
+  roba_exportar: "/api/roba/exportar",
 };
 
 /**
