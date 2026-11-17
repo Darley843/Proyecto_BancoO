@@ -469,6 +469,40 @@ Al final imprime el resumen por etapa y la ruta de una página Gold generada. An
 un `403` o `429` se detiene con un mensaje neutro, sin cambiar de red ni de
 cliente.
 
+## Canal de WhatsApp
+
+La Sucursal también atiende por WhatsApp Cloud API, con webhook propio en el
+mismo FastAPI (Vía 2, sin N8N). El canal valida la firma de Meta, identifica al
+usuario con una huella HMAC de su número, pide consentimiento de la Ley 1581 y
+entrega el turno al grafo existente. La guía completa está en
+[`docs/OPERACION_WHATSAPP.md`](docs/OPERACION_WHATSAPP.md).
+
+```powershell
+# 1. Cargar los secretos en la sesión (nunca en el repositorio)
+$env:WHATSAPP_VERIFY_TOKEN = "..."
+$env:WHATSAPP_APP_SECRET = "..."
+$env:WHATSAPP_ACCESS_TOKEN = "..."
+$env:WHATSAPP_PHONE_NUMBER_ID = "..."
+$env:WHATSAPP_ID_SALT = "..."
+$env:WHATSAPP_MODO = "falso"
+
+# 2. Levantar la Sucursal (solo 127.0.0.1:8000)
+make app
+
+# 3. Exponer el webhook con un túnel HTTPS
+cloudflared tunnel --url http://127.0.0.1:8000
+```
+
+- **Variables:** `.env.example` lista los nombres; el proyecto **no** lee
+  `.env` (ver `docs/SEGURIDAD.md` §4).
+- **Callback en Meta:** `https://<túnel>/webhooks/whatsapp`, con el mismo token
+  de verificación y suscripción a `messages`.
+- **Números autorizados:** se guardan como huellas, no en claro:
+  `python -m banco_occidente_corpus.canal.identidad --huella "+57..."`.
+- **Modos:** `falso` registra el envío sin red (suite y ensayos); `real` usa la
+  API de Meta y exige que el destino esté autorizado.
+- **Límites del número de prueba:** cinco destinatarios y ventana de 24 horas.
+
 ## Capturas
 
 La app vigente es `app/web/` y se abre con `make app` en
