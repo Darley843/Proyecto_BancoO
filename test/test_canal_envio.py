@@ -29,7 +29,7 @@ from banco_occidente_corpus.canal.envio import (
 USUARIO = "u" * 64
 """Huella ficticia del número."""
 
-TOKEN = "token-secreto-de-prueba"
+TOKEN = "token-de-prueba"
 """Token ficticio de Meta, para comprobar que no se filtra."""
 
 AHORA = datetime(2026, 11, 17, 12, 0, tzinfo=UTC)
