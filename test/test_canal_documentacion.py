@@ -62,10 +62,21 @@ def test_la_guia_cubre_arranque_tunel_callback_y_modos() -> None:
         "WHATSAPP_MODO",
         "127.0.0.1",
         "X-Hub-Signature-256",
+        "subscribed_apps",
+        "Whatsapp Business Account",
         "falso",
         "real",
     ):
         assert pieza in texto, pieza
+
+
+def test_la_guia_explica_publicar_la_app_y_la_suscripcion() -> None:
+    """Los dos bloqueos reales de Meta quedan documentados."""
+    texto = (RAIZ / "docs" / "OPERACION_WHATSAPP.md").read_text(encoding="utf-8")
+
+    assert "modo Desarrollo" in texto
+    assert "«Activo»" in texto
+    assert "Estado verificado" in texto
 
 
 def test_el_readme_enlaza_la_operacion_del_canal() -> None:
