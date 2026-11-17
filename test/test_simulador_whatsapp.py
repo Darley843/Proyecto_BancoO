@@ -178,7 +178,7 @@ def test_enviar_a_webhook_firma_el_cuerpo_exacto() -> None:
     cliente = _ClienteFalso()
     enviar_a_webhook(cliente, payload_texto(numero_ficticio(1), "hola"), SECRETO)
     url, cuerpo, encabezados = cliente.llamadas[0]
-    assert url == "/webhook/whatsapp"
+    assert url == "/webhooks/whatsapp"
     assert encabezados["Content-Type"] == "application/json"
     assert encabezados["X-Hub-Signature-256"] == firmar(cuerpo, SECRETO)
 

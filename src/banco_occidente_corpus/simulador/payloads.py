@@ -196,7 +196,7 @@ def enviar_a_webhook(
     payload: Payload,
     app_secret: str,
     *,
-    ruta: str = "/webhook/whatsapp",
+    ruta: str = "/webhooks/whatsapp",
     firma_valida: bool = True,
 ) -> Any:
     """Serializa, firma y envía un payload al webhook. Devuelve la respuesta del cliente.
