@@ -25,6 +25,7 @@ from banco_occidente_corpus.simulador.payloads import (
 )
 from banco_occidente_corpus.simulador.personas import (
     SemaforoEsperado,
+    Turno,
     cargar_personas,
     conversacion,
 )
@@ -191,16 +192,68 @@ def test_enviar_a_webhook_puede_mandar_firma_invalida() -> None:
     assert encabezados["X-Hub-Signature-256"] != firmar(cuerpo, SECRETO)
 
 
-# --- Personas sintéticas ---
+# --- Personas sintéticas (contrato con docs/DIAGNOSTICO.md) ---
+
+#: Ids canónicos del guion del diagnóstico. Si el guion cambia, se actualiza aquí y en las personas.
+IDS_GUION: dict[str, set[str]] = {
+    "objetivo": {
+        "libre_inversion",
+        "compra_cartera",
+        "vehiculo_nuevo",
+        "vehiculo_usado",
+        "vivienda",
+        "libranza",
+        "ahorro",
+    },
+    "vinculacion": {"empleado", "independiente", "pensionado"},
+    "ingresos": {"MENOS_2M", "DE_2M_A_3M", "DE_3M_A_5M", "DE_5M_A_8M", "DE_8M_A_12M", "MAS_12M"},
+    "gastos": {"MENOS_1M", "DE_1M_A_2M", "DE_2M_A_3M", "DE_3M_A_5M", "MAS_5M"},
+    "cuotas": {"NINGUNA", "MENOS_500K", "DE_500K_A_1M", "DE_1M_A_2M", "DE_2M_A_3M", "MAS_3M"},
+    "cuota_trasladar": {"MENOS_500K", "DE_500K_A_1M", "DE_1M_A_2M", "DE_2M_A_3M", "MAS_3M"},
+    "monto": {
+        "HASTA_5M",
+        "DE_5M_A_10M",
+        "DE_10M_A_20M",
+        "DE_20M_A_50M",
+        "MAS_50M",
+        "DE_30M_A_60M",
+        "DE_60M_A_100M",
+        "MAS_100M",
+        "DE_100M_A_200M",
+        "DE_200M_A_350M",
+        "MAS_350M",
+    },
+    "plazo": {"12", "24", "36", "48", "60", "72", "120", "180", "240"},
+}
+ORDEN_GUION = (
+    "objetivo",
+    "vinculacion",
+    "ingresos",
+    "gastos",
+    "cuotas",
+    "cuota_trasladar",
+    "monto",
+    "plazo",
+)
 
 
-def test_hay_cinco_personas_con_los_perfiles_de_la_guia() -> None:
+def _ids_interactivos(payloads: list[dict[str, Any]]) -> list[str]:
+    mensajes = [_mensaje(p) for p in payloads]
+    return [
+        m["interactive"][m["interactive"]["type"]]["id"]
+        for m in mensajes
+        if m["type"] == "interactive"
+    ]
+
+
+def test_hay_seis_personas_con_los_perfiles_del_guion() -> None:
     ids = {p.id for p in cargar_personas(PERSONAS)}
     assert ids == {
         "empleada_verde",
         "independiente_rojo",
         "pensionado_amarillo",
-        "joven_sin_historial",
+        "joven_ahorro",
+        "compra_cartera",
         "intento_inyeccion",
     }
 
@@ -216,24 +269,42 @@ def test_las_personas_cubren_los_tres_colores_y_la_inyeccion() -> None:
 
 
 @pytest.mark.parametrize("persona", cargar_personas(PERSONAS), ids=lambda p: p.id)
-def test_conversacion_completa_y_ordenada(persona: Any) -> None:
-    payloads = conversacion(persona)
-    mensajes = [_mensaje(p) for p in payloads]
+def test_ids_son_canonicos_y_siguen_el_orden_del_guion(persona: Any) -> None:
+    ids = _ids_interactivos(conversacion(persona))
+    preguntas = [i.split(".", 1)[0] for i in ids]
+    for id_completo, pregunta in zip(ids, preguntas, strict=True):
+        assert pregunta in IDS_GUION, id_completo
+        assert id_completo.split(".", 1)[1] in IDS_GUION[pregunta], id_completo
+    assert preguntas == sorted(preguntas, key=ORDEN_GUION.index)
+    assert len(set(preguntas)) == len(preguntas), "cada pregunta se responde una vez"
+    obligatorias = {"objetivo", "vinculacion", "ingresos", "gastos", "cuotas"}
+    if "objetivo.ahorro" not in ids:
+        obligatorias |= {"monto", "plazo"}
+    else:
+        assert not {"monto", "plazo", "cuota_trasladar"} & set(preguntas), (
+            "ahorro omite monto y plazo"
+        )
+    assert obligatorias <= set(preguntas)
+    assert ("cuota_trasladar" in preguntas) == ("objetivo.compra_cartera" in ids)
+
+
+@pytest.mark.parametrize("persona", cargar_personas(PERSONAS), ids=lambda p: p.id)
+def test_conversacion_ordenada_con_ids_unicos(persona: Any) -> None:
+    mensajes = [_mensaje(p) for p in conversacion(persona)]
     assert len(mensajes) == len(persona.turnos)
     marcas = [int(m["timestamp"]) for m in mensajes]
     assert marcas == sorted(marcas) and len(set(marcas)) == len(marcas)
     assert len({m["id"] for m in mensajes}) == len(mensajes)
     assert {m["from"] for m in mensajes} == {persona.numero}
-    ids_interactivos = [
-        m["interactive"][m["interactive"]["type"]]["id"]
-        for m in mensajes
-        if m["type"] == "interactive"
-    ]
-    assert "consentimiento.acepto" in ids_interactivos
-    assert ids_interactivos[-1] == "confirmacion.confirmar"
-    # La entrevista pide las cinco listas del guion antes de confirmar.
-    for prefijo in ("objetivo.", "ingresos.", "gastos.", "cuotas.", "vinculacion.", "plazo."):
-        assert any(i.startswith(prefijo) for i in ids_interactivos), prefijo
+
+
+def test_preambulo_y_cierre_del_canal_envuelven_la_entrevista() -> None:
+    persona = next(p for p in cargar_personas(PERSONAS) if p.id == "empleada_verde")
+    consentimiento = Turno(tipo="boton", valor="consentimiento.acepto", titulo="Acepto")
+    confirmar = Turno(tipo="boton", valor="confirmacion.confirmar", titulo="Confirmar")
+    ids = _ids_interactivos(conversacion(persona, preambulo=(consentimiento,), cierre=(confirmar,)))
+    assert ids[0] == "consentimiento.acepto"
+    assert ids[-1] == "confirmacion.confirmar"
 
 
 def test_persona_de_inyeccion_envia_los_ataques_antes_de_la_entrevista() -> None:
@@ -241,3 +312,5 @@ def test_persona_de_inyeccion_envia_los_ataques_antes_de_la_entrevista() -> None
     textos = [t.valor for t in persona.turnos if t.tipo == "texto"]
     assert any("prompt" in t.lower() for t in textos)
     assert any("ignora" in t.lower() for t in textos)
+    primer_interactivo = next(i for i, t in enumerate(persona.turnos) if t.tipo != "texto")
+    assert all(t.tipo == "texto" for t in persona.turnos[:primer_interactivo])

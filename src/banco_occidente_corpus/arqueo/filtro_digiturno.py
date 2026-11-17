@@ -232,7 +232,7 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.salida:
         args.salida.parent.mkdir(parents=True, exist_ok=True)
-        args.salida.write_text(informe, encoding="utf-8")
+        args.salida.write_text(informe, encoding="utf-8", newline="\n")
     if isinstance(sys.stdout, io.TextIOWrapper):
         sys.stdout.reconfigure(encoding="utf-8")
     print(informe)

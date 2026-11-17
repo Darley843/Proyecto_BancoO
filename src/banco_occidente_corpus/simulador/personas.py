@@ -1,9 +1,10 @@
 """Personas sintéticas: guiones de turnos que se convierten en payloads del webhook.
 
-Cada persona es una conversación completa (consentimiento, entrevista del
-diagnóstico y confirmación) con el resultado esperado. Se usan en las pruebas de
-punta a punta sin red y en el Arqueo. Los ids de botones y filas siguen la
-convención ``pregunta.opcion`` y deben coincidir con los del guion del diagnóstico.
+Cada persona es la entrevista del diagnóstico con el resultado esperado. Los ids
+de botones y filas son los canónicos de ``docs/DIAGNOSTICO.md``. El consentimiento
+y la confirmación los define el canal: se agregan con ``preambulo`` y ``cierre``
+de :func:`conversacion`. Se usan en las pruebas de punta a punta sin red y en el
+Arqueo.
 """
 
 from __future__ import annotations
@@ -26,7 +27,7 @@ from banco_occidente_corpus.simulador.payloads import (
 
 
 class SemaforoEsperado(StrEnum):
-    """Color esperado del diagnóstico (con la tasa fixture de 24 % E.A.)."""
+    """Color esperado del diagnóstico según ``docs/DIAGNOSTICO.md``."""
 
     VERDE = "verde"
     AMARILLO = "amarillo"
@@ -90,14 +91,24 @@ def cargar_personas(ruta: Path) -> tuple[Persona, ...]:
 def conversacion(
     persona: Persona,
     *,
+    preambulo: tuple[Turno, ...] = (),
+    cierre: tuple[Turno, ...] = (),
     marca_tiempo_inicial: int = MARCA_TIEMPO_BASE,
     segundos_entre_turnos: int = 20,
 ) -> list[Payload]:
-    """Convierte el guion de la persona en la lista ordenada de payloads del webhook."""
+    """Convierte el guion de la persona en la lista ordenada de payloads del webhook.
+
+    Args:
+        persona: persona sintética con sus turnos de entrevista.
+        preambulo: turnos del canal antes de la entrevista (p. ej., el botón de consentimiento).
+        cierre: turnos del canal después de la entrevista (p. ej., el botón de confirmación).
+        marca_tiempo_inicial: hora Unix del primer mensaje.
+        segundos_entre_turnos: separación entre mensajes consecutivos.
+    """
     if segundos_entre_turnos <= 0:
         raise ValueError("segundos_entre_turnos debe ser positivo")
     payloads: list[Payload] = []
-    for posicion, turno in enumerate(persona.turnos):
+    for posicion, turno in enumerate((*preambulo, *persona.turnos, *cierre)):
         marca = marca_tiempo_inicial + posicion * segundos_entre_turnos
         if turno.tipo == "texto":
             payloads.append(
