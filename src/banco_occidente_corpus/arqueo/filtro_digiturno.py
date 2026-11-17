@@ -179,6 +179,109 @@ def medir(
     return "".join(partes)
 
 
+def _fraccion(intervalo: Any) -> str:
+    """``exitos/n`` de un intervalo, o una raya si no hay casos."""
+    return f"{intervalo.exitos}/{intervalo.n}" if intervalo is not None else "—"
+
+
+def _rango(valores: Sequence[int], n: int) -> str:
+    """Rango ``mín a máx`` en conteo y porcentaje."""
+    bajo, alto = min(valores), max(valores)
+    if n == 0:
+        return "—"
+    pct_bajo = f"{bajo / n * 100:.1f}".replace(".", ",")
+    pct_alto = f"{alto / n * 100:.1f}".replace(".", ",")
+    if bajo == alto:
+        return f"{bajo}/{n} ({pct_bajo} %)"
+    return f"{bajo} a {alto} de {n} ({pct_bajo} a {pct_alto} %)"
+
+
+def medir_varias(
+    repeticiones: int,
+    *,
+    ruta: Path = RUTA_CONJUNTO,
+    clasificador_dudas: ClasificadorDudas | None = None,
+    registrar_uso: RegistradorUso | None = None,
+    turnos_por_corrida: list[dict[str, Turno]] | None = None,
+) -> str:
+    """Corre el conjunto varias veces y reporta el rango de cada métrica y los casos inestables.
+
+    El modelo no es determinista aunque use temperatura 0, así que una sola corrida no
+    basta. No se agrupan las corridas en un solo intervalo de Wilson: son los mismos casos
+    repetidos, no muestras independientes. Se reporta el rango y, por caso, cuántas
+    corridas fallaron y con qué letra.
+    """
+    if repeticiones < 1:
+        raise ValueError("repeticiones debe ser al menos 1")
+    casos = cargar_casos(ruta)
+    corridas = [] if turnos_por_corrida is None else turnos_por_corrida
+    resultados = []
+    for _ in range(repeticiones):
+        turnos: dict[str, Turno] = {}
+        resultados.append(
+            evaluar_filtro(
+                casos,
+                clasificador_digiturno(
+                    clasificador_dudas=clasificador_dudas,
+                    registrar_uso=registrar_uso,
+                    turnos=turnos,
+                ),
+            )
+        )
+        corridas.append(turnos)
+
+    lineas = [
+        "| Corrida | Fuga | Rechazo indebido | Acierto en frontera | Dudas sin respuesta |",
+        "|---:|---|---|---|---:|",
+    ]
+    for numero, (resultado, turnos) in enumerate(zip(resultados, corridas, strict=True), start=1):
+        sin_respuesta = sum(1 for t in turnos.values() if t.motivo.endswith(MOTIVO_SIN_RESPUESTA))
+        lineas.append(
+            f"| {numero} | {_fraccion(resultado.fuga)} | {_fraccion(resultado.rechazo_indebido)} "
+            f"| {_fraccion(resultado.acierto_frontera)} | {sin_respuesta} |"
+        )
+    n_fuera = resultados[0].fuga.n if resultados[0].fuga else 0
+    n_dentro = resultados[0].rechazo_indebido.n if resultados[0].rechazo_indebido else 0
+    n_frontera = resultados[0].acierto_frontera.n if resultados[0].acierto_frontera else 0
+    lineas.append(
+        "| **Rango** | "
+        + _rango([len(r.ids_fuga) for r in resultados], n_fuera)
+        + " | "
+        + _rango([len(r.ids_rechazo_indebido) for r in resultados], n_dentro)
+        + " | "
+        + _rango([n_frontera - len(r.ids_frontera_fallidos) for r in resultados], n_frontera)
+        + " | |"
+    )
+
+    errores = [
+        "| Caso | Texto | Esperado | Corridas con error | Letra por corrida |",
+        "|---|---|---|---:|---|",
+    ]
+    for caso in casos:
+        letras = [t[caso.texto].letra if caso.texto in t else "?" for t in corridas]
+        fallos = sum(
+            1
+            for t in corridas
+            if caso.texto in t and decision_de_turno(t[caso.texto]) is not caso.esperado
+        )
+        if fallos:
+            texto = caso.texto.replace("|", "\\|")
+            errores.append(
+                f"| {caso.id} | {texto} | {caso.esperado.value} | {fallos} de {repeticiones} | {', '.join(letras)} |"
+            )
+
+    partes = ["\n".join(lineas) + "\n"]
+    if len(errores) > 2:
+        partes.append(
+            "\n### Casos con error en al menos una corrida\n\n"
+            "Un caso con error en todas las corridas es un fallo estable de la regla o del prompt; "
+            "uno con error en algunas es inestable.\n\n" + "\n".join(errores) + "\n"
+        )
+    else:
+        partes.append("\nNingún caso tuvo error en ninguna corrida.\n")
+    return "".join(partes)
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     """Punto de entrada de línea de comandos."""
     parser = argparse.ArgumentParser(description="Mide el filtro de dominio del Digiturno real.")
@@ -188,7 +291,15 @@ def main(argv: Sequence[str] | None = None) -> int:
         help="manda las dudas a DeepSeek (gasta tokens; usa la clave del entorno)",
     )
     parser.add_argument("--salida", type=Path, help="archivo Markdown donde guardar el informe")
+    parser.add_argument(
+        "--repeticiones",
+        type=int,
+        default=1,
+        help="corre el conjunto N veces y reporta el rango (útil con --con-modelo)",
+    )
     args = parser.parse_args(argv)
+    if args.repeticiones < 1:
+        parser.error("--repeticiones debe ser al menos 1")
 
     clasificador_dudas: ClasificadorDudas | None = None
     uso: Counter[str] = Counter()
@@ -205,13 +316,26 @@ def main(argv: Sequence[str] | None = None) -> int:
         clasificador_dudas = crear_clasificador()
 
     modo = "reglas + modelo (DeepSeek)" if args.con_modelo else "solo reglas (sin modelo, US$ 0)"
+    registrador = registrar if args.con_modelo else None
     turnos: dict[str, Turno] = {}
-    informe = f"## Filtro de dominio del Digiturno: {modo}\n\n" + medir(
-        clasificador_dudas=clasificador_dudas,
-        registrar_uso=registrar if args.con_modelo else None,
-        turnos=turnos,
+    if args.repeticiones == 1:
+        cuerpo = medir(
+            clasificador_dudas=clasificador_dudas, registrar_uso=registrador, turnos=turnos
+        )
+        todas = [turnos]
+    else:
+        todas = []
+        cuerpo = medir_varias(
+            args.repeticiones,
+            clasificador_dudas=clasificador_dudas,
+            registrar_uso=registrador,
+            turnos_por_corrida=todas,
+        )
+        modo += f", {args.repeticiones} corridas"
+    informe = f"## Filtro de dominio del Digiturno: {modo}\n\n" + cuerpo
+    sin_respuesta = sum(
+        1 for t in todas for turno in t.values() if turno.motivo.endswith(MOTIVO_SIN_RESPUESTA)
     )
-    sin_respuesta = sum(1 for t in turnos.values() if t.motivo.endswith(MOTIVO_SIN_RESPUESTA))
     if args.con_modelo and llamadas == 0 and sin_respuesta:
         print(
             f"ERROR: el modelo no respondió ninguna de las {sin_respuesta} dudas. Revisa DEEPSEEK_API_KEY "
@@ -221,11 +345,14 @@ def main(argv: Sequence[str] | None = None) -> int:
         return 2
     if sin_respuesta:
         informe += (
-            f"\n> **Atención:** {sin_respuesta} dudas quedaron sin respuesta del modelo y se aceptaron "
-            "por defecto; esas cifras no reflejan al modelo.\n"
+            f"\n> **Atención:** {sin_respuesta} dudas quedaron sin respuesta del modelo (sumando todas las "
+            "corridas) y se aceptaron por defecto; esas cifras no reflejan al modelo.\n"
         )
     if args.con_modelo:
-        resumen = ", ".join(f"{clave} {valor:g}" for clave, valor in sorted(uso.items()))
+        claves = [c for c in uso if c.startswith("uso.")] or list(uso)
+        resumen = ", ".join(
+            f"{clave.removeprefix('uso.')} {uso[clave]:g}" for clave in sorted(claves)
+        )
         informe += (
             f"\n**Llamadas al modelo:** {llamadas}. Uso acumulado: {resumen or 'sin métricas'}.\n"
         )

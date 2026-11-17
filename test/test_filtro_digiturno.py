@@ -13,6 +13,7 @@ from banco_occidente_corpus.arqueo.filtro_digiturno import (
     decision_de_turno,
     main,
     medir,
+    medir_varias,
     origen_turno,
     sumar_metricas,
 )
@@ -147,3 +148,45 @@ def test_medir_lista_las_dudas_sin_respuesta() -> None:
     informe = medir(clasificador_dudas=_dudas_sin_respuesta)
     assert "### Dudas sin respuesta del modelo" in informe
     assert "modelo sin respuesta" in informe
+
+
+# --- Varias corridas ---
+
+
+def test_medir_varias_con_doble_estable_da_rango_fijo() -> None:
+    informe = medir_varias(3, clasificador_dudas=_dudas_x)
+    assert informe.count("\n| 1 |") == 1 and "| 3 |" in informe
+    assert "| **Rango** |" in informe
+    # Con un doble que rechaza toda duda, ningún fuera de tema se escapa en ninguna corrida.
+    assert "| **Rango** | 0/50 (0,0 %) |" in informe
+
+
+def test_medir_varias_marca_casos_inestables() -> None:
+    llamadas = {"n": 0}
+
+    def alterna(texto: str) -> Clasificacion:
+        """Rechaza en las corridas impares y acepta en las pares, para simular inestabilidad."""
+        llamadas["n"] += 1
+        return Clasificacion(
+            letra="X" if "chiste" in texto and llamadas["n"] % 2 else "B", motivo="doble"
+        )
+
+    corridas: list[dict[str, Turno]] = []
+    informe = medir_varias(2, clasificador_dudas=alterna, turnos_por_corrida=corridas)
+    assert len(corridas) == 2
+    assert "### Casos con error en al menos una corrida" in informe
+    assert "fuera-004" in informe  # «Cuéntame un chiste»
+
+
+def test_medir_varias_rechaza_cero() -> None:
+    with pytest.raises(ValueError):
+        medir_varias(0)
+
+
+def test_main_con_repeticiones_guarda_rango(tmp_path: Path) -> None:
+    salida = tmp_path / "rango.md"
+    assert main(["--repeticiones", "2", "--salida", str(salida)]) == 0
+    contenido = salida.read_text(encoding="utf-8")
+    assert "2 corridas" in contenido
+    assert "| **Rango** |" in contenido
+    assert "\r\n" not in salida.read_bytes().decode("utf-8")
