@@ -167,11 +167,17 @@ def test_rol_invalido_falla() -> None:
 
 
 def test_plazo_fuera_de_rango_falla() -> None:
-    """El plazo del diagnóstico vive entre 6 y 120 meses."""
+    """El plazo del diagnóstico vive entre 6 y 240 meses (vivienda)."""
     with pytest.raises(ValidationError):
         _entrada(plazo_meses=5)
     with pytest.raises(ValidationError):
-        _entrada(plazo_meses=121)
+        _entrada(plazo_meses=241)
+
+
+def test_plazo_largo_de_vivienda_pasa() -> None:
+    """Los plazos de vivienda del guion (180 y 240 meses) caben en el contrato."""
+    assert _entrada(plazo_meses=180).plazo_meses == 180
+    assert _entrada(plazo_meses=240).plazo_meses == 240
 
 
 def test_rango_invertido_falla() -> None:

@@ -92,7 +92,8 @@ class EntradaDiagnostico(BaseModel):
     gastos_mensuales: Decimal
     cuotas_deudas: Decimal
     monto_credito: Decimal
-    plazo_meses: int = Field(ge=6, le=120)
+    # Vivienda llega a 240 meses; el resto de productos no pasa de 72.
+    plazo_meses: int = Field(ge=6, le=240)
 
 
 class ResultadoDiagnostico(BaseModel):
