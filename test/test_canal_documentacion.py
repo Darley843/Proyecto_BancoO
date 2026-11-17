@@ -75,3 +75,12 @@ def test_el_readme_enlaza_la_operacion_del_canal() -> None:
     assert "## Canal de WhatsApp" in readme
     assert "docs/OPERACION_WHATSAPP.md" in readme
     assert ".env.example" in readme
+
+
+def test_los_comandos_del_modulo_usan_uv() -> None:
+    """Ningún comando del paquete se invoca con el Python del sistema."""
+    for archivo in ("README.md", "docs/OPERACION_WHATSAPP.md"):
+        texto = (RAIZ / archivo).read_text(encoding="utf-8")
+
+        assert "uv run python -m banco_occidente_corpus.canal.identidad" in texto, archivo
+        assert re.search(r"(?<!uv run )python -m banco_occidente_corpus", texto) is None, archivo

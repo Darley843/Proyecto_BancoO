@@ -498,7 +498,7 @@ cloudflared tunnel --url http://127.0.0.1:8000
 - **Callback en Meta:** `https://<túnel>/webhooks/whatsapp`, con el mismo token
   de verificación y suscripción a `messages`.
 - **Números autorizados:** se guardan como huellas, no en claro:
-  `python -m banco_occidente_corpus.canal.identidad --huella "+57..."`.
+  `uv run python -m banco_occidente_corpus.canal.identidad --huella "+57..."`.
 - **Modos:** `falso` registra el envío sin red (suite y ensayos); `real` usa la
   API de Meta y exige que el destino esté autorizado.
 - **Límites del número de prueba:** cinco destinatarios y ventana de 24 horas.

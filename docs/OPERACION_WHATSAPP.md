@@ -103,7 +103,7 @@ autorizar un número, calcula su huella y pégala en `config/whatsapp.toml`,
 sección `[autorizados]`:
 
 ```powershell
-python -m banco_occidente_corpus.canal.identidad --huella "+57 300 123 4567"
+uv run python -m banco_occidente_corpus.canal.identidad --huella "+57 300 123 4567"
 ```
 
 El comando imprime solo la huella; no imprime la sal ni el número. Repite el
