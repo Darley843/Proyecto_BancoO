@@ -1,0 +1,31 @@
+# Tasas de personas del Banco de Occidente (colocación y captación).
+# Fuente: PDF «tasas-personas-bdo» capturado en Bronze el 16 de noviembre
+# de 2026, descubierto desde la página /tarifas. Sin secretos: se versiona.
+
+[fuente]
+url = "https://www.bancodeoccidente.com.co/documents/d/guest/tasas-personas-bdo"
+pagina = "https://www.bancodeoccidente.com.co/tarifas"
+# Vigencia impresa en el PDF: del 01 al 30 de noviembre de 2026.
+vigencia_desde = "2026-11-01"
+vigencia_hasta = "2026-11-30"
+
+[archivo]
+# PDF vigente dentro de Bronze: data/raw no se versiona, se recaptura.
+pdf = "data/raw/documents/989be43a0ed19eb3.pdf"
+sha256 = "989be43a0ed19eb33e2057cd01c1ae612b6f15544eaaf41af6348846a6ff1b7f"
+# Tabla Gold versionada por vigencia; se reescribe completa si cambia el PDF.
+tabla = "data/gold/tasas/tasas-personas-2026-11.jsonl"
+
+[usura]
+# Tasa de usura certificada por la Superintendencia Financiera para las
+# modalidades de consumo y ordinario. El centinela 0.0 significa «sin
+# certificar» y bloquea la publicación con `usura_sin_certificar`.
+tasa_ea = 0.2834
+vigencia_desde = "2026-11-01"
+vigencia_hasta = "2026-11-30"
+fuente = "https://www.superfinanciera.gov.co/"
+resolucion = "Resolución 1707 de 2026"
+productos = ["consumo", "ordinario"]
+# Vivienda tiene modalidad y certificación propias: no se valida contra esta
+# usura. Ahorro y CDT no son crédito: solo sirven de control de cordura.
+exceptuados = ["vivienda", "ahorro", "cdt"]

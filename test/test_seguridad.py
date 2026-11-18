@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import ast
 import importlib.util
+import os
 import re
 import shutil
 import socket
@@ -24,6 +25,7 @@ from types import ModuleType
 
 import pytest
 from langchain_core.messages import HumanMessage, SystemMessage
+from langsmith.utils import tracing_is_enabled
 
 from banco_occidente_corpus.asistente.prompts import cargar_prompt
 from banco_occidente_corpus.asistente.rag import (
@@ -373,6 +375,20 @@ def test_nada_en_produccion_activa_langsmith() -> None:
                 hallazgos.append(f"{ruta.relative_to(RAIZ)}: {activador}")
 
     assert hallazgos == [], "\n".join(hallazgos)
+
+
+def test_la_suite_corre_sin_trazas_de_langsmith() -> None:
+    """`make check` no exporta trazas aunque la sesión de demo las encienda.
+
+    ``test/conftest.py`` borra las variables al arrancar. Sin esa limpieza,
+    LangChain exporta los turnos a ``api.smith.langchain.com`` desde un hilo de
+    fondo y la guardia de red no lo ve: actúa durante cada prueba y la
+    exportación ocurre después.
+    """
+    presentes = [variable for variable in ACTIVADORES_LANGSMITH if variable in os.environ]
+
+    assert presentes == []
+    assert tracing_is_enabled() is False
 
 
 def test_seguridad_documenta_el_encendido_de_langsmith() -> None:

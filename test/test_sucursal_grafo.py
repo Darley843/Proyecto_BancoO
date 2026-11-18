@@ -13,7 +13,11 @@ from banco_occidente_corpus.asistente.contexto_prompt import CanalOficial
 from banco_occidente_corpus.asistente.metricas import leer_uso
 from banco_occidente_corpus.asistente.validacion import respuesta_sin_datos
 from banco_occidente_corpus.boveda.tipos import Fragmento
-from banco_occidente_corpus.sucursal.digiturno import Clasificacion, ContadorTurnos
+from banco_occidente_corpus.sucursal.digiturno import (
+    Clasificacion,
+    ConfiguracionDigiturno,
+    ContadorTurnos,
+)
 from banco_occidente_corpus.sucursal.grafo import (
     MAX_TOKENS_REFORMULAR,
     TEXTO_DIAGNOSTICO,
@@ -183,6 +187,49 @@ def test_tablero_con_una_a_tres_filas_no_usa_modelo(tmp_path: Path) -> None:
     assert estado["uso"] == {"uso_modelo": False, "costo_usd": 0.0}
     assert modelo.llamadas == []
     assert estado["fuentes"] == [URL]
+
+
+def test_la_plantilla_del_tarifario_cita_la_vigencia(tmp_path: Path) -> None:
+    """Una fila sin vigencia en la periodicidad sigue mostrando «vigente desde»."""
+    modelo = ModeloEspia([])
+    grafo, dependencias = deps(
+        tmp_path, modelo=modelo, filas=[fila("Cuota de manejo tarjeta débito")]
+    )
+
+    estado = responder_turno(grafo, dependencias, "cuota de manejo", "t1")
+
+    assert ", vigente desde 2025-11-20" in estado["respuesta"]
+
+
+def test_la_plantilla_de_tasas_cita_la_vigencia_una_sola_vez(tmp_path: Path) -> None:
+    """Si la periodicidad ya trae la vigencia, no se repite el «vigente desde»."""
+    tasa = Fila(
+        concepto="CDT · De $100 a $499 millones · 360 días (12 meses)",
+        categoria="tasa de interés · cdt · 360 días",
+        valor="11,90",
+        moneda="%",
+        recargos="",
+        periodicidad="E.A., vigencia del 1 al 30 de noviembre de 2026",
+        vigente_desde="2026-11-01",
+        origen="tasa",
+        pagina="data/gold/tasas/tasas-personas-2026-11.jsonl",
+        fuente=URL,
+    )
+    dependencias = DependenciasGrafo(
+        recuperador=RecuperadorFalso([]),
+        filas=[tasa],
+        modelo=ModeloEspia([]),
+        canal=canal(),
+        configuracion_digiturno=ConfiguracionDigiturno(palabras_tarifas=("tasa",)),
+        contador=ContadorTurnos(),
+    )
+    grafo = crear_grafo(dependencias, tmp_path / "memoria.sqlite")
+
+    estado = responder_turno(grafo, dependencias, "tasa de un CDT a 360 días", "t1")
+
+    assert estado["turno"]["letra"] == "T"
+    assert "vigencia del 1 al 30 de noviembre de 2026" in estado["respuesta"]
+    assert "vigente desde" not in estado["respuesta"]
 
 
 def test_tablero_sin_filas_pasa_a_boveda(tmp_path: Path) -> None:

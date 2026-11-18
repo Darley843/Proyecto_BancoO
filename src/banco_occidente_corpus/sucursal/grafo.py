@@ -45,7 +45,7 @@ from ..asistente.validacion import (
     texto_de_contenido,
 )
 from ..boveda.tipos import Fragmento, Recuperador
-from ..tablero.consultas import concepto_sin_franquicia
+from ..tablero.consultas import concepto_sin_franquicia, misma_tasa
 from ..tablero.herramienta import crear_herramienta_tablero, filas_de_consulta
 from ..tablero.tipos import Fila
 from ..texto import normalizar
@@ -906,8 +906,9 @@ def _puede_responder_tabla(filas: Sequence[Fila]) -> bool:
 
     Una a tres filas siempre se responden. Con más, solo si todas comparten el
     mismo concepto base (por ejemplo, los topes de la misma asistencia para Visa
-    y Mastercard) y no superan ``MAX_FILAS_TABLERO``; si hay conceptos distintos,
-    la consulta es ambigua y debe responder la Bóveda.
+    y Mastercard) o si son la misma tasa: las bandas de monto y los índices de un
+    producto y un plazo son una sola respuesta, no una consulta ambigua. En los
+    demás casos la Bóveda debe responder.
     """
     if not filas:
         return False
@@ -916,11 +917,18 @@ def _puede_responder_tabla(filas: Sequence[Fila]) -> bool:
     if len(filas) > MAX_FILAS_TABLERO:
         return False
     bases = {concepto_sin_franquicia(fila.concepto) for fila in filas}
-    return len(bases) == 1
+    if len(bases) == 1:
+        return True
+    return misma_tasa(filas)
 
 
 def _plantilla_tablero(filas: Sequence[Fila]) -> tuple[str, tuple[str, ...]]:
-    """Responde con las filas del Tablero sin llamar al modelo."""
+    """Responde con las filas del Tablero sin llamar al modelo.
+
+    La vigencia se cita una sola vez: si la periodicidad ya la trae completa
+    («E.A., vigencia del 1 al 30 de noviembre de 2026»), no se repite el
+    «vigente desde».
+    """
     lineas = ["Según el Tablero de tarifas:"]
     for fila in filas:
         partes = [f"- {fila.concepto}: {fila.valor}"]
@@ -928,7 +936,7 @@ def _plantilla_tablero(filas: Sequence[Fila]) -> tuple[str, tuple[str, ...]]:
             partes[-1] += f" {fila.moneda}"
         if fila.periodicidad:
             partes[-1] += f" ({fila.periodicidad})"
-        if fila.vigente_desde:
+        if fila.vigente_desde and "vigencia" not in normalizar(fila.periodicidad):
             partes[-1] += f", vigente desde {fila.vigente_desde}"
         lineas.append(partes[-1])
     fuentes = tuple(dict.fromkeys(fila.fuente for fila in filas))

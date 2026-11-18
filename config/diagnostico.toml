@@ -1,0 +1,335 @@
+# Diagnóstico financiero: umbrales del semáforo, catálogo de productos y
+# rangos de la entrevista.
+#
+# Los umbrales son la razón de endeudamiento (cuotas actuales más cuota nueva
+# sobre el ingreso mensual). Se ajustan sin tocar código; los valores de
+# partida son 0,30 y 0,40.
+#
+# Los rangos, sus ids y sus valores de cálculo salen del guion de la entrevista
+# (docs/DIAGNOSTICO.md, cambio OpenSpec `corresponsal-whatsapp`). Los ids son el
+# contrato con el canal y con el simulador de personas: no se renombran.
+#
+# `valor` es la cifra que usa el motor. Cuando el rango tiene `desde` y `hasta`,
+# `valor` es el punto medio; cuando el rango es abierto («menos de», «más de»,
+# «hasta»), no hay punto medio matemático y `valor` es la estimación declarada
+# del guion. Ningún valor se calcula en tiempo de ejecución: el motor lee esta
+# cifra y la declara en el resultado.
+
+[umbrales]
+verde_hasta = 0.30
+amarillo_hasta = 0.40
+
+[productos]
+libre_inversion = "Libre inversión"
+compra_cartera = "Compra de cartera"
+credito_rotativo = "Crédito rotativo"
+libranza = "Libranza"
+vehiculo_nuevo = "Vehículo nuevo"
+vehiculo_usado = "Vehículo usado"
+vivienda = "Vivienda"
+tarjeta_credito = "Tarjeta de crédito"
+ahorro = "Ahorro"
+cdt = "CDT"
+
+[[rango]]
+clave = "ingresos"
+pregunta = "¿En qué rango están tus ingresos mensuales?"
+
+[[rango.opcion]]
+id = "ingresos.MENOS_2M"
+texto = "Menos de $2 millones"
+hasta = 2000000
+valor = 1500000
+
+[[rango.opcion]]
+id = "ingresos.DE_2M_A_3M"
+texto = "$2 a $3 millones"
+desde = 2000000
+hasta = 3000000
+valor = 2500000
+
+[[rango.opcion]]
+id = "ingresos.DE_3M_A_5M"
+texto = "$3 a $5 millones"
+desde = 3000000
+hasta = 5000000
+valor = 4000000
+
+[[rango.opcion]]
+id = "ingresos.DE_5M_A_8M"
+texto = "$5 a $8 millones"
+desde = 5000000
+hasta = 8000000
+valor = 6500000
+
+[[rango.opcion]]
+id = "ingresos.DE_8M_A_12M"
+texto = "$8 a $12 millones"
+desde = 8000000
+hasta = 12000000
+valor = 10000000
+
+[[rango.opcion]]
+id = "ingresos.MAS_12M"
+texto = "Más de $12 millones"
+desde = 12000000
+valor = 14000000
+
+[[rango]]
+clave = "gastos"
+pregunta = "¿Cuánto gastas al mes en gastos fijos (arriendo, servicios, mercado, transporte)?"
+
+[[rango.opcion]]
+id = "gastos.MENOS_1M"
+texto = "Menos de $1 millón"
+hasta = 1000000
+valor = 750000
+
+[[rango.opcion]]
+id = "gastos.DE_1M_A_2M"
+texto = "$1 a $2 millones"
+desde = 1000000
+hasta = 2000000
+valor = 1500000
+
+[[rango.opcion]]
+id = "gastos.DE_2M_A_3M"
+texto = "$2 a $3 millones"
+desde = 2000000
+hasta = 3000000
+valor = 2500000
+
+[[rango.opcion]]
+id = "gastos.DE_3M_A_5M"
+texto = "$3 a $5 millones"
+desde = 3000000
+hasta = 5000000
+valor = 4000000
+
+[[rango.opcion]]
+id = "gastos.MAS_5M"
+texto = "Más de $5 millones"
+desde = 5000000
+valor = 6000000
+
+[[rango]]
+clave = "cuotas"
+pregunta = "¿Cuánto pagas hoy en cuotas de créditos o tarjetas?"
+
+[[rango.opcion]]
+id = "cuotas.NINGUNA"
+texto = "No tengo cuotas"
+valor = 0
+
+[[rango.opcion]]
+id = "cuotas.MENOS_500K"
+texto = "Menos de $500 mil"
+hasta = 500000
+valor = 300000
+
+[[rango.opcion]]
+id = "cuotas.DE_500K_A_1M"
+texto = "$500 mil a $1 millón"
+desde = 500000
+hasta = 1000000
+valor = 750000
+
+[[rango.opcion]]
+id = "cuotas.DE_1M_A_2M"
+texto = "$1 a $2 millones"
+desde = 1000000
+hasta = 2000000
+valor = 1500000
+
+[[rango.opcion]]
+id = "cuotas.DE_2M_A_3M"
+texto = "$2 a $3 millones"
+desde = 2000000
+hasta = 3000000
+valor = 2500000
+
+[[rango.opcion]]
+id = "cuotas.MAS_3M"
+texto = "Más de $3 millones"
+desde = 3000000
+valor = 3500000
+
+[[rango]]
+clave = "cuota_trasladar"
+pregunta = "¿Cuánto pagas hoy de cuota por las deudas que quieres trasladar?"
+
+[[rango.opcion]]
+id = "cuota_trasladar.MENOS_500K"
+texto = "Menos de $500 mil"
+hasta = 500000
+valor = 300000
+
+[[rango.opcion]]
+id = "cuota_trasladar.DE_500K_A_1M"
+texto = "$500 mil a $1 millón"
+desde = 500000
+hasta = 1000000
+valor = 750000
+
+[[rango.opcion]]
+id = "cuota_trasladar.DE_1M_A_2M"
+texto = "$1 a $2 millones"
+desde = 1000000
+hasta = 2000000
+valor = 1500000
+
+[[rango.opcion]]
+id = "cuota_trasladar.DE_2M_A_3M"
+texto = "$2 a $3 millones"
+desde = 2000000
+hasta = 3000000
+valor = 2500000
+
+[[rango.opcion]]
+id = "cuota_trasladar.MAS_3M"
+texto = "Más de $3 millones"
+desde = 3000000
+valor = 3500000
+
+[[rango]]
+clave = "monto"
+pregunta = "¿Cuánto dinero necesitas?"
+aplica_a = ["libre_inversion", "compra_cartera", "libranza"]
+
+[[rango.opcion]]
+id = "monto.HASTA_5M"
+texto = "Hasta $5 millones"
+hasta = 5000000
+valor = 4000000
+
+[[rango.opcion]]
+id = "monto.DE_5M_A_10M"
+texto = "$5 a $10 millones"
+desde = 5000000
+hasta = 10000000
+valor = 7500000
+
+[[rango.opcion]]
+id = "monto.DE_10M_A_20M"
+texto = "$10 a $20 millones"
+desde = 10000000
+hasta = 20000000
+valor = 15000000
+
+[[rango.opcion]]
+id = "monto.DE_20M_A_50M"
+texto = "$20 a $50 millones"
+desde = 20000000
+hasta = 50000000
+valor = 35000000
+
+[[rango.opcion]]
+id = "monto.MAS_50M"
+texto = "Más de $50 millones"
+desde = 50000000
+valor = 60000000
+
+[[rango]]
+clave = "monto_vehiculo"
+pregunta = "¿Cuánto dinero necesitas para el vehículo?"
+aplica_a = ["vehiculo_nuevo", "vehiculo_usado"]
+
+[[rango.opcion]]
+id = "monto.DE_30M_A_60M"
+texto = "$30 a $60 millones"
+desde = 30000000
+hasta = 60000000
+valor = 45000000
+
+[[rango.opcion]]
+id = "monto.DE_60M_A_100M"
+texto = "$60 a $100 millones"
+desde = 60000000
+hasta = 100000000
+valor = 80000000
+
+[[rango.opcion]]
+id = "monto.MAS_100M"
+texto = "Más de $100 millones"
+desde = 100000000
+valor = 120000000
+
+[[rango]]
+clave = "monto_vivienda"
+pregunta = "¿Cuánto dinero necesitas para la vivienda?"
+aplica_a = ["vivienda"]
+
+[[rango.opcion]]
+id = "monto.DE_100M_A_200M"
+texto = "$100 a $200 millones"
+desde = 100000000
+hasta = 200000000
+valor = 150000000
+
+[[rango.opcion]]
+id = "monto.DE_200M_A_350M"
+texto = "$200 a $350 millones"
+desde = 200000000
+hasta = 350000000
+valor = 275000000
+
+[[rango.opcion]]
+id = "monto.MAS_350M"
+texto = "Más de $350 millones"
+desde = 350000000
+valor = 400000000
+
+[[rango]]
+clave = "plazo"
+pregunta = "¿En cuánto tiempo quieres pagarlo?"
+aplica_a = ["libre_inversion", "compra_cartera", "libranza", "vehiculo_nuevo", "vehiculo_usado"]
+
+[[rango.opcion]]
+id = "plazo.12"
+texto = "12 meses"
+valor = 12
+
+[[rango.opcion]]
+id = "plazo.24"
+texto = "24 meses"
+valor = 24
+
+[[rango.opcion]]
+id = "plazo.36"
+texto = "36 meses"
+valor = 36
+
+[[rango.opcion]]
+id = "plazo.48"
+texto = "48 meses"
+valor = 48
+
+[[rango.opcion]]
+id = "plazo.60"
+texto = "60 meses"
+valor = 60
+
+[[rango.opcion]]
+id = "plazo.72"
+texto = "72 meses"
+valor = 72
+
+[[rango]]
+clave = "plazo_vivienda"
+pregunta = "¿En cuánto tiempo quieres pagar la vivienda?"
+aplica_a = ["vivienda"]
+
+[[rango.opcion]]
+id = "plazo.120"
+texto = "120 meses"
+valor = 120
+
+[[rango.opcion]]
+id = "plazo.180"
+texto = "180 meses"
+valor = 180
+
+[[rango.opcion]]
+id = "plazo.240"
+texto = "240 meses"
+valor = 240
