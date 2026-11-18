@@ -31,7 +31,11 @@ const COLUMNAS = [
 ];
 
 /** Nombre visible de cada origen del CSV. */
-const ORIGENES = { tarifario: "Tarifario", tabla_web: "Tabla web" };
+const ORIGENES = {
+  tarifario: "Tarifario",
+  tabla_web: "Tabla web",
+  tasa: "Tasa 2026",
+};
 
 /**
  * Pinta la vista Tablero dentro de su contenedor.

@@ -1,0 +1,97 @@
+"""Pruebas de la documentación operativa del canal (sin red).
+
+Fijan que `.env.example` solo tenga marcadores, que la guía cubra arranque,
+túnel, callback y modos, y que el README enlace la operación.
+"""
+
+from __future__ import annotations
+
+import re
+from pathlib import Path
+
+RAIZ = Path(__file__).resolve().parents[1]
+
+VARIABLES = (
+    "WHATSAPP_VERIFY_TOKEN",
+    "WHATSAPP_APP_SECRET",
+    "WHATSAPP_ACCESS_TOKEN",
+    "WHATSAPP_PHONE_NUMBER_ID",
+    "WHATSAPP_ID_SALT",
+)
+
+MODO = "WHATSAPP_MODO"
+
+
+def test_env_example_solo_tiene_marcadores() -> None:
+    """Cada variable de ejemplo usa `<...>` o un modo válido, nunca un valor real."""
+    texto = (RAIZ / ".env.example").read_text(encoding="utf-8")
+
+    for nombre in VARIABLES:
+        assert re.search(rf"^{nombre}=<[^>]+>$", texto, re.MULTILINE), nombre
+
+    assert re.search(rf"^{MODO}=(falso|real)$", texto, re.MULTILINE)
+
+
+def test_env_example_no_parece_contener_secretos() -> None:
+    """Ningún valor del ejemplo tiene forma de clave."""
+    texto = (RAIZ / ".env.example").read_text(encoding="utf-8")
+
+    valores = [
+        linea.split("=", 1)[1]
+        for linea in texto.splitlines()
+        if linea and not linea.startswith("#") and "=" in linea
+    ]
+
+    assert valores
+    for valor in valores:
+        assert valor.startswith("<") or valor in {"falso", "real"}
+        assert len(valor) < 60
+
+
+def test_la_guia_cubre_arranque_tunel_callback_y_modos() -> None:
+    """La guía operativa tiene los pasos que pide la tarea 2.10."""
+    texto = (RAIZ / "docs" / "OPERACION_WHATSAPP.md").read_text(encoding="utf-8")
+
+    for pieza in (
+        "make app",
+        "cloudflared",
+        "ngrok",
+        "/webhooks/whatsapp",
+        "hub.verify_token",
+        "WHATSAPP_ID_SALT",
+        "WHATSAPP_MODO",
+        "127.0.0.1",
+        "X-Hub-Signature-256",
+        "subscribed_apps",
+        "Whatsapp Business Account",
+        "falso",
+        "real",
+    ):
+        assert pieza in texto, pieza
+
+
+def test_la_guia_explica_publicar_la_app_y_la_suscripcion() -> None:
+    """Los dos bloqueos reales de Meta quedan documentados."""
+    texto = (RAIZ / "docs" / "OPERACION_WHATSAPP.md").read_text(encoding="utf-8")
+
+    assert "modo Desarrollo" in texto
+    assert "«Activo»" in texto
+    assert "Estado verificado" in texto
+
+
+def test_el_readme_enlaza_la_operacion_del_canal() -> None:
+    """El README explica el canal y apunta a la guía completa."""
+    readme = (RAIZ / "README.md").read_text(encoding="utf-8")
+
+    assert "## Canal de WhatsApp" in readme
+    assert "docs/OPERACION_WHATSAPP.md" in readme
+    assert ".env.example" in readme
+
+
+def test_los_comandos_del_modulo_usan_uv() -> None:
+    """Ningún comando del paquete se invoca con el Python del sistema."""
+    for archivo in ("README.md", "docs/OPERACION_WHATSAPP.md"):
+        texto = (RAIZ / archivo).read_text(encoding="utf-8")
+
+        assert "uv run python -m banco_occidente_corpus.canal.identidad" in texto, archivo
+        assert re.search(r"(?<!uv run )python -m banco_occidente_corpus", texto) is None, archivo
