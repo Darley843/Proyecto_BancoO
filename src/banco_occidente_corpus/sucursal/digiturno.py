@@ -87,6 +87,8 @@ PATRONES_FUERA_ALCANCE: tuple[str, ...] = (
     r"\bcriptomonedas?\b",
     # Prompt: intento de cambiar o revelar las instrucciones.
     r"\b(prompt|instrucciones del sistema|system prompt|ignora (tus|las) instrucciones|revela)\b",
+    # Inyección con otras palabras: «ignora tus reglas», «olvida las indicaciones».
+    r"\b(ignora|ignorar|olvida|olvidar|omite|omitir)\b.*\b(instrucciones|reglas|indicaciones|restricciones)\b",
 )
 #: Tope de tokens del clasificador de dudas. DeepSeek Flash gasta alrededor de
 #: 50-60 tokens solo en razonar antes de emitir el JSON; con un tope de 80 el
