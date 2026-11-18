@@ -26,6 +26,7 @@ from fastapi import FastAPI, Response
 from fastapi.staticfiles import StaticFiles
 
 from banco_occidente_corpus.boveda.mapa import ServicioMapa
+from banco_occidente_corpus.canal.webhook import router as router_canal
 from banco_occidente_corpus.config import Config, load_config
 from banco_occidente_corpus.sucursal.ajustes import (
     ConfiguracionSucursal,
@@ -100,6 +101,7 @@ def crear_app(
             mapa_boveda=mapa_boveda,
         )
     )
+    app.include_router(router_canal)
 
     @app.get("/health", response_model=SaludRespuesta, tags=["salud"])
     def salud(response: Response) -> SaludRespuesta:
