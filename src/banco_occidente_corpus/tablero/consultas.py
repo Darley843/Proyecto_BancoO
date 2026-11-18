@@ -10,12 +10,15 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 
 from ..texto import normalizar
+from .tasas import banda_de_concepto, montos_en_texto, sin_montos
 from .tipos import Fila
 
 #: Sufijo de franquicia que se ignora al emparejar dos filas.
 _FRANQUICIA = re.compile(r"\s*\((visa|mastercard)\)\s*$", re.IGNORECASE)
 #: Palabra de la consulta o de una fila del Tablero.
 _PALABRA = re.compile(r"\w+")
+#: Cifra con separadores de miles o decimales, como `16.700` o `11,90`.
+_CIFRA = re.compile(r"\d+(?:[.,]\d+)*")
 #: Equivalencias del dominio que no aparecen literalmente en las filas.
 _SINONIMOS: dict[str, str] = {
     "europa": "schengen",
@@ -33,6 +36,8 @@ _CONTRARIOS: tuple[tuple[str, str], ...] = (
 )
 #: Nombres de producto que deben aparecer en la fila cuando la consulta los pide.
 _DISTINTIVOS = frozenset({"black", "gold", "platinum", "clasica", "joven", "business", "viajera"})
+#: Índices sobre los que se publica un spread; sin nombrarlos, no es una tasa.
+_INDICES = frozenset({"ipc", "ibr"})
 #: Sustantivos que introducen el nombre de un producto en la consulta.
 _PRODUCTOS = frozenset({"cuenta", "tarjeta", "producto", "plan", "paquete"})
 #: Palabras que no distinguen una tarifa: artículos, preposiciones y muletillas.
@@ -223,6 +228,9 @@ def buscar_filas(filas: Sequence[Fila], consulta: str, categoria: str | None = N
     todas las empatadas; ``filas_para_plantilla`` aplica el desempate por
     especificidad cuando la respuesta va al usuario.
 
+    Un spread sobre IPC o IBR solo entra si la consulta nombra el índice: no es
+    «la tasa» del producto y no puede responder «cuánto paga un CDT».
+
     Args:
         filas: filas del Tablero.
         consulta: pregunta o términos a buscar.
@@ -231,23 +239,23 @@ def buscar_filas(filas: Sequence[Fila], consulta: str, categoria: str | None = N
     Returns:
         Las filas con más coincidencias, en el orden original.
     """
-    terminos = _terminos(consulta)
-    if _nombra_producto_desconocido(filas, consulta):
+    terminos = _terminos(sin_montos(consulta))
+    if _nombra_producto_desconocido(filas, sin_montos(consulta)):
         return []
     objetivo = normalizar(categoria) if categoria else ""
     elegibles = [fila for fila in filas if not objetivo or objetivo in normalizar(fila.categoria)]
     if not terminos:
         return [] if consulta.strip() else elegibles
-    elegibles = _exigir_distintivos(elegibles, consulta)
+    nombra_indice = any(termino in _INDICES for termino in terminos)
+    elegibles = [fila for fila in elegibles if nombra_indice or not es_spread(fila)]
+    elegibles = _exigir_distintivos(elegibles, sin_montos(consulta))
 
     puntuadas: list[tuple[int, Fila]] = []
     raices = list(dict.fromkeys(_raiz(_SINONIMOS.get(termino, termino)) for termino in terminos))
     for fila in elegibles:
         palabras = {
             _raiz(palabra)
-            for palabra in _PALABRA.findall(
-                normalizar(f"{fila.concepto} {fila.categoria} {fila.valor} {fila.moneda}")
-            )
+            for palabra in _palabras(f"{fila.concepto} {fila.categoria} {fila.valor} {fila.moneda}")
         }
         if _contradice(raices, palabras):
             continue
@@ -280,14 +288,16 @@ def filas_para_plantilla(
     Returns:
         Las filas más específicas entre las que empatan en coincidencias.
     """
-    candidatas = buscar_filas(filas, consulta, categoria)
-    if len(candidatas) <= 1:
+    candidatas = _ajustar_bandas(buscar_filas(filas, consulta, categoria), consulta)
+    if len(candidatas) <= 1 or misma_tasa(candidatas):
         return candidatas
 
-    raices_consulta = [_raiz(_SINONIMOS.get(termino, termino)) for termino in _terminos(consulta)]
+    raices_consulta = [
+        _raiz(_SINONIMOS.get(termino, termino)) for termino in _terminos(sin_montos(consulta))
+    ]
     rachas = [
         _racha(
-            [_raiz(palabra) for palabra in _PALABRA.findall(normalizar(fila.concepto))],
+            [_raiz(palabra) for palabra in _palabras(fila.concepto)],
             raices_consulta,
         )
         for fila in candidatas
@@ -307,12 +317,109 @@ def concepto_sin_franquicia(concepto: str) -> str:
     return " ".join(_FRANQUICIA.sub("", normalizar(concepto)).split())
 
 
+def es_spread(fila: Fila) -> bool:
+    """Indica si la fila es un spread sobre índice y no una tasa.
+
+    Las filas de origen `tasa` con moneda `puntos` publican «IPC + X puntos» o
+    «IBR + X puntos»: no son un porcentaje E.A. y no responden una pregunta por
+    «la tasa» del producto.
+
+    Args:
+        fila: fila del Tablero.
+
+    Returns:
+        True si la cifra es un spread sobre IPC o IBR.
+    """
+    return fila.origen == "tasa" and fila.moneda == "puntos"
+
+
+def misma_tasa(filas: Sequence[Fila]) -> bool:
+    """Indica si las filas son la misma tasa, del mismo producto y plazo.
+
+    La categoría de una fila de origen `tasa` identifica producto y plazo, así
+    que las bandas de monto del CDT y sus índices comparten categoría. Esas
+    filas forman una sola respuesta y no una consulta ambigua.
+
+    Args:
+        filas: filas del Tablero.
+
+    Returns:
+        True si todas son tasas y comparten categoría.
+    """
+    if not filas or not all(fila.origen == "tasa" for fila in filas):
+        return False
+    return len({fila.categoria for fila in filas}) == 1
+
+
+def _ajustar_bandas(filas: Sequence[Fila], consulta: str) -> list[Fila]:
+    """Responde por la banda de monto de la consulta y ordena las bandas.
+
+    Si la pregunta trae una cifra de monto («200 millones», «$5.000.000») se
+    deja solo la banda de CDT que la contiene. Si no la trae, las bandas se
+    listan de menor a mayor. Las filas que no son bandas conocidas no se tocan.
+
+    Args:
+        filas: filas candidatas que devolvió la búsqueda.
+        consulta: pregunta del cliente.
+
+    Returns:
+        Las filas de la banda que contiene el monto, o todas las bandas en
+        orden ascendente cuando la pregunta no trae monto.
+    """
+    candidatas = list(filas)
+    montos = montos_en_texto(consulta)
+    if montos:
+        contenidas = [fila for fila in candidatas if _contiene_monto(fila, montos[0])]
+        if contenidas:
+            return contenidas
+    return _ordenar_bandas(candidatas)
+
+
+def _contiene_monto(fila: Fila, monto: int) -> bool:
+    """Indica si el monto cae dentro de la banda de monto que nombra la fila."""
+    banda = banda_de_concepto(fila.concepto)
+    return banda is not None and banda.desde <= monto <= banda.hasta
+
+
+def _ordenar_bandas(filas: Sequence[Fila]) -> list[Fila]:
+    """Ordena las bandas de monto de menor a mayor cuando todas lo son."""
+    pares: list[tuple[int, Fila]] = []
+    for fila in filas:
+        banda = banda_de_concepto(fila.concepto)
+        if banda is None:
+            return list(filas)
+        pares.append((banda.desde, fila))
+    return [fila for _, fila in sorted(pares, key=lambda par: par[0])]
+
+
 def _terminos(consulta: str) -> list[str]:
-    """Devuelve las palabras significativas de la consulta, sin repetir."""
-    palabras = _PALABRA.findall(normalizar(consulta))
+    """Devuelve las palabras significativas de la consulta, sin repetir.
+
+    Las cifras de una sola cifra («2 años», «1 mes») se conservan: distinguen un
+    plazo de otro aunque el resto de la frase coincida.
+    """
+    palabras = _palabras(consulta)
     return list(
-        dict.fromkeys(p for p in palabras if len(p) > 1 and p not in _VACIAS and p not in _PREGUNTA)
+        dict.fromkeys(
+            p
+            for p in palabras
+            if (len(p) > 1 or p.isdigit()) and p not in _VACIAS and p not in _PREGUNTA
+        )
     )
+
+
+def _palabras(texto: str) -> list[str]:
+    """Parte un texto en palabras y une cada cifra en un solo número.
+
+    «16.700» y «11,90» se comparan como «16700» y «1190», para que un término
+    numérico no coincida con el fragmento de un decimal («90» en «11,90»).
+    """
+    return _PALABRA.findall(_unir_numeros(normalizar(texto)))
+
+
+def _unir_numeros(texto: str) -> str:
+    """Quita los separadores de miles y decimales de cada cifra del texto."""
+    return _CIFRA.sub(lambda encontrado: re.sub(r"[.,]", "", encontrado.group(0)), texto)
 
 
 def _raiz(palabra: str) -> str:
@@ -344,11 +451,11 @@ def _nombra_producto_desconocido(filas: Sequence[Fila], consulta: str) -> bool:
     Returns:
         True si la consulta pide un producto cuyo nombre no está en el catálogo.
     """
-    palabras = _PALABRA.findall(normalizar(consulta))
+    palabras = _palabras(consulta)
     vocabulario = {
         _raiz(palabra)
         for fila in filas
-        for palabra in _PALABRA.findall(normalizar(f"{fila.concepto} {fila.categoria}"))
+        for palabra in _palabras(f"{fila.concepto} {fila.categoria}")
     }
     for indice, palabra in enumerate(palabras):
         if palabra not in _PRODUCTOS:
@@ -379,10 +486,7 @@ def _exigir_distintivos(filas: Sequence[Fila], consulta: str) -> list[Fila]:
         return list(filas)
     resultado: list[Fila] = []
     for fila in filas:
-        palabras = {
-            _raiz(palabra)
-            for palabra in _PALABRA.findall(normalizar(f"{fila.concepto} {fila.categoria}"))
-        }
+        palabras = {_raiz(palabra) for palabra in _palabras(f"{fila.concepto} {fila.categoria}")}
         if exigidos <= palabras:
             resultado.append(fila)
     return resultado

@@ -42,9 +42,11 @@ from decimal import Decimal
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from ..config import PROJECT_ROOT
+from ..texto import normalizar
+from .tipos import Fila
 
 log = logging.getLogger(__name__)
 
@@ -104,6 +106,55 @@ _RE_PLAZO = re.compile(r"(\d+)\s*(d[ií]as|meses|años)", re.IGNORECASE)
 _RE_TRAMO_AHORRO = re.compile(r"(De \$?[\d.]+(?:\s*[’']\s*[\d.]+)*\s+a \$?[\d.]+)\s+([\d,.]+)\s*%")
 #: Tolerancia de la coherencia M.V./E.A.: 0,01 puntos porcentuales.
 TOLERANCIA_MV = Decimal("0.0001")
+#: Nombre visible de cada producto del alcance, para el Tablero y las consultas.
+NOMBRES_PRODUCTO: dict[str, str] = {
+    "libre_inversion": "Libre inversión",
+    "compra_cartera": "Compra de cartera",
+    "credito_rotativo": "Crédito rotativo",
+    "libranza": "Libranza",
+    "vehiculo_nuevo": "Vehículo nuevo",
+    "vehiculo_usado": "Vehículo usado",
+    "vivienda": "Vivienda",
+    "tarjeta_credito": "Tarjeta de crédito",
+    "ahorro": "Ahorro",
+    "cdt": "CDT",
+}
+#: Nombre de cada mes en español, indexado por su número.
+_NOMBRES_MES: dict[int, str] = {numero: nombre for nombre, numero in _MESES.items()}
+#: Cifra con moneda (`$5.000.000`) o con unidad de monto (`200 millones`).
+_RE_MONTO = re.compile(
+    r"\$\s*(?P<pesos>\d[\d.,]*)"
+    r"|(?P<numero>\d[\d.,]*)\s*(?P<unidad>millones|millon|mil)(?![a-z])",
+    re.IGNORECASE,
+)
+
+
+@dataclass(frozen=True, slots=True)
+class BandaMonto:
+    """Banda de monto del CDT: texto publicado, etiqueta visible y extremos.
+
+    Gold conserva el texto del PDF (`$500M- $99 MM`); el Tablero muestra la
+    etiqueta legible (`De $500 mil a $99 millones`) y usa los extremos en pesos
+    para responder por el monto de la pregunta.
+    """
+
+    publicado: str
+    etiqueta: str
+    desde: int
+    hasta: int
+
+
+#: Bandas de monto del CDT, de la más baja a la más alta, en pesos.
+BANDAS_MONTO: tuple[BandaMonto, ...] = (
+    BandaMonto("$500M- $99 MM", "De $500 mil a $99 millones", 500_000, 99_000_000),
+    BandaMonto("$100 MM - 499 MM", "De $100 a $499 millones", 100_000_000, 499_000_000),
+    BandaMonto(
+        "$500 MM - 10.000 MM",
+        "De $500 millones a $10.000 millones",
+        500_000_000,
+        10_000_000_000,
+    ),
+)
 
 
 class ErrorTasas(ValueError):
@@ -147,6 +198,12 @@ class TasaIncoherente(ErrorTasas):
     codigo = "tasa_incoherente"
 
 
+class TasaNoDisponible(ErrorTasas):
+    """No hay fila publicada para el producto y la fecha consultados."""
+
+    codigo = "tasa_no_disponible"
+
+
 class FilaTasa(BaseModel):
     """Una tasa publicada para un producto, su segmento y su vigencia."""
 
@@ -187,6 +244,29 @@ class FilaTasa(BaseModel):
             "sha256_pdf": self.sha256_pdf,
             "fecha_extraccion": self.fecha_extraccion.isoformat(),
         }
+
+
+class TasaVigente(BaseModel):
+    """Tasa publicada para un producto, con su rango y su vigencia.
+
+    Es la envolvente del producto en la vigencia elegida: el `desde` más bajo y
+    el `hasta` más alto entre sus segmentos, sin promedio. Las filas por
+    segmento se conservan en la tabla Gold y las devuelve `tasas_producto`.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    producto: str
+    segmento: str | None = None
+    tasa_ea_desde: Decimal
+    tasa_ea_hasta: Decimal
+    tasa_mv_desde: Decimal | None = None
+    tasa_mv_hasta: Decimal | None = None
+    vigencia_desde: date
+    vigencia_hasta: date
+    fuente: str
+    sha256_pdf: str = Field(min_length=64, max_length=64)
+    fecha_extraccion: date
 
 
 @dataclass(frozen=True, slots=True)
@@ -567,12 +647,18 @@ def describir_tasa(fila: FilaTasa) -> str:
         spread sobre IPC y `«IBR + 0,20 puntos»` para un spread sobre IBR.
     """
     if fila.tipo_tasa == "spread_ipc":
-        return f"IPC + {_puntos(fila)} puntos"
+        return f"{_spread(fila)} puntos"
     if fila.tipo_tasa == "spread_ibr":
-        return f"IBR + {_puntos(fila)} puntos"
+        return f"{_spread(fila)} puntos"
     if fila.tasa_ea_desde == fila.tasa_ea_hasta:
         return f"{_porcentaje(fila.tasa_ea_desde)} % E.A."
     return f"{_porcentaje(fila.tasa_ea_desde)}–{_porcentaje(fila.tasa_ea_hasta)} % E.A."
+
+
+def _spread(fila: FilaTasa) -> str:
+    """Escribe el spread con su índice y sus puntos, sin la palabra «puntos»."""
+    indice = "IPC" if fila.tipo_tasa == "spread_ipc" else "IBR"
+    return f"{indice} + {_puntos(fila)}"
 
 
 def _porcentaje(valor: Decimal) -> str:
@@ -585,6 +671,456 @@ def _puntos(fila: FilaTasa) -> str:
     if fila.tasa_ea_desde == fila.tasa_ea_hasta:
         return _porcentaje(fila.tasa_ea_desde)
     return f"{_porcentaje(fila.tasa_ea_desde)}–{_porcentaje(fila.tasa_ea_hasta)}"
+
+
+def clave_producto(producto: str) -> str:
+    """Normaliza el nombre de un producto a su clave de la tabla Gold.
+
+    Acepta «Libre inversión», «libre inversión» o «libre_inversion» y devuelve
+    siempre la misma clave, para que la consulta no dependa de cómo se escriba.
+
+    Args:
+        producto: nombre o clave del producto.
+
+    Returns:
+        La clave canónica, en minúsculas y con guiones bajos.
+    """
+    descompuesto = unicodedata.normalize("NFKD", producto)
+    sin_tildes = "".join(
+        caracter for caracter in descompuesto if not unicodedata.combining(caracter)
+    )
+    return re.sub(r"[^a-z0-9]+", "_", sin_tildes.casefold()).strip("_")
+
+
+def nombre_producto(producto: str) -> str:
+    """Devuelve el nombre visible del producto; si no está en el alcance, la clave.
+
+    Args:
+        producto: clave canónica del producto.
+
+    Returns:
+        El nombre en español que se muestra en el Tablero.
+    """
+    return NOMBRES_PRODUCTO.get(producto, producto.replace("_", " ").capitalize())
+
+
+def etiqueta_banda(segmento: str) -> str:
+    """Devuelve la etiqueta legible de una banda de monto del CDT.
+
+    El texto del PDF (`$500M- $99 MM`) se conserva en Gold; el Tablero muestra
+    `De $500 mil a $99 millones`. Una banda desconocida se deja como está.
+
+    Args:
+        segmento: texto del segmento tal como lo publica el PDF.
+
+    Returns:
+        La etiqueta legible o el mismo texto si la banda no está en la tabla.
+    """
+    clave = _clave_banda(segmento)
+    for banda in BANDAS_MONTO:
+        if clave == _clave_banda(banda.publicado):
+            return banda.etiqueta
+    return segmento
+
+
+def banda_de_concepto(concepto: str) -> BandaMonto | None:
+    """Busca la banda de monto del CDT que nombra el concepto de una fila.
+
+    Args:
+        concepto: concepto de la fila del Tablero.
+
+    Returns:
+        La banda con sus extremos en pesos, o None si el concepto no nombra una.
+    """
+    texto = " ".join(concepto.split())
+    for banda in BANDAS_MONTO:
+        if banda.etiqueta in texto or _clave_banda(banda.publicado) in texto:
+            return banda
+    return None
+
+
+def montos_en_texto(texto: str) -> list[int]:
+    """Devuelve, en pesos, las cifras de monto que trae una pregunta.
+
+    Reconoce la moneda (`$5.000.000`) y la unidad escrita (`200 millones`,
+    `500 mil`). Una cifra sin unidad («a 360 días», «2 años») no es un monto.
+
+    Args:
+        texto: pregunta del cliente.
+
+    Returns:
+        Los montos en pesos, en el orden en que aparecen.
+    """
+    montos: list[int] = []
+    for encontrado in _RE_MONTO.finditer(normalizar(texto)):
+        numero = encontrado.group("pesos") or encontrado.group("numero")
+        if not numero:
+            continue
+        valor = _numero_de_pesos(numero)
+        unidad = encontrado.group("unidad")
+        if unidad == "mil":
+            valor *= 1_000
+        elif unidad is not None:
+            valor *= 1_000_000
+        montos.append(int(valor))
+    return montos
+
+
+def sin_montos(texto: str) -> str:
+    """Quita de la pregunta las cifras de monto, que se responden por banda.
+
+    Así «por 200 millones» o «por $5.000.000» no se confunden con una cifra de
+    la tabla al buscar la fila; el monto se usa después para elegir la banda.
+
+    Args:
+        texto: pregunta del cliente.
+
+    Returns:
+        La pregunta sin las expresiones de monto.
+    """
+    return " ".join(_RE_MONTO.sub(" ", normalizar(texto)).split())
+
+
+def vigencia_legible(desde: date, hasta: date) -> str:
+    """Escribe una vigencia en español, como «del 1 al 30 de noviembre de 2026».
+
+    Args:
+        desde: primer día de la vigencia.
+        hasta: último día de la vigencia.
+
+    Returns:
+        La vigencia en texto, con el mes repetido solo si cambia.
+    """
+    if (desde.month, desde.year) == (hasta.month, hasta.year):
+        return f"del {desde.day} al {hasta.day} de {_NOMBRES_MES[hasta.month]} de {hasta.year}"
+    return (
+        f"del {desde.day} de {_NOMBRES_MES[desde.month]} de {desde.year} al "
+        f"{hasta.day} de {_NOMBRES_MES[hasta.month]} de {hasta.year}"
+    )
+
+
+def plazo_legible(dias: int) -> str:
+    """Escribe un plazo en días con su equivalencia en meses o años.
+
+    Args:
+        dias: plazo publicado por el PDF, con mes de 30 y año de 360 días.
+
+    Returns:
+        «360 días (12 meses)», «720 días (2 años)» o «45 días».
+    """
+    if dias >= 720 and dias % 360 == 0:
+        return f"{dias} días ({dias // 360} años)"
+    if dias % 30 == 0:
+        return f"{dias} días ({dias // 30} meses)"
+    return f"{dias} días"
+
+
+def concepto_tablero(fila: FilaTasa) -> str:
+    """Arma el concepto con el que la tasa aparece en el Tablero.
+
+    Args:
+        fila: fila de la tabla Gold.
+
+    Returns:
+        «Libre inversión», «Libranza · Retanqueo» o «CDT · IPC · 720 días (2 años)».
+    """
+    partes = [nombre_producto(fila.producto)]
+    if fila.segmento:
+        partes.append(etiqueta_banda(fila.segmento))
+    if fila.plazo_dias is not None:
+        partes.append(plazo_legible(fila.plazo_dias))
+    return " · ".join(partes)
+
+
+def categoria_tablero(fila: FilaTasa) -> str:
+    """Agrupa las filas que responden la misma pregunta de tasa.
+
+    Incluye el producto y, cuando lo hay, el plazo: las bandas de monto y los
+    índices de un mismo plazo son una sola respuesta y no una consulta ambigua.
+
+    Args:
+        fila: fila de la tabla Gold.
+
+    Returns:
+        La categoría del Tablero, como «tasa de interés · CDT · 360 días».
+    """
+    categoria = f"tasa de interés · {nombre_producto(fila.producto).casefold()}"
+    if fila.plazo_dias is not None:
+        categoria += f" · {fila.plazo_dias} días"
+    return categoria
+
+
+def fila_tablero(fila: FilaTasa, pagina: str) -> Fila:
+    """Convierte una fila de tasas en una fila del Tablero.
+
+    Una tasa fija sale como rango en `valor` con moneda `%`; un spread sobre IPC
+    o IBR sale como «IPC + X puntos» con moneda `puntos`, nunca como porcentaje
+    E.A. La periodicidad cita la vigencia completa y `fuente` es el PDF.
+
+    Args:
+        fila: fila de la tabla Gold.
+        pagina: ruta de la tabla Gold que respalda la cifra.
+
+    Returns:
+        La fila con las diez columnas del contrato del Tablero.
+    """
+    vigencia = vigencia_legible(fila.vigencia_desde, fila.vigencia_hasta)
+    if es_spread(fila):
+        valor = _spread(fila)
+        moneda = "puntos"
+        periodicidad = f"vigencia {vigencia}"
+    else:
+        valor = _puntos(fila)
+        moneda = "%"
+        periodicidad = f"E.A., vigencia {vigencia}"
+    return Fila(
+        concepto=concepto_tablero(fila),
+        categoria=categoria_tablero(fila),
+        valor=valor,
+        moneda=moneda,
+        recargos="",
+        periodicidad=periodicidad,
+        vigente_desde=fila.vigencia_desde.isoformat(),
+        origen="tasa",
+        pagina=pagina,
+        fuente=fila.fuente,
+    )
+
+
+def filas_tablero(filas: Iterable[FilaTasa], pagina: str) -> list[Fila]:
+    """Convierte la tabla de tasas en filas del Tablero, sin duplicados.
+
+    Args:
+        filas: filas de la tabla Gold de la vigencia publicada.
+        pagina: ruta de la tabla Gold que respalda las cifras.
+
+    Returns:
+        Una fila del Tablero por producto, segmento y plazo.
+    """
+    unicas: dict[tuple[object, ...], Fila] = {}
+    for fila in filas:
+        convertida = fila_tablero(fila, pagina)
+        unicas.setdefault(_clave_fila_tablero(convertida), convertida)
+    return sorted(unicas.values(), key=lambda convertida: convertida.concepto)
+
+
+def tabla_mas_reciente(directorio: Path) -> Path | None:
+    """Devuelve la tabla Gold de tasas de la vigencia más reciente.
+
+    Args:
+        directorio: carpeta `data/gold/tasas` con las tablas por vigencia.
+
+    Returns:
+        El archivo `tasas-personas-<AAAA-MM>.jsonl` más reciente, o None si la
+        carpeta no existe o no tiene tablas.
+    """
+    if not directorio.is_dir():
+        return None
+    tablas = sorted(directorio.glob("tasas-personas-*.jsonl"))
+    return tablas[-1] if tablas else None
+
+
+def tablas_gold(raiz: Path | None = None) -> list[Path]:
+    """Devuelve las tablas Gold de tasas, de la vigencia más antigua a la última.
+
+    Args:
+        raiz: carpeta de las tablas; por defecto la declarada en `config/tasas.toml`.
+
+    Returns:
+        Las tablas por vigencia en orden ascendente de nombre.
+    """
+    directorio = raiz if raiz is not None else cargar_config_tasas().tabla.parent
+    if not directorio.is_dir():
+        return []
+    return sorted(directorio.glob("tasas-personas-*.jsonl"))
+
+
+def cargar_tabla(ruta: Path) -> list[FilaTasa]:
+    """Lee una tabla Gold descartando las filas que no cumplen el contrato.
+
+    Normaliza la coma decimal y rechaza, sin corregir, la fila cuya tasa sea
+    negativa, supere el 100 % o tenga la vigencia invertida. Cada descarte queda
+    en el log con su número de línea.
+
+    Args:
+        ruta: archivo JSONL de la vigencia.
+
+    Returns:
+        Las filas válidas; vacío si el archivo no existe.
+    """
+    if not ruta.exists():
+        return []
+    filas: list[FilaTasa] = []
+    for numero, linea in enumerate(ruta.read_text(encoding="utf-8").splitlines(), 1):
+        if not linea.strip():
+            continue
+        try:
+            fila = FilaTasa.model_validate(_normalizar_datos(json.loads(linea)))
+        except (json.JSONDecodeError, ValidationError, TypeError, ValueError) as exc:
+            log.warning("fila %d de %s descartada: %s", numero, ruta.name, exc)
+            continue
+        if not _rango_valido(fila):
+            log.warning(
+                "fila %d de %s descartada: tasa fuera de rango o vigencia invertida",
+                numero,
+                ruta.name,
+            )
+            continue
+        filas.append(fila)
+    return filas
+
+
+def tasas_producto(
+    producto: str,
+    fecha: date | None = None,
+    *,
+    raiz: Path | None = None,
+) -> list[FilaTasa]:
+    """Devuelve las tasas fijas por segmento del producto en su vigencia vigente.
+
+    Parte de `tasas_fijas`: un spread sobre IPC o IBR no es «la tasa» del
+    producto y solo se presenta con `describir_tasa`. Elige la vigencia más
+    reciente que contenga la fecha consultada (por defecto, la más reciente de
+    la tabla) y no mezcla tasas de vigencias distintas.
+
+    Args:
+        producto: nombre o clave del producto.
+        fecha: fecha consultada; por defecto, la vigencia más reciente.
+        raiz: carpeta de las tablas; por defecto la de `config/tasas.toml`.
+
+    Returns:
+        Las filas por segmento de la vigencia elegida, en orden determinista.
+
+    Raises:
+        TasaNoDisponible: si el producto no tiene tasa o ninguna vigencia
+            contiene la fecha consultada.
+    """
+    clave = clave_producto(producto)
+    todas = [fila for ruta in tablas_gold(raiz) for fila in cargar_tabla(ruta)]
+    fijas = [fila for fila in tasas_fijas(todas) if fila.producto == clave]
+    if not fijas:
+        raise TasaNoDisponible(f"no hay tasa publicada para «{producto}»")
+    vigencia = _vigencia_elegida(fijas, fecha)
+    elegidas: dict[tuple[object, ...], FilaTasa] = {}
+    for fila in fijas:
+        if fila.vigencia_desde == vigencia:
+            elegidas.setdefault(_clave_fila(fila), fila)
+    return sorted(elegidas.values(), key=_orden)
+
+
+def tasa_vigente(
+    producto: str,
+    fecha: date | None = None,
+    *,
+    raiz: Path | None = None,
+) -> TasaVigente:
+    """Devuelve el rango E.A./M.V. del producto con su vigencia y su fuente.
+
+    Con varios segmentos devuelve la envolvente del producto: el `desde` más
+    bajo y el `hasta` más alto, sin promediar. La M.V. solo se informa cuando
+    todas las filas elegidas la publican; si falta, queda vacía.
+
+    Args:
+        producto: nombre o clave del producto.
+        fecha: fecha consultada; por defecto, la vigencia más reciente.
+        raiz: carpeta de las tablas; por defecto la de `config/tasas.toml`.
+
+    Returns:
+        La envolvente de la tasa en la vigencia elegida.
+
+    Raises:
+        TasaNoDisponible: si el producto no tiene tasa publicado.
+        TasaFueraDeRango: si el rango resultante no es un decimal válido.
+    """
+    filas = tasas_producto(producto, fecha, raiz=raiz)
+    desde = min(fila.tasa_ea_desde for fila in filas)
+    hasta = max(fila.tasa_ea_hasta for fila in filas)
+    if not 0 <= desde <= hasta <= 1:
+        raise TasaFueraDeRango(f"{filas[0].producto}: la envolvente E.A. queda en {desde}–{hasta}")
+    mensuales = [
+        (fila.tasa_mv_desde, fila.tasa_mv_hasta)
+        for fila in filas
+        if fila.tasa_mv_desde is not None and fila.tasa_mv_hasta is not None
+    ]
+    publicadas = len(mensuales) == len(filas)
+    segmentos = {fila.segmento for fila in filas}
+    huellas = {fila.sha256_pdf for fila in filas}
+    if len(huellas) > 1:
+        log.warning(
+            "la vigencia %s mezcla PDF: %d huellas distintas",
+            filas[0].vigencia_desde,
+            len(huellas),
+        )
+    return TasaVigente(
+        producto=filas[0].producto,
+        segmento=segmentos.pop() if len(segmentos) == 1 else None,
+        tasa_ea_desde=desde,
+        tasa_ea_hasta=hasta,
+        tasa_mv_desde=min(valor[0] for valor in mensuales) if publicadas else None,
+        tasa_mv_hasta=max(valor[1] for valor in mensuales) if publicadas else None,
+        vigencia_desde=min(fila.vigencia_desde for fila in filas),
+        vigencia_hasta=max(fila.vigencia_hasta for fila in filas),
+        fuente=filas[0].fuente,
+        sha256_pdf=filas[0].sha256_pdf,
+        fecha_extraccion=filas[0].fecha_extraccion,
+    )
+
+
+def _vigencia_elegida(filas: Sequence[FilaTasa], fecha: date | None) -> date:
+    """Elige la vigencia más reciente que contenga la fecha consultada."""
+    if fecha is None:
+        return max(fila.vigencia_desde for fila in filas)
+    candidatas = [
+        fila.vigencia_desde for fila in filas if fila.vigencia_desde <= fecha <= fila.vigencia_hasta
+    ]
+    if not candidatas:
+        raise TasaNoDisponible(f"{filas[0].producto}: sin tasa vigente el {fecha.isoformat()}")
+    return max(candidatas)
+
+
+def _numero_de_pesos(texto: str) -> Decimal:
+    """Convierte una cifra escrita a su valor en pesos, sin la unidad."""
+    limpio = texto.rstrip(".,")
+    if re.fullmatch(r"\d{1,3}(?:\.\d{3})+", limpio):
+        limpio = limpio.replace(".", "")
+    elif "," in limpio:
+        limpio = limpio.replace(".", "").replace(",", ".")
+    return Decimal(limpio)
+
+
+def _clave_banda(texto: str) -> str:
+    """Normaliza los espacios de una banda para comparar dos textos."""
+    return " ".join(texto.split())
+
+
+def _normalizar_datos(datos: object) -> dict[str, object]:
+    """Normaliza la coma decimal de las tasas de una fila cruda del JSONL."""
+    if not isinstance(datos, dict):
+        raise TypeError("la fila no es un objeto JSON")
+    limpio = dict(datos)
+    for campo in ("tasa_ea_desde", "tasa_ea_hasta", "tasa_mv_desde", "tasa_mv_hasta"):
+        valor = limpio.get(campo)
+        if isinstance(valor, str):
+            limpio[campo] = valor.replace(",", ".")
+    return limpio
+
+
+def _rango_valido(fila: FilaTasa) -> bool:
+    """Indica si la fila tiene tasas entre 0 y 1 y la vigencia en orden."""
+    if not 0 <= fila.tasa_ea_desde <= fila.tasa_ea_hasta <= 1:
+        return False
+    if (
+        fila.tasa_mv_desde is not None
+        and fila.tasa_mv_hasta is not None
+        and not 0 <= fila.tasa_mv_desde <= fila.tasa_mv_hasta <= 1
+    ):
+        return False
+    return fila.vigencia_desde <= fila.vigencia_hasta
+
+
+def _clave_fila_tablero(fila: Fila) -> tuple[str, ...]:
+    """Identidad de una fila del Tablero, para no duplicarla."""
+    return (fila.concepto, fila.categoria, fila.valor, fila.origen)
 
 
 def escribir_tabla(ruta: Path, filas: Iterable[FilaTasa]) -> int:

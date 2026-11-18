@@ -4,10 +4,14 @@ El PDF vive en Bronze y no se versiona, así que la extracción se prueba con un
 texto de muestra que reproduce la maquetación del PDF: tablas «desde/hasta»,
 notas de vigencia, mora, comisiones, seguros y tablas variables que deben
 quedar fuera.
+
+Las consultas `tasa_vigente` y `tasas_producto` se prueban sobre tablas Gold
+temporales: no abren red, no leen la Bóveda y parten siempre de las tasas fijas.
 """
 
 from __future__ import annotations
 
+import json
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -19,16 +23,23 @@ from banco_occidente_corpus.tablero.tasas import (
     TablaIncompleta,
     TasaFueraDeRango,
     TasaIncoherente,
+    TasaNoDisponible,
     TasaSobreUsura,
     Usura,
     UsuraSinCertificar,
     cargar_config_tasas,
+    cargar_tabla,
     describir_tasa,
     es_spread,
     escribir_tabla,
+    etiqueta_banda,
     filas_desde_texto,
     leer_tabla,
+    montos_en_texto,
+    sin_montos,
+    tasa_vigente,
     tasas_fijas,
+    tasas_producto,
     validar_coherencia_tasas,
     validar_filas,
     validar_usura,
@@ -473,3 +484,267 @@ def test_tabla_gold_versionada_cumple_la_usura() -> None:
     validar_filas(filas)
     validar_usura(filas, config.usura)
     validar_coherencia_tasas(filas)
+
+
+# ---------------------------------------------------------------------------
+# Consulta determinista de la tasa vigente (tarea 3.5)
+# ---------------------------------------------------------------------------
+
+#: URL del PDF de tasas en las tablas temporales de las consultas.
+URL_TASAS = "https://www.bancodeoccidente.com.co/documents/d/guest/tasas-personas-bdo"
+#: Vigencia de la tabla de prueba por defecto.
+VIGENCIA = ("2026-11-01", "2026-11-30")
+
+
+def fila_consulta(
+    producto: str,
+    *,
+    segmento: str | None = None,
+    desde: str = "0.2056",
+    hasta: str = "0.2817",
+    tipo_tasa: str = "fija",
+    plazo_dias: int | None = None,
+    vigencia: tuple[str, str] = VIGENCIA,
+    mensual: tuple[str, str] | None = None,
+) -> FilaTasa:
+    """Construye una fila de la tabla Gold para las pruebas de consulta."""
+    return FilaTasa(
+        producto=producto,
+        segmento=segmento,
+        tipo_tasa=tipo_tasa,
+        plazo_dias=plazo_dias,
+        tasa_ea_desde=Decimal(desde),
+        tasa_ea_hasta=Decimal(hasta),
+        tasa_mv_desde=None if mensual is None else Decimal(mensual[0]),
+        tasa_mv_hasta=None if mensual is None else Decimal(mensual[1]),
+        vigencia_desde=date.fromisoformat(vigencia[0]),
+        vigencia_hasta=date.fromisoformat(vigencia[1]),
+        fuente=URL_TASAS,
+        sha256_pdf=SHA_EJEMPLO,
+        fecha_extraccion=FECHA,
+    )
+
+
+def publicar(raiz: Path, nombre: str, filas: list[FilaTasa]) -> Path:
+    """Escribe una tabla Gold de la vigencia en `raiz` y devuelve su ruta."""
+    destino = raiz / nombre
+    escribir_tabla(destino, filas)
+    return destino
+
+
+def test_tasa_vigente_de_un_solo_segmento(tmp_path: Path) -> None:
+    """Con una sola fila devuelve su rango, su vigencia y su fuente."""
+    publicar(
+        tmp_path,
+        "tasas-personas-2026-11.jsonl",
+        [fila_consulta("libre_inversion", mensual=("0.0157", "0.0209"))],
+    )
+
+    tasa = tasa_vigente("libre_inversion", raiz=tmp_path)
+
+    assert (tasa.tasa_ea_desde, tasa.tasa_ea_hasta) == (Decimal("0.2056"), Decimal("0.2817"))
+    assert (tasa.tasa_mv_desde, tasa.tasa_mv_hasta) == (Decimal("0.0157"), Decimal("0.0209"))
+    assert tasa.segmento is None
+    assert (tasa.vigencia_desde, tasa.vigencia_hasta) == (date(2026, 11, 1), date(2026, 11, 30))
+    assert tasa.fuente == URL_TASAS
+    assert tasa.sha256_pdf == SHA_EJEMPLO
+    assert tasa.fecha_extraccion == FECHA
+
+
+def test_tasa_vigente_envuelve_los_segmentos_sin_promediar(tmp_path: Path) -> None:
+    """Con varios segmentos devuelve el desde más bajo y el hasta más alto."""
+    publicar(
+        tmp_path,
+        "tasas-personas-2026-11.jsonl",
+        [
+            fila_consulta("libranza", segmento="Libre inversión", desde="0.1539", hasta="0.2431"),
+            fila_consulta("libranza", segmento="Compra de cartera", desde="0.1471", hasta="0.2343"),
+            fila_consulta("libranza", segmento="Retanqueo", desde="0.143", hasta="0.23"),
+        ],
+    )
+
+    tasa = tasa_vigente("libranza", raiz=tmp_path)
+
+    assert (tasa.tasa_ea_desde, tasa.tasa_ea_hasta) == (Decimal("0.143"), Decimal("0.2431"))
+    assert tasa.segmento is None
+    assert tasa.tasa_mv_desde is None and tasa.tasa_mv_hasta is None
+
+
+def test_tasas_producto_conserva_las_filas_por_segmento(tmp_path: Path) -> None:
+    """La evidencia por segmento se conserva y se devuelve ordenada."""
+    publicar(
+        tmp_path,
+        "tasas-personas-2026-11.jsonl",
+        [
+            fila_consulta("libranza", segmento="Libre inversión", desde="0.1539", hasta="0.2431"),
+            fila_consulta("libranza", segmento="Retanqueo", desde="0.143", hasta="0.23"),
+        ],
+    )
+
+    filas = tasas_producto("Libranza", raiz=tmp_path)
+
+    assert [(fila.segmento, fila.tasa_ea_hasta) for fila in filas] == [
+        ("Libre inversión", Decimal("0.2431")),
+        ("Retanqueo", Decimal("0.23")),
+    ]
+
+
+def test_la_consulta_elige_la_vigencia_mas_reciente(tmp_path: Path) -> None:
+    """Dos tablas con vigencias distintas no se mezclan: gana la más reciente."""
+    publicar(
+        tmp_path,
+        "tasas-personas-2026-10.jsonl",
+        [
+            fila_consulta(
+                "libre_inversion",
+                desde="0.18",
+                hasta="0.25",
+                vigencia=("2026-10-01", "2026-10-31"),
+            )
+        ],
+    )
+    publicar(
+        tmp_path,
+        "tasas-personas-2026-11.jsonl",
+        [fila_consulta("libre_inversion")],
+    )
+
+    reciente = tasa_vigente("libre_inversion", raiz=tmp_path)
+    octubre = tasa_vigente("libre_inversion", date(2026, 10, 15), raiz=tmp_path)
+
+    assert reciente.tasa_ea_desde == Decimal("0.2056")
+    assert reciente.vigencia_desde == date(2026, 11, 1)
+    assert octubre.tasa_ea_desde == Decimal("0.18")
+    assert octubre.vigencia_desde == date(2026, 10, 1)
+
+
+def test_la_consulta_fuera_de_vigencia_responde_tasa_no_disponible(tmp_path: Path) -> None:
+    """Una fecha que ninguna vigencia contiene no se responde con otra tabla."""
+    publicar(tmp_path, "tasas-personas-2026-11.jsonl", [fila_consulta("libre_inversion")])
+
+    with pytest.raises(TasaNoDisponible) as error:
+        tasa_vigente("libre_inversion", date(2026, 12, 15), raiz=tmp_path)
+
+    assert error.value.codigo == "tasa_no_disponible"
+
+
+def test_la_consulta_sin_producto_responde_tasa_no_disponible(tmp_path: Path) -> None:
+    """Un producto que no está en la tabla no se inventa."""
+    publicar(tmp_path, "tasas-personas-2026-11.jsonl", [fila_consulta("libre_inversion")])
+
+    with pytest.raises(TasaNoDisponible) as error:
+        tasa_vigente("credito_rotativo", raiz=tmp_path)
+
+    assert "credito_rotativo" in str(error.value)
+
+
+def test_las_consultas_parten_de_las_tasas_fijas(tmp_path: Path) -> None:
+    """Un spread sobre IPC no es «la tasa» del CDT y no entra en las consultas."""
+    publicar(
+        tmp_path,
+        "tasas-personas-2026-11.jsonl",
+        [
+            fila_consulta(
+                "cdt", segmento="$100 MM - 499 MM", desde="0.119", hasta="0.119", plazo_dias=360
+            ),
+            fila_consulta(
+                "cdt",
+                segmento="IPC",
+                desde="0.032",
+                hasta="0.032",
+                tipo_tasa="spread_ipc",
+                plazo_dias=360,
+            ),
+            fila_consulta(
+                "cdt",
+                segmento="IBR a 30 días",
+                desde="0.002",
+                hasta="0.002",
+                tipo_tasa="spread_ibr",
+                plazo_dias=360,
+            ),
+        ],
+    )
+
+    tasa = tasa_vigente("cdt", raiz=tmp_path)
+    filas = tasas_producto("cdt", raiz=tmp_path)
+
+    assert (tasa.tasa_ea_desde, tasa.tasa_ea_hasta) == (Decimal("0.119"), Decimal("0.119"))
+    assert [fila.segmento for fila in filas] == ["$100 MM - 499 MM"]
+    assert not any(es_spread(fila) for fila in filas)
+
+
+def test_un_valor_fuera_de_rango_se_descarta_y_se_informa(
+    tmp_path: Path, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Una tasa negativa o mayor que 100 % no se corrige: se descarta con aviso."""
+    ruta = tmp_path / "tasas-personas-2026-11.jsonl"
+    crudas = [
+        fila_consulta("libre_inversion").como_dict(),
+        {**fila_consulta("compra_cartera").como_dict(), "tasa_ea_desde": -0.1},
+        {**fila_consulta("libranza").como_dict(), "tasa_ea_hasta": 1.2},
+    ]
+    ruta.write_text(
+        "".join(json.dumps(fila, ensure_ascii=False) + "\n" for fila in crudas),
+        encoding="utf-8",
+    )
+
+    with caplog.at_level("WARNING"):
+        filas = cargar_tabla(ruta)
+
+    assert [fila.producto for fila in filas] == ["libre_inversion"]
+    assert "fuera de rango" in caplog.text
+
+
+def test_la_tabla_normaliza_la_coma_decimal(tmp_path: Path) -> None:
+    """Una tabla con «0,2056» se lee como el decimal 0,2056 y no se rechaza."""
+    ruta = tmp_path / "tasas-personas-2026-11.jsonl"
+    cruda = {
+        **fila_consulta("libre_inversion").como_dict(),
+        "tasa_ea_desde": "0,2056",
+        "tasa_ea_hasta": "0,2817",
+    }
+    ruta.write_text(json.dumps(cruda) + "\n", encoding="utf-8")
+
+    filas = cargar_tabla(ruta)
+
+    assert len(filas) == 1
+    assert filas[0].tasa_ea_desde == Decimal("0.2056")
+    assert filas[0].tasa_ea_hasta == Decimal("0.2817")
+
+
+def test_la_consulta_funciona_offline_sobre_la_tabla_gold() -> None:
+    """La consulta lee la tabla Gold local; la suite bloquea cualquier socket."""
+    config = cargar_config_tasas()
+
+    tasa = tasa_vigente("Libre inversión")
+    filas = tasas_producto("libranza")
+
+    assert tasa.fuente == config.fuente
+    assert tasa.sha256_pdf == config.sha256
+    assert tasa.vigencia_desde == config.vigencia_desde
+    assert tasa_vigente("Libre inversión") == tasa
+    assert len(filas) == 3
+
+
+def test_los_montos_de_la_pregunta_se_leen_en_pesos() -> None:
+    """«200 millones», «500 mil» y «$5.000.000» son montos; el plazo no."""
+    assert montos_en_texto("un CDT por 200 millones") == [200_000_000]
+    assert montos_en_texto("un CDT por $5.000.000") == [5_000_000]
+    assert montos_en_texto("un CDT por 500 mil") == [500_000]
+    assert montos_en_texto("un CDT a 360 días") == []
+    assert montos_en_texto("un CDT a 2 años") == []
+
+
+def test_la_pregunta_sin_montos_conserva_el_plazo() -> None:
+    """Quitar el monto deja intactos el producto y el plazo de la pregunta."""
+    assert sin_montos("CDT a 360 días por 200 millones") == "cdt a 360 dias por"
+    assert sin_montos("CDT por $5.000.000 a 2 años") == "cdt por a 2 anos"
+
+
+def test_las_bandas_se_muestran_con_etiquetas_legibles() -> None:
+    """La etiqueta visible traduce el texto del PDF y no lo reescribe en Gold."""
+    assert etiqueta_banda("$500M- $99 MM") == "De $500 mil a $99 millones"
+    assert etiqueta_banda("$100 MM - 499 MM") == "De $100 a $499 millones"
+    assert etiqueta_banda("$500 MM - 10.000 MM") == "De $500 millones a $10.000 millones"
+    assert etiqueta_banda("De 0 a $5.000.000") == "De 0 a $5.000.000"

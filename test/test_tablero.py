@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import csv
 import tomllib
+from datetime import date
+from decimal import Decimal
 from pathlib import Path
 from typing import Any
 
@@ -11,6 +13,7 @@ import pytest
 from pydantic import ValidationError
 
 from banco_occidente_corpus.config import Config, Paths
+from banco_occidente_corpus.sucursal.grafo import tablero_responde_sin_modelo
 from banco_occidente_corpus.tablero import (
     MAX_FILAS_HERRAMIENTA,
     ConsultaTablero,
@@ -27,7 +30,9 @@ from banco_occidente_corpus.tablero.construir import (
     Falla,
     ResumenTablero,
     cargar_preguntas_tabla,
+    construir_filas,
     escribir_tablero,
+    filas_de_tasas,
     formatear_resumen,
     verificar_preguntas,
 )
@@ -40,6 +45,12 @@ from banco_occidente_corpus.tablero.tablas_web import (
     viajes_nacionales,
 )
 from banco_occidente_corpus.tablero.tarifas import extraer_tarifario
+from banco_occidente_corpus.tablero.tasas import (
+    FilaTasa,
+)
+from banco_occidente_corpus.tablero.tasas import (
+    escribir_tabla as escribir_tabla_tasas,
+)
 from banco_occidente_corpus.tablero.tipos import COLUMNAS, escribir_filas, leer_filas
 from banco_occidente_corpus.utils import write_jsonl
 
@@ -741,3 +752,219 @@ def test_filas_de_consulta_respeta_el_limite() -> None:
     filas = [fila(f"Gastos médicos {indice}", str(1_000 + indice)) for indice in range(5)]
 
     assert len(filas_de_consulta(filas, "gastos médicos", limite=2)) == 2
+
+
+# ---------------------------------------------------------------------------
+# Tasas vigentes en el Tablero (tarea 3.4)
+# ---------------------------------------------------------------------------
+
+#: URL del PDF de tasas que alimenta al Tablero.
+URL_TASAS = "https://www.bancodeoccidente.com.co/documents/d/guest/tasas-personas-bdo"
+#: Huella del PDF de tasas en las tablas temporales.
+SHA_TASAS = "989be43a0ed19eb33e2057cd01c1ae612b6f15544eaaf41af6348846a6ff1b7f"
+
+
+def fila_tasa(
+    producto: str,
+    *,
+    segmento: str | None = None,
+    desde: str = "0.2056",
+    hasta: str = "0.2817",
+    tipo_tasa: str = "fija",
+    plazo_dias: int | None = None,
+) -> FilaTasa:
+    """Construye una fila de la tabla Gold de tasas para el Tablero."""
+    return FilaTasa(
+        producto=producto,
+        segmento=segmento,
+        tipo_tasa=tipo_tasa,
+        plazo_dias=plazo_dias,
+        tasa_ea_desde=Decimal(desde),
+        tasa_ea_hasta=Decimal(hasta),
+        vigencia_desde=date(2026, 11, 1),
+        vigencia_hasta=date(2026, 11, 30),
+        fuente=URL_TASAS,
+        sha256_pdf=SHA_TASAS,
+        fecha_extraccion=date(2026, 11, 16),
+    )
+
+
+def preparar_tasas(config: Config) -> Path:
+    """Escribe en Gold una tabla de tasas mínima con una tasa fija y un spread."""
+    ruta = config.paths.gold / "tasas" / "tasas-personas-2026-11.jsonl"
+    escribir_tabla_tasas(
+        ruta,
+        [
+            fila_tasa("libre_inversion"),
+            fila_tasa(
+                "cdt", segmento="$100 MM - 499 MM", desde="0.119", hasta="0.119", plazo_dias=360
+            ),
+            fila_tasa(
+                "cdt",
+                segmento="IPC",
+                desde="0.032",
+                hasta="0.032",
+                tipo_tasa="spread_ipc",
+                plazo_dias=360,
+            ),
+        ],
+    )
+    return ruta
+
+
+def test_construir_filas_incluye_las_tasas_del_gold(tmp_path: Path) -> None:
+    """La tabla Gold de tasas entra al Tablero con origen `tasa` y su vigencia."""
+    config = make_config(tmp_path)
+    preparar_gold(config)
+    preparar_tasas(config)
+
+    filas = [fila for fila in construir_filas(config) if fila.origen == "tasa"]
+
+    assert {(fila.concepto, fila.valor, fila.moneda) for fila in filas} == {
+        ("Libre inversión", "20,56–28,17", "%"),
+        ("CDT · De $100 a $499 millones · 360 días (12 meses)", "11,90", "%"),
+        ("CDT · IPC · 360 días (12 meses)", "IPC + 3,20", "puntos"),
+    }
+    libre = next(fila for fila in filas if fila.concepto == "Libre inversión")
+    assert libre.periodicidad == "E.A., vigencia del 1 al 30 de noviembre de 2026"
+    assert libre.vigente_desde == "2026-11-01"
+    assert libre.pagina == "data/gold/tasas/tasas-personas-2026-11.jsonl"
+    assert libre.fuente == URL_TASAS
+
+
+def test_el_tablero_sin_tabla_de_tasas_sigue_funcionando(tmp_path: Path) -> None:
+    """Sin tabla de tasas, el Tablero conserva el tarifario y las tablas web."""
+    config = make_config(tmp_path)
+    preparar_gold(config)
+
+    assert filas_de_tasas(config) == []
+    assert all(fila.origen != "tasa" for fila in construir_filas(config))
+
+
+def test_escribir_tablero_con_tasas_es_idempotente_y_conserva_las_columnas(
+    tmp_path: Path,
+) -> None:
+    """Dos ejecuciones producen el mismo CSV y mantienen las diez columnas."""
+    config = make_config(tmp_path)
+    preparar_gold(config)
+    preparar_tasas(config)
+
+    resumen = escribir_tablero(config)
+    primera = resumen.ruta.read_bytes()
+    escribir_tablero(config)
+    segunda = resumen.ruta.read_bytes()
+
+    assert resumen.por_origen["tasa"] == 3
+    assert primera == segunda
+    with resumen.ruta.open(encoding="utf-8", newline="") as fh:
+        assert tuple(csv.DictReader(fh).fieldnames or ()) == COLUMNAS
+
+
+def test_el_csv_publicado_trae_las_tasas_2026() -> None:
+    """El CSV versionado incluye las 53 tasas de noviembre y sus spreads."""
+    filas = [fila for fila in leer_filas(ARCHIVO_TABLERO) if fila.origen == "tasa"]
+
+    assert len(filas) == 53
+    assert {fila.fuente for fila in filas} == {URL_TASAS}
+    assert {
+        (fila.concepto, fila.valor, fila.moneda)
+        for fila in filas
+        if fila.concepto in {"Libre inversión", "CDT · IPC · 720 días (2 años)"}
+    } == {
+        ("Libre inversión", "20,56–28,17", "%"),
+        ("CDT · IPC · 720 días (2 años)", "IPC + 3,80", "puntos"),
+    }
+    assert all(fila.periodicidad.startswith(("E.A., vigencia", "vigencia")) for fila in filas)
+    with ARCHIVO_TABLERO.open(encoding="utf-8", newline="") as fh:
+        assert tuple(csv.DictReader(fh).fieldnames or ()) == COLUMNAS
+
+
+def test_el_tablero_responde_las_preguntas_de_tasas_sin_modelo() -> None:
+    """Las tres preguntas de tasas se responden con la tabla 2026, sin Bóveda."""
+    filas = leer_filas(ARCHIVO_TABLERO)
+    esperadas = {
+        "¿Cuál es la tasa de libre inversión?": ("Libre inversión", "20,56–28,17"),
+        "¿Cuánto paga un CDT a 360 días por 200 millones?": (
+            "CDT · De $100 a $499 millones · 360 días (12 meses)",
+            "11,90",
+        ),
+        "¿Cuál es la tasa del CDT IPC a 2 años?": (
+            "CDT · IPC · 720 días (2 años)",
+            "IPC + 3,80",
+        ),
+    }
+
+    for pregunta, esperada in esperadas.items():
+        encontradas = filas_de_consulta(filas, pregunta, limite=11)
+        assert esperada in [(fila.concepto, fila.valor) for fila in encontradas], pregunta
+        assert tablero_responde_sin_modelo(filas, pregunta), pregunta
+
+
+@pytest.mark.parametrize(
+    ("pregunta", "banda"),
+    [
+        ("¿Cuánto paga un CDT a 360 días por 200 millones?", "De $100 a $499 millones"),
+        ("¿Cuánto paga un CDT a 360 días por 50 millones?", "De $500 mil a $99 millones"),
+        ("¿Cuánto paga un CDT a 360 días por $5.000.000?", "De $500 mil a $99 millones"),
+        ("¿Cuánto paga un CDT a 360 días por 500 millones?", "De $500 millones a $10.000 millones"),
+    ],
+)
+def test_el_cdt_con_monto_responde_solo_su_banda(pregunta: str, banda: str) -> None:
+    """Con un monto en la pregunta se responde solo la banda que lo contiene."""
+    encontradas = filas_para_plantilla(leer_filas(ARCHIVO_TABLERO), pregunta)
+
+    assert len(encontradas) == 1
+    assert banda in encontradas[0].concepto
+    assert "(12 meses)" in encontradas[0].concepto
+
+
+def test_el_cdt_sin_monto_lista_las_bandas_de_menor_a_mayor() -> None:
+    """Sin monto se listan todas las bandas del plazo, de la más baja a la más alta."""
+    encontradas = filas_para_plantilla(
+        leer_filas(ARCHIVO_TABLERO), "¿Cuál es la tasa de un CDT a 360 días?"
+    )
+
+    assert [fila.concepto for fila in encontradas] == [
+        "CDT · De $500 mil a $99 millones · 360 días (12 meses)",
+        "CDT · De $100 a $499 millones · 360 días (12 meses)",
+        "CDT · De $500 millones a $10.000 millones · 360 días (12 meses)",
+    ]
+    assert [fila.valor for fila in encontradas] == ["11,80", "11,90", "12,00"]
+
+
+def test_las_bandas_del_cdt_se_muestran_con_etiquetas_legibles() -> None:
+    """El Tablero usa etiquetas legibles y Gold conserva el texto del PDF."""
+    conceptos = {fila.concepto for fila in leer_filas(ARCHIVO_TABLERO) if fila.origen == "tasa"}
+    for etiqueta in (
+        "De $500 mil a $99 millones",
+        "De $100 a $499 millones",
+        "De $500 millones a $10.000 millones",
+    ):
+        assert any(etiqueta in concepto for concepto in conceptos), etiqueta
+    assert not any("$100 MM - 499 MM" in concepto for concepto in conceptos)
+
+    gold = (RAIZ / "data/gold/tasas/tasas-personas-2026-11.jsonl").read_text(encoding="utf-8")
+    assert '"segmento": "$500M- $99 MM"' in gold
+    assert '"segmento": "$100 MM - 499 MM"' in gold
+    assert '"segmento": "$500 MM - 10.000 MM"' in gold
+
+
+def test_las_preguntas_de_tasas_llegan_al_turno_t() -> None:
+    """Con las palabras «tasa» e «intereses» del turno T, la pregunta es T."""
+    from banco_occidente_corpus.sucursal.digiturno import (
+        PALABRAS_TARIFAS,
+        ConfiguracionDigiturno,
+        ContadorTurnos,
+        clasificar,
+    )
+
+    configuracion = ConfiguracionDigiturno(
+        palabras_tarifas=(*PALABRAS_TARIFAS, "tasa", "intereses")
+    )
+
+    for pregunta in (
+        "¿Cuál es la tasa de libre inversión?",
+        "¿Cuál es la tasa del CDT IPC a 2 años?",
+    ):
+        turno = clasificar(pregunta, configuracion=configuracion, contador=ContadorTurnos())
+        assert turno.letra == "T", pregunta

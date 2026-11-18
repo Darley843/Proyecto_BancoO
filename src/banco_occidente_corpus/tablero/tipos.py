@@ -23,7 +23,7 @@ COLUMNAS: tuple[str, ...] = (
     "fuente",
 )
 #: Orígenes admitidos de una fila.
-Origen = Literal["tarifario", "tabla_web"]
+Origen = Literal["tarifario", "tabla_web", "tasa"]
 
 
 @dataclass(frozen=True, slots=True)
