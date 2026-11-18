@@ -13,6 +13,7 @@ from ..texto import normalizar
 from ..utils import read_jsonl
 from .tablas_web import extraer_tablas_web
 from .tarifas import extraer_tarifario
+from .tasas import cargar_tabla, filas_tablero, tabla_mas_reciente
 from .tipos import Fila, escribir_filas, ruta_tablero
 
 #: URL del tarifario que alimenta al Tablero.
@@ -44,13 +45,33 @@ class ResumenTablero:
 
 
 def construir_filas(config: Config) -> list[Fila]:
-    """Extrae el tarifario y las tablas web sin hacer red."""
+    """Extrae el tarifario, las tablas web y las tasas sin hacer red."""
     filas: list[Fila] = []
     ruta, fuente = _ruta_tarifario(config)
     texto = ruta.read_text(encoding="utf-8", errors="replace")
     filas.extend(extraer_tarifario(texto, _relativa(config, ruta), fuente))
     filas.extend(extraer_tablas_web(config))
+    filas.extend(filas_de_tasas(config))
     return filas
+
+
+def filas_de_tasas(config: Config) -> list[Fila]:
+    """Convierte la tabla Gold de tasas más reciente en filas del Tablero.
+
+    No hace red ni reescribe Gold: lee `data/gold/tasas/tasas-personas-*.jsonl`
+    y usa la vigencia más reciente. Si todavía no hay tabla, el Tablero sigue
+    funcionando con el tarifario y las tablas web.
+
+    Args:
+        config: configuración con la raíz y la carpeta de Gold del proyecto.
+
+    Returns:
+        Una fila por producto, segmento y plazo, con origen `tasa`.
+    """
+    ruta = tabla_mas_reciente(config.paths.gold / "tasas")
+    if ruta is None:
+        return []
+    return filas_tablero(cargar_tabla(ruta), _relativa(config, ruta))
 
 
 def escribir_tablero(config: Config) -> ResumenTablero:

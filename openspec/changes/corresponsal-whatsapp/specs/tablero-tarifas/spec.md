@@ -28,15 +28,27 @@ Tras el descubrimiento, SHALL respaldar el inventario completo en `data/raw/docu
 
 ### Requirement: Tabla Gold versionada de tasas
 
-La extracción SHALL usar `pypdfium2` y escribir una tabla Gold versionada por vigencia con producto, segmento, tasa E.A. desde y hasta, tasa M.V. desde y hasta, vigencia desde y hasta, URL de la fuente, `sha256` del PDF y fecha de extracción. MUST conservar la vigencia publicada (1–30 de noviembre de 2026 en la versión inicial) y MUST NOT inventar filas ausentes.
+La extracción SHALL usar `pypdfium2` y escribir una tabla Gold versionada por vigencia con producto, segmento, tipo de tasa (`fija`, `spread_ipc` o `spread_ibr`), plazo en días cuando el producto lo publica (CDT), tasa E.A. desde y hasta, tasa M.V. desde y hasta, vigencia desde y hasta, URL de la fuente, `sha256` del PDF y fecha de extracción. MUST conservar la vigencia publicada (1–30 de noviembre de 2026 en la versión inicial) y MUST NOT inventar filas ausentes.
 
 #### Scenario: Tabla versionada en Gold
 - **WHEN** el módulo extrae el PDF
-- **THEN** escribe una tabla Gold identificada por la vigencia, con una fila por producto y segmento, y cada fila incluye los once campos del contrato, la URL, el `sha256` y la fecha de extracción
+- **THEN** escribe una tabla Gold identificada por la vigencia, con una fila por producto, segmento y plazo, y cada fila incluye los trece campos del contrato, la URL, el `sha256` y la fecha de extracción
 
 #### Scenario: Rango de tasa
 - **WHEN** el PDF publica una tasa E.A. desde 18,50 % hasta 24,90 % para un producto
 - **THEN** la fila conserva ambos extremos y la M.V. correspondiente, sin reducirlos a un promedio
+
+#### Scenario: M.V. coherente con la E.A.
+- **WHEN** el PDF publica la M.V. junto a la E.A. de un producto
+- **THEN** la M.V. cumple `(1 + E.A.) ** (1/12) - 1` con tolerancia de 0,01 puntos porcentuales y una fila incoherente no se publica
+
+#### Scenario: CDT por plazo y monto
+- **WHEN** el PDF publica el CDT con plazos y rangos de monto
+- **THEN** cada cruce plazo × monto es una fila con su `plazo_dias` y su tasa impresa, y los plazos sin tasa no se inventan
+
+#### Scenario: Spread no es tasa
+- **WHEN** el PDF publica un CDT indexado a IPC o a IBR
+- **THEN** la fila se marca con `tipo_tasa` `spread_ipc` o `spread_ibr`, no se valida contra la usura ni contra la equivalencia M.V./E.A., no la devuelve una consulta de «la tasa» del producto y se presenta como «IPC + X puntos» o «IBR + X puntos»
 
 #### Scenario: Producto ausente
 - **WHEN** el PDF no publica uno de los productos esperados
