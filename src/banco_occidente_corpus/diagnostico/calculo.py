@@ -22,18 +22,24 @@ que no corresponde. La tasa se lee de `tablero.tasas` y nunca de un spread.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import re
+from dataclasses import dataclass, replace
 from datetime import date
 from decimal import ROUND_HALF_UP, Context, Decimal, localcontext
 from pathlib import Path
 from typing import Literal
 
 from ..tablero.tasas import (
+    BANDAS_MONTO,
+    BandaMonto,
+    FilaTasa,
     TasaFueraDeRango,
     TasaNoDisponible,
-    TasaVigente,
+    banda_de_concepto,
     clave_producto,
-    tasa_vigente,
+    fecha_legible,
+    nombre_producto,
+    plazo_legible,
     tasas_producto,
     vigencia_legible,
 )
@@ -100,8 +106,23 @@ RECOMENDACIONES: dict[str, tuple[str, ...]] = {
 
 
 @dataclass(frozen=True, slots=True)
+class TramoCaptacion:
+    """Plazo o tramo de saldo de una tasa de captación, con su tasa E.A."""
+
+    etiqueta: str
+    ea_desde: Decimal
+    ea_hasta: Decimal
+
+
+@dataclass(frozen=True, slots=True)
 class TasaProducto:
-    """Rango de tasa E.A. de un producto, con su vigencia y su fuente."""
+    """Rango de tasa E.A. de un producto, con su vigencia y su fuente.
+
+    En ahorro y CDT, `ea_desde`–`ea_hasta` es el rango de referencia (el tramo
+    de saldo más bajo o el monto mínimo por plazo), `tramo` nombra ese tramo,
+    `rango_completo_*` conserva la envolvente del producto y `tramos` desagrega
+    el CDT por plazo.
+    """
 
     producto: str
     segmento: str | None
@@ -111,6 +132,10 @@ class TasaProducto:
     vigencia_hasta: date
     fuente: str
     sha256_pdf: str
+    tramo: str | None = None
+    rango_completo_desde: Decimal | None = None
+    rango_completo_hasta: Decimal | None = None
+    tramos: tuple[TramoCaptacion, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -341,7 +366,10 @@ def tasa_de_tablero(
 
     Vivienda usa el segmento «Crédito hipotecario» y libranza el segmento
     «Libre inversión»; el resto de productos usa la envolvente de sus filas
-    fijas. La consulta es offline y conserva vigencia, fuente y `sha256`.
+    fijas. El ahorro devuelve como referencia el tramo de saldo más bajo y el
+    CDT el rango por plazo del monto mínimo, con la envolvente en
+    `rango_completo_*`. La consulta es offline y conserva vigencia, fuente y
+    `sha256`.
 
     Args:
         producto: clave o nombre del producto.
@@ -358,8 +386,10 @@ def tasa_de_tablero(
     clave = clave_producto(producto)
     if clave not in PRODUCTOS_TASAS:
         raise TasaNoDisponible(f"«{producto}» no es un producto del diagnóstico")
-    if clave in {"ahorro", "cdt"}:
-        return _tasa_desde_vigente(tasa_vigente(clave, fecha, raiz=raiz))
+    if clave == "ahorro":
+        return _tasa_ahorro(fecha, raiz)
+    if clave == "cdt":
+        return _tasa_cdt(fecha, raiz)
 
     filas = tasas_producto(clave, fecha, raiz=raiz)
     segmento = SEGMENTOS.get(clave)
@@ -384,11 +414,187 @@ def tasa_de_tablero(
     )
 
 
+def _tasa_ahorro(fecha: date | None, raiz: Path | None) -> TasaProducto:
+    """Toma el tramo de saldo más bajo como referencia y conserva la envolvente.
+
+    Args:
+        fecha: fecha de la vigencia consultada.
+        raiz: carpeta de tablas Gold alternativa.
+
+    Returns:
+        La tasa del tramo más bajo, con la etiqueta del tramo y el rango
+        completo por saldo.
+
+    Raises:
+        TasaNoDisponible: si no hay tasa de ahorro publicada.
+        TasaFueraDeRango: si alguna tasa no es un decimal válido.
+    """
+    filas = tasas_producto("ahorro", fecha, raiz=raiz)
+    completa_desde, completa_hasta = _envolvente("ahorro", filas)
+    referencia = min(filas, key=lambda fila: (_inicio_tramo(fila.segmento), fila.segmento or ""))
+    desde, hasta = _rango_valido("ahorro", referencia.tasa_ea_desde, referencia.tasa_ea_hasta)
+    return TasaProducto(
+        producto="ahorro",
+        segmento=referencia.segmento,
+        ea_desde=desde,
+        ea_hasta=hasta,
+        vigencia_desde=min(fila.vigencia_desde for fila in filas),
+        vigencia_hasta=max(fila.vigencia_hasta for fila in filas),
+        fuente=referencia.fuente,
+        sha256_pdf=referencia.sha256_pdf,
+        tramo=referencia.segmento,
+        rango_completo_desde=completa_desde,
+        rango_completo_hasta=completa_hasta,
+    )
+
+
+def _tasa_cdt(fecha: date | None, raiz: Path | None) -> TasaProducto:
+    """Toma el monto mínimo del CDT y devuelve su rango por plazo.
+
+    Así la referencia no es el máximo de la envolvente (12,15 % E.A.), sino lo
+    que paga el CDT de menor monto según el plazo; el rango completo del
+    producto queda en `rango_completo_*` como dato adicional.
+
+    Args:
+        fecha: fecha de la vigencia consultada.
+        raiz: carpeta de tablas Gold alternativa.
+
+    Returns:
+        El rango por plazo del monto mínimo, con el detalle de cada plazo.
+
+    Raises:
+        TasaNoDisponible: si no hay tasa de CDT publicada.
+        TasaFueraDeRango: si alguna tasa no es un decimal válido.
+    """
+    filas = tasas_producto("cdt", fecha, raiz=raiz)
+    completa_desde, completa_hasta = _envolvente("cdt", filas)
+    banda, referidas = _banda_minima(filas)
+    tramos = _tramos_por_plazo(referidas)
+    if tramos:
+        desde = min(tramo.ea_desde for tramo in tramos)
+        hasta = max(tramo.ea_hasta for tramo in tramos)
+    else:
+        desde = min(fila.tasa_ea_desde for fila in referidas)
+        hasta = max(fila.tasa_ea_hasta for fila in referidas)
+    desde, hasta = _rango_valido("cdt", desde, hasta)
+    return TasaProducto(
+        producto="cdt",
+        segmento=banda.etiqueta if banda is not None else None,
+        ea_desde=desde,
+        ea_hasta=hasta,
+        vigencia_desde=min(fila.vigencia_desde for fila in filas),
+        vigencia_hasta=max(fila.vigencia_hasta for fila in filas),
+        fuente=referidas[0].fuente,
+        sha256_pdf=referidas[0].sha256_pdf,
+        tramo=banda.etiqueta if banda is not None else None,
+        rango_completo_desde=completa_desde,
+        rango_completo_hasta=completa_hasta,
+        tramos=tramos,
+    )
+
+
+def _banda_minima(filas: list[FilaTasa]) -> tuple[BandaMonto | None, list[FilaTasa]]:
+    """Busca la banda de monto más baja del CDT y sus filas.
+
+    Args:
+        filas: tasas fijas del CDT en la vigencia elegida.
+
+    Returns:
+        La banda de monto más baja con sus filas, o `(None, filas)` si ninguna
+        fila nombra una banda conocida.
+    """
+    for banda in BANDAS_MONTO:
+        coinciden = [fila for fila in filas if banda_de_concepto(fila.segmento or "") is banda]
+        if coinciden:
+            return banda, coinciden
+    return None, filas
+
+
+def _tramos_por_plazo(filas: list[FilaTasa]) -> tuple[TramoCaptacion, ...]:
+    """Agrupa las filas del CDT por plazo y arma su rango de tasa.
+
+    Args:
+        filas: filas del CDT de la banda de monto elegida.
+
+    Returns:
+        Un tramo por plazo, de menor a mayor, con su etiqueta legible.
+    """
+    por_plazo: dict[int, list[FilaTasa]] = {}
+    for fila in filas:
+        if fila.plazo_dias is not None:
+            por_plazo.setdefault(fila.plazo_dias, []).append(fila)
+    return tuple(
+        TramoCaptacion(
+            etiqueta=plazo_legible(plazo),
+            ea_desde=min(fila.tasa_ea_desde for fila in por_plazo[plazo]),
+            ea_hasta=max(fila.tasa_ea_hasta for fila in por_plazo[plazo]),
+        )
+        for plazo in sorted(por_plazo)
+    )
+
+
+def _envolvente(producto: str, filas: list[FilaTasa]) -> tuple[Decimal, Decimal]:
+    """Devuelve y valida la envolvente E.A. de las filas de un producto.
+
+    Args:
+        producto: clave del producto, para el mensaje de error.
+        filas: filas de tasa del producto.
+
+    Returns:
+        El `desde` más bajo y el `hasta` más alto.
+
+    Raises:
+        TasaFueraDeRango: si la envolvente no es un decimal entre 0 y 1.
+    """
+    desde = min(fila.tasa_ea_desde for fila in filas)
+    hasta = max(fila.tasa_ea_hasta for fila in filas)
+    return _rango_valido(producto, desde, hasta)
+
+
+def _rango_valido(producto: str, desde: Decimal, hasta: Decimal) -> tuple[Decimal, Decimal]:
+    """Comprueba que un rango E.A. sea un decimal válido entre 0 y 1.
+
+    Args:
+        producto: clave del producto, para el mensaje de error.
+        desde: extremo inferior del rango.
+        hasta: extremo superior del rango.
+
+    Returns:
+        El mismo rango, ya validado.
+
+    Raises:
+        TasaFueraDeRango: si el rango se sale de 0–1 o está invertido.
+    """
+    if not Decimal(0) <= desde <= hasta <= Decimal(1):
+        raise TasaFueraDeRango(f"{producto}: el rango E.A. queda en {desde}–{hasta}")
+    return desde, hasta
+
+
+#: Primera cifra de un tramo de saldo, como «De 0» o «De $5.000.001».
+_RE_CIFRA = re.compile(r"\d[\d.]*")
+
+
+def _inicio_tramo(segmento: str | None) -> Decimal:
+    """Lee el extremo inferior de un tramo de saldo para ordenarlo.
+
+    Args:
+        segmento: texto publicado del tramo, como «De $5.000.001 a $20.000.000».
+
+    Returns:
+        El monto inicial en pesos; 0 si el texto no trae cifras.
+    """
+    encontrado = _RE_CIFRA.search(segmento or "")
+    if encontrado is None:
+        return Decimal(0)
+    return Decimal(encontrado.group(0).replace(".", ""))
+
+
 def calcular(
     entrada: EntradaCalculo,
     *,
     tasa: TasaProducto | None = None,
     fecha: date | None = None,
+    hoy: date | None = None,
     raiz: Path | None = None,
     verde_hasta: Decimal = UMBRAL_VERDE,
     amarillo_hasta: Decimal = UMBRAL_AMARILLO,
@@ -404,6 +610,8 @@ def calcular(
         entrada: insumos normalizados del diagnóstico.
         tasa: rango ya resuelto; si falta, se lee del Tablero.
         fecha: fecha de la vigencia consultada.
+        hoy: fecha con la que se comprueba la vigencia de la tasa; por defecto
+            la de hoy.
         raiz: carpeta de tablas Gold alternativa.
         verde_hasta: umbral verde de la razón de endeudamiento.
         amarillo_hasta: umbral amarillo de la razón de endeudamiento.
@@ -424,6 +632,7 @@ def calcular(
         return evaluar(
             entrada,
             tasas_captacion=captacion,
+            hoy=hoy,
             verde_hasta=verde_hasta,
             amarillo_hasta=amarillo_hasta,
             umbral_vivienda=umbral_vivienda,
@@ -438,6 +647,7 @@ def calcular(
         return evaluar(
             entrada,
             tasa,
+            hoy=hoy,
             verde_hasta=verde_hasta,
             amarillo_hasta=amarillo_hasta,
             umbral_vivienda=umbral_vivienda,
@@ -446,6 +656,7 @@ def calcular(
     return evaluar(
         entrada,
         rango,
+        hoy=hoy,
         verde_hasta=verde_hasta,
         amarillo_hasta=amarillo_hasta,
         umbral_vivienda=umbral_vivienda,
@@ -457,6 +668,7 @@ def evaluar(
     tasa: TasaProducto | None = None,
     *,
     tasas_captacion: tuple[TasaProducto, ...] = (),
+    hoy: date | None = None,
     verde_hasta: Decimal = UMBRAL_VERDE,
     amarillo_hasta: Decimal = UMBRAL_AMARILLO,
     umbral_vivienda: Decimal = UMBRAL_VIVIENDA,
@@ -467,12 +679,15 @@ def evaluar(
         entrada: insumos normalizados del diagnóstico.
         tasa: rango de tasa del producto; obligatorio si hay que simular.
         tasas_captacion: tasas de ahorro y CDT para el producto `ahorro`.
+        hoy: fecha con la que se comprueba la vigencia de la tasa; por defecto
+            la de hoy.
         verde_hasta: umbral verde de la razón de endeudamiento.
         amarillo_hasta: umbral amarillo de la razón de endeudamiento.
         umbral_vivienda: porcentaje máximo de la cuota sobre el ingreso.
 
     Returns:
-        El resultado determinista del diagnóstico.
+        El resultado determinista del diagnóstico, con la alerta
+        `vigencia_vencida` si la tasa consultada ya no cubre la fecha de hoy.
 
     Raises:
         ValueError: si la entrada no cumple el contrato o falta la tasa.
@@ -487,20 +702,65 @@ def evaluar(
         entrada.cuota_trasladar or Decimal(0),
     )
     if clave == "ahorro":
-        return _resultado_ahorro(entrada, capacidad, tasas_captacion)
-    if capacidad < 0:
-        return _resultado_capacidad_negativa(entrada, capacidad, tasa)
-    if clave == "libranza" and entrada.vinculacion == "independiente":
-        return _resultado_libranza_no_disponible(entrada, capacidad, tasa)
-    if tasa is None:
-        raise ValueError("falta la tasa del Tablero para simular el crédito")
-    return _resultado_credito(
-        entrada,
-        tasa,
-        capacidad,
-        verde_hasta=verde_hasta,
-        amarillo_hasta=amarillo_hasta,
-        umbral_vivienda=umbral_vivienda,
+        resultado = _resultado_ahorro(entrada, capacidad, tasas_captacion)
+    elif capacidad < 0:
+        resultado = _resultado_capacidad_negativa(entrada, capacidad, tasa)
+    elif clave == "libranza" and entrada.vinculacion == "independiente":
+        resultado = _resultado_libranza_no_disponible(entrada, capacidad, tasa)
+    else:
+        if tasa is None:
+            raise ValueError("falta la tasa del Tablero para simular el crédito")
+        resultado = _resultado_credito(
+            entrada,
+            tasa,
+            capacidad,
+            verde_hasta=verde_hasta,
+            amarillo_hasta=amarillo_hasta,
+            umbral_vivienda=umbral_vivienda,
+        )
+    return _con_vigencia(resultado, hoy)
+
+
+def _con_vigencia(resultado: ResultadoCalculo, hoy: date | None) -> ResultadoCalculo:
+    """Añade la alerta y el motivo cuando la tasa no cubre la fecha de hoy.
+
+    Args:
+        resultado: resultado del cálculo con sus tasas.
+        hoy: fecha de contraste; por defecto la de hoy.
+
+    Returns:
+        El mismo resultado, con `vigencia_vencida` en las alertas y un motivo
+        por cada tasa cuya vigencia no incluye la fecha.
+    """
+    fecha = hoy if hoy is not None else date.today()
+    tasas = resultado.tasas_captacion if resultado.producto == "ahorro" else (resultado.tasa,)
+    vencidas = [
+        tasa
+        for tasa in tasas
+        if tasa is not None and not tasa.vigencia_desde <= fecha <= tasa.vigencia_hasta
+    ]
+    if not vencidas:
+        return resultado
+    alertas = (*resultado.alertas, "vigencia_vencida")
+    motivos = (*resultado.motivos, *(_motivo_vigencia(tasa, fecha) for tasa in vencidas))
+    return replace(resultado, alertas=alertas, motivos=motivos)
+
+
+def _motivo_vigencia(tasa: TasaProducto, hoy: date) -> str:
+    """Explica en texto que la vigencia de una tasa no incluye la fecha de hoy.
+
+    Args:
+        tasa: tasa cuya vigencia se comprobó.
+        hoy: fecha de contraste.
+
+    Returns:
+        El motivo, con la vigencia publicada y la fecha consultada.
+    """
+    nombre = "CDT" if tasa.producto == "cdt" else nombre_producto(tasa.producto).casefold()
+    vigencia = vigencia_legible(tasa.vigencia_desde, tasa.vigencia_hasta)
+    return (
+        f"La vigencia de la tasa de {nombre} ({vigencia}) no incluye la fecha de "
+        f"hoy ({fecha_legible(hoy)}): confírmala antes de usarla."
     )
 
 
@@ -610,16 +870,39 @@ def _resultado_ahorro(
     capacidad: Decimal,
     tasas_captacion: tuple[TasaProducto, ...],
 ) -> ResultadoCalculo:
-    """Informa la capacidad de ahorro y las tasas de captación, sin semáforo."""
+    """Informa la capacidad de ahorro y las tasas de captación, sin semáforo.
+
+    Con capacidad de ahorro nula o negativa la recomendación es revisar los
+    gastos fijos antes de ahorrar, y no automatizar un ahorro que no cabe en el
+    presupuesto.
+    """
     motivos = ["El ahorro no tiene semáforo de crédito: se informa la capacidad mensual."]
     if capacidad < 0:
         motivos.append("Los gastos y las cuotas superan el ingreso: no hay capacidad de ahorro.")
-    recomendaciones = [
-        "Con tu capacidad de ahorro puedes revisar las tasas de ahorro y CDT del Tablero.",
-        "Define una meta y automatiza el ahorro apenas recibas tus ingresos.",
-    ]
+        recomendaciones = [
+            "Revisa tus gastos fijos: primero hay que liberar margen en el presupuesto.",
+            "Reduce o renegocia las cuotas que más pesan en tus gastos mensuales.",
+            "Cuando el presupuesto deje margen, define una meta de ahorro.",
+        ]
+    elif capacidad == 0:
+        motivos.append(
+            "Los gastos y las cuotas consumen todo el ingreso: no queda margen para ahorrar."
+        )
+        recomendaciones = [
+            "Revisa tus gastos fijos: es el primer paso antes de empezar a ahorrar.",
+            "Identifica los gastos que puedes reducir o renegociar este mes.",
+            "Cuando liberes margen, vuelve a revisar las tasas de ahorro y CDT.",
+        ]
+    else:
+        recomendaciones = [
+            "Con tu capacidad de ahorro puedes revisar las tasas de ahorro y CDT del Tablero.",
+            "Define una meta y automatiza el ahorro apenas recibas tus ingresos.",
+        ]
     if not tasas_captacion:
         motivos.append("No hay tasas de ahorro o CDT disponibles en el Tablero.")
+    motivos.extend(
+        motivo for tasa in tasas_captacion if (motivo := _motivo_captacion(tasa)) is not None
+    )
     primera = tasas_captacion[0] if tasas_captacion else None
     return ResultadoCalculo(
         producto="ahorro",
@@ -646,6 +929,55 @@ def _resultado_ahorro(
         tasas_captacion=tasas_captacion,
         aviso=_aviso(primera),
     )
+
+
+def _motivo_captacion(tasa: TasaProducto) -> str | None:
+    """Explica en texto la referencia y el rango completo de una tasa de captación.
+
+    Args:
+        tasa: tasa de ahorro o CDT leída del Tablero.
+
+    Returns:
+        El motivo con el tramo de referencia y el rango completo, o None si la
+        tasa no trae ese detalle.
+    """
+    completa = _rango_texto(tasa.rango_completo_desde, tasa.rango_completo_hasta)
+    if tasa.producto == "ahorro":
+        if tasa.tramo is None or completa is None:
+            return None
+        return (
+            f"La tasa de ahorro de referencia es la del tramo «{tasa.tramo}»: "
+            f"{_rango_texto(tasa.ea_desde, tasa.ea_hasta)} E.A. El rango completo "
+            f"por saldo va de {completa} E.A."
+        )
+    if not tasa.tramos:
+        return None
+    primero, ultimo = tasa.tramos[0], tasa.tramos[-1]
+    tramo = f"«{tasa.tramo}»" if tasa.tramo is not None else "de menor monto"
+    return (
+        f"El CDT depende del plazo y del monto: para el tramo {tramo} la tasa va "
+        f"de {_rango_texto(tasa.ea_desde, tasa.ea_hasta)} E.A. entre "
+        f"{primero.etiqueta} y {ultimo.etiqueta}. El rango completo del producto "
+        f"es {completa} E.A. según el monto."
+    )
+
+
+def _rango_texto(desde: Decimal | None, hasta: Decimal | None) -> str | None:
+    """Escribe un rango de tasas como «0,05 % a 12,05 %».
+
+    Args:
+        desde: extremo inferior de la tasa.
+        hasta: extremo superior de la tasa.
+
+    Returns:
+        El rango en texto, la cifra sola si los extremos coinciden, o None si
+        falta alguno de los extremos.
+    """
+    if desde is None or hasta is None:
+        return None
+    if desde == hasta:
+        return _porcentaje(desde)
+    return f"{_porcentaje(desde)} a {_porcentaje(hasta)}"
 
 
 def _resultado_capacidad_negativa(
@@ -725,20 +1057,6 @@ def _resultado_libranza_no_disponible(
         ),
         tasas_captacion=(),
         aviso=_aviso(tasa),
-    )
-
-
-def _tasa_desde_vigente(vigente: TasaVigente) -> TasaProducto:
-    """Convierte la envolvente de `tasa_vigente` en el rango interno."""
-    return TasaProducto(
-        producto=vigente.producto,
-        segmento=vigente.segmento,
-        ea_desde=vigente.tasa_ea_desde,
-        ea_hasta=vigente.tasa_ea_hasta,
-        vigencia_desde=vigente.vigencia_desde,
-        vigencia_hasta=vigente.vigencia_hasta,
-        fuente=vigente.fuente,
-        sha256_pdf=vigente.sha256_pdf,
     )
 
 

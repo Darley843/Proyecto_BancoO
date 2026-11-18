@@ -24,6 +24,8 @@ from banco_occidente_corpus.canal.contratos import (
     RangoDecimal,
     RespuestaCanal,
     ResultadoDiagnostico,
+    TasaCaptacion,
+    TramoTasa,
 )
 
 AHORA = datetime(2026, 11, 16, 12, 0, tzinfo=UTC)
@@ -305,11 +307,44 @@ def test_resultado_de_ahorro_no_tiene_semaforo_ni_cuota() -> None:
 
 def test_alertas_solo_admiten_los_motivos_conocidos() -> None:
     """Las alertas son un conjunto cerrado y se guardan como lista."""
-    resultado = _resultado(alertas=["capacidad_negativa", "libranza_no_aplica"])
+    resultado = _resultado(alertas=["capacidad_negativa", "vigencia_vencida"])
 
-    assert resultado.alertas == ["capacidad_negativa", "libranza_no_aplica"]
+    assert resultado.alertas == ["capacidad_negativa", "vigencia_vencida"]
     with pytest.raises(ValidationError):
         _resultado(alertas=["otra_cosa"])
+
+
+def test_tasa_captacion_separa_la_referencia_del_rango_completo() -> None:
+    """El CDT lleva la referencia del monto mínimo y el detalle por plazo."""
+    tasa = TasaCaptacion(
+        producto="cdt",
+        tasa_ea=RangoDecimal(desde=Decimal("0.0005"), hasta=Decimal("0.1205")),
+        referencia="De $500 mil a $99 millones",
+        rango_completo=RangoDecimal(desde=Decimal("0.0005"), hasta=Decimal("0.1215")),
+        tramos=[
+            TramoTasa(
+                etiqueta="30 días (1 mes)",
+                tasa_ea=RangoDecimal(desde=Decimal("0.0005"), hasta=Decimal("0.0005")),
+            )
+        ],
+        vigencia_desde=date(2026, 11, 1),
+        vigencia_hasta=date(2026, 11, 30),
+        fuente="https://www.bancodeoccidente.com.co/tasas",
+    )
+
+    assert tasa.referencia == "De $500 mil a $99 millones"
+    assert tasa.rango_completo is not None
+    assert tasa.rango_completo.hasta == Decimal("0.1215")
+    assert tasa.tramos[0].etiqueta == "30 días (1 mes)"
+
+
+def test_tasa_captacion_rechaza_un_tramo_sin_etiqueta() -> None:
+    """El tramo siempre se puede nombrar en el texto."""
+    with pytest.raises(ValidationError):
+        TramoTasa(
+            etiqueta="",
+            tasa_ea=RangoDecimal(desde=Decimal("0.01"), hasta=Decimal("0.01")),
+        )
 
 
 def test_caso_asesor_nace_pendiente_y_sin_resultado() -> None:

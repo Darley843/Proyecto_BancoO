@@ -31,7 +31,12 @@ ProductoDiagnostico = Literal[
 #: Formas válidas de recibir ingresos en la entrevista.
 Vinculacion = Literal["empleado", "independiente", "pensionado"]
 #: Motivos estructurados que acompañan a un resultado sin cuota de crédito.
-AlertaDiagnostico = Literal["vivienda_30", "libranza_no_aplica", "capacidad_negativa"]
+AlertaDiagnostico = Literal[
+    "vivienda_30",
+    "libranza_no_aplica",
+    "capacidad_negativa",
+    "vigencia_vencida",
+]
 #: Color del semáforo; ``None`` significa que el producto no tiene semáforo.
 SemaforoDiagnostico = Literal["verde", "amarillo", "rojo"]
 
@@ -136,13 +141,32 @@ class EntradaDiagnostico(BaseModel):
         return self
 
 
+class TramoTasa(BaseModel):
+    """Un plazo o un tramo de saldo con su propia tasa E.A."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    etiqueta: str = Field(min_length=1)
+    tasa_ea: RangoDecimal
+
+
 class TasaCaptacion(BaseModel):
-    """Tasa de ahorro o CDT vigente que acompaña a un resultado de ahorro."""
+    """Tasa de ahorro o CDT vigente que acompaña a un resultado de ahorro.
+
+    ``tasa_ea`` es la referencia que se muestra primero: en ahorro, el tramo de
+    saldo más bajo, y en CDT, el rango por plazo del monto mínimo. ``referencia``
+    nombra ese tramo y ``rango_completo`` conserva la envolvente del producto
+    como dato adicional. En el CDT, ``tramos`` desagrega la tasa por plazo para
+    que la respuesta no presente un solo porcentaje como «la tasa».
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     producto: Literal["ahorro", "cdt"]
     tasa_ea: RangoDecimal
+    referencia: str | None = None
+    rango_completo: RangoDecimal | None = None
+    tramos: list[TramoTasa] = Field(default_factory=list, max_length=16)
     vigencia_desde: date
     vigencia_hasta: date
     fuente: str

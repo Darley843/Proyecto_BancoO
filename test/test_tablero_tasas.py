@@ -33,6 +33,7 @@ from banco_occidente_corpus.tablero.tasas import (
     es_spread,
     escribir_tabla,
     etiqueta_banda,
+    fecha_legible,
     filas_desde_texto,
     leer_tabla,
     montos_en_texto,
@@ -748,3 +749,9 @@ def test_las_bandas_se_muestran_con_etiquetas_legibles() -> None:
     assert etiqueta_banda("$100 MM - 499 MM") == "De $100 a $499 millones"
     assert etiqueta_banda("$500 MM - 10.000 MM") == "De $500 millones a $10.000 millones"
     assert etiqueta_banda("De 0 a $5.000.000") == "De 0 a $5.000.000"
+
+
+def test_la_fecha_se_escribe_en_espanol() -> None:
+    """La alerta de vigencia nombra el día y el mes, no la fecha ISO."""
+    assert fecha_legible(date(2026, 11, 18)) == "18 de noviembre de 2026"
+    assert fecha_legible(date(2026, 11, 4)) == "4 de noviembre de 2026"

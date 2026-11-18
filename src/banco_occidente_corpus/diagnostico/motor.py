@@ -33,6 +33,9 @@ from ..canal.contratos import (
     ResultadoDiagnostico,
     TasaCaptacion,
 )
+from ..canal.contratos import (
+    TramoTasa as TramoTasaContrato,
+)
 from ..config import PROJECT_ROOT
 from .calculo import (
     PRODUCTOS_DIAGNOSTICO,
@@ -197,6 +200,7 @@ def calcular(
     entrada: EntradaDiagnostico,
     *,
     fecha: date | None = None,
+    hoy: date | None = None,
     raiz: Path | None = None,
     config: ConfigDiagnostico | None = None,
 ) -> ResultadoDiagnostico:
@@ -205,6 +209,9 @@ def calcular(
     Args:
         entrada: insumos ya validados por `EntradaDiagnostico`.
         fecha: vigencia de la tasa consultada; por defecto la más reciente.
+        hoy: fecha con la que se comprueba la vigencia de la tasa; por defecto
+            la de hoy. Si la vigencia no la incluye, la alerta es
+            `vigencia_vencida`.
         raiz: carpeta de tablas Gold alternativa; por defecto la del Tablero.
         config: umbrales ya cargados; por defecto se leen del TOML.
 
@@ -230,6 +237,7 @@ def calcular(
             cuota_trasladar=entrada.cuota_trasladar,
         ),
         fecha=fecha,
+        hoy=hoy,
         raiz=raiz,
         verde_hasta=ajustes.verde_hasta,
         amarillo_hasta=ajustes.amarillo_hasta,
@@ -315,14 +323,23 @@ def _captacion(tasa: TasaProducto) -> TasaCaptacion:
         tasa: tasa de captación del motor de cálculo.
 
     Returns:
-        La tasa de captación con su vigencia y su fuente.
+        La tasa de captación con su tramo de referencia, el rango completo, el
+        detalle por plazo, su vigencia y su fuente.
     """
     producto = cast(Literal["ahorro", "cdt"], tasa.producto)
     rango = _rango(tasa.ea_desde, tasa.ea_hasta)
     assert rango is not None
+    tramos: list[TramoTasaContrato] = []
+    for tramo in tasa.tramos:
+        rango_tramo = _rango(tramo.ea_desde, tramo.ea_hasta)
+        if rango_tramo is not None:
+            tramos.append(TramoTasaContrato(etiqueta=tramo.etiqueta, tasa_ea=rango_tramo))
     return TasaCaptacion(
         producto=producto,
         tasa_ea=rango,
+        referencia=tasa.tramo,
+        rango_completo=_rango(tasa.rango_completo_desde, tasa.rango_completo_hasta),
+        tramos=tramos,
         vigencia_desde=tasa.vigencia_desde,
         vigencia_hasta=tasa.vigencia_hasta,
         fuente=tasa.fuente,

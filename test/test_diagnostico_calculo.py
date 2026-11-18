@@ -82,8 +82,12 @@ def raiz_tasas(tmp_path: Path) -> Path:
         _fila("libranza", "0.1430", "0.2300", segmento="Retanqueo"),
         _fila("vivienda", "0.1517", "0.1854", segmento="Crédito hipotecario"),
         _fila("vivienda", "0.1452", "0.1819", segmento="Leasing habitacional"),
-        _fila("ahorro", "0.0010", "0.0010", segmento="De 0 a $5.000.000"),
+        _fila("ahorro", "0.0001", "0.0001", segmento="De 0 a $5.000.000"),
+        _fila("ahorro", "0.0010", "0.0010", segmento="De $100.000.001 a $3.000.000.000"),
+        _fila("cdt", "0.0005", "0.0005", segmento="$500M- $99 MM", plazo_dias=30),
         _fila("cdt", "0.1100", "0.1100", segmento="$500M- $99 MM", plazo_dias=90),
+        _fila("cdt", "0.1205", "0.1205", segmento="$500M- $99 MM", plazo_dias=1080),
+        _fila("cdt", "0.1215", "0.1215", segmento="$500 MM - 10.000 MM", plazo_dias=1080),
         _fila(
             "cdt",
             "0.9999",
@@ -235,7 +239,37 @@ def test_tasa_de_tablero_filtra_segmentos(raiz_tasas: Path) -> None:
 def test_tasa_de_tablero_excluye_spreads(raiz_tasas: Path) -> None:
     """Un spread IPC no se presenta como tasa del producto."""
     cdt = tasa_de_tablero("cdt", raiz=raiz_tasas)
-    assert cdt.ea_hasta == Decimal("0.1100")
+    assert cdt.ea_hasta == Decimal("0.1205")
+    assert all(tramo.ea_hasta < Decimal("0.5") for tramo in cdt.tramos)
+
+
+def test_tasa_de_tablero_ahorro_usa_el_tramo_de_saldo_mas_bajo(raiz_tasas: Path) -> None:
+    """La referencia del ahorro es el tramo más bajo, no el máximo del producto."""
+    tasa = tasa_de_tablero("ahorro", raiz=raiz_tasas)
+
+    assert tasa.tramo == "De 0 a $5.000.000"
+    assert (tasa.ea_desde, tasa.ea_hasta) == (Decimal("0.0001"), Decimal("0.0001"))
+    assert (tasa.rango_completo_desde, tasa.rango_completo_hasta) == (
+        Decimal("0.0001"),
+        Decimal("0.0010"),
+    )
+
+
+def test_tasa_de_tablero_cdt_rango_por_plazo_del_monto_minimo(raiz_tasas: Path) -> None:
+    """El CDT se informa por plazo para el monto mínimo, con la envolvente aparte."""
+    tasa = tasa_de_tablero("cdt", raiz=raiz_tasas)
+
+    assert tasa.tramo == "De $500 mil a $99 millones"
+    assert (tasa.ea_desde, tasa.ea_hasta) == (Decimal("0.0005"), Decimal("0.1205"))
+    assert [tramo.etiqueta for tramo in tasa.tramos] == [
+        "30 días (1 mes)",
+        "90 días (3 meses)",
+        "1080 días (3 años)",
+    ]
+    assert (tasa.rango_completo_desde, tasa.rango_completo_hasta) == (
+        Decimal("0.0005"),
+        Decimal("0.1215"),
+    )
 
 
 def test_tasa_de_tablero_sin_producto(tmp_path: Path) -> None:
@@ -260,6 +294,15 @@ def test_laura_verde_con_cuota_en_rango(raiz_tasas: Path) -> None:
     assert resultado.tasa.fuente == FUENTE
     assert "orientativo" in resultado.aviso
     assert "No es una aprobación" in resultado.aviso
+
+
+def test_vigencia_vencida_en_credito_tambien_alerta(raiz_tasas: Path) -> None:
+    """Una tasa de crédito vencida también se marca y se explica en el motivo."""
+    resultado = calcular(_laura(), raiz=raiz_tasas, hoy=date(2026, 12, 1))
+
+    assert "vigencia_vencida" in resultado.alertas
+    assert any("tasa de libre inversión" in motivo for motivo in resultado.motivos)
+    assert any("no incluye la fecha de hoy" in motivo for motivo in resultado.motivos)
 
 
 def test_andres_rojo_porque_la_cuota_supera_la_capacidad(raiz_tasas: Path) -> None:
@@ -314,12 +357,46 @@ def test_ahorro_sin_semaforo_y_con_capacidad(raiz_tasas: Path) -> None:
         cuotas_deudas=Decimal(0),
         vinculacion="empleado",
     )
-    resultado = calcular(entrada, raiz=raiz_tasas)
+    resultado = calcular(entrada, raiz=raiz_tasas, hoy=date(2026, 11, 16))
     assert resultado.semaforo is None
     assert resultado.capacidad_ahorro == Decimal("500000.00")
     assert resultado.margen_despues_cuota is None
     assert resultado.cuota_max is None
     assert {tasa.producto for tasa in resultado.tasas_captacion} == {"ahorro", "cdt"}
+    assert any("tramo «De 0 a $5.000.000»" in motivo for motivo in resultado.motivos)
+    assert any("CDT depende del plazo y del monto" in motivo for motivo in resultado.motivos)
+
+
+def test_ahorro_sin_capacidad_orienta_a_revisar_los_gastos_fijos(raiz_tasas: Path) -> None:
+    """Con capacidad cero no se recomienda ahorrar: se revisan los gastos fijos."""
+    entrada = EntradaCalculo(
+        producto="ahorro",
+        ingreso_mensual=Decimal(2_000_000),
+        gastos_mensuales=Decimal(2_000_000),
+        cuotas_deudas=Decimal(0),
+        vinculacion="empleado",
+    )
+    resultado = calcular(entrada, raiz=raiz_tasas, hoy=date(2026, 11, 16))
+
+    assert resultado.capacidad_ahorro == Decimal(0)
+    assert any("gastos fijos" in recomendacion for recomendacion in resultado.recomendaciones)
+    assert all("automatiza" not in recomendacion for recomendacion in resultado.recomendaciones)
+
+
+def test_vigencia_vencida_agrega_alerta_y_motivo(raiz_tasas: Path) -> None:
+    """Si la vigencia no cubre la fecha de hoy, el resultado lo advierte."""
+    entrada = EntradaCalculo(
+        producto="ahorro",
+        ingreso_mensual=Decimal(2_000_000),
+        gastos_mensuales=Decimal(1_500_000),
+        cuotas_deudas=Decimal(0),
+        vinculacion="empleado",
+    )
+    resultado = calcular(entrada, raiz=raiz_tasas, hoy=date(2026, 12, 1))
+
+    assert resultado.alertas == ("vigencia_vencida",)
+    assert any("no incluye la fecha de hoy" in motivo for motivo in resultado.motivos)
+    assert any("del 1 al 30 de noviembre de 2026" in motivo for motivo in resultado.motivos)
 
 
 def test_compra_de_cartera_informa_ahorro_mensual(raiz_tasas: Path) -> None:

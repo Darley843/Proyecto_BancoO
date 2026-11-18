@@ -145,9 +145,22 @@ Reglas adicionales:
   ahorro mensual estimado `cuota_trasladar − cuota_nueva`; si es negativo, se
   dice que el traslado no reduce la cuota con ese plazo.
 - **Ahorro:** no hay semáforo de crédito. Se informa la capacidad de ahorro
-  mensual (`capacidad`) y las tasas vigentes de ahorro y CDT del Tablero.
+  mensual (`capacidad`) y las tasas vigentes de ahorro y CDT del Tablero. La
+  tasa de ahorro se presenta con el **tramo de saldo más bajo** (por ejemplo,
+  «De 0 a $5.000.000») como referencia para quien empieza, y la envolvente del
+  producto queda en `rango_completo` como dato adicional. El CDT no se resume en
+  un solo porcentaje: `tasa_ea` es el rango por plazo del **monto mínimo** (por
+  ejemplo, «De $500 mil a $99 millones»), `tramos` detalla cada plazo y
+  `rango_completo` conserva la envolvente. El motivo explica que la tasa depende
+  del plazo y del monto.
 - **Capacidad negativa** (gastos + cuotas actuales > ingresos): rojo sin
-  simular crédito, con recomendación de ordenar gastos y deudas primero.
+  simular crédito, con recomendación de ordenar gastos y deudas primero. Con
+  capacidad **cero** la recomendación del ahorro es revisar los gastos fijos, no
+  automatizar un ahorro que no cabe en el presupuesto.
+- **Vigencia:** si la vigencia de la tasa consultada no incluye la fecha de hoy
+  (por ejemplo, la de ahorro del 4 al 9 de noviembre de 2026), el resultado
+  agrega la alerta `vigencia_vencida` y un motivo que cita la vigencia publicada
+  y la fecha de la consulta. La tasa se informa igual, con la advertencia.
 
 ## Representación en `ResultadoDiagnostico`
 
@@ -161,6 +174,11 @@ cuota. El motor lo representa así:
 | Libranza de independiente | `None` | `None` | `libranza_no_aplica` |
 | Capacidad negativa | `rojo` (regla del guion) | `None`: no se simula | `capacidad_negativa` |
 | Vivienda sobre el 30 % del ingreso | `rojo` | Con valor | `vivienda_30` |
+| Tasa cuya vigencia no cubre hoy | El del producto | Con el valor publicado | `vigencia_vencida` |
+
+`TasaCaptacion` guarda `producto`, `tasa_ea` (la referencia), `referencia` (el
+tramo de saldo o la banda de monto), `rango_completo`, `tramos` (plazos del CDT
+con su tasa), la vigencia y la fuente.
 
 `monto_credito` y `plazo_meses` son obligatorios en los productos de crédito y
 el contrato los prohíbe en ahorro: el validador rechaza un ahorro con monto o
@@ -183,6 +201,9 @@ ejecuta con `diagnostico.motor.calcular`.
 - **Rojo:** con estos datos la cuota compromete demasiado el ingreso. Sugerir
   monto menor o plazo mayor, compra de cartera si hay deudas caras, y ofrecer
   hablar con un asesor (HITL).
+- **Ahorro sin capacidad (cero o negativa):** sugerir revisar los gastos fijos
+  y renegociar las cuotas que más pesan; no proponer automatizar el ahorro
+  hasta que haya margen.
 
 ## Texto de aviso (obligatorio)
 

@@ -799,6 +799,18 @@ def vigencia_legible(desde: date, hasta: date) -> str:
     )
 
 
+def fecha_legible(fecha: date) -> str:
+    """Escribe una fecha en español, como «18 de noviembre de 2026».
+
+    Args:
+        fecha: día que se quiere nombrar.
+
+    Returns:
+        La fecha con el día, el mes y el año.
+    """
+    return f"{fecha.day} de {_NOMBRES_MES[fecha.month]} de {fecha.year}"
+
+
 def plazo_legible(dias: int) -> str:
     """Escribe un plazo en días con su equivalencia en meses o años.
 
@@ -811,7 +823,9 @@ def plazo_legible(dias: int) -> str:
     if dias >= 720 and dias % 360 == 0:
         return f"{dias} días ({dias // 360} años)"
     if dias % 30 == 0:
-        return f"{dias} días ({dias // 30} meses)"
+        meses = dias // 30
+        unidad = "mes" if meses == 1 else "meses"
+        return f"{dias} días ({meses} {unidad})"
     return f"{dias} días"
 
 

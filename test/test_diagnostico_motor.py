@@ -38,6 +38,8 @@ RUTA_PERSONAS = PROJECT_ROOT / "data" / "evaluacion" / "personas_sinteticas.json
 VIGENCIA_DESDE = date(2026, 11, 1)
 #: Último día de la vigencia de la tabla de prueba.
 VIGENCIA_HASTA = date(2026, 11, 30)
+#: Fecha de consulta fija: dentro de la vigencia y sin depender del día de la corrida.
+FECHA_CONSULTA = date(2026, 11, 16)
 #: Huella del PDF de tasas de la vigencia.
 
 SHA_EJEMPLO = "989be43a0ed19eb33e2057cd01c1ae612b6f15544eaaf41af6348846a6ff1b7f"
@@ -49,7 +51,13 @@ PREFIJOS = frozenset(
 )
 
 
-def _fila(producto: str, desde: str, hasta: str, segmento: str | None = None) -> FilaTasa:
+def _fila(
+    producto: str,
+    desde: str,
+    hasta: str,
+    segmento: str | None = None,
+    plazo_dias: int | None = None,
+) -> FilaTasa:
     """Construye una fila de la tabla Gold de prueba.
 
     Args:
@@ -57,6 +65,7 @@ def _fila(producto: str, desde: str, hasta: str, segmento: str | None = None) ->
         desde: tasa E.A. mínima publicada.
         hasta: tasa E.A. máxima publicada.
         segmento: segmento del Tablero, si el producto tiene varios.
+        plazo_dias: plazo del CDT en días, si el producto lo publica.
 
     Returns:
         La fila lista para escribir la tabla.
@@ -65,6 +74,7 @@ def _fila(producto: str, desde: str, hasta: str, segmento: str | None = None) ->
         producto=producto,
         segmento=segmento,
         tipo_tasa="fija",
+        plazo_dias=plazo_dias,
         tasa_ea_desde=Decimal(desde),
         tasa_ea_hasta=Decimal(hasta),
         vigencia_desde=VIGENCIA_DESDE,
@@ -84,8 +94,12 @@ def raiz_tasas(tmp_path: Path) -> Path:
         _fila("libranza", "0.1539", "0.2431", "Libre inversión"),
         _fila("libranza", "0.1471", "0.2343", "Compra de cartera"),
         _fila("vivienda", "0.1517", "0.1854", "Crédito hipotecario"),
-        _fila("ahorro", "0.0010", "0.0010", "De 0 a $5.000.000"),
-        _fila("cdt", "0.1100", "0.1100", "$500M- $99 MM"),
+        _fila("ahorro", "0.0001", "0.0001", "De 0 a $5.000.000"),
+        _fila("ahorro", "0.0010", "0.0010", "De $100.000.001 a $3.000.000.000"),
+        _fila("cdt", "0.0005", "0.0005", "$500M- $99 MM", 30),
+        _fila("cdt", "0.1100", "0.1100", "$500M- $99 MM", 90),
+        _fila("cdt", "0.1205", "0.1205", "$500M- $99 MM", 1080),
+        _fila("cdt", "0.1215", "0.1215", "$500 MM - 10.000 MM", 1080),
     ]
     escribir_tabla(tmp_path / "tasas-personas-2026-11.jsonl", filas)
     return tmp_path
@@ -130,7 +144,7 @@ def _diagnostico(ident: str, raiz: Path) -> ResultadoDiagnostico:
     """
     persona = _personas()[ident]
     entrada = entrada_desde_respuestas(_ids(persona))
-    return calcular(entrada, raiz=raiz)
+    return calcular(entrada, hoy=FECHA_CONSULTA, raiz=raiz)
 
 
 def test_cargar_config_lee_umbrales_valores_y_aplicabilidad() -> None:
@@ -303,6 +317,71 @@ def test_valentina_ahorro_sin_semaforo(raiz_tasas: Path) -> None:
     assert {tasa.producto for tasa in resultado.tasas_captacion} == {"ahorro", "cdt"}
 
 
+def test_ahorro_de_referencia_es_el_tramo_mas_bajo(raiz_tasas: Path) -> None:
+    """El ahorro presenta el tramo que empieza, no el máximo de la envolvente."""
+    resultado = _diagnostico("joven_ahorro", raiz_tasas)
+    ahorro = next(tasa for tasa in resultado.tasas_captacion if tasa.producto == "ahorro")
+
+    assert ahorro.referencia == "De 0 a $5.000.000"
+    assert ahorro.tasa_ea.desde == Decimal("0.0001")
+    assert ahorro.tasa_ea.hasta == Decimal("0.0001")
+    assert ahorro.rango_completo is not None
+    assert ahorro.rango_completo.desde == Decimal("0.0001")
+    assert ahorro.rango_completo.hasta == Decimal("0.0010")
+    assert any("tramo «De 0 a $5.000.000»" in motivo for motivo in resultado.motivos)
+
+
+def test_cdt_informa_el_rango_por_plazo_del_monto_minimo(raiz_tasas: Path) -> None:
+    """El CDT no publica un solo porcentaje: depende del plazo y del monto."""
+    resultado = _diagnostico("joven_ahorro", raiz_tasas)
+    cdt = next(tasa for tasa in resultado.tasas_captacion if tasa.producto == "cdt")
+
+    assert cdt.referencia == "De $500 mil a $99 millones"
+    assert cdt.tasa_ea.desde == Decimal("0.0005")
+    assert cdt.tasa_ea.hasta == Decimal("0.1205")
+    assert cdt.rango_completo is not None
+    assert cdt.rango_completo.hasta == Decimal("0.1215")
+    assert [tramo.etiqueta for tramo in cdt.tramos] == [
+        "30 días (1 mes)",
+        "90 días (3 meses)",
+        "1080 días (3 años)",
+    ]
+    assert any("depende del plazo y del monto" in motivo for motivo in resultado.motivos)
+
+
+def test_capacidad_cero_orienta_a_revisar_los_gastos_fijos(raiz_tasas: Path) -> None:
+    """Sin capacidad de ahorro la recomendación es revisar los gastos fijos."""
+    resultado = _diagnostico("joven_ahorro", raiz_tasas)
+
+    assert resultado.capacidad_pago == Decimal(0)
+    assert any("gastos fijos" in recomendacion for recomendacion in resultado.recomendaciones)
+    assert all("automatiza" not in recomendacion for recomendacion in resultado.recomendaciones)
+
+
+def test_vigencia_vencida_en_el_ahorro_alerta_y_lo_explica(tmp_path: Path) -> None:
+    """La tasa de ahorro del 4 al 9 de noviembre ya venció el 18 de noviembre."""
+    filas = [
+        _fila("ahorro", "0.0001", "0.0001", "De 0 a $5.000.000").model_copy(
+            update={"vigencia_desde": date(2026, 11, 4), "vigencia_hasta": date(2026, 11, 9)}
+        )
+    ]
+    escribir_tabla(tmp_path / "tasas-personas-2026-11.jsonl", filas)
+    entrada = entrada_desde_respuestas(
+        [
+            "objetivo.ahorro",
+            "vinculacion.empleado",
+            "ingresos.MENOS_2M",
+            "gastos.DE_1M_A_2M",
+            "cuotas.NINGUNA",
+        ]
+    )
+    resultado = calcular(entrada, hoy=date(2026, 11, 18), raiz=tmp_path)
+
+    assert resultado.alertas == ["vigencia_vencida"]
+    assert any("del 4 al 9 de noviembre de 2026" in motivo for motivo in resultado.motivos)
+    assert any("18 de noviembre de 2026" in motivo for motivo in resultado.motivos)
+
+
 def test_carolina_compra_de_cartera_verde_con_ahorro(raiz_tasas: Path) -> None:
     """Carolina: compra de cartera verde y ahorro mensual de $471.120."""
     resultado = _diagnostico("compra_cartera", raiz_tasas)
@@ -337,7 +416,7 @@ def test_libranza_de_independiente_no_aplica(raiz_tasas: Path) -> None:
             "plazo.36",
         ]
     )
-    resultado = calcular(entrada, raiz=raiz_tasas)
+    resultado = calcular(entrada, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
 
     assert resultado.semaforo is None
     assert resultado.cuota_mensual is None
@@ -375,7 +454,7 @@ def test_vivienda_sobre_el_30_por_ciento_alerta(raiz_tasas: Path) -> None:
         monto_credito=Decimal(220_000_000),
         plazo_meses=240,
     )
-    resultado = calcular(entrada, raiz=raiz_tasas)
+    resultado = calcular(entrada, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
 
     assert resultado.semaforo == "rojo"
     assert resultado.alertas == ["vivienda_30"]
@@ -408,7 +487,7 @@ def test_resultado_reproducible_desde_el_json(raiz_tasas: Path) -> None:
     original = _diagnostico("compra_cartera", raiz_tasas)
 
     recuperado = ResultadoDiagnostico.model_validate_json(original.model_dump_json())
-    repetido = calcular(recuperado.entrada, raiz=raiz_tasas)
+    repetido = calcular(recuperado.entrada, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
 
     assert recuperado == original
     assert repetido.model_copy(update={"escenario_de": None}) == original
