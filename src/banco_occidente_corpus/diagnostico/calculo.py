@@ -44,7 +44,7 @@ Semaforo = Literal["verde", "amarillo", "rojo"]
 #: Versión de las fórmulas, que se guarda en el resultado para reproducirlo.
 VERSION_FORMULA = "v1"
 #: El semáforo se calcula siempre con la tasa máxima del rango publicado.
-BASE_SEMAFORO = "tasa_maxima"
+BASE_SEMAFORO: Literal["tasa_maxima"] = "tasa_maxima"
 #: Umbral por defecto entre verde y amarillo.
 UMBRAL_VERDE = Decimal("0.30")
 #: Umbral por defecto entre amarillo y rojo.
@@ -139,7 +139,7 @@ class ResultadoCalculo:
 
     producto: str
     version_formula: str
-    base_semaforo: str
+    base_semaforo: Literal["tasa_maxima"]
     tasa: TasaProducto | None
     tasa_mensual_min: Decimal | None
     tasa_mensual_max: Decimal | None
@@ -155,6 +155,7 @@ class ResultadoCalculo:
     capacidad_ahorro: Decimal | None
     ahorro_mensual: Decimal | None
     semaforo: Semaforo | None
+    alertas: tuple[str, ...]
     motivos: tuple[str, ...]
     recomendaciones: tuple[str, ...]
     tasas_captacion: tuple[TasaProducto, ...]
@@ -548,10 +549,12 @@ def _resultado_credito(
             f"y la razón de endeudamiento es {_porcentaje(razon)}."
         )
 
+    alertas: list[str] = []
     if clave == "vivienda":
         limite = _peso(Decimal(entrada.ingreso_mensual) * Decimal(umbral_vivienda))
         if cuota_max > limite:
             color = "rojo"
+            alertas.append("vivienda_30")
             motivos.append(
                 f"En vivienda la primera cuota no debe superar el "
                 f"{_porcentaje(umbral_vivienda)} del ingreso: {_pesos(cuota_max)} > "
@@ -594,6 +597,7 @@ def _resultado_credito(
         capacidad_ahorro=None,
         ahorro_mensual=ahorro_mensual,
         semaforo=color,
+        alertas=tuple(alertas),
         motivos=tuple(motivos),
         recomendaciones=tuple(recomendaciones),
         tasas_captacion=(),
@@ -636,6 +640,7 @@ def _resultado_ahorro(
         capacidad_ahorro=capacidad,
         ahorro_mensual=None,
         semaforo=None,
+        alertas=(),
         motivos=tuple(motivos),
         recomendaciones=tuple(recomendaciones),
         tasas_captacion=tasas_captacion,
@@ -668,6 +673,7 @@ def _resultado_capacidad_negativa(
         capacidad_ahorro=None,
         ahorro_mensual=None,
         semaforo="rojo",
+        alertas=("capacidad_negativa",),
         motivos=(
             "Los gastos y las cuotas superan el ingreso: no hay capacidad para "
             "una cuota nueva y no se simula el crédito.",
@@ -707,6 +713,7 @@ def _resultado_libranza_no_disponible(
         capacidad_ahorro=None,
         ahorro_mensual=None,
         semaforo=None,
+        alertas=("libranza_no_aplica",),
         motivos=(
             "La libranza solo está disponible para empleados o pensionados con "
             "convenio de descuento.",

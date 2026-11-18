@@ -149,6 +149,31 @@ Reglas adicionales:
 - **Capacidad negativa** (gastos + cuotas actuales > ingresos): rojo sin
   simular crédito, con recomendación de ordenar gastos y deudas primero.
 
+## Representación en `ResultadoDiagnostico`
+
+Los campos de crédito son opcionales porque no todos los productos simulan una
+cuota. El motor lo representa así:
+
+| Caso | `semaforo` | `cuota_mensual` y tasa | Alerta |
+|---|---|---|---|
+| Crédito simulado | `verde`, `amarillo` o `rojo` | Con valor, en rango | Ninguna |
+| Ahorro (`objetivo.ahorro`) | `None` | `None`; `capacidad_pago` es la capacidad de ahorro y `tasas_captacion` lista ahorro y CDT | Ninguna |
+| Libranza de independiente | `None` | `None` | `libranza_no_aplica` |
+| Capacidad negativa | `rojo` (regla del guion) | `None`: no se simula | `capacidad_negativa` |
+| Vivienda sobre el 30 % del ingreso | `rojo` | Con valor | `vivienda_30` |
+
+`monto_credito` y `plazo_meses` son obligatorios en los productos de crédito y
+el contrato los prohíbe en ahorro: el validador rechaza un ahorro con monto o
+plazo. `vinculacion` es obligatoria. `cuota_trasladar` es opcional y el motor
+solo la exige en compra de cartera. `ahorro_mensual_estimado` se llena solo en
+compra de cartera (`cuota_trasladar − cuota_nueva`) y `rango_usado` conserva el
+id canónico de cada bloque de la entrevista.
+
+Los ids de la entrevista se convierten en la entrada con
+`diagnostico.motor.entrada_desde_respuestas`, que toma los valores de cálculo
+de `config/diagnostico.toml`; el canal nunca conoce las cifras. El cálculo se
+ejecuta con `diagnostico.motor.calcular`.
+
 ## Recomendaciones por color
 
 - **Verde:** la cuota cabe con margen. Sugerir comparar plazos (el más corto

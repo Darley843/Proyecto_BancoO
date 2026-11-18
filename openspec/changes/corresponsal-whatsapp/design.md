@@ -387,18 +387,54 @@ class RangoDecimal(BaseModel):
     hasta: Decimal
 
 
+ProductoDiagnostico = Literal[
+    "libre_inversion",
+    "compra_cartera",
+    "vehiculo_nuevo",
+    "vehiculo_usado",
+    "vivienda",
+    "libranza",
+    "ahorro",
+]
+
+
 class EntradaDiagnostico(BaseModel):
     """Insumos normalizados de un diagnóstico."""
 
     model_config = ConfigDict(extra="forbid")
-    producto: str
-    ingreso_mensual: Decimal
-    gastos_mensuales: Decimal
-    cuotas_deudas: Decimal
-    monto_credito: Decimal
-    plazo_meses: int = Field(ge=6, le=120)
-    tasa_ea: Decimal | None = None
+    producto: ProductoDiagnostico
+    vinculacion: Literal["empleado", "independiente", "pensionado"]
+    ingreso_mensual: Decimal = Field(ge=0)
+    gastos_mensuales: Decimal = Field(ge=0)
+    cuotas_deudas: Decimal = Field(ge=0)
+    cuota_trasladar: Decimal | None = Field(default=None, ge=0)
+    monto_credito: Decimal | None = Field(default=None, ge=0)
+    plazo_meses: int | None = Field(default=None, ge=6, le=240)
     rango_usado: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _insumos_por_producto(self) -> Self:
+        """Exige monto y plazo en crédito y los prohíbe en ahorro."""
+        if self.producto == "ahorro":
+            if self.monto_credito is not None or self.plazo_meses is not None:
+                raise ValueError("el ahorro no se simula con monto ni plazo de crédito")
+            return self
+        if self.monto_credito is None or self.plazo_meses is None:
+            raise ValueError(
+                "monto_credito y plazo_meses son obligatorios para productos de crédito"
+            )
+        return self
+
+
+class TasaCaptacion(BaseModel):
+    """Tasa de ahorro o CDT vigente que acompaña a un resultado de ahorro."""
+
+    model_config = ConfigDict(extra="forbid")
+    producto: Literal["ahorro", "cdt"]
+    tasa_ea: RangoDecimal
+    vigencia_desde: date
+    vigencia_hasta: date
+    fuente: str
 
 
 class ResultadoDiagnostico(BaseModel):
@@ -407,22 +443,28 @@ class ResultadoDiagnostico(BaseModel):
     model_config = ConfigDict(extra="forbid")
     version_formula: str = "v1"
     entrada: EntradaDiagnostico
-    tasa_ea: RangoDecimal
-    tasa_mensual: RangoDecimal
-    cuota_mensual: RangoDecimal
-    total_intereses: RangoDecimal
-    total_pagado: RangoDecimal
     base_semaforo: Literal["tasa_maxima"] = "tasa_maxima"
-    razon_endeudamiento: Decimal
+    tasa_ea: RangoDecimal | None = None
+    tasa_mensual: RangoDecimal | None = None
+    cuota_mensual: RangoDecimal | None = None
+    total_intereses: RangoDecimal | None = None
+    total_pagado: RangoDecimal | None = None
+    razon_endeudamiento: Decimal | None = None
     capacidad_pago: Decimal
     margen_despues_cuota: Decimal | None = None
-    semaforo: Literal["verde", "amarillo", "rojo"]
+    ahorro_mensual_estimado: Decimal | None = None
+    semaforo: Literal["verde", "amarillo", "rojo"] | None = None
+    alertas: list[Literal["vivienda_30", "libranza_no_aplica", "capacidad_negativa"]] = (
+        Field(default_factory=list)
+    )
+    motivos: list[str] = Field(default_factory=list)
     recomendaciones: list[str]
-    fuente_tasa: str
-    vigencia_tasa_desde: date
-    vigencia_tasa_hasta: date
-    sha256_pdf: str
-    umbrales: dict[str, Decimal]
+    fuente_tasa: str | None = None
+    vigencia_tasa_desde: date | None = None
+    vigencia_tasa_hasta: date | None = None
+    sha256_pdf: str | None = None
+    umbrales: dict[str, Decimal] = Field(default_factory=dict)
+    tasas_captacion: list[TasaCaptacion] = Field(default_factory=list)
     aviso: str
     escenario_de: str | None = None
 
@@ -442,6 +484,18 @@ class CasoAsesor(BaseModel):
 ```
 
 `remitente` existe solo en memoria: el almacén guarda el `usuario_id` y borra el número antes de persistir. `ResultadoDiagnostico` no contiene nombre ni número.
+
+**Productos y campos opcionales del diagnóstico.** `EntradaDiagnostico.producto` solo admite los siete objetivos de `docs/DIAGNOSTICO.md`; la tarjeta de crédito y el crédito rotativo quedan fuera porque no tienen cuota fija que simular. `vinculacion` es obligatoria porque decide si la libranza aplica. `cuota_trasladar` es opcional y solo la usa la compra de cartera, donde el motor la exige al calcular. `monto_credito` y `plazo_meses` son opcionales en el contrato, pero el validador exige los dos en los productos de crédito y los prohíbe en `ahorro`: el ahorro no simula una cuota.
+
+`ResultadoDiagnostico` hace opcionales los campos de crédito porque no todos los resultados simulan uno. La representación es explícita:
+
+- **Crédito simulado:** `semaforo`, `tasa_ea`, `cuota_mensual`, `razon_endeudamiento`, `margen_despues_cuota` y los totales llevan valor; `fuente_tasa`, `vigencia_tasa_*` y `sha256_pdf` citan la tasa del Tablero.
+- **Ahorro:** `semaforo` es `None`, igual que `cuota_mensual`, `tasa_ea`, `tasa_mensual`, `razon_endeudamiento`, `margen_despues_cuota` y los totales. `capacidad_pago` guarda la capacidad de ahorro mensual y `tasas_captacion` lista las tasas de ahorro y CDT; `fuente_tasa` y `vigencia_tasa_*` describen la primera de esas tasas.
+- **Libranza que no aplica** (vinculación independiente): `semaforo` es `None`, no hay cuota y la alerta es `libranza_no_aplica`.
+- **Capacidad negativa:** el semáforo es `rojo` (la regla del guion) aunque no haya cuota, y la alerta es `capacidad_negativa`.
+- **Vivienda con cuota sobre el 30 % del ingreso:** el semáforo es `rojo` y la alerta es `vivienda_30`.
+
+`alertas` es un conjunto cerrado y `motivos` guarda la explicación en español para el canal. `ahorro_mensual_estimado` solo se llena en compra de cartera (`cuota_trasladar - cuota_nueva`). `rango_usado` conserva el id canónico de cada bloque de la entrevista para que el resultado se pueda reproducir.
 
 ### Contrato del Tablero para tasas
 
