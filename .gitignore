@@ -18,6 +18,11 @@ data/raw/
 data/processed/
 # Salidas del asistente (no versionadas: se generan con --salida).
 data/asistente/
+# Bases del canal, el diagnóstico, el red team y la latencia: se crean al usarlas.
+data/asistente/whatsapp.sqlite
+data/asistente/diagnostico.sqlite
+data/asistente/roba.sqlite
+data/asistente/latencias.sqlite
 # Indice vectorial de la Boveda (Qdrant local + metadatos): se regenera con 'make indice'.
 data/boveda/
 # Explicito aunque la carpeta padre ya este ignorada.
