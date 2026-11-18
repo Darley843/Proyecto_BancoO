@@ -104,9 +104,9 @@ Crea un archivo **fuera del repositorio**, por ejemplo un nivel arriba:
 Contenido (con tus valores reales, sin `< >`):
 
 ```powershell
-$env:WHATSAPP_PHONE_NUMBER_ID = "1459670830563185"
+$env:WHATSAPP_PHONE_NUMBER_ID = "<phone-number-id>"
 $env:WHATSAPP_APP_SECRET      = "el-app-secret"
-$env:WHATSAPP_VERIFY_TOKEN    = "el-token-alfanumerico"
+$env:WHATSAPP_VERIFY_TOKEN    = "<token-alfanumerico>"
 $env:WHATSAPP_ACCESS_TOKEN    = "el-token-permanente"
 $env:WHATSAPP_ID_SALT         = "una-cadena-aleatoria-larga"
 $env:WHATSAPP_MODO            = "falso"
@@ -249,14 +249,17 @@ Configuración comprobada el **17 de noviembre de 2026**:
 
 | Dato | Valor |
 |---|---|
-| App | `Prueba1` · App ID `972260228330201` · publicada |
+| App | `Prueba1` · App ID `000000000000000` · publicada |
 | Portafolio | `Sucursal 1965 UAO` |
-| WABA ID | `912443945191248`, suscrita a `Prueba1` |
-| Número de prueba | `+1 (555) 181-3254` |
-| Phone Number ID | `1459670830563185` |
+| WABA ID | `000000000000000`, suscrita a `Prueba1` |
+| Número de prueba | `+1 (555) 555-0100` |
+| Phone Number ID | `000000000000001` |
 | Webhook | verificado con `hub.challenge` |
 | Entrega real | `POST /webhooks/whatsapp 200 OK` |
 | Túnel | cloudflared rápido (URL variable) |
+
+Los identificadores y el número de la tabla son de ejemplo: los reales se leen
+en Meta y no se versionan, porque el repositorio es público.
 
 Los secretos (App Secret, tokens, sal) no se documentan aquí.
 
