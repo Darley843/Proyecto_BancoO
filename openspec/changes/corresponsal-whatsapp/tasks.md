@@ -90,6 +90,8 @@
 - [ ] 8.8 Crear `app/web/vistas/operacion.js` y `app/web/vistas/roba.js`, sus datos de ejemplo `operacion.json` y `roba.json` y la navegación de ocho vistas; verificar con una prueba de forma que los campos coinciden con la API y que las dos vistas cargan sin otra vista.
 - [ ] 8.9 Implementar la terminal de Roba la Bóveda en `roba.js` con envío, categoría, resultado, marcador, reinicio y exportación; verificar que no usa librerías externas ni llama a otra API que `/api/roba`.
 - [ ] 8.10 Preparar el guion de sustentación en `docs/SUSTENTACION.md` con el recorrido consentimiento → pregunta → diagnóstico → HITL → «¿Y si…?» → comité → Roba la Bóveda → Arqueo; verificar que cada paso tiene el comando o la pantalla que lo demuestra.
+- [ ] 8.11 Crear el paquete `pana` con el dibujo del personaje (foto de perfil y tres caras), las tarjetas PNG del diagnóstico y del «¿Y si…?» y su texto equivalente, con Pillow fijo y DejaVu Sans versionada; verificar con `test/test_pana_tarjetas.py` que la imagen pesa menos de 1 MB, se genera en memoria, rechaza teléfonos y documentos y que el texto lleva los mismos datos.
+- [ ] 8.12 Enviar la tarjeta por el canal como mensaje de tipo imagen después del texto, cuando `RespuestaCanal` tenga el tipo imagen; verificar con el enviador falso que el texto sale primero y que una falla de la imagen no corta la respuesta.
 
 ## 9. Integración y cierre — equipo (21–23 nov)
 
