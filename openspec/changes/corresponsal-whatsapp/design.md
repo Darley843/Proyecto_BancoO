@@ -164,15 +164,19 @@ El motor vive en `diagnostico/motor.py` y no importa LangGraph ni el modelo. Usa
 
 Fórmulas, aplicadas a los dos extremos del rango de tasa E.A. que publica el PDF:
 
-- `tasa_mensual(valor_ea) = (1 + valor_ea) ** (1/12) - 1`.
+- `tasa_mensual(valor_ea) = (1 + valor_ea) ** (1/12) - 1`, sin redondear.
 - `cuota = monto * i / (1 - (1 + i) ** -n)`; si `i = 0`, `cuota = monto / n`.
+  Solo la cuota final se redondea al peso.
 - `total_intereses = cuota * n - monto` y `total_pagado = cuota * n`.
 - `razon_endeudamiento = (cuotas_deudas + cuota_nueva) / ingreso_mensual`.
-- `capacidad_pago = ingreso_mensual - gastos_mensuales - cuotas_deudas - cuota_nueva`.
+- `capacidad_pago = ingreso_mensual - gastos_mensuales - cuotas_deudas`
+  (antes de la cuota nueva). En compra de cartera las cuotas trasladadas
+  desaparecen: `capacidad_pago = ingreso - gastos - (cuotas - cuota_trasladar)`.
+- `margen_despues_cuota = capacidad_pago - cuota_nueva`.
 
-La cuota se informa como rango: se calcula con la tasa E.A. `desde` y con la `hasta`. El semáforo, la razón de endeudamiento y la capacidad de pago usan la tasa `hasta` (la máxima del rango) y la cuota máxima; es el criterio conservador y el resultado lo declara en `base_semaforo="tasa_maxima"`. Si el usuario escribe una tasa exacta, el rango colapsa a ese valor. Redondeo: dinero a dos decimales, tasas a seis, razón y capacidad a cuatro. La versión de la fórmula es `v1` y se guarda en el resultado.
+La cuota se informa como rango: se calcula con la tasa E.A. `desde` y con la `hasta`. El semáforo, la razón de endeudamiento y el margen usan la tasa `hasta` (la máxima del rango) y la cuota máxima; es el criterio conservador y el resultado lo declara en `base_semaforo="tasa_maxima"`. Si el usuario escribe una tasa exacta, el rango colapsa a ese valor. Redondeo: la tasa mensual conserva la precisión completa del contexto de 28 dígitos, la cuota final y los montos se redondean al peso, y la razón a cuatro decimales. La versión de la fórmula es `v1` y se guarda en el resultado.
 
-Umbrales por defecto en `config/diagnostico.toml`: verde si la razón es menor o igual a `0.30` y la capacidad es positiva; amarillo si la razón es menor o igual a `0.40` y la capacidad no es negativa; rojo en el resto. Son configurables y el resultado guarda los umbrales usados.
+Umbrales por defecto en `config/diagnostico.toml`: verde si la razón es menor o igual a `0.30` y el margen no es negativo; amarillo si la razón es menor o igual a `0.40` y el margen no es negativo; rojo si el margen es negativo o la razón supera `0.40`. Son configurables y el resultado guarda los umbrales usados.
 
 **Fuente y captura.** La fuente es el PDF vigente `https://www.bancodeoccidente.com.co/documents/d/guest/tasas-personas-bdo`, enlazado desde `/tarifas`. El flujo es: capturar `/tarifas` en Bronze con el pipeline web; ejecutar `corpus docs discover`; respaldar el inventario completo en `data/raw/documents_urls.original.jsonl` y dejar en `data/raw/documents_urls.jsonl` solo las URLs que contengan `tasas-personas-bdo` y `tarifas-persona-bdo`; ejecutar `corpus docs fetch --priority-max 3 --max-mb 50 --delay 1.5`. No se usa filtro por tipo (`--tipo`): `tasas-personas-bdo` queda clasificado como `otro` y el filtro lo excluiría. La descarga guarda `data/raw/documents/<sha>.pdf` y su registro en `documents_capture.jsonl`. No se ejecuta `corpus docs extract` ni `make gold`: el PDF no se convierte en una página Gold más. Si `/tarifas` no está en Bronze, se captura primero con el pipeline web y después se descubre.
 
@@ -411,6 +415,7 @@ class ResultadoDiagnostico(BaseModel):
     base_semaforo: Literal["tasa_maxima"] = "tasa_maxima"
     razon_endeudamiento: Decimal
     capacidad_pago: Decimal
+    margen_despues_cuota: Decimal | None = None
     semaforo: Literal["verde", "amarillo", "rojo"]
     recomendaciones: list[str]
     fuente_tasa: str

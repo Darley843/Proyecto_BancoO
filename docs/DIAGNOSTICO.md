@@ -108,11 +108,15 @@ puede ser mayor que la respuesta del paso 5.
 
 ## Cálculo
 
-Con los valores de cálculo de cada rango:
+Con los valores de cálculo de cada rango, con precisión decimal de 28 dígitos:
 
-- Tasa mensual: `i = (1 + EA) ^ (1/12) − 1`
-- Cuota (amortización francesa): `cuota = monto × i / (1 − (1 + i) ^ (−n))`
-- Capacidad de pago: `capacidad = ingresos − gastos − cuotas`
+- Tasa mensual: `i = (1 + EA) ^ (1/12) − 1`, sin redondear.
+- Cuota (amortización francesa): `cuota = monto × i / (1 − (1 + i) ^ (−n))`;
+  con `i = 0`, `cuota = monto / n`. Solo la cuota final se redondea al peso.
+- **Capacidad de pago**: `capacidad = ingresos − gastos − cuotas actuales`,
+  antes de la cuota nueva. En compra de cartera las cuotas trasladadas
+  desaparecen: `capacidad = ingresos − gastos − (cuotas − cuota_trasladar)`.
+- **Margen después de la cuota**: `margen = capacidad − cuota_nueva`.
 - Razón de endeudamiento: `RE = (cuotas + cuota_nueva) / ingresos`
   (en compra de cartera: `(cuotas − cuota_trasladar + cuota_nueva) / ingresos`)
 - Cuota mostrada: rango entre la cuota con la tasa mínima y con la tasa máxima.
@@ -122,9 +126,9 @@ Con los valores de cálculo de cada rango:
 
 | Color | Regla |
 |---|---|
-| Rojo | `cuota_nueva > capacidad`, o `RE > 40 %` |
-| Amarillo | `30 % < RE ≤ 40 %` |
-| Verde | `RE ≤ 30 %` y `cuota_nueva ≤ capacidad` |
+| Rojo | `margen < 0`, o `RE > 40 %` |
+| Amarillo | `margen ≥ 0` y `30 % < RE ≤ 40 %` |
+| Verde | `margen ≥ 0` y `RE ≤ 30 %` |
 
 Umbrales configurables en `config/diagnostico.toml` (por defecto 0,30 y 0,40).
 
@@ -136,13 +140,14 @@ Reglas adicionales:
 - **Libranza:** solo para `empleado` o `pensionado`. Si es `independiente`, se
   explica que la libranza requiere convenio con el empleador o pagador y se
   ofrece simular libre inversión.
-- **Compra de cartera:** además del semáforo, se informa el ahorro mensual
-  estimado `cuota_trasladar − cuota_nueva`; si es negativo, se dice que el
-  traslado no reduce la cuota con ese plazo.
+- **Compra de cartera:** la capacidad comparable descuenta las cuotas que se
+  trasladan y el margen se calcula con la cuota nueva. Además se informa el
+  ahorro mensual estimado `cuota_trasladar − cuota_nueva`; si es negativo, se
+  dice que el traslado no reduce la cuota con ese plazo.
 - **Ahorro:** no hay semáforo de crédito. Se informa la capacidad de ahorro
   mensual (`capacidad`) y las tasas vigentes de ahorro y CDT del Tablero.
-- **Capacidad negativa** (gastos + cuotas > ingresos): rojo sin simular
-  crédito, con recomendación de ordenar gastos y deudas primero.
+- **Capacidad negativa** (gastos + cuotas actuales > ingresos): rojo sin
+  simular crédito, con recomendación de ordenar gastos y deudas primero.
 
 ## Recomendaciones por color
 
