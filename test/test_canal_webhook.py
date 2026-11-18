@@ -22,8 +22,8 @@ from banco_occidente_corpus.canal.webhook import router
 RAIZ = Path(__file__).resolve().parents[1]
 """Raíz del repositorio, para cargar ``app.py`` por ruta."""
 
-TOKEN = "token-de-verificacion"
-"""Token ficticio de la verificación GET."""
+TOKEN = "token-ficticio"
+"""Token ficticio de la verificación GET (corto para no parecer una clave real)."""
 
 SECRETO = "s3creto-de-prueba"
 """App Secret ficticio de la prueba."""
