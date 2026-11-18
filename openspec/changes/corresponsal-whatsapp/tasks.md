@@ -53,10 +53,13 @@
 ## 5. MCP de solo lectura — Nayla (19–20 nov)
 
 - [ ] 5.1 Implementar `mcp_servidor/servidor.py` con transporte stdio y las herramientas `consultar_tasa`, `simular_cuota` y `buscar_en_boveda`; verificar que el listado MCP solo declara esas tres y ninguna de escritura.
+  > Nota (Nayla, 18 nov): el servidor está en `mcp_servidor/servidor.py` con stdio y declara `consultar_tasa` y `buscar_en_boveda`. `simular_cuota` queda pendiente: depende de `diagnostico.motor.simular` (PR #136), que todavía no está en `main`; se registra cuando llegue, sin cambiar el contrato de las otras dos. `test/test_mcp_servidor.py::test_listado_solo_declara_consultas` fija el listado actual y ninguna herramienta de escritura.
 - [ ] 5.2 Implementar `consultar_tasa` sobre `tasas_producto` y `tasa_vigente` y `simular_cuota` sobre `diagnostico.motor.simular`; verificar con `test/test_mcp_servidor.py` una consulta que devuelve el rango E.A./M.V. con vigencia, fuente y `sha256`, una sin coincidencias, una simulación válida y una entrada inválida.
-- [ ] 5.3 Implementar `buscar_en_boveda` con el recuperador híbrido y respaldo BM25 cuando Ollama no responde; verificar con `DeterministicFakeEmbedding` que devuelve fragmentos con URL y puntaje y que un fragmento con instrucciones se devuelve como dato.
-- [ ] 5.4 Añadir límites de `k`, largo de consulta, tiempo de respuesta y errores estructurados; verificar con pruebas una consulta de 501 caracteres, `k` mayor que 20, índice ausente y ruta del sistema tratada como texto.
+  > Nota (Nayla, 18 nov): `consultar_tasa` está lista sobre `tasas_producto` y `tasa_vigente`, con vigencia, fuente y `sha256_pdf`, sin coincidencias y sin presentar spreads como tasa (`describir_tasa`). `simular_cuota` y sus dos casos (simulación válida y entrada inválida) siguen pendientes de `diagnostico.motor.simular` (PR #136).
+- [x] 5.3 Implementar `buscar_en_boveda` con el recuperador híbrido y respaldo BM25 cuando Ollama no responde; verificar con `DeterministicFakeEmbedding` que devuelve fragmentos con URL y puntaje y que un fragmento con instrucciones se devuelve como dato.
+- [x] 5.4 Añadir límites de `k`, largo de consulta, tiempo de respuesta y errores estructurados; verificar con pruebas una consulta de 501 caracteres, `k` mayor que 20, índice ausente y ruta del sistema tratada como texto.
 - [ ] 5.5 Documentar en `docs/MCP.md` el arranque, las tres herramientas, los límites y el carácter de solo lectura; verificar que el comando documentado arranca el servidor y que no requiere `DEEPSEEK_API_KEY`.
+  > Nota (Nayla, 18 nov): `docs/MCP.md` documenta el arranque, `consultar_tasa`, `buscar_en_boveda`, los límites y el carácter de solo lectura, y deja `simular_cuota` como pendiente del PR #136. Verificado con un cliente MCP real por stdio: el comando documentado arranca el servidor, lista las dos herramientas y responde sin `DEEPSEEK_API_KEY`. La tarea se cierra cuando se documente la tercera herramienta.
 
 ## 6. Comité de crédito — Nayla (19–20 nov)
 

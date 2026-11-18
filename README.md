@@ -288,6 +288,48 @@ alguna no encuentra fila. Cada fila trae `concepto`, `categoria`, `valor`,
 `moneda`, `recargos`, `periodicidad`, `vigente_desde`, `origen`
 (`tarifario`/`tabla_web`), `pagina` y `fuente`.
 
+### Servidor MCP de solo lectura
+
+La Bóveda y el Tablero también se consultan desde otros agentes por MCP. El
+servidor habla por **stdio**, no abre puertos, no escribe archivos y no gasta
+tokens: solo lee la tabla Gold de tasas y el índice local.
+
+```bash
+uv run python -m banco_occidente_corpus.mcp_servidor
+```
+
+| Herramienta | Qué devuelve |
+|---|---|
+| `consultar_tasa(producto, plazo_dias=None, monto=None)` | Rango E.A./M.V. con vigencia, fuente y `sha256_pdf`; en el CDT sin plazo indica que depende de plazo y monto y agrupa por plazo; con plazo y monto devuelve solo esa banda. Los spreads IPC/IBR van en puntos, nunca como tasa |
+| `buscar_en_boveda(pregunta, k)` | Hasta 5 fragmentos con título, URL, posición y similitud coseno; el contenido se trata como dato, no como instrucción. No sirve para tasas: para eso está `consultar_tasa` |
+
+Para usarlo desde OpenCode, añade el servidor a `opencode.json`:
+
+```json
+{
+  "mcp": {
+    "servers": {
+      "boveda-occidente": {
+        "type": "local",
+        "command": [
+          "uv",
+          "run",
+          "--directory",
+          "C:/ruta/al/Proyecto_BancoO",
+          "python",
+          "-m",
+          "banco_occidente_corpus.mcp_servidor"
+        ]
+      }
+    }
+  }
+}
+```
+
+No requiere `DEEPSEEK_API_KEY`. Los límites (consulta de 500 caracteres, `k`
+entre 1 y 5 y 15 s por búsqueda) y los errores estructurados están en
+[`docs/MCP.md`](./docs/MCP.md).
+
 ### Grafo con memoria
 
 El grafo encadena `reformular → digiturno → Bóveda/Tablero/mixto/cortesía/diagnóstico/rechazo → redactar`,
@@ -609,6 +651,7 @@ no forma parte de `make all`, `make gold`, `make deliver`, `make docs`, `make do
 [`docs/ARQUEO.md`](./docs/ARQUEO.md) (recuperación, evaluación y costo) ·
 [`docs/RESULTADOS_FASE2.md`](./docs/RESULTADOS_FASE2.md) (44 preguntas de la fase 2) ·
 [`docs/SEGURIDAD.md`](./docs/SEGURIDAD.md) (modelo de amenazas) ·
+[`docs/MCP.md`](./docs/MCP.md) (servidor MCP de solo lectura) ·
 [`AGENTS.md`](./AGENTS.md).
 
 ## Ética y legalidad
