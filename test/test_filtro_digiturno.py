@@ -37,6 +37,7 @@ def _dudas_sin_respuesta(_: str) -> None:
     [("X", Decision.RECHAZAR), ("B", Decision.ACEPTAR), ("T", Decision.ACEPTAR)],
 )
 def test_letra_x_es_rechazo(letra: Any, esperada: Decision) -> None:
+    """Solo la letra X cuenta como rechazo en el filtro de dominio."""
     assert decision_de_turno(Turno(numero=1, letra=letra, motivo="m")) is esperada
 
 
@@ -48,10 +49,12 @@ def test_letra_x_es_rechazo(letra: Any, esperada: Decision) -> None:
     ],
 )
 def test_reglas_rechazan_competidor_y_prompt(texto: str) -> None:
+    """Las reglas fijas rechazan otros bancos y los intentos sobre el prompt."""
     assert clasificador_digiturno()(texto) is Decision.RECHAZAR
 
 
 def test_reglas_aceptan_tarifas_sin_modelo() -> None:
+    """Una pregunta de tarifas se acepta por regla, sin consultar el modelo."""
     assert (
         clasificador_digiturno(clasificador_dudas=_dudas_x)(
             "¿Cuál es la cuota de manejo de la tarjeta?"
@@ -61,6 +64,7 @@ def test_reglas_aceptan_tarifas_sin_modelo() -> None:
 
 
 def test_sin_modelo_las_dudas_se_aceptan() -> None:
+    """Sin clasificador, las dudas caen en B con motivo defecto."""
     turnos: dict[str, Turno] = {}
     decidir = clasificador_digiturno(turnos=turnos)
     assert decidir("Cuéntame un chiste") is Decision.ACEPTAR
@@ -68,20 +72,23 @@ def test_sin_modelo_las_dudas_se_aceptan() -> None:
 
 
 def test_con_modelo_las_dudas_siguen_al_modelo() -> None:
+    """Con clasificador, la letra de la duda la decide el modelo."""
     assert (
         clasificador_digiturno(clasificador_dudas=_dudas_x)("Cuéntame un chiste")
         is Decision.RECHAZAR
     )
 
 
-def test_modelo_sin_respuesta_cae_en_aceptar() -> None:
+def test_modelo_sin_respuesta_cae_en_rechazo() -> None:
+    """Desde el ajuste del Digiturno, una duda sin clasificar no pasa el filtro."""
     turnos: dict[str, Turno] = {}
     decidir = clasificador_digiturno(clasificador_dudas=_dudas_sin_respuesta, turnos=turnos)
-    assert decidir("Cuéntame un chiste") is Decision.ACEPTAR
-    assert turnos["Cuéntame un chiste"].motivo == "defecto:modelo_sin_respuesta"
+    assert decidir("Cuéntame un chiste") is Decision.RECHAZAR
+    assert turnos["Cuéntame un chiste"].motivo.endswith("modelo_sin_respuesta")
 
 
 def test_medir_reporta_errores_y_registra_uso() -> None:
+    """El informe lista los errores y entrega el uso al registrador."""
     llamadas: list[dict[str, Any]] = []
 
     def dudas_con_uso(texto: str, registrar_uso: Any = None) -> Clasificacion:
@@ -98,6 +105,7 @@ def test_medir_reporta_errores_y_registra_uso() -> None:
 def test_main_solo_reglas_escribe_el_informe(
     tmp_path: Path, capsys: pytest.CaptureFixture[str]
 ) -> None:
+    """El modo solo reglas escribe el informe en el archivo pedido."""
     salida = tmp_path / "informe.md"
     assert main(["--salida", str(salida)]) == 0
     contenido = salida.read_text(encoding="utf-8")
@@ -127,14 +135,18 @@ def test_main_con_modelo_caido_falla_y_no_guarda(
         ("defecto", "B", "regla defecto"),
         ("perfil:tarifas", "T", "regla perfil"),
         ("defecto:modelo_sin_respuesta", "B", "modelo sin respuesta"),
+        ("rechazo:modelo_sin_respuesta", "X", "modelo sin respuesta"),
+        ("diagnostico", "D", "regla diagnostico"),
         ("La pregunta es sobre el clima, fuera del alcance.", "X", "modelo → X"),
     ],
 )
 def test_origen_agrupa_motivos_libres_del_modelo(motivo: str, letra: Any, origen: str) -> None:
+    """Los motivos libres del modelo se agrupan por letra."""
     assert origen_turno(Turno(numero=1, letra=letra, motivo=motivo)) == origen
 
 
 def test_sumar_metricas_incluye_anidadas_y_omite_textos() -> None:
+    """Se suman las métricas numéricas, también las anidadas, y se omiten textos."""
     uso: Counter[str] = Counter()
     sumar_metricas(
         uso,
@@ -145,6 +157,7 @@ def test_sumar_metricas_incluye_anidadas_y_omite_textos() -> None:
 
 
 def test_medir_lista_las_dudas_sin_respuesta() -> None:
+    """El informe lista las dudas que el modelo no respondió."""
     informe = medir(clasificador_dudas=_dudas_sin_respuesta)
     assert "### Dudas sin respuesta del modelo" in informe
     assert "modelo sin respuesta" in informe
@@ -154,6 +167,7 @@ def test_medir_lista_las_dudas_sin_respuesta() -> None:
 
 
 def test_medir_varias_con_doble_estable_da_rango_fijo() -> None:
+    """Con un clasificador estable, el rango de las corridas es un solo valor."""
     informe = medir_varias(3, clasificador_dudas=_dudas_x)
     assert informe.count("\n| 1 |") == 1 and "| 3 |" in informe
     assert "| **Rango** |" in informe
@@ -162,28 +176,31 @@ def test_medir_varias_con_doble_estable_da_rango_fijo() -> None:
 
 
 def test_medir_varias_marca_casos_inestables() -> None:
-    llamadas = {"n": 0}
+    """Un caso que cambia de letra entre corridas aparece como inestable."""
+    vistas: Counter[str] = Counter()
 
     def alterna(texto: str) -> Clasificacion:
-        """Rechaza en las corridas impares y acepta en las pares, para simular inestabilidad."""
-        llamadas["n"] += 1
-        return Clasificacion(
-            letra="X" if "chiste" in texto and llamadas["n"] % 2 else "B", motivo="doble"
-        )
+        """Rechaza el chiste la primera vez que lo ve y lo acepta la segunda: simula inestabilidad."""
+        vistas[texto] += 1
+        rechaza = "chiste" in texto and vistas[texto] == 1
+        return Clasificacion(letra="X" if rechaza else "B", motivo="doble")
 
     corridas: list[dict[str, Turno]] = []
     informe = medir_varias(2, clasificador_dudas=alterna, turnos_por_corrida=corridas)
     assert len(corridas) == 2
     assert "### Casos con error en al menos una corrida" in informe
-    assert "fuera-004" in informe  # «Cuéntame un chiste»
+    assert "| fuera-004 |" in informe  # «Cuéntame un chiste»: X en la 1, B en la 2
+    assert "1 de 2 | X, B" in informe
 
 
 def test_medir_varias_rechaza_cero() -> None:
+    """Pedir cero corridas es un error."""
     with pytest.raises(ValueError):
         medir_varias(0)
 
 
 def test_main_con_repeticiones_guarda_rango(tmp_path: Path) -> None:
+    """Con --repeticiones el informe guarda el rango y usa saltos LF."""
     salida = tmp_path / "rango.md"
     assert main(["--repeticiones", "2", "--salida", str(salida)]) == 0
     contenido = salida.read_text(encoding="utf-8")

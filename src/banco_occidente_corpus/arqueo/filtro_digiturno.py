@@ -50,7 +50,17 @@ from .filtro_dominio import (
 MOTIVO_SIN_RESPUESTA = "modelo_sin_respuesta"
 #: Motivos que asignan las reglas del Digiturno; cualquier otro lo escribió el modelo.
 MOTIVOS_REGLAS: frozenset[str] = frozenset(
-    {"pii", "fuera_alcance", "perfil", "cortesia", "identidad", "mixta", "tarifas", "defecto"}
+    {
+        "pii",
+        "fuera_alcance",
+        "perfil",
+        "diagnostico",
+        "cortesia",
+        "identidad",
+        "mixta",
+        "tarifas",
+        "defecto",
+    }
 )
 #: Conjunto versionado del filtro de dominio.
 RUTA_CONJUNTO: Path = PROJECT_ROOT / "data" / "evaluacion" / "filtro_dominio.jsonl"
@@ -172,7 +182,7 @@ def medir(
         ("Fugas", resultado.ids_fuga),
         ("Rechazos indebidos", resultado.ids_rechazo_indebido),
         ("Frontera con decisión distinta", resultado.ids_frontera_fallidos),
-        ("Dudas sin respuesta del modelo (aceptadas por defecto)", sin_respuesta),
+        ("Dudas sin respuesta del modelo", sin_respuesta),
     ):
         if ids:
             partes.append(f"\n### {titulo}\n\n{detalle_errores(casos, ids, turnos)}")
@@ -186,9 +196,9 @@ def _fraccion(intervalo: Any) -> str:
 
 def _rango(valores: Sequence[int], n: int) -> str:
     """Rango ``mín a máx`` en conteo y porcentaje."""
-    bajo, alto = min(valores), max(valores)
-    if n == 0:
+    if n == 0 or not valores:
         return "—"
+    bajo, alto = min(valores), max(valores)
     pct_bajo = f"{bajo / n * 100:.1f}".replace(".", ",")
     pct_alto = f"{alto / n * 100:.1f}".replace(".", ",")
     if bajo == alto:
@@ -346,7 +356,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if sin_respuesta:
         informe += (
             f"\n> **Atención:** {sin_respuesta} dudas quedaron sin respuesta del modelo (sumando todas las "
-            "corridas) y se aceptaron por defecto; esas cifras no reflejan al modelo.\n"
+            "corridas); el Digiturno las resolvió con su respaldo y no con el modelo.\n"
         )
     if args.con_modelo:
         claves = [c for c in uso if c.startswith("uso.")] or list(uso)

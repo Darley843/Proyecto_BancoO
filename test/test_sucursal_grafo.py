@@ -16,6 +16,7 @@ from banco_occidente_corpus.boveda.tipos import Fragmento
 from banco_occidente_corpus.sucursal.digiturno import Clasificacion, ContadorTurnos
 from banco_occidente_corpus.sucursal.grafo import (
     MAX_TOKENS_REFORMULAR,
+    TEXTO_DIAGNOSTICO,
     DependenciasGrafo,
     crear_grafo,
     es_seguimiento,
@@ -690,4 +691,19 @@ def test_cuenta_demo_no_responde_con_la_cuota_de_debito(tmp_path: Path) -> None:
     assert estado["turno"]["letra"] == "B"
     assert estado["respuesta"] == respuesta_sin_datos(dependencias.canal)
     assert "16.700" not in estado["respuesta"]
+    assert modelo.llamadas == []
+
+
+def test_diagnostico_va_a_su_nodo_sin_modelo(tmp_path: Path) -> None:
+    """La ruta D responde la invitación fija, sin búsqueda ni modelo."""
+    modelo = ModeloEspia([])
+    grafo, dependencias = deps(tmp_path, modelo=modelo, fragmentos=[fragmento()])
+
+    estado = responder_turno(grafo, dependencias, "Hazme el diagnóstico financiero", "t1")
+
+    assert estado["turno"]["letra"] == "D"
+    assert estado["turno"]["motivo"] == "diagnostico"
+    assert estado["respuesta"] == TEXTO_DIAGNOSTICO
+    assert estado["avisos"] == ["diagnostico"]
+    assert estado["uso"]["uso_modelo"] is False
     assert modelo.llamadas == []

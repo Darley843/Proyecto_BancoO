@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Literal
 
-#: Letras del digiturno: Bóveda, Tablero o rechazo.
-Letra = Literal["B", "T", "X"]
+#: Letras del digiturno: Bóveda, Tablero, rechazo o diagnóstico.
+Letra = Literal["B", "T", "X", "D"]
 
 
 @dataclass(frozen=True, slots=True)

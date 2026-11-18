@@ -45,6 +45,9 @@ palabras_tarifas = [
   "apartamento",
   "chequera",
   "cheque",
+  # Tasas de interés: la cifra vigente está en el Tablero (Gold de nov. 2026).
+  "tasa",
+  "intereses",
 ]
 # Patrones de fuera de alcance (ruta X), escritos por intención y no por palabra
 # suelta; se aplican sobre el texto normalizado sin tildes. «Inversión» o
@@ -54,10 +57,12 @@ palabras_tarifas = [
 # clima o el prompt.
 patrones_fuera_alcance = [
   # Dato propio: el valor o el estado, no el trámite para consultarlo.
-  '^(?!.*\bcomo\b).*\bmi (saldo|deuda|deudas|extracto|movimientos)\b',
-  '^(?!.*\bcomo\b).*\bmis (deudas|saldos|movimientos|extractos)\b',
+  # Si la frase pide orientación (¿me alcanza?, capacidad, diagnóstico, pagar),
+  # no es un dato propio: sigue a la regla de diagnóstico (ruta D).
+  '^(?!.*\b(como|alcanza|alcanzaria|capacidad|diagnostico|pagar)\b).*\bmi (saldo|deuda|deudas|extracto|movimientos)\b',
+  '^(?!.*\b(como|alcanza|alcanzaria|capacidad|diagnostico|pagar)\b).*\bmis (deudas|saldos|movimientos|extractos)\b',
   '\b(cual|cuanto|cuanta|cuantos|cuantas)\b.*\b(saldo|deuda|deudas|debo|extracto|movimientos)\b.*\b(mi|mis|cuenta|tarjeta)\b',
-  '\btengo (deudas|saldo|movimientos)\b',
+  '^(?!.*\b(alcanza|alcanzaria|capacidad|diagnostico|pagar|credito|prestamo|hago|hacer|ayuda)\b).*\btengo (deudas|saldo|movimientos)\b',
   # Otro banco: la frase explícita o el nombre de un competidor.
   '\b(otro banco|bancolombia|davivienda|bbva|colpatria)\b',
   # Banco de Bogotá es del mismo Grupo Aval: solo es X si se pide un producto.
