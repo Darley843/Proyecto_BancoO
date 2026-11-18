@@ -36,7 +36,7 @@ LADO = 1080
 """Lado de la tarjeta cuadrada en píxeles (WhatsApp la muestra completa)."""
 
 PESO_MAXIMO = 1_000_000
-"""Tope del PNG en bytes; WhatsApp acepta hasta 5 MB, pero así carga rápido."""
+"""La tarjeta debe pesar menos que esto (bytes); WhatsApp acepta 5 MB, así carga rápido."""
 
 AVISO = (
     "Orientativo, no es una aprobación de crédito. Pana es el asistente de un "
@@ -92,9 +92,12 @@ def _sin_numeros_largos(valor: str) -> str:
         El mismo texto, sin espacios en los extremos.
 
     Raises:
-        ValueError: si el texto (sin espacios, puntos ni guiones) tiene una
-            secuencia de 7 o más dígitos.
+        ValueError: si el texto queda vacío sin los espacios de los extremos,
+            o si (sin espacios, puntos ni guiones) tiene una secuencia de 7 o
+            más dígitos.
     """
+    if not valor.strip():
+        raise ValueError("el texto no puede estar vacío")
     compacto = re.sub(r"[\s.\-()+]", "", valor)
     if _DIGITOS_LARGOS.search(compacto):
         raise ValueError("la tarjeta no puede llevar números de teléfono ni de documento")
@@ -445,13 +448,13 @@ def _a_png(img: Image.Image) -> bytes:
         Bytes del PNG.
 
     Raises:
-        RuntimeError: si el PNG supera ``PESO_MAXIMO``.
+        RuntimeError: si el PNG llega a ``PESO_MAXIMO`` o lo supera.
     """
     salida = io.BytesIO()
     img.save(salida, format="PNG", optimize=True)
     datos = salida.getvalue()
-    if len(datos) > PESO_MAXIMO:
-        raise RuntimeError("la tarjeta pesa más de 1 MB")
+    if len(datos) >= PESO_MAXIMO:
+        raise RuntimeError("la tarjeta pesa 1 MB o más")
     return datos
 
 

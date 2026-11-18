@@ -284,3 +284,20 @@ def test_muestras_se_guardan_solo_cuando_se_piden(tmp_path: Path) -> None:
         "tarjeta-escenario.png",
     ]
     assert all(ruta.read_bytes().startswith(FIRMA_PNG) for ruta in escritos)
+
+
+@pytest.mark.parametrize("campo", ["producto", "razon", "tasa_vigencia", "tasa_fuente"])
+def test_rechaza_textos_solo_con_espacios(campo: str) -> None:
+    """Un texto que solo tiene espacios no se acepta como si tuviera contenido."""
+    with pytest.raises(ValidationError, match="vacío"):
+        _diagnostico(**{campo: "   "})
+
+
+def test_rechaza_tarjetas_de_un_mega_o_mas(monkeypatch: pytest.MonkeyPatch) -> None:
+    """El tope es estricto: una tarjeta que llega a 1 MB da error."""
+    import banco_occidente_corpus.pana.tarjetas as tarjetas
+
+    peso_real = len(tarjeta_diagnostico(EJEMPLO_DIAGNOSTICO))
+    monkeypatch.setattr(tarjetas, "PESO_MAXIMO", peso_real)
+    with pytest.raises(RuntimeError, match="1 MB"):
+        tarjetas.tarjeta_diagnostico(EJEMPLO_DIAGNOSTICO)
