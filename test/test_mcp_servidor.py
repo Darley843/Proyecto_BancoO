@@ -194,6 +194,12 @@ def config_boveda(tmp_path: Path) -> Config:
     return Config(paths=Paths(root=tmp_path))
 
 
+@pytest.fixture(autouse=True)
+def fecha_fija(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fija la fecha de consulta para que la suite no dependa del día de la corrida."""
+    monkeypatch.setattr(modulo, "_hoy", lambda: date(2026, 11, 16))
+
+
 def test_listado_solo_declara_consultas() -> None:
     """El listado MCP declara solo las herramientas de consulta habilitadas."""
     nombres = [herramienta.name for herramienta in asyncio.run(crear_servidor().list_tools())]
@@ -218,7 +224,28 @@ def test_consultar_tasa_devuelve_vigencia_fuente_y_sha(
     assert resumen["vigencia_hasta"] == "2026-11-30"
     assert resumen["fuente"] == FUENTE
     assert resumen["sha256_pdf"] == SHA
+    assert resumen["vigencia_vencida"] is False
+    assert resumen["alerta"] is None
     assert resultado["tasas"][0]["descripcion"].endswith("% E.A.")
+    assert "error" not in resultado
+
+
+def test_consultar_tasa_avisa_si_la_vigencia_vencio(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sin tabla de diciembre, responde con noviembre y la alerta, sin fallar."""
+    monkeypatch.setattr(modulo, "tasas_producto", lambda producto: [fila_tasa()])
+    monkeypatch.setattr(modulo, "tasa_vigente", lambda producto: vigente())
+    monkeypatch.setattr(modulo, "_spreads_producto", lambda producto, desde, plazo=None: [])
+    monkeypatch.setattr(modulo, "_hoy", lambda: date(2026, 12, 5))
+
+    resultado = consultar_tasa("libre_inversion")
+
+    resumen = resultado["resumen"]
+    assert resumen["vigencia_desde"] == "2026-11-01"
+    assert resumen["tasa_ea_hasta"] == 0.2817
+    assert resumen["vigencia_vencida"] is True
+    assert resumen["alerta"] == "vigencia_vencida"
     assert "error" not in resultado
 
 

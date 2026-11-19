@@ -24,7 +24,10 @@ un error explicable y no una lista vacía.
 (`Libre inversión`) o una frase que lo contenga (`tarjeta de crédito`). No llama
 al modelo ni a la red y no inventa una tasa ausente: responde
 `tasa_no_disponible`. Un spread sobre IPC o IBR se presenta como
-«IPC + 3,80 puntos» y nunca como porcentaje E.A.
+«IPC + 3,80 puntos» y nunca como porcentaje E.A. Si la tabla publicada ya no
+cubre la fecha de hoy, la consulta conserva la vigencia más reciente y agrega
+`vigencia_vencida` (con `alerta: "vigencia_vencida"`) en el resumen, en lugar de
+fallar: la app sigue respondiendo después del 30 de noviembre.
 
 En el **CDT**:
 

@@ -6,11 +6,14 @@ Bóveda— y nunca escriben en Gold, Knowledge, la Bóveda, el Tablero ni las ba
 del asistente. Tampoco llaman a DeepSeek ni al sitio del banco.
 
 `consultar_tasa` devuelve el rango E.A./M.V. del producto con su vigencia, su
-fuente y su `sha256_pdf`. Un spread sobre IPC o IBR no es una tasa: se presenta
-con `describir_tasa` («IPC + 3,80 puntos») y nunca como porcentaje E.A. En el
-CDT sin plazo no publica una envolvente: indica que la tasa depende del plazo y
-del monto y agrupa las tasas por plazo; con `plazo_dias` y `monto` devuelve solo
-la banda que corresponde, con la misma lógica del Tablero.
+fuente y su `sha256_pdf`. Si la tabla publicada ya no cubre la fecha de hoy, la
+consulta no falla: informa el dato de la vigencia más reciente con la alerta
+`vigencia_vencida`, igual que el motor del diagnóstico. Un spread sobre IPC o
+IBR no es una tasa: se presenta con `describir_tasa` («IPC + 3,80 puntos») y
+nunca como porcentaje E.A. En el CDT sin plazo no publica una envolvente: indica
+que la tasa depende del plazo y del monto y agrupa las tasas por plazo; con
+`plazo_dias` y `monto` devuelve solo la banda que corresponde, con la misma
+lógica del Tablero.
 
 `buscar_en_boveda` recupera hasta cinco fragmentos con su título, su URL, su
 posición y su similitud coseno. Los fragmentos son datos citados del corpus: el
@@ -185,8 +188,39 @@ def _spreads_producto(
     return sorted(encontrados, key=lambda item: (item["plazo_dias"] or 0, str(item["segmento"])))
 
 
+#: Alerta que acompaña a la tasa cuando la vigencia publicada ya no cubre hoy.
+ALERTA_VIGENCIA_VENCIDA: str = "vigencia_vencida"
+
+
+def _hoy() -> date:
+    """Devuelve la fecha de referencia de la consulta; las pruebas la fijan."""
+    return date.today()
+
+
+def _vigencia_vencida(vigente: TasaVigente) -> bool:
+    """Indica si la vigencia publicada no incluye la fecha de hoy.
+
+    La consulta no se detiene cuando el Tablero no publicó una tabla nueva: el
+    servidor devuelve la más reciente y lo declara con `vigencia_vencida`.
+
+    Args:
+        vigente: envolvente del producto en la vigencia elegida por el Tablero.
+
+    Returns:
+        `True` si hoy queda fuera de la vigencia, con los extremos incluidos.
+    """
+    hoy = _hoy()
+    return not vigente.vigencia_desde <= hoy <= vigente.vigencia_hasta
+
+
 def _comun_resumen(vigente: TasaVigente) -> dict[str, Any]:
-    """Arma la vigencia, la fuente y la huella que acompañan a toda respuesta."""
+    """Arma la vigencia, la fuente, la huella y la alerta de vigencia.
+
+    Una tabla publicada que ya venció no detiene la consulta: se informa el
+    dato más reciente con `vigencia_vencida` y `alerta`, igual que el motor del
+    diagnóstico. Así la app sigue respondiendo después del 30 de noviembre.
+    """
+    vencida = _vigencia_vencida(vigente)
     return {
         "vigencia_desde": vigente.vigencia_desde.isoformat(),
         "vigencia_hasta": vigente.vigencia_hasta.isoformat(),
@@ -194,6 +228,8 @@ def _comun_resumen(vigente: TasaVigente) -> dict[str, Any]:
         "fuente": vigente.fuente,
         "sha256_pdf": vigente.sha256_pdf,
         "fecha_extraccion": vigente.fecha_extraccion.isoformat(),
+        "vigencia_vencida": vencida,
+        "alerta": ALERTA_VIGENCIA_VENCIDA if vencida else None,
     }
 
 
