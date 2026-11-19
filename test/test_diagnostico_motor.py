@@ -25,6 +25,7 @@ from banco_occidente_corpus.diagnostico.motor import (
     calcular,
     cargar_config,
     entrada_desde_respuestas,
+    limites_credito,
 )
 from banco_occidente_corpus.tablero.tasas import (
     FilaTasa,
@@ -157,6 +158,27 @@ def test_cargar_config_lee_umbrales_valores_y_aplicabilidad() -> None:
     assert config.valores["ingresos.DE_5M_A_8M"] == Decimal(6_500_000)
     assert config.claves["gastos.DE_2M_A_3M"] == "gastos"
     assert "libre_inversion" in config.aplica_a["monto.DE_10M_A_20M"]
+    assert config.monto_minimo == Decimal(500_000)
+    assert config.monto_maximo == Decimal(2_000_000_000)
+
+
+def test_limites_credito_usa_la_frontera_de_monto_compartida() -> None:
+    """El monto sale de [limites] del TOML y el plazo del bloque del producto."""
+    libre = limites_credito("libre_inversion")
+    vivienda = limites_credito("vivienda")
+
+    assert libre.monto_minimo == Decimal(500_000)
+    assert libre.monto_maximo == Decimal(2_000_000_000)
+    assert (libre.plazo_minimo, libre.plazo_maximo) == (12, 72)
+    assert vivienda.monto_minimo == Decimal(500_000)
+    assert vivienda.monto_maximo == Decimal(2_000_000_000)
+    assert (vivienda.plazo_minimo, vivienda.plazo_maximo) == (120, 240)
+
+
+def test_limites_credito_rechaza_productos_sin_cuota() -> None:
+    """El ahorro no tiene bloques de monto ni plazo de crédito."""
+    with pytest.raises(ValueError, match="no es un producto de crédito"):
+        limites_credito("ahorro")
 
 
 def test_entrada_desde_respuestas_toma_los_valores_del_toml() -> None:

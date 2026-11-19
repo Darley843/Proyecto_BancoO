@@ -23,15 +23,20 @@ from banco_occidente_corpus.boveda.almacen import Coincidencia
 from banco_occidente_corpus.boveda.configuracion import cargar_configuracion_recuperacion
 from banco_occidente_corpus.boveda.recuperador import RecuperadorHibrido
 from banco_occidente_corpus.boveda.tipos import Fragmento
+from banco_occidente_corpus.canal.contratos import EntradaDiagnostico
 from banco_occidente_corpus.config import Config, Paths
+from banco_occidente_corpus.diagnostico.calculo import TasaProducto
+from banco_occidente_corpus.diagnostico.motor import calcular as calcular_diagnostico
 from banco_occidente_corpus.mcp_servidor import servidor as modulo
 from banco_occidente_corpus.mcp_servidor.servidor import (
     LIMITE_CONSULTA,
     LIMITE_K,
     _buscar_en_boveda,
+    _simular_cuota,
     buscar_en_boveda,
     consultar_tasa,
     crear_servidor,
+    simular_cuota,
 )
 from banco_occidente_corpus.tablero.tasas import FilaTasa, TasaNoDisponible, TasaVigente
 
@@ -203,7 +208,7 @@ def fecha_fija(monkeypatch: pytest.MonkeyPatch) -> None:
 def test_listado_solo_declara_consultas() -> None:
     """El listado MCP declara solo las herramientas de consulta habilitadas."""
     nombres = [herramienta.name for herramienta in asyncio.run(crear_servidor().list_tools())]
-    assert nombres == ["consultar_tasa", "buscar_en_boveda"]
+    assert nombres == ["consultar_tasa", "simular_cuota", "buscar_en_boveda"]
     assert all(("escribir" not in nombre and "borrar" not in nombre) for nombre in nombres)
 
 
@@ -620,3 +625,175 @@ def test_consultar_tasa_serializa_todas_las_tasas_como_float() -> None:
     assert isinstance(resultado["resumen"]["tasa_mv_hasta"], float)
     assert isinstance(resultado["tasas"][0]["tasa_mv_desde"], float)
     assert json.loads(json.dumps(resultado))["producto"] == "libre_inversion"
+
+
+def tasa_producto(
+    producto: str = "libre_inversion",
+    *,
+    desde: str = "0.2056",
+    hasta: str = "0.2817",
+    vigencia_desde: date = date(2026, 11, 1),
+    vigencia_hasta: date = date(2026, 11, 30),
+) -> TasaProducto:
+    """Construye el rango de tasa del Tablero para las pruebas de simulación."""
+    return TasaProducto(
+        producto=producto,
+        segmento=None,
+        ea_desde=Decimal(desde),
+        ea_hasta=Decimal(hasta),
+        vigencia_desde=vigencia_desde,
+        vigencia_hasta=vigencia_hasta,
+        fuente=FUENTE,
+        sha256_pdf=SHA,
+    )
+
+
+def test_simular_cuota_devuelve_rango_dos_tasas_y_trazabilidad() -> None:
+    """La simulación devuelve cuota en rango, las dos tasas y la fuente."""
+    resultado = _simular_cuota(
+        "libre_inversion", 15_000_000, 48, tasa=tasa_producto(), hoy=date(2026, 11, 16)
+    )
+
+    assert resultado["producto"] == "libre_inversion"
+    assert resultado["monto"] == 15_000_000.0
+    assert resultado["plazo_meses"] == 48
+    assert resultado["version_formula"] == "v1"
+    assert resultado["tasa_ea"] == {
+        "desde": 0.2056,
+        "hasta": 0.2817,
+        "descripcion": "20,56–28,17 % E.A.",
+    }
+    assert resultado["tasa_mensual"]["desde"] < resultado["tasa_mensual"]["hasta"]
+    assert resultado["cuota_mensual"]["descripcion"] == "$447.269–$498.003"
+    assert resultado["cuota_mensual"]["desde"] == 447_269.0
+    assert resultado["cuota_mensual"]["hasta"] == 498_003.0
+    assert resultado["total_pagado"]["desde"] == 21_468_912.0
+    assert resultado["total_intereses"]["hasta"] == 8_904_144.0
+    assert resultado["vigencia"] == "del 1 al 30 de noviembre de 2026"
+    assert resultado["fuente"] == FUENTE
+    assert resultado["sha256_pdf"] == SHA
+    assert resultado["vigencia_vencida"] is False
+    assert resultado["alertas"] == []
+    assert "orientativo" in resultado["aviso"]
+
+
+def test_simular_cuota_coincide_con_el_diagnostico() -> None:
+    """La cuota del MCP es la misma que calcula el diagnóstico financiero."""
+    entrada = EntradaDiagnostico(
+        producto="libre_inversion",
+        vinculacion="empleado",
+        ingreso_mensual=Decimal(10_000_000),
+        gastos_mensuales=Decimal(1_000_000),
+        cuotas_deudas=Decimal(0),
+        monto_credito=Decimal(15_000_000),
+        plazo_meses=48,
+    )
+    diagnostico = calcular_diagnostico(entrada, hoy=date(2026, 11, 16))
+    simulacion = simular_cuota("libre_inversion", 15_000_000, 48)
+
+    assert diagnostico.cuota_mensual is not None
+    assert Decimal(str(simulacion["cuota_mensual"]["desde"])) == diagnostico.cuota_mensual.desde
+    assert Decimal(str(simulacion["cuota_mensual"]["hasta"])) == diagnostico.cuota_mensual.hasta
+    assert simulacion["vigencia_desde"] == diagnostico.vigencia_tasa_desde.isoformat()
+
+
+@pytest.mark.parametrize("producto", ["ahorro", "cdt", "tarjeta_credito", "credito_rotativo"])
+def test_simular_cuota_rechaza_productos_sin_cuota(producto: str) -> None:
+    """Ahorro, CDT, tarjeta y rotativo explican que no tienen cuota fija."""
+    resultado = simular_cuota(producto, 1_000_000, 12)
+
+    assert resultado["error"]["codigo"] == "producto_no_simulable"
+    assert "no tiene cuota" in resultado["error"]["mensaje"]
+
+
+@pytest.mark.parametrize(
+    ("monto", "codigo"),
+    [
+        (0, "monto_invalido"),
+        (-1, "monto_invalido"),
+        ("mucho", "monto_invalido"),
+        (100_000, "monto_fuera_de_rango"),
+        (3_000_000_000, "monto_fuera_de_rango"),
+    ],
+)
+def test_simular_cuota_valida_el_monto(monto: object, codigo: str) -> None:
+    """Un monto inválido o fuera de la frontera compartida no calcula."""
+    resultado = _simular_cuota("libre_inversion", monto, 48)
+
+    assert resultado["error"]["codigo"] == codigo
+
+
+@pytest.mark.parametrize(("monto", "plazo"), [(3_000_000, 24), (80_000_000, 60)])
+def test_simular_cuota_acepta_montos_fuera_de_los_rangos(monto: int, plazo: int) -> None:
+    """La frontera de monto es la del producto, no la de los rangos de la entrevista."""
+    resultado = simular_cuota("libre_inversion", monto, plazo)
+
+    assert "error" not in resultado
+    assert resultado["monto"] == float(monto)
+    assert resultado["plazo_meses"] == plazo
+    assert resultado["cuota_mensual"]["desde"] < resultado["cuota_mensual"]["hasta"]
+
+
+@pytest.mark.parametrize(
+    ("plazo", "codigo"),
+    [
+        (0, "plazo_invalido"),
+        (-12, "plazo_invalido"),
+        (12.0, "plazo_invalido"),
+        (3, "plazo_fuera_de_rango"),
+        (96, "plazo_fuera_de_rango"),
+    ],
+)
+def test_simular_cuota_valida_el_plazo(plazo: object, codigo: str) -> None:
+    """Un plazo inválido o fuera del rango del producto no calcula."""
+    resultado = _simular_cuota("libre_inversion", 15_000_000, plazo)
+
+    assert resultado["error"]["codigo"] == codigo
+
+
+def test_simular_cuota_usa_los_limites_de_la_vivienda() -> None:
+    """La vivienda acepta montos y plazos largos y rechaza el plazo corto."""
+    resultado = simular_cuota("vivienda", 150_000_000, 240)
+    corto = simular_cuota("vivienda", 150_000_000, 12)
+
+    assert resultado["producto"] == "vivienda"
+    assert resultado["tasa_ea"]["desde"] == 0.1517
+    assert resultado["cuota_mensual"]["desde"] < resultado["cuota_mensual"]["hasta"]
+    assert corto["error"]["codigo"] == "plazo_fuera_de_rango"
+    assert "120 a 240" in corto["error"]["mensaje"]
+
+
+def test_simular_cuota_avisa_vigencia_vencida() -> None:
+    """Una tabla que ya no cubre hoy conserva el dato y agrega la alerta."""
+    vencida = tasa_producto(vigencia_desde=date(2026, 10, 1), vigencia_hasta=date(2026, 10, 31))
+
+    resultado = _simular_cuota(
+        "libre_inversion", 15_000_000, 48, tasa=vencida, hoy=date(2026, 11, 18)
+    )
+
+    assert resultado["vigencia_vencida"] is True
+    assert resultado["alertas"] == ["vigencia_vencida"]
+    assert "error" not in resultado
+
+
+def test_simular_cuota_sin_tasa_del_tablero(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Un producto sin tasa publicada responde un error y no inventa una cifra."""
+
+    def sin_tasa(producto: str) -> TasaProducto:
+        """Simula un Tablero que no publica el producto."""
+        raise TasaNoDisponible(f"no hay tasa publicada para «{producto}»")
+
+    monkeypatch.setattr(modulo, "tasa_de_tablero", sin_tasa)
+
+    resultado = simular_cuota("libre_inversion", 15_000_000, 48)
+
+    assert resultado["error"]["codigo"] == "tasa_no_disponible"
+
+
+def test_simular_cuota_es_json_serializable() -> None:
+    """El resultado se puede serializar en JSON sin conversiones extra."""
+    resultado = simular_cuota("libre_inversion", 15_000_000, 48)
+
+    datos = json.loads(json.dumps(resultado))
+    assert datos["plazo_meses"] == 48
+    assert isinstance(datos["cuota_mensual"]["desde"], float)

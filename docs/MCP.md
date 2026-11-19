@@ -3,7 +3,7 @@
 El proyecto expone la Bóveda y el Tablero a otros agentes por el **Protocolo de
 Contexto de Modelo (MCP)** con transporte **stdio**. El servidor no abre puertos,
 no escribe archivos y no gasta tokens: solo lee la tabla Gold de tasas y el
-índice local de la Bóveda.
+índice local de la Bóveda, y calcula la cuota con aritmética determinista.
 
 ```bash
 # desde la raíz del repositorio
@@ -18,6 +18,7 @@ un error explicable y no una lista vacía.
 | Herramienta | Entrada | Devuelve |
 |---|---|---|
 | `consultar_tasa` | `producto: str, plazo_dias: int \| None = None, monto: int \| None = None` | Rango E.A./M.V. con vigencia, fuente y `sha256_pdf`; filas por segmento con la etiqueta legible del Tablero y spreads IPC/IBR |
+| `simular_cuota` | `producto: str, monto: float, plazo_meses: int` | Cuota en rango, las dos tasas E.A. y M.V., totales, vigencia, fuente, `sha256_pdf` y alertas |
 | `buscar_en_boveda` | `pregunta: str, k: int = 5` | Hasta `k` fragmentos con texto, título, URL, posición y similitud coseno |
 
 `consultar_tasa` acepta la clave canónica (`libre_inversion`), el nombre visible
@@ -52,9 +53,25 @@ fija el recuperador híbrido. Los fragmentos son **datos citados** del corpus: e
 servidor no los ejecuta como instrucciones ni los usa para elegir herramientas.
 Cada respuesta incluye `tratamiento: "dato"` y el aviso correspondiente.
 
-`simular_cuota` queda **pendiente**: depende de `diagnostico.motor.simular`, que
-llega con el motor del diagnóstico (PR #136). Cuando exista se registrará en el
-mismo servidor sin cambiar el contrato de las otras dos herramientas.
+`simular_cuota` calcula la cuota francesa con la **misma aritmética del
+diagnóstico** (`diagnostico.calculo`: `tasa_mensual` y `cuota_francesa`) y la
+tasa que publica el Tablero para el producto. La cuota se informa como rango
+entre la tasa mínima y la máxima, y la tasa se cita con su vigencia, su fuente y
+su `sha256_pdf`.
+
+- Solo acepta productos de crédito con cuota fija: libre inversión, compra de
+  cartera, libranza, vehículo nuevo, vehículo usado y vivienda.
+- El **ahorro, el CDT, la tarjeta de crédito y el crédito rotativo** responden
+  `producto_no_simulable`: no tienen una cuota que simular.
+- El monto y el plazo se validan con los **mismos límites de
+  `config/diagnostico.toml`** que el diagnóstico y «¿Y si…?». El monto va de
+  $500.000 a $2.000 millones para todos los productos de crédito; los valores de
+  cálculo de la entrevista no son límites del producto. El plazo es por
+  producto: de 12 a 72 meses para libre inversión y de 120 a 240 para vivienda.
+- Si la tabla publicada ya no cubre la fecha de hoy, agrega
+  `vigencia_vencida` a `alertas` y sigue respondiendo con la vigencia más
+  reciente.
+- El resultado es orientativo y no es una aprobación ni una oferta de crédito.
 
 ## Límites y errores
 
@@ -63,7 +80,8 @@ mismo servidor sin cambiar el contrato de las otras dos herramientas.
 | Largo de la consulta o del nombre del producto | 500 caracteres |
 | Fragmentos por búsqueda (`k`) | entre 1 y 5 |
 | Tiempo máximo de una recuperación | 15 s |
-| `plazo_dias` y `monto` | enteros positivos; solo aplican al CDT |
+| `plazo_dias` y `monto` de `consultar_tasa` | enteros positivos; solo aplican al CDT |
+| Monto y plazo de `simular_cuota` | monto de $500.000 a $2.000 millones; plazo según el producto |
 
 Los errores viajan como un objeto estructurado:
 
@@ -72,9 +90,10 @@ Los errores viajan como un objeto estructurado:
 ```
 
 Códigos: `producto_requerido`, `producto_demasiado_largo`, `tasa_no_disponible`,
-`plazo_invalido`, `monto_invalido`, `consulta_vacia`,
-`consulta_demasiado_larga`, `k_fuera_de_rango`, `indice_ausente`,
-`indice_ilegible` y `tiempo_agotado`.
+`producto_no_simulable`, `producto_no_disponible`, `monto_invalido`,
+`monto_fuera_de_rango`, `plazo_invalido`, `plazo_fuera_de_rango`,
+`consulta_vacia`, `consulta_demasiado_larga`, `k_fuera_de_rango`,
+`indice_ausente`, `indice_ilegible` y `tiempo_agotado`.
 
 Una ruta del sistema (`C:\Windows\...`, `../../config/site.toml`) se trata como
 texto: el servidor no abre archivos por esa vía.
@@ -160,6 +179,42 @@ Respuesta (resumida):
   "filtros": {"plazo_dias": 360, "monto": 200000000},
   "total": 3
 }
+```
+
+Argumentos:
+
+```json
+{"producto": "libre_inversion", "monto": 15000000, "plazo_meses": 48}
+```
+
+Respuesta (resumida):
+
+```json
+{
+  "producto": "libre_inversion",
+  "nombre": "Libre inversión",
+  "monto": 15000000.0,
+  "plazo_meses": 48,
+  "version_formula": "v1",
+  "tasa_ea": {"desde": 0.2056, "hasta": 0.2817, "descripcion": "20,56–28,17 % E.A."},
+  "cuota_mensual": {"desde": 447269.0, "hasta": 498003.0, "descripcion": "$447.269–$498.003"},
+  "total_pagado": {"desde": 21468912.0, "hasta": 23904144.0},
+  "vigencia": "del 1 al 30 de noviembre de 2026",
+  "fuente": "https://www.bancodeoccidente.com.co/documents/d/guest/tasas-personas-bdo",
+  "sha256_pdf": "989be43a0ed19eb33e2057cd01c1ae612b6f15544eaaf41af6348846a6ff1b7f",
+  "vigencia_vencida": false,
+  "alertas": []
+}
+```
+
+Para un producto sin cuota la respuesta es un error explicable:
+
+```json
+{"producto": "ahorro", "monto": 1000000, "plazo_meses": 12}
+```
+
+```json
+{"error": {"codigo": "producto_no_simulable", "mensaje": "«Ahorro» no tiene cuota de crédito que simular. Usa un producto de crédito con cuota fija o consulta su tasa con consultar_tasa."}}
 ```
 
 Argumentos:
