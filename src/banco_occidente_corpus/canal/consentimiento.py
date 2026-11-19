@@ -5,16 +5,22 @@ La primera interacción de un número autorizado recibe el aviso y dos botones:
 perfil; el estado queda en ``consentimientos`` y la versión del aviso se guarda
 para poder auditar qué texto se aceptó.
 
-«Olvida mis datos» borra el consentimiento y los casos del usuario; el perfil
-del store lo borra la tarea 2.6 y el id de deduplicación se conserva porque no
-contiene datos personales.
+«Olvida mis datos» revoca la autorización y borra los casos del usuario. La
+fila del consentimiento **no se borra**: queda con ``revocado_en`` como prueba
+de la autorización (Decreto 1377 de 2013, art. 8); solo guarda la huella, la
+versión del aviso y las fechas. El perfil del store lo borra la tarea 2.6 y el
+id de deduplicación se conserva porque no contiene datos personales.
+
+El aviso cumple el deber de informar (Ley 1581 de 2012, art. 12): responsable,
+datos que se tratan, finalidad, a quién se comparten, conservación, derechos
+del titular y cómo ejercerlos.
 """
 
 from __future__ import annotations
 
 import unicodedata
 from dataclasses import dataclass
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Literal
 
@@ -35,21 +41,44 @@ Decision = Literal["acepto", "rechazo", "silencio"]
 #: Versión por defecto del aviso; `config/whatsapp.toml` puede cambiarla.
 VERSION_POR_DEFECTO = "2026-11"
 
-#: Texto del aviso que exige la Ley 1581 de 2012.
-AVISO = (
-    "Este es un proyecto académico de la Universidad Autónoma de Occidente. "
-    "Para continuar necesito tu autorización para tratar tus datos personales "
-    "(Ley 1581 de 2012): nombre, rol y el resultado orientativo del diagnóstico. "
-    "No guardo tu número de teléfono. Puedes escribir «olvida mis datos» cuando "
-    "quieras para borrarlos."
-)
+#: Días que se conservan los casos si `config/whatsapp.toml` no dice otra cosa.
+RETENCION_POR_DEFECTO = 30
+
+#: Límite de caracteres del cuerpo de un mensaje interactivo de WhatsApp.
+LARGO_MAXIMO_AVISO = 1024
+
+
+def texto_aviso(retencion_dias: int = RETENCION_POR_DEFECTO) -> str:
+    """Arma el aviso de privacidad con el plazo de conservación configurado.
+
+    Args:
+        retencion_dias: días que se conservan los datos del diagnóstico.
+
+    Returns:
+        El aviso completo que exige la Ley 1581 de 2012 (art. 12).
+    """
+    return (
+        "Proyecto académico de la Universidad Autónoma de Occidente; no es un canal "
+        "oficial del Banco de Occidente. Responsable: equipo Sucursal 1965 (UAO). "
+        "Para orientarte trataremos tu nombre (opcional), tu rol, los rangos de "
+        "ingresos, gastos y deudas que elijas y el resultado del diagnóstico; si lo "
+        "pides, lo verá un asesor del equipo. No guardamos tu número, solo una "
+        f"huella cifrada, y conservamos los datos máximo {retencion_dias} días. "
+        "Puedes conocer, actualizar, rectificar o suprimir tus datos escribiendo "
+        "aquí, y revocar esta autorización con «olvida mis datos». "
+        "¿Autorizas el tratamiento de tus datos (Ley 1581 de 2012)?"
+    )
+
+
+#: Texto del aviso con la conservación por defecto.
+AVISO = texto_aviso()
 
 #: Identificadores de los botones del aviso.
 ID_ACEPTO = "consent:acepto"
 ID_RECHAZO = "consent:rechazo"
 
 #: Palabras que cuentan como aceptación o rechazo por texto libre.
-TEXTOS_ACEPTO = frozenset({"acepto", "si acepto", "autorizo", "si autorizo"})
+TEXTOS_ACEPTO = frozenset({"acepto", "si acepto", "autorizo", "si autorizo", "si"})
 TEXTOS_RECHAZO = frozenset({"no acepto", "ahora no", "no autorizo", "no"})
 TEXTOS_REVOCACION = frozenset({"olvida mis datos", "borra mis datos", "elimina mis datos"})
 
@@ -95,6 +124,7 @@ class MaquinaConsentimiento:
 
     ruta: Path
     version: str = VERSION_POR_DEFECTO
+    retencion_dias: int = RETENCION_POR_DEFECTO
 
     def __post_init__(self) -> None:
         """Crea el almacén y sus tablas si no existen."""
@@ -135,15 +165,43 @@ class MaquinaConsentimiento:
                 (usuario_id, self.version, instante),
             )
 
-    def revocar(self, usuario_id: str) -> None:
-        """Borra consentimiento y casos; el perfil lo borra la tarea 2.6.
+    def revocar(self, usuario_id: str, momento: datetime | None = None) -> None:
+        """Revoca la autorización y borra los casos; el perfil lo borra la tarea 2.6.
+
+        La fila del consentimiento se conserva con ``revocado_en`` como prueba
+        de la autorización (Decreto 1377 de 2013, art. 8). No contiene datos
+        personales: solo la huella, la versión del aviso y las fechas.
 
         Args:
             usuario_id: huella del número.
+            momento: instante de la revocación; por defecto ahora en UTC.
         """
+        instante = (momento or datetime.now(UTC)).isoformat()
         with conectar(self.ruta) as conexion:
-            conexion.execute("DELETE FROM consentimientos WHERE usuario_id = ?", (usuario_id,))
+            conexion.execute(
+                "UPDATE consentimientos SET revocado_en = ? "
+                "WHERE usuario_id = ? AND revocado_en IS NULL",
+                (instante, usuario_id),
+            )
             conexion.execute("DELETE FROM casos WHERE usuario_id = ?", (usuario_id,))
+
+    def purgar_casos_vencidos(self, momento: datetime | None = None) -> int:
+        """Borra los casos más viejos que el plazo de conservación del aviso.
+
+        El despachador la llama al arrancar; así el aviso no promete un plazo
+        que el código no cumple. Los consentimientos no se purgan: son la
+        prueba de la autorización.
+
+        Args:
+            momento: instante de referencia; por defecto ahora en UTC.
+
+        Returns:
+            Cuántos casos se borraron.
+        """
+        limite = ((momento or datetime.now(UTC)) - timedelta(days=self.retencion_dias)).isoformat()
+        with conectar(self.ruta) as conexion:
+            cursor = conexion.execute("DELETE FROM casos WHERE creado_en < ?", (limite,))
+            return cursor.rowcount
 
     def aviso(self, usuario_id: str, id_mensaje: str) -> RespuestaCanal:
         """Construye el aviso con los botones «Acepto» y «Ahora no».
@@ -158,7 +216,7 @@ class MaquinaConsentimiento:
         return RespuestaCanal(
             usuario_id=usuario_id,
             id_mensaje_origen=id_mensaje,
-            texto=AVISO,
+            texto=texto_aviso(self.retencion_dias),
             tipo="botones",
             botones=[
                 BotonCanal(id=ID_ACEPTO, titulo="Acepto"),
@@ -182,7 +240,8 @@ class MaquinaConsentimiento:
             return self._respuesta(
                 usuario_id,
                 mensaje.id_mensaje,
-                "Listo, borré tus datos. Si quieres volver a empezar, escribe «hola».",
+                "Listo, revoqué tu autorización y borré los datos de tu diagnóstico. "
+                "Si quieres volver a empezar, escribe «hola».",
             )
 
         if self.estado(usuario_id) == ESTADO_ACEPTADO:
