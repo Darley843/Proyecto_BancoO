@@ -14,20 +14,32 @@ from pydantic import ValidationError
 from banco_occidente_corpus.pana import (
     AVISO,
     EXPRESIONES,
+    DatosAhorro,
     DatosDiagnostico,
     DatosEscenario,
+    DatosNoAplica,
     FotoEscenario,
+    TasaCaptacion,
     dibujar_pana,
     foto_de_perfil,
+    insignia,
+    tarjeta_ahorro,
     tarjeta_diagnostico,
     tarjeta_escenario,
+    tarjeta_no_aplica,
+    texto_ahorro,
     texto_diagnostico,
     texto_escenario,
+    texto_no_aplica,
 )
 from banco_occidente_corpus.pana.__main__ import (
+    EJEMPLO_AHORRO,
+    EJEMPLO_CARTERA,
     EJEMPLO_DIAGNOSTICO,
     EJEMPLO_ESCENARIO,
+    EJEMPLO_NO_APLICA,
     guardar_muestras,
+    main,
 )
 from banco_occidente_corpus.pana.tarjetas import (
     LADO,
@@ -280,8 +292,11 @@ def test_muestras_se_guardan_solo_cuando_se_piden(tmp_path: Path) -> None:
         "pana-feliz.png",
         "pana-pensativo.png",
         "pana-perfil.png",
+        "tarjeta-ahorro.png",
+        "tarjeta-cartera.png",
         "tarjeta-diagnostico.png",
         "tarjeta-escenario.png",
+        "tarjeta-no-aplica.png",
     ]
     assert all(ruta.read_bytes().startswith(FIRMA_PNG) for ruta in escritos)
 
@@ -324,3 +339,122 @@ def test_sigue_rechazando_documentos_junto_a_montos(razon: str) -> None:
     """Quitar los montos no deja pasar cédulas ni teléfonos."""
     with pytest.raises(ValidationError, match="teléfono"):
         _diagnostico(razon=razon)
+
+
+# --- variantes: compra de cartera, ahorro y «no aplica» ---------------------
+
+
+@pytest.mark.parametrize(
+    ("dibujar", "datos"),
+    [
+        (tarjeta_diagnostico, EJEMPLO_CARTERA),
+        (tarjeta_ahorro, EJEMPLO_AHORRO),
+        (tarjeta_no_aplica, EJEMPLO_NO_APLICA),
+    ],
+)
+def test_variantes_son_png_cuadrados_y_livianos(dibujar: object, datos: object) -> None:
+    """Las tres variantes salen como PNG de 1080 × 1080 de menos de 1 MB."""
+    png = dibujar(datos)  # type: ignore[operator]
+
+    assert png.startswith(FIRMA_PNG)
+    assert len(png) < PESO_MAXIMO
+    assert _abrir(png).size == (LADO, LADO)
+
+
+def test_compra_de_cartera_muestra_el_ahorro_mensual() -> None:
+    """El texto de compra de cartera trae el ahorro mensual; los demás no."""
+    assert "Ahorro mensual estimado: *$140.000*" in texto_diagnostico(EJEMPLO_CARTERA)
+    assert "Ahorro mensual" not in texto_diagnostico(EJEMPLO_DIAGNOSTICO)
+
+
+def test_la_fila_de_ahorro_cambia_la_tarjeta() -> None:
+    """Agregar el ahorro mensual cambia la imagen (hay una fila más)."""
+    sin_ahorro = _diagnostico(**(EJEMPLO_CARTERA.model_dump() | {"ahorro_mensual": None}))
+    assert tarjeta_diagnostico(sin_ahorro) != tarjeta_diagnostico(EJEMPLO_CARTERA)
+
+
+def test_ahorro_mensual_debe_ser_positivo() -> None:
+    """Un ahorro de cero o negativo no se muestra como ahorro."""
+    with pytest.raises(ValidationError):
+        _diagnostico(ahorro_mensual=Decimal(0))
+
+
+def test_texto_del_ahorro_no_tiene_semaforo() -> None:
+    """El ahorro informa capacidad y tasas, sin colores de semáforo."""
+    texto = texto_ahorro(EJEMPLO_AHORRO)
+
+    for pieza in (
+        "Puedes ahorrar hasta $350.000 al mes",
+        "CDT a 90 días: 8,2 % – 8,9 % E.A.",
+        "Cuenta de ahorros: 0,5 % E.A.",
+        "Tablero de tasas, nov. 2026",
+        AVISO,
+    ):
+        assert pieza in texto, pieza
+    for color in ("verde", "amarillo", "rojo", "Verde", "Amarillo", "Rojo"):
+        assert color not in texto
+
+
+@pytest.mark.parametrize("capacidad", [Decimal(0), Decimal(-200_000)])
+def test_ahorro_sin_margen_lo_dice_sin_cifras_negativas(capacidad: Decimal) -> None:
+    """Sin capacidad de ahorro no se muestra un monto negativo."""
+    datos = DatosAhorro(**(EJEMPLO_AHORRO.model_dump() | {"capacidad_ahorro": capacidad}))
+    texto = texto_ahorro(datos)
+
+    assert "Hoy no queda margen para ahorrar" in texto
+    assert "-$" not in texto
+    assert tarjeta_ahorro(datos).startswith(FIRMA_PNG)
+
+
+def test_ahorro_admite_hasta_tres_tasas() -> None:
+    """Más de tres tasas no caben en la tarjeta y se rechazan."""
+    tasa = TasaCaptacion(etiqueta="CDT", ea_min_pct=Decimal(8), ea_max_pct=Decimal(9))
+    with pytest.raises(ValidationError):
+        DatosAhorro(**(EJEMPLO_AHORRO.model_dump() | {"tasas": [tasa.model_dump()] * 4}))
+
+
+def test_tasa_de_captacion_con_rango_invertido() -> None:
+    """La tasa mínima no puede ser mayor que la máxima."""
+    with pytest.raises(ValidationError, match="ea_min_pct"):
+        TasaCaptacion(etiqueta="CDT", ea_min_pct=Decimal(9), ea_max_pct=Decimal(8))
+
+
+def test_texto_de_no_aplica_trae_razon_y_alternativa() -> None:
+    """La libranza para independiente explica por qué y qué sí se puede."""
+    texto = texto_no_aplica(EJEMPLO_NO_APLICA)
+
+    assert "Libranza: esta opción no aplica" in texto
+    assert "convenio de descuento" in texto
+    assert "libre inversión" in texto
+    assert AVISO in texto
+    assert "$" not in texto
+
+
+@pytest.mark.parametrize("campo", ["producto", "razon", "alternativa"])
+def test_no_aplica_rechaza_telefonos(campo: str) -> None:
+    """La regla de privacidad también aplica a la tarjeta de «no aplica»."""
+    datos = EJEMPLO_NO_APLICA.model_dump() | {campo: "Llama al 3001234567"}
+    with pytest.raises(ValidationError, match="teléfono"):
+        DatosNoAplica(**datos)
+
+
+def test_insignia_es_redonda_con_esquinas_transparentes() -> None:
+    """La insignia de Pana es un círculo: esquinas transparentes y centro lleno."""
+    circulo = insignia("feliz", 200)
+
+    assert circulo.mode == "RGBA"
+    assert circulo.size == (200, 200)
+    assert circulo.getpixel((0, 0))[3] == 0  # type: ignore[index]
+    assert circulo.getpixel((100, 100))[3] == 255  # type: ignore[index]
+
+
+def test_main_guarda_muestras_e_imprime_las_rutas(
+    tmp_path: Path, capsys: pytest.CaptureFixture[str]
+) -> None:
+    """El comando de muestras devuelve 0 e imprime una ruta por archivo."""
+    destino = tmp_path / "salida"
+
+    assert main(["--muestras", str(destino)]) == 0
+    impresas = capsys.readouterr().out.strip().splitlines()
+    assert len(impresas) == 9
+    assert all(Path(linea).exists() for linea in impresas)

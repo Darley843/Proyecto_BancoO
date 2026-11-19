@@ -16,11 +16,16 @@ from pathlib import Path
 
 from .personaje import EXPRESIONES, dibujar_pana, foto_de_perfil
 from .tarjetas import (
+    DatosAhorro,
     DatosDiagnostico,
     DatosEscenario,
+    DatosNoAplica,
     FotoEscenario,
+    TasaCaptacion,
+    tarjeta_ahorro,
     tarjeta_diagnostico,
     tarjeta_escenario,
+    tarjeta_no_aplica,
 )
 
 EJEMPLO_DIAGNOSTICO = DatosDiagnostico(
@@ -49,9 +54,47 @@ EJEMPLO_ESCENARIO = DatosEscenario(
 )
 """Escenario ficticio de la demo."""
 
+EJEMPLO_CARTERA = DatosDiagnostico(
+    producto="Compra de cartera",
+    monto=Decimal(8_000_000),
+    plazo_meses=36,
+    semaforo="verde",
+    cuota_min=Decimal(290_000),
+    cuota_max=Decimal(310_000),
+    razon="Al trasladar tus deudas, la cuota cabe con holgura en lo que te queda libre.",
+    tasa_mensual_pct=Decimal("1.6"),
+    tasa_vigencia="nov. 2026",
+    tasa_fuente="Tablero de tasas",
+    ahorro_mensual=Decimal(140_000),
+)
+"""Compra de cartera ficticia, con el ahorro mensual estimado."""
+
+EJEMPLO_AHORRO = DatosAhorro(
+    capacidad_ahorro=Decimal(350_000),
+    razon="El ahorro no tiene semáforo de crédito: se informa la capacidad mensual.",
+    tasas=[
+        TasaCaptacion(
+            etiqueta="Cuenta de ahorros", ea_min_pct=Decimal("0.5"), ea_max_pct=Decimal("0.5")
+        ),
+        TasaCaptacion(
+            etiqueta="CDT a 90 días", ea_min_pct=Decimal("8.2"), ea_max_pct=Decimal("8.9")
+        ),
+    ],
+    tasa_vigencia="nov. 2026",
+    tasa_fuente="Tablero de tasas",
+)
+"""Ahorro ficticio, sin semáforo."""
+
+EJEMPLO_NO_APLICA = DatosNoAplica(
+    producto="Libranza",
+    razon="La libranza solo está disponible para empleados o pensionados con convenio de descuento.",
+    alternativa="Puedes simular un préstamo de libre inversión o hablar con un asesor.",
+)
+"""Libranza para una persona independiente: no se simula."""
+
 
 def guardar_muestras(carpeta: Path) -> list[Path]:
-    """Escribe la foto de perfil, las tres caras y las dos tarjetas.
+    """Escribe la foto de perfil, las tres caras y las cinco tarjetas.
 
     Args:
         carpeta: carpeta de destino (se crea si no existe).
@@ -74,6 +117,9 @@ def guardar_muestras(carpeta: Path) -> list[Path]:
     for nombre, contenido in (
         ("tarjeta-diagnostico.png", tarjeta_diagnostico(EJEMPLO_DIAGNOSTICO)),
         ("tarjeta-escenario.png", tarjeta_escenario(EJEMPLO_ESCENARIO)),
+        ("tarjeta-cartera.png", tarjeta_diagnostico(EJEMPLO_CARTERA)),
+        ("tarjeta-ahorro.png", tarjeta_ahorro(EJEMPLO_AHORRO)),
+        ("tarjeta-no-aplica.png", tarjeta_no_aplica(EJEMPLO_NO_APLICA)),
     ):
         ruta = carpeta / nombre
         ruta.write_bytes(contenido)

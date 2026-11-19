@@ -125,6 +125,8 @@ class DatosDiagnostico(BaseModel):
         tasa_mensual_pct: tasa de referencia mensual, en porcentaje.
         tasa_vigencia: corte de la tasa («nov. 2026»).
         tasa_fuente: de dónde sale la tasa («Tablero de tasas»).
+        ahorro_mensual: en compra de cartera, cuánto baja la cuota al mes al
+            trasladar las deudas; ``None`` en los demás créditos.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -139,6 +141,7 @@ class DatosDiagnostico(BaseModel):
     tasa_mensual_pct: Decimal = Field(gt=0, lt=10)
     tasa_vigencia: str = Field(min_length=1, max_length=30)
     tasa_fuente: str = Field(min_length=1, max_length=40)
+    ahorro_mensual: Decimal | None = Field(default=None, gt=0)
 
     @field_validator("producto", "razon", "tasa_vigencia", "tasa_fuente")
     @classmethod
@@ -218,6 +221,115 @@ class DatosEscenario(BaseModel):
     nota: str = Field(min_length=1, max_length=120)
 
     @field_validator("pregunta", "nota")
+    @classmethod
+    def _textos_sin_numeros(cls, valor: str) -> str:
+        """Aplica la regla de no llevar teléfonos ni documentos.
+
+        Args:
+            valor: texto del campo.
+
+        Returns:
+            El texto validado.
+        """
+        return _sin_numeros_largos(valor)
+
+
+class TasaCaptacion(BaseModel):
+    """Una tasa de ahorro o CDT para la tarjeta de ahorro.
+
+    Attributes:
+        etiqueta: nombre corto del producto o plazo («CDT a 90 días»).
+        ea_min_pct: tasa efectiva anual mínima, en porcentaje.
+        ea_max_pct: tasa efectiva anual máxima, en porcentaje.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    etiqueta: str = Field(min_length=1, max_length=30)
+    ea_min_pct: Decimal = Field(ge=0, lt=100)
+    ea_max_pct: Decimal = Field(ge=0, lt=100)
+
+    @field_validator("etiqueta")
+    @classmethod
+    def _etiqueta_sin_numeros(cls, valor: str) -> str:
+        """Aplica la regla de no llevar teléfonos ni documentos.
+
+        Args:
+            valor: texto del campo.
+
+        Returns:
+            El texto validado.
+        """
+        return _sin_numeros_largos(valor)
+
+    @model_validator(mode="after")
+    def _rango_ordenado(self) -> TasaCaptacion:
+        """Comprueba que el rango de la tasa esté en orden.
+
+        Returns:
+            El modelo validado.
+
+        Raises:
+            ValueError: si ``ea_min_pct`` es mayor que ``ea_max_pct``.
+        """
+        if self.ea_min_pct > self.ea_max_pct:
+            raise ValueError("ea_min_pct no puede ser mayor que ea_max_pct")
+        return self
+
+
+class DatosAhorro(BaseModel):
+    """Datos de la tarjeta de ahorro: sin semáforo y sin datos personales.
+
+    Attributes:
+        capacidad_ahorro: lo que queda libre al mes; cero o negativo si no
+            hay margen.
+        razon: frase corta del motor («El ahorro no tiene semáforo…»).
+        tasas: hasta tres tasas de ahorro o CDT de referencia.
+        tasa_vigencia: corte de las tasas («nov. 2026»).
+        tasa_fuente: de dónde salen las tasas («Tablero de tasas»).
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    capacidad_ahorro: Decimal
+    razon: str = Field(min_length=1, max_length=110)
+    tasas: list[TasaCaptacion] = Field(default_factory=list, max_length=3)
+    tasa_vigencia: str = Field(min_length=1, max_length=30)
+    tasa_fuente: str = Field(min_length=1, max_length=40)
+
+    @field_validator("razon", "tasa_vigencia", "tasa_fuente")
+    @classmethod
+    def _textos_sin_numeros(cls, valor: str) -> str:
+        """Aplica la regla de no llevar teléfonos ni documentos.
+
+        Args:
+            valor: texto del campo.
+
+        Returns:
+            El texto validado.
+        """
+        return _sin_numeros_largos(valor)
+
+
+class DatosNoAplica(BaseModel):
+    """Datos de la tarjeta cuando el producto no se puede simular.
+
+    Por ejemplo, la libranza para una persona independiente: no hay cuota ni
+    semáforo, solo la explicación y la alternativa.
+
+    Attributes:
+        producto: nombre corto del producto («Libranza»).
+        razon: por qué no aplica.
+        alternativa: lo que sí se puede hacer.
+    """
+
+    model_config = ConfigDict(frozen=True, extra="forbid")
+
+    producto: str = Field(min_length=1, max_length=40)
+    razon: str = Field(min_length=1, max_length=140)
+    alternativa: str = Field(min_length=1, max_length=110)
+
+    @field_validator("producto", "razon", "alternativa")
     @classmethod
     def _textos_sin_numeros(cls, valor: str) -> str:
         """Aplica la regla de no llevar teléfonos ni documentos.
@@ -313,8 +425,13 @@ def texto_diagnostico(datos: DatosDiagnostico) -> str:
         f"{datos.razon}\n\n"
         f"Lo que pagarías al mes: *{rango_pesos(datos.cuota_min, datos.cuota_max)}*\n"
         f"Tasa de referencia: {porcentaje(datos.tasa_mensual_pct)} mensual "
-        f"({datos.tasa_fuente}, {datos.tasa_vigencia})\n\n"
-        f"_{AVISO}_"
+        f"({datos.tasa_fuente}, {datos.tasa_vigencia})\n"
+        + (
+            f"Ahorro mensual estimado: *{pesos(datos.ahorro_mensual)}*\n"
+            if datos.ahorro_mensual is not None
+            else ""
+        )
+        + f"\n_{AVISO}_"
     )
 
 
@@ -335,6 +452,66 @@ def texto_escenario(datos: DatosEscenario) -> str:
         f"Escenario, {b.plazo_meses} meses: {rango_pesos(b.cuota_min, b.cuota_max)} al mes "
         f"({b.semaforo})\n"
         f"{datos.nota}\n\n"
+        f"_{AVISO}_"
+    )
+
+
+def _rango_ea(tasa: TasaCaptacion) -> str:
+    """Formatea el rango efectivo anual de una tasa de captación.
+
+    Args:
+        tasa: tasa de ahorro o CDT.
+
+    Returns:
+        Texto como ``8,5 % E.A.`` o ``8 % – 9,2 % E.A.``.
+    """
+    if tasa.ea_min_pct == tasa.ea_max_pct:
+        return f"{porcentaje(tasa.ea_min_pct)} E.A."
+    return f"{porcentaje(tasa.ea_min_pct)} – {porcentaje(tasa.ea_max_pct)} E.A."
+
+
+def _frase_capacidad(capacidad: Decimal) -> str:
+    """Resume la capacidad de ahorro en una frase corta.
+
+    Args:
+        capacidad: lo que queda libre al mes.
+
+    Returns:
+        «Puedes ahorrar hasta $X al mes» o que hoy no queda margen.
+    """
+    if capacidad > 0:
+        return f"Puedes ahorrar hasta {pesos(capacidad)} al mes"
+    return "Hoy no queda margen para ahorrar"
+
+
+def texto_ahorro(datos: DatosAhorro) -> str:
+    """Escribe el texto que acompaña a la tarjeta de ahorro.
+
+    Args:
+        datos: datos validados del ahorro.
+
+    Returns:
+        Texto listo para WhatsApp con la capacidad, las tasas y el aviso.
+    """
+    lineas = [f"*{_frase_capacidad(datos.capacidad_ahorro)}*", datos.razon, ""]
+    lineas += [f"{tasa.etiqueta}: {_rango_ea(tasa)}" for tasa in datos.tasas]
+    lineas.append(f"Tasas: {datos.tasa_fuente}, {datos.tasa_vigencia}")
+    return "\n".join(lineas) + f"\n\n_{AVISO}_"
+
+
+def texto_no_aplica(datos: DatosNoAplica) -> str:
+    """Escribe el texto que acompaña a la tarjeta de «no aplica».
+
+    Args:
+        datos: datos validados.
+
+    Returns:
+        Texto listo para WhatsApp con la razón, la alternativa y el aviso.
+    """
+    return (
+        f"*{datos.producto}: esta opción no aplica*\n"
+        f"{datos.razon}\n\n"
+        f"Lo que sí puedes hacer: {datos.alternativa}\n\n"
         f"_{AVISO}_"
     )
 
@@ -465,6 +642,46 @@ def _a_png(img: Image.Image) -> bytes:
     return datos
 
 
+def _tabla(d: ImageDraw.ImageDraw, filas: list[tuple[str, str]], y: int, paso: int) -> None:
+    """Dibuja filas «etiqueta … valor» con una línea debajo de cada una.
+
+    Args:
+        d: lienzo de dibujo.
+        filas: pares ``(etiqueta, valor)``.
+        y: altura de la primera fila.
+        paso: separación entre filas en píxeles.
+    """
+    fuente_valor = _fuente(30, negrita=True)
+    for etiqueta, valor in filas:
+        d.text((92, y), etiqueta, font=_fuente(30), fill=TINTA)
+        d.text((LADO - 92 - fuente_valor.getlength(valor), y), valor, font=fuente_valor, fill=TINTA)
+        y += paso
+        d.line((92, y - 14, LADO - 92, y - 14), fill=LINEA, width=1)
+
+
+def _caja_mensaje(
+    d: ImageDraw.ImageDraw,
+    titulo: str,
+    detalle: str,
+    fondo: tuple[int, int, int],
+    borde: tuple[int, int, int],
+) -> None:
+    """Dibuja la caja central con un título y una frase, sin luz de semáforo.
+
+    Args:
+        d: lienzo de dibujo.
+        titulo: frase principal.
+        detalle: frase de apoyo.
+        fondo: color de relleno.
+        borde: color del borde.
+    """
+    caja = (92, 430, LADO - 92, 660)
+    d.rounded_rectangle(caja, radius=22, fill=fondo, outline=borde, width=3)
+    ancho = caja[2] - caja[0] - 76
+    alto = _parrafo(d, (130, 466), titulo, _fuente(40, True), ancho, TINTA, 1.2)
+    _parrafo(d, (130, 476 + alto), detalle, _fuente(28), ancho, GRIS, 1.3)
+
+
 def tarjeta_diagnostico(datos: DatosDiagnostico) -> bytes:
     """Dibuja la tarjeta del diagnóstico en PNG, en memoria.
 
@@ -508,13 +725,9 @@ def tarjeta_diagnostico(datos: DatosDiagnostico) -> bytes:
         ("Tasa de referencia", f"{porcentaje(datos.tasa_mensual_pct)} mensual"),
         ("Fuente de la tasa", f"{datos.tasa_fuente}, {datos.tasa_vigencia}"),
     ]
-    y = 700
-    for etiqueta, valor in filas:
-        d.text((92, y), etiqueta, font=_fuente(30), fill=TINTA)
-        fuente_valor = _fuente(30, negrita=True)
-        d.text((LADO - 92 - fuente_valor.getlength(valor), y), valor, font=fuente_valor, fill=TINTA)
-        y += 62
-        d.line((92, y - 14, LADO - 92, y - 14), fill=LINEA, width=1)
+    if datos.ahorro_mensual is not None:
+        filas.append(("Ahorro mensual estimado", pesos(datos.ahorro_mensual)))
+    _tabla(d, filas, 690, 62 if len(filas) <= 3 else 56)
 
     _parrafo(d, (92, LADO - 150), AVISO, _fuente(23), ancho, GRIS_CLARO, 1.35)
     return _a_png(img)
@@ -585,5 +798,52 @@ def tarjeta_escenario(datos: DatosEscenario) -> bytes:
         fill=VERDE,
     )
     _parrafo(d, (92, arriba + 420), datos.nota, _fuente(30), ancho, TINTA, 1.35)
+    _parrafo(d, (92, LADO - 150), AVISO, _fuente(23), ancho, GRIS_CLARO, 1.35)
+    return _a_png(img)
+
+
+FONDO_NEUTRO = (234, 242, 238)
+"""Relleno de las tarjetas sin semáforo (ahorro y «no aplica»)."""
+
+
+def tarjeta_ahorro(datos: DatosAhorro) -> bytes:
+    """Dibuja la tarjeta de ahorro, sin semáforo, en PNG y en memoria.
+
+    Args:
+        datos: datos validados del ahorro.
+
+    Returns:
+        Bytes del PNG de 1080 × 1080.
+    """
+    img, d = _lienzo()
+    expresion: Expresion = "feliz" if datos.capacidad_ahorro > 0 else "calma"
+    _encabezado(img, d, "Sucursal 1965 · Pana", expresion)
+    d.text((92, 270), "Tu plan de ahorro", font=_fuente(64, negrita=True), fill=TINTA)
+    d.text((92, 356), "El ahorro no lleva semáforo", font=_fuente(32), fill=GRIS)
+    _caja_mensaje(d, _frase_capacidad(datos.capacidad_ahorro), datos.razon, FONDO_NEUTRO, VERDE)
+    filas = [(tasa.etiqueta, _rango_ea(tasa)) for tasa in datos.tasas]
+    filas.append(("Fuente de las tasas", f"{datos.tasa_fuente}, {datos.tasa_vigencia}"))
+    _tabla(d, filas, 690, 62 if len(filas) <= 3 else 56)
+    _parrafo(d, (92, LADO - 150), AVISO, _fuente(23), LADO - 2 * 92, GRIS_CLARO, 1.35)
+    return _a_png(img)
+
+
+def tarjeta_no_aplica(datos: DatosNoAplica) -> bytes:
+    """Dibuja la tarjeta de un producto que no se puede simular.
+
+    Args:
+        datos: datos validados.
+
+    Returns:
+        Bytes del PNG de 1080 × 1080.
+    """
+    img, d = _lienzo()
+    _encabezado(img, d, "Sucursal 1965 · Pana", "calma")
+    ancho = LADO - 2 * 92
+    d.text((92, 270), datos.producto, font=_fuente(64, negrita=True), fill=TINTA)
+    d.text((92, 356), "Esta opción no aplica para ti", font=_fuente(32), fill=GRIS)
+    _caja_mensaje(d, "Calma, hay otro camino", datos.razon, (241, 238, 232), GRIS_CLARO)
+    d.text((92, 700), "Lo que sí puedes hacer", font=_fuente(30, negrita=True), fill=VERDE)
+    _parrafo(d, (92, 750), datos.alternativa, _fuente(32), ancho, TINTA, 1.35)
     _parrafo(d, (92, LADO - 150), AVISO, _fuente(23), ancho, GRIS_CLARO, 1.35)
     return _a_png(img)
