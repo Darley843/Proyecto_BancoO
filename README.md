@@ -260,15 +260,19 @@ letra:
 |---|---|
 | `B` | Bóveda: consulta general |
 | `B` · motivo `cortesia` | Cortesía: saludo, gracias o identidad, sin recuperador ni modelo (0 tokens) |
-| `T` | Tablero: tarifas, cuotas, coberturas o carencias |
+| `T` | Tablero: tarifas, tasas de interés, cuotas, coberturas o carencias |
 | `T` · motivo `mixta` | Mixta: la cifra del Tablero y la explicación de la Bóveda en el mismo turno |
-| `X` | Rechazo: datos personales o fuera de alcance |
+| `D` | Diagnóstico: capacidad de pago o de endeudamiento, «¿me alcanza?» o pedir el diagnóstico; invitación fija al diagnóstico guiado, sin recuperador ni modelo (0 tokens) |
+| `X` | Rechazo: datos personales, fuera de alcance o una instrucción incrustada para cambiar o revelar las reglas |
 
-Las reglas van antes que el modelo (PII → fuera de alcance → cortesía →
-identidad → mixta → tarifas → duda → `B`), se configuran en `[digiturno]` de
-`config/sucursal.toml` y el modelo solo se usa para dudas, a temperatura 0. La
-cortesía no gasta búsqueda ni tokens y la mixta cita las dos fuentes: el turno
-no persiste la pregunta.
+Las reglas van antes que el modelo (PII → fuera de alcance → diagnóstico →
+cortesía → identidad → mixta → tarifas → duda → `B`), se configuran en
+`[digiturno]` de `config/sucursal.toml` y el modelo solo se usa para dudas, a
+temperatura 0. Si el modelo no responde una duda después de un reintento, el
+turno va a `X` con motivo `rechazo:modelo_sin_respuesta`: una duda sin
+clasificar no pasa el filtro de dominio (`docs/ALCANCE.md`). La cortesía no
+gasta búsqueda ni tokens y la mixta cita las dos fuentes: el turno no persiste
+la pregunta.
 
 ### Tablero de tasas
 
@@ -286,7 +290,7 @@ alguna no encuentra fila. Cada fila trae `concepto`, `categoria`, `valor`,
 
 ### Grafo con memoria
 
-El grafo encadena `reformular → digiturno → Bóveda/Tablero/mixto/cortesía/rechazo → redactar`,
+El grafo encadena `reformular → digiturno → Bóveda/Tablero/mixto/cortesía/diagnóstico/rechazo → redactar`,
 guarda la conversación con `SqliteSaver` en `data/asistente/memoria.sqlite` y
 aísla cada sesión por `thread_id`. Un seguimiento se reformula solo si hay
 historial; el Tablero responde sin modelo cuando hay 1-3 filas o varias del
@@ -346,9 +350,10 @@ pruebas que impiden activarlo sin querer.
 `POST /api/preguntar` recibe la pregunta y el hilo de la Ventanilla. El grafo, el
 recuperador y el modelo se construyen en la primera pregunta del proceso, no al
 importar `app.py`. El Digiturno decide la letra: `B` (Bóveda), `T` (Tablero con
-plantilla) o `X` (rechazo). El campo `ruta` distingue además `cortesia` (sin
-búsqueda ni modelo), `mixta` (Tablero + Bóveda en el mismo turno) y `perfil`
-(memoria del cliente); las letras no cambian.
+plantilla), `D` (invitación al diagnóstico, ruta `diagnostico`) o `X`
+(rechazo). El campo `ruta` distingue además `cortesia` (sin búsqueda ni
+modelo), `mixta` (Tablero + Bóveda en el mismo turno) y `perfil` (memoria del
+cliente); esas tres rutas van por motivo y no son letras.
 
 ```bash
 curl -s http://127.0.0.1:8000/api/preguntar \
@@ -551,7 +556,7 @@ Resultados vigentes y respuestas completas de v1:
 │   ├── contexto.py · knowledge.py · documents.py · videos.py · news.py
 │   ├── asistente/             # Q&A, FAQ, resumen y evaluación con DeepSeek
 │   ├── boveda/               # fragmentos, embeddings, índice Qdrant y recuperador
-│   ├── sucursal/             # digiturno (B/T/X), grafo y API de la fase 2
+│   ├── sucursal/             # digiturno (B/T/X/D), grafo y API de la fase 2
 │   └── tablero/              # tarifario y tablas de Gold → data/estructurados/tablero.csv
 ├── scripts/                   # demo_offline.py · scrape_empresa.py · tasks.py
 ├── config/ · data/ · docs/    # configuración, capas y documentación
