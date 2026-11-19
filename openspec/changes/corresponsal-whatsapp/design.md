@@ -243,7 +243,7 @@ Se añade la dependencia `mcp` con `uv add mcp` y se implementa `mcp_servidor/se
 Herramientas:
 
 - `consultar_tasa(consulta: str, limite: int = 5)`: usa `tasas_producto` y `tasa_vigente` del Tablero y devuelve el rango E.A./M.V., la vigencia, la URL, el `sha256` y la fecha de extracción. No llama al modelo ni a la red.
-- `simular_cuota(monto: float, plazo_meses: int, tasa_ea: float)`: importa `diagnostico.motor.simular` para que la fórmula sea la misma. Valida monto y plazo positivos.
+- `simular_cuota(producto: str, monto: float, plazo_meses: int)`: calcula la cuota con las mismas primitivas de `diagnostico.calculo` que usa el motor (`tasa_mensual`, `cuota_francesa`) y la tasa que publica el Tablero para el producto. Devuelve la cuota en rango, las dos tasas E.A. y M.V., la vigencia, la fuente y las alertas. Solo acepta productos de crédito con cuota fija: el ahorro, el CDT, la tarjeta de crédito y el crédito rotativo responden un error explicable. Valida monto y plazo con los límites de `config/diagnostico.toml` para ese producto.
 - `buscar_en_boveda(consulta: str, k: int = 5)`: usa el recuperador híbrido sobre el índice local. Si Ollama no responde, intenta el resultado BM25 disponible y, si tampoco, devuelve un error estructurado. Los fragmentos se devuelven como datos, con su URL y su puntaje.
 
 El servidor no declara herramientas de escritura, no acepta rutas del sistema y limita `k` a 20, la consulta a 500 caracteres y el tiempo a 15 s. No llama a DeepSeek ni al sitio del banco.
@@ -454,9 +454,9 @@ class ResultadoDiagnostico(BaseModel):
     margen_despues_cuota: Decimal | None = None
     ahorro_mensual_estimado: Decimal | None = None
     semaforo: Literal["verde", "amarillo", "rojo"] | None = None
-    alertas: list[Literal["vivienda_30", "libranza_no_aplica", "capacidad_negativa"]] = Field(
-        default_factory=list
-    )
+    alertas: list[
+        Literal["vivienda_30", "libranza_no_aplica", "capacidad_negativa", "vigencia_vencida"]
+    ] = Field(default_factory=list)
     motivos: list[str] = Field(default_factory=list)
     recomendaciones: list[str]
     fuente_tasa: str | None = None
@@ -656,6 +656,10 @@ Variables de entorno, nunca en el repositorio: `WHATSAPP_VERIFY_TOKEN`, `WHATSAP
 verde_hasta = 0.30
 amarillo_hasta = 0.40
 
+[limites]
+monto_minimo = 500000
+monto_maximo = 2000000000
+
 [productos]
 libre_inversion = "Libre inversión"
 compra_cartera = "Compra de cartera"
@@ -689,11 +693,11 @@ El `0.0` no es una tasa: significa «sin certificar» y bloquea la publicación 
 
 ```text
 consultar_tasa(consulta: str, limite: int = 5) -> {tasas: [{producto, segmento, tasa_ea_desde, tasa_ea_hasta, tasa_mv_desde, tasa_mv_hasta, vigencia_desde, vigencia_hasta, fuente, sha256_pdf, fecha_extraccion}], total: int}
-simular_cuota(monto: float, plazo_meses: int, tasa_ea: float) -> {cuota, total_intereses, total_pagado, version}
+simular_cuota(producto: str, monto: float, plazo_meses: int) -> {producto, tasa_ea: {desde, hasta}, tasa_mensual: {desde, hasta}, cuota_mensual: {desde, hasta}, total_intereses: {desde, hasta}, total_pagado: {desde, hasta}, version_formula, fuente, vigencia_desde, vigencia_hasta, sha256_pdf, alertas}
 buscar_en_boveda(consulta: str, k: int = 5) -> {fragmentos: [...], total: int}
 ```
 
-Cada respuesta incluye `fuente`, `vigencia_desde`, `vigencia_hasta` y `sha256_pdf` cuando existe. Los errores son `{codigo, mensaje}` y nunca incluyen la consulta completa si contiene PII.
+Cada respuesta incluye `fuente`, `vigencia_desde`, `vigencia_hasta` y `sha256_pdf` cuando existe. `simular_cuota` y `consultar_tasa` agregan `vigencia_vencida` a las alertas cuando la tabla publicada ya no cubre la fecha de hoy, en lugar de fallar. Los errores son `{codigo, mensaje}` y nunca incluyen la consulta completa si contiene PII.
 
 ### Contrato del comité
 

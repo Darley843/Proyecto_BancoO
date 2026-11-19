@@ -265,6 +265,20 @@ def test_vivienda_admite_plazos_largos() -> None:
         aplicar_cambio(entrada_base(), cambio)
 
 
+def test_el_monto_comparte_la_frontera_del_mcp() -> None:
+    """«¿Y si…?» y el MCP aceptan montos de $500.000 a $2.000 millones."""
+    original = entrada_base()
+    nuevo = aplicar_cambio(
+        original, CambioEscenario(campo="monto_credito", valor=Decimal(80_000_000))
+    )
+
+    assert nuevo.monto_credito == Decimal(80_000_000)
+    with pytest.raises(EscenarioFueraDeRango, match=r"\$500\.000"):
+        aplicar_cambio(
+            original, CambioEscenario(campo="monto_credito", valor=Decimal(3_000_000_000))
+        )
+
+
 def test_aplicar_cambio_no_modifica_la_entrada_original() -> None:
     """La entrada original sigue igual después de aplicar el cambio."""
     original = entrada_base()

@@ -52,8 +52,6 @@ MAXIMO_ESCENARIOS = 10
 PLAZO_GENERAL = (6, 72)
 #: Plazo en meses para vivienda.
 PLAZO_VIVIENDA = (60, 240)
-#: Monto del crédito en pesos.
-MONTO = (Decimal(500_000), Decimal(2_000_000_000))
 #: Ingreso, gastos y cuotas mensuales en pesos (0 solo para gastos y cuotas).
 VALOR_MENSUAL_MAXIMO = Decimal(1_000_000_000)
 
@@ -191,9 +189,11 @@ def aplicar_cambio(entrada: EntradaDiagnostico, cambio: CambioEscenario) -> Entr
             )
         nuevo: Any = int(valor)
     elif cambio.campo == "monto_credito":
-        if not MONTO[0] <= valor <= MONTO[1]:
+        ajustes = motor.cargar_config()
+        if not ajustes.monto_minimo <= valor <= ajustes.monto_maximo:
             raise EscenarioFueraDeRango(
-                f"El monto debe estar entre {formatear_pesos(MONTO[0])} y {formatear_pesos(MONTO[1])}."
+                f"El monto debe estar entre {formatear_pesos(ajustes.monto_minimo)} "
+                f"y {formatear_pesos(ajustes.monto_maximo)}."
             )
         nuevo = valor
     else:

@@ -19,6 +19,13 @@
 verde_hasta = 0.30
 amarillo_hasta = 0.40
 
+# Frontera del monto del crédito, en pesos, para el diagnóstico, los escenarios
+# «¿Y si…?» y el MCP. No son los valores de cálculo de los rangos de la
+# entrevista: esos son representativos y no limitan el producto.
+[limites]
+monto_minimo = 500000
+monto_maximo = 2000000000
+
 [productos]
 libre_inversion = "Libre inversión"
 compra_cartera = "Compra de cartera"

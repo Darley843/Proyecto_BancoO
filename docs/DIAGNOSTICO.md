@@ -99,6 +99,11 @@ puede ser mayor que la respuesta del paso 5.
 | Vehículo | `monto.DE_30M_A_60M`, `monto.DE_60M_A_100M`, `monto.MAS_100M` | 45M, 80M, 120M |
 | Vivienda | `monto.DE_100M_A_200M`, `monto.DE_200M_A_350M`, `monto.MAS_350M` | 150M, 275M, 400M |
 
+El **valor de cálculo** de cada rango es representativo y no un límite del
+producto. Los escenarios «¿Y si…?» y el MCP aceptan montos de **$500.000 a
+$2.000 millones** (`[limites]` de `config/diagnostico.toml`), y el plazo sigue
+los rangos de cada objetivo.
+
 ### plazo (meses)
 
 | Objetivo | Ids |
