@@ -10,7 +10,8 @@ Qué tarjeta corresponde a cada resultado:
 - Crédito con cuota simulada → `DatosDiagnostico` (con `ahorro_mensual` en la
   compra de cartera cuando el traslado sí baja la cuota).
 - Ahorro → `DatosAhorro` (sin semáforo).
-- Libranza para independiente o capacidad negativa → `DatosNoAplica`.
+- Libranza para independiente → `DatosNoAplica` neutra.
+- Capacidad negativa → `DatosNoAplica` en rojo: es una alerta, no un «no aplica».
 
 `tarjeta_y_texto` hace todo el recorrido y devuelve el PNG y su texto
 equivalente, que llevan los mismos datos. Nada de esto toca el disco.
@@ -26,6 +27,7 @@ from ..canal.contratos import TasaCaptacion as TasaContrato
 from ..diagnostico.escenarios import ComparacionEscenario
 from ..tablero.tasas import nombre_producto
 from .tarjetas import (
+    FUENTE_TASAS,
     DatosAhorro,
     DatosDiagnostico,
     DatosEscenario,
@@ -46,9 +48,9 @@ from .tarjetas import (
 #: Datos que puede recibir una tarjeta de diagnóstico.
 DatosTarjeta = DatosDiagnostico | DatosAhorro | DatosNoAplica
 
-#: Nombre corto de la fuente que se muestra en la tarjeta. El detalle (archivo,
-#: huella del PDF) queda en el `ResultadoDiagnostico` para el Arqueo.
-FUENTE_TARJETA = "Tablero de tasas"
+#: Fuente que se muestra en la tarjeta, dicha para la persona. El enlace al PDF
+#: va en el texto; la huella del PDF queda en el `ResultadoDiagnostico`.
+FUENTE_TARJETA = FUENTE_TASAS
 
 #: Abreviatura de cada mes, como se imprime en la tarjeta («nov. 2026»).
 MESES_CORTOS: dict[int, str] = {
@@ -80,14 +82,12 @@ FRASE_VIVIENDA = "En vivienda la primera cuota no debe pasar del 30 % de tu ingr
 #: Textos de la tarjeta «no aplica» según la alerta del motor.
 NO_APLICA: dict[str, tuple[str, str]] = {
     "libranza_no_aplica": (
-        "La libranza solo está disponible para empleados o pensionados con "
-        "convenio de descuento.",
+        "La libranza solo está disponible para empleados o pensionados con convenio de descuento.",
         "Puedes simular un préstamo de libre inversión o hablar con un asesor.",
     ),
     "capacidad_negativa": (
-        "Hoy tus gastos y cuotas ya superan tu ingreso, así que no se simula un "
-        "crédito nuevo.",
-        "Ordena primero tus gastos y deudas, o habla con un asesor.",
+        "Tus gastos y cuotas ya superan tu ingreso: no hay espacio para una cuota nueva.",
+        "Ordena primero tus gastos y deudas, y habla con un asesor para revisar tu caso.",
     ),
 }
 
@@ -103,6 +103,10 @@ NOTA_TENDENCIA: dict[str, str] = {
 }
 #: Frase común a todas las notas del escenario.
 NOTA_ORIGINAL = "Tu diagnóstico original no cambió."
+
+
+#: Alertas del motor que se muestran en rojo en la tarjeta «no aplica».
+ALERTAS_ROJAS = frozenset({"capacidad_negativa"})
 
 
 class SinTarjeta(ValueError):
@@ -133,6 +137,20 @@ def _pct_texto(fraccion: Decimal) -> str:
     """
     entero = int((fraccion * 100).quantize(Decimal(1), rounding=ROUND_HALF_UP))
     return f"{entero} %"
+
+
+def _enlace(fuente: str | None) -> str | None:
+    """Devuelve la fuente solo si es un enlace https, para citarla en el texto.
+
+    Args:
+        fuente: `fuente_tasa` del resultado (la URL del PDF de tasas).
+
+    Returns:
+        El enlace, o None si la fuente no es una URL https.
+    """
+    if fuente and fuente.startswith("https://") and " " not in fuente:
+        return fuente
+    return None
 
 
 def vigencia_corta(hasta: date | None, *, vencida: bool = False) -> str:
@@ -229,6 +247,7 @@ def datos_diagnostico(resultado: ResultadoDiagnostico) -> DatosDiagnostico:
             resultado.vigencia_tasa_hasta, vencida="vigencia_vencida" in resultado.alertas
         ),
         tasa_fuente=FUENTE_TARJETA,
+        tasa_enlace=_enlace(resultado.fuente_tasa),
         ahorro_mensual=ahorro if ahorro is not None and ahorro > 0 else None,
     )
 
@@ -251,13 +270,15 @@ def datos_ahorro(resultado: ResultadoDiagnostico) -> DatosAhorro:
         )
         for tasa in resultado.tasas_captacion[:3]
     ]
-    hasta = resultado.tasas_captacion[0].vigencia_hasta if resultado.tasas_captacion else None
+    primera = resultado.tasas_captacion[0] if resultado.tasas_captacion else None
+    hasta = primera.vigencia_hasta if primera is not None else None
     return DatosAhorro(
         capacidad_ahorro=capacidad,
         razon=FRASE_AHORRO_CON_MARGEN if capacidad > 0 else FRASE_AHORRO_SIN_MARGEN,
         tasas=tasas,
         tasa_vigencia=vigencia_corta(hasta, vencida="vigencia_vencida" in resultado.alertas),
         tasa_fuente=FUENTE_TARJETA,
+        tasa_enlace=_enlace(primera.fuente if primera is not None else None),
     )
 
 
@@ -280,6 +301,7 @@ def datos_no_aplica(resultado: ResultadoDiagnostico) -> DatosNoAplica:
                 producto=nombre_producto(resultado.entrada.producto),
                 razon=razon,
                 alternativa=alternativa,
+                semaforo="rojo" if alerta in ALERTAS_ROJAS else None,
             )
     raise SinTarjeta("el resultado no es un caso de «no aplica»")
 

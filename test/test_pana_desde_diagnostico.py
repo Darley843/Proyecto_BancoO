@@ -197,23 +197,33 @@ def test_credito_verde_da_tarjeta_de_diagnostico(raiz: Path) -> None:
     assert datos.plazo_meses == 48
     assert datos.cuota_min == resultado.cuota_mensual.desde
     assert datos.cuota_max == resultado.cuota_mensual.hasta
-    assert datos.tasa_mensual_pct == (resultado.tasa_mensual.hasta * 100).quantize(
-        Decimal("0.01")
-    )
+    assert datos.tasa_mensual_pct == (resultado.tasa_mensual.hasta * 100).quantize(Decimal("0.01"))
     assert datos.tasa_vigencia == "nov. 2026"
-    assert datos.tasa_fuente == "Tablero de tasas"
+    assert datos.tasa_fuente == "Tasas publicadas por el Banco de Occidente"
     assert "cabe con margen" in datos.razon
     assert datos.ahorro_mensual is None
 
 
-def test_la_url_de_la_fuente_no_llega_a_la_tarjeta(raiz: Path) -> None:
-    """La tarjeta muestra un nombre corto; la URL queda en el resultado."""
+def test_la_fuente_se_dice_para_la_persona_y_el_texto_cita_el_pdf(raiz: Path) -> None:
+    """La tarjeta dice quién publica la tasa y el texto lleva el enlace al PDF."""
     resultado = _credito(raiz)
+    datos = datos_diagnostico(resultado)
     _, texto = tarjeta_y_texto(resultado)
 
     assert resultado.fuente_tasa == FUENTE
-    assert FUENTE not in texto
-    assert "Tablero de tasas" in texto
+    assert datos.tasa_fuente == "Tasas publicadas por el Banco de Occidente"
+    assert datos.tasa_enlace == FUENTE
+    assert "Tasas publicadas por el Banco de Occidente, nov. 2026" in texto
+    assert FUENTE in texto
+    assert "Tablero" not in texto
+
+
+def test_el_ahorro_tambien_cita_el_pdf(raiz: Path) -> None:
+    """La tarjeta de ahorro lleva la misma fuente y el enlace en el texto."""
+    _, texto = tarjeta_y_texto(_ahorro(raiz, ingreso=3_000_000, gastos=1_500_000))
+
+    assert "Tasas publicadas por el Banco de Occidente" in texto
+    assert FUENTE in texto
 
 
 def test_amarillo_y_rojo_explican_el_color(raiz: Path) -> None:
@@ -311,19 +321,20 @@ def test_libranza_de_independiente_no_aplica(raiz: Path) -> None:
 
     assert isinstance(datos, DatosNoAplica)
     assert datos.producto == "Libranza"
+    assert datos.semaforo is None
     assert "convenio" in datos.razon
     assert "libre inversión" in datos.alternativa
 
 
 def test_capacidad_negativa_no_aplica(tmp_path: Path) -> None:
     """Sin capacidad no se simula: tarjeta «no aplica» y no se lee la tasa."""
-    resultado = _credito(
-        tmp_path / "vacia", ingreso=2_000_000, gastos=1_200_000, cuotas=1_000_000
-    )
+    resultado = _credito(tmp_path / "vacia", ingreso=2_000_000, gastos=1_200_000, cuotas=1_000_000)
     datos = datos_tarjeta(resultado)
 
     assert isinstance(datos, DatosNoAplica)
+    assert datos.semaforo == "rojo"
     assert "superan tu ingreso" in datos.razon
+    assert "Ordena primero" in datos.alternativa
 
 
 def test_un_resultado_sin_cuota_ni_alerta_no_tiene_tarjeta(raiz: Path) -> None:
