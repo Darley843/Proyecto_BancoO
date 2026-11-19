@@ -232,15 +232,18 @@ def test_duda_sin_modelo_marca_el_motivo_defecto() -> None:
     assert (turno.letra, turno.motivo) == ("B", "defecto")
 
 
-def test_duda_con_modelo_sin_respuesta_lo_dice_en_el_motivo() -> None:
-    """Si el clasificador no responde, el motivo no finge que decidió."""
+def test_duda_con_modelo_sin_respuesta_va_a_rechazo() -> None:
+    """Si el clasificador no responde ni al reintento, la duda no pasa el filtro."""
+    llamadas: list[str] = []
 
     def clasificador_sin_respuesta(pregunta: str) -> Clasificacion | None:
+        llamadas.append(pregunta)
         return None
 
     turno = clasificar("¿qué necesito para un crédito?", clasificador=clasificador_sin_respuesta)
 
-    assert (turno.letra, turno.motivo) == ("B", "defecto:modelo_sin_respuesta")
+    assert (turno.letra, turno.motivo) == ("X", "rechazo:modelo_sin_respuesta")
+    assert len(llamadas) == 2
 
 
 def test_clasificador_deja_margen_para_el_razonamiento(
@@ -282,26 +285,26 @@ def test_modelo_valido_devuelve_la_letra() -> None:
     assert turno.motivo == "tarifa"
 
 
-def test_modelo_con_json_roto_cae_en_b() -> None:
-    """Un JSON inválido no rompe: la ruta por defecto es B."""
+def test_modelo_con_json_roto_cae_en_rechazo() -> None:
+    """Un JSON inválido no rompe ni deja pasar la duda: va a rechazo."""
     modelo = FakeListChatModel(responses=["esto no es json"])
 
     turno = clasificar("¿qué necesito para un crédito?", clasificador=clasificador_deepseek(modelo))
 
-    assert turno.letra == "B"
+    assert turno.letra == "X"
 
 
-def test_modelo_con_letra_desconocida_cae_en_b() -> None:
-    """Una letra fuera de B/T/X se descarta y se usa B."""
+def test_modelo_con_letra_desconocida_cae_en_rechazo() -> None:
+    """Una letra fuera de B/T/X se descarta y la duda va a rechazo."""
     modelo = FakeListChatModel(responses=['{"letra": "Z", "motivo": "raro"}'])
 
     turno = clasificar("¿qué necesito para un crédito?", clasificador=clasificador_deepseek(modelo))
 
-    assert turno.letra == "B"
+    assert turno.letra == "X"
 
 
-def test_modelo_que_falla_cae_en_b() -> None:
-    """Si el modelo lanza una excepción, el turno sigue siendo válido."""
+def test_modelo_que_falla_cae_en_rechazo() -> None:
+    """Si el modelo lanza una excepción, el turno es válido y va a rechazo."""
 
     class ModeloRoto:
         def invoke(self, mensajes: object, **opciones: object) -> object:
@@ -311,7 +314,7 @@ def test_modelo_que_falla_cae_en_b() -> None:
         "¿qué necesito para un crédito?", clasificador=clasificador_deepseek(ModeloRoto())
     )
 
-    assert turno.letra == "B"
+    assert turno.letra == "X"
 
 
 def test_clasificador_reporta_su_uso() -> None:
@@ -332,7 +335,7 @@ def test_clasificador_reporta_su_uso() -> None:
 
 
 def test_clasificador_reporta_uso_aunque_el_json_sea_invalido() -> None:
-    """Un JSON roto también consumió tokens y debe contarse."""
+    """Un JSON roto también consumió tokens: se cuentan el intento y el reintento."""
     modelo = ModeloConUso("esto no es json")
     registros: list[dict[str, Any]] = []
 
@@ -342,9 +345,9 @@ def test_clasificador_reporta_uso_aunque_el_json_sea_invalido() -> None:
         registrar_uso=registros.append,
     )
 
-    assert turno.letra == "B"
-    assert len(registros) == 1
-    assert leer_uso(registros[0]).entrada == 80
+    assert turno.letra == "X"
+    assert len(registros) == 2
+    assert all(leer_uso(registro).entrada == 80 for registro in registros)
 
 
 def test_regla_que_evita_el_clasificador_no_reporta_uso() -> None:

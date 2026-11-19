@@ -728,7 +728,7 @@ def contar_preguntas_con_clasificador(
 #: Motivos que el digiturno o el tablero resuelven sin el clasificador de dudas.
 #: ``tablero_generico`` es la marca determinista que deja el nodo de tablero.
 MOTIVOS_DE_REGLA: frozenset[str] = frozenset(
-    {"identidad", "tarifas", "fuera_alcance", "tablero_generico"}
+    {"identidad", "tarifas", "fuera_alcance", "tablero_generico", "diagnostico"}
 )
 
 

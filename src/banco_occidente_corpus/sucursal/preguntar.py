@@ -77,7 +77,7 @@ RUTA_PERFIL = "data/asistente/perfil.sqlite"
 #: La ruta ``perfil`` no se sondea: nunca se lee ni se escribe en la caché.
 RUTAS: tuple[str, ...] = ("boveda", "tablero", "rechazo", "mixta")
 #: Letra del turno a ruta descriptiva del contrato JSON.
-RUTA_POR_LETRA: dict[str, str] = {"B": "boveda", "T": "tablero", "X": "rechazo"}
+RUTA_POR_LETRA: dict[str, str] = {"B": "boveda", "T": "tablero", "X": "rechazo", "D": "diagnostico"}
 #: Motivos que cambian la ruta sin cambiar la letra del turno.
 RUTA_POR_MOTIVO: dict[str, str] = {
     "cortesia": "cortesia",
@@ -170,7 +170,7 @@ def ruta_de_turno(letra: str, motivo: str = "") -> str:
     residual.
 
     Args:
-        letra: letra del turno (`B`, `T` o `X`).
+        letra: letra del turno (`B`, `T`, `X` o `D`).
         motivo: motivo con el que el digiturno o el nodo ajustó el turno.
 
     Returns:
@@ -227,7 +227,7 @@ def requiere_modelo(
         return False
     if turno.motivo == "mixta":
         return True
-    if turno.letra == "X":
+    if turno.letra in {"X", "D"}:
         return False
     if turno.letra == "T":
         return not tablero_responde_sin_modelo(dependencias.filas, pregunta)
@@ -647,7 +647,7 @@ class ServicioPreguntas:
             principal = fragmentos[0] if ruta == "mixta" else _fragmento_principal(fragmentos)
             respuesta = _respuesta_demo(principal)
             fuentes = fuentes_de_boveda([principal], None)
-        elif letra == "X":
+        elif letra in {"X", "D"}:
             fuentes = []
         elif ruta == "mixta":
             fuentes = fuentes_de_boveda(fragmentos, list(estado.get("fuentes") or []))

@@ -50,6 +50,7 @@ ETAPAS: dict[str, tuple[str, str]] = {
     "mixto": ("buscando", "Consultando el Tablero y la Bóveda a la vez…"),
     "cortesia": ("redactando", "Respondiendo el saludo, sin buscar…"),
     "rechazo": ("redactando", "Preparando la respuesta fija…"),
+    "diagnostico": ("redactando", "Preparando la invitación al diagnóstico…"),
     "redactar": ("redactando", "Redactando y validando la respuesta con sus citas…"),
 }
 
@@ -59,6 +60,7 @@ NOMBRES_RUTA: dict[str, str] = {
     "tablero": "Tablero",
     "rechazo": "Rechazo",
     "cortesia": "Cortesía",
+    "diagnostico": "Diagnóstico",
     "mixta": "Mixta (Tablero + Bóveda)",
     "perfil": "Perfil",
 }
@@ -256,6 +258,8 @@ def resumir_resultado(nodo: str, resultado: Mapping[str, Any]) -> tuple[str, dic
         return "Saludo respondido sin búsqueda y sin modelo (0 tokens).", {}
     if nodo == "rechazo":
         return "Respuesta fija, sin modelo y sin búsqueda.", {}
+    if nodo == "diagnostico":
+        return "Invitación al diagnóstico, sin modelo y sin búsqueda.", {}
     avisos = [str(aviso) for aviso in resultado.get("avisos") or []]
     return "Respuesta lista y validada.", {"avisos": avisos}
 
