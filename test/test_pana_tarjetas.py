@@ -158,6 +158,7 @@ def test_el_aviso_dice_que_es_un_proyecto_academico() -> None:
     assert "proyecto académico" in AVISO
     assert "no del Banco de Occidente" in AVISO
     assert "no es una aprobación" in AVISO
+    assert "historial crediticio" in AVISO
 
 
 @pytest.mark.parametrize(
@@ -426,7 +427,8 @@ def test_texto_de_no_aplica_trae_razon_y_alternativa() -> None:
     texto = texto_no_aplica(EJEMPLO_NO_APLICA)
 
     assert "Libranza: esta opción no aplica" in texto
-    assert "convenio de descuento" in texto
+    assert "contratistas por prestación de servicios" in texto
+    assert "entidad pagadora con convenio" in texto
     assert "libre inversión" in texto
     assert AVISO in texto
     assert "$" not in texto

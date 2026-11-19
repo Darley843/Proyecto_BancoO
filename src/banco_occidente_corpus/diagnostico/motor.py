@@ -44,7 +44,7 @@ from .calculo import (
     PRODUCTOS_DIAGNOSTICO,
     UMBRAL_AMARILLO,
     UMBRAL_VERDE,
-    UMBRAL_VIVIENDA,
+    UMBRAL_VIVIENDA_PRIMERA_CUOTA,
     VINCULACIONES,
     EntradaCalculo,
     ResultadoCalculo,
@@ -97,7 +97,7 @@ class ConfigDiagnostico:
 
     verde_hasta: Decimal
     amarillo_hasta: Decimal
-    umbral_vivienda: Decimal
+    umbral_vivienda_primera_cuota: Decimal
     valores: Mapping[str, Decimal]
     claves: Mapping[str, str]
     aplica_a: Mapping[str, tuple[str, ...]]
@@ -155,7 +155,9 @@ def cargar_config(ruta: Path | None = None) -> ConfigDiagnostico:
     return ConfigDiagnostico(
         verde_hasta=Decimal(str(umbrales.get("verde_hasta", UMBRAL_VERDE))),
         amarillo_hasta=Decimal(str(umbrales.get("amarillo_hasta", UMBRAL_AMARILLO))),
-        umbral_vivienda=Decimal(str(umbrales.get("vivienda_hasta", UMBRAL_VIVIENDA))),
+        umbral_vivienda_primera_cuota=Decimal(
+            str(umbrales.get("vivienda_primera_cuota", UMBRAL_VIVIENDA_PRIMERA_CUOTA))
+        ),
         valores=valores,
         claves=claves,
         aplica_a=aplica_a,
@@ -339,7 +341,7 @@ def calcular(
         raiz=raiz,
         verde_hasta=ajustes.verde_hasta,
         amarillo_hasta=ajustes.amarillo_hasta,
-        umbral_vivienda=ajustes.umbral_vivienda,
+        umbral_vivienda_primera_cuota=ajustes.umbral_vivienda_primera_cuota,
     )
     return _resultado(entrada, interno, ajustes)
 
@@ -407,7 +409,7 @@ def _resultado(
         umbrales={
             "verde_hasta": config.verde_hasta,
             "amarillo_hasta": config.amarillo_hasta,
-            "vivienda_hasta": config.umbral_vivienda,
+            "vivienda_primera_cuota": config.umbral_vivienda_primera_cuota,
         },
         tasas_captacion=[_captacion(tasa) for tasa in interno.tasas_captacion],
         aviso=interno.aviso,

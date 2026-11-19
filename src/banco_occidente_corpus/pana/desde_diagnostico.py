@@ -77,12 +77,15 @@ FRASE_SEMAFORO: dict[str, str] = {
 #: Frase cuando la cuota no cabe en lo que queda libre (margen negativo).
 FRASE_SIN_MARGEN = "La cuota no cabe en lo que te queda libre cada mes."
 #: Frase cuando la vivienda supera el tope de la primera cuota.
-FRASE_VIVIENDA = "En vivienda la primera cuota no debe pasar del 30 % de tu ingreso."
+FRASE_VIVIENDA = (
+    "En vivienda la primera cuota no debe pasar del 40 % de tus ingresos (Decreto 583 de 2025)."
+)
 
 #: Textos de la tarjeta «no aplica» según la alerta del motor.
 NO_APLICA: dict[str, tuple[str, str]] = {
     "libranza_no_aplica": (
-        "La libranza solo está disponible para empleados o pensionados con convenio de descuento.",
+        "La Ley 1527 de 2012 y la Ley 1902 de 2018 cubren a contratistas por "
+        "prestación de servicios si hay entidad pagadora con convenio.",
         "Puedes simular un préstamo de libre inversión o hablar con un asesor.",
     ),
     "capacidad_negativa": (
@@ -179,7 +182,7 @@ def _razon_credito(resultado: ResultadoDiagnostico) -> str:
     Returns:
         Una frase de menos de 110 caracteres, sin números largos.
     """
-    if "vivienda_30" in resultado.alertas:
+    if "vivienda_primera_cuota" in resultado.alertas:
         return FRASE_VIVIENDA
     if resultado.margen_despues_cuota is not None and resultado.margen_despues_cuota < 0:
         return FRASE_SIN_MARGEN

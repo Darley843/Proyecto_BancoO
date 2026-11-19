@@ -176,7 +176,7 @@ Fórmulas, aplicadas a los dos extremos del rango de tasa E.A. que publica el PD
 
 La cuota se informa como rango: se calcula con la tasa E.A. `desde` y con la `hasta`. El semáforo, la razón de endeudamiento y el margen usan la tasa `hasta` (la máxima del rango) y la cuota máxima; es el criterio conservador y el resultado lo declara en `base_semaforo="tasa_maxima"`. Si el usuario escribe una tasa exacta, el rango colapsa a ese valor. Redondeo: la tasa mensual conserva la precisión completa del contexto de 28 dígitos, la cuota final y los montos se redondean al peso, y la razón a cuatro decimales. La versión de la fórmula es `v1` y se guarda en el resultado.
 
-Umbrales por defecto en `config/diagnostico.toml`: verde si la razón es menor o igual a `0.30` y el margen no es negativo; amarillo si la razón es menor o igual a `0.40` y el margen no es negativo; rojo si el margen es negativo o la razón supera `0.40`. Son configurables y el resultado guarda los umbrales usados.
+Umbrales por defecto en `config/diagnostico.toml`: verde si la razón es menor o igual a `0.30` y el margen no es negativo; amarillo si la razón es menor o igual a `0.40` y el margen no es negativo; rojo si el margen es negativo o la razón supera `0.40`. En vivienda, además, la primera cuota no puede superar `vivienda_primera_cuota = 0.40` de los ingresos familiares (Decreto 583 de 2025). Son configurables y el resultado guarda los umbrales usados.
 
 **Fuente y captura.** La fuente es el PDF vigente `https://www.bancodeoccidente.com.co/documents/d/guest/tasas-personas-bdo`, enlazado desde `/tarifas`. El flujo es: capturar `/tarifas` en Bronze con el pipeline web; ejecutar `corpus docs discover`; respaldar el inventario completo en `data/raw/documents_urls.original.jsonl` y dejar en `data/raw/documents_urls.jsonl` solo las URLs que contengan `tasas-personas-bdo` y `tarifas-persona-bdo`; ejecutar `corpus docs fetch --priority-max 3 --max-mb 50 --delay 1.5`. No se usa filtro por tipo (`--tipo`): `tasas-personas-bdo` queda clasificado como `otro` y el filtro lo excluiría. La descarga guarda `data/raw/documents/<sha>.pdf` y su registro en `documents_capture.jsonl`. No se ejecuta `corpus docs extract` ni `make gold`: el PDF no se convierte en una página Gold más. Si `/tarifas` no está en Bronze, se captura primero con el pipeline web y después se descubre.
 
@@ -455,7 +455,9 @@ class ResultadoDiagnostico(BaseModel):
     ahorro_mensual_estimado: Decimal | None = None
     semaforo: Literal["verde", "amarillo", "rojo"] | None = None
     alertas: list[
-        Literal["vivienda_30", "libranza_no_aplica", "capacidad_negativa", "vigencia_vencida"]
+        Literal[
+            "vivienda_primera_cuota", "libranza_no_aplica", "capacidad_negativa", "vigencia_vencida"
+        ]
     ] = Field(default_factory=list)
     motivos: list[str] = Field(default_factory=list)
     recomendaciones: list[str]
@@ -491,9 +493,9 @@ class CasoAsesor(BaseModel):
 
 - **Crédito simulado:** `semaforo`, `tasa_ea`, `cuota_mensual`, `razon_endeudamiento`, `margen_despues_cuota` y los totales llevan valor; `fuente_tasa`, `vigencia_tasa_*` y `sha256_pdf` citan la tasa del Tablero.
 - **Ahorro:** `semaforo` es `None`, igual que `cuota_mensual`, `tasa_ea`, `tasa_mensual`, `razon_endeudamiento`, `margen_despues_cuota` y los totales. `capacidad_pago` guarda la capacidad de ahorro mensual y `tasas_captacion` lista las tasas de ahorro y CDT; `fuente_tasa` y `vigencia_tasa_*` describen la primera de esas tasas.
-- **Libranza que no aplica** (vinculación independiente): `semaforo` es `None`, no hay cuota y la alerta es `libranza_no_aplica`.
+- **Libranza que no aplica** (vinculación independiente): `semaforo` es `None`, no hay cuota y la alerta es `libranza_no_aplica`. El motivo explica que la Ley 1527 de 2012, modificada por la Ley 1902 de 2018, también cubre a los contratistas por prestación de servicios y que lo exigido es una entidad pagadora con convenio; la entrevista todavía no pregunta por esa entidad.
 - **Capacidad negativa:** el semáforo es `rojo` (la regla del guion) aunque no haya cuota, y la alerta es `capacidad_negativa`.
-- **Vivienda con cuota sobre el 30 % del ingreso:** el semáforo es `rojo` y la alerta es `vivienda_30`.
+- **Vivienda con primera cuota sobre el 40 % de los ingresos familiares:** el semáforo es `rojo` y la alerta es `vivienda_primera_cuota`. Es el límite del Decreto 583 de 2025, que modificó el Decreto 1077 de 2015 (antes 30 % para No VIS).
 
 `alertas` es un conjunto cerrado y `motivos` guarda la explicación en español para el canal. `ahorro_mensual_estimado` solo se llena en compra de cartera (`cuota_trasladar - cuota_nueva`). `rango_usado` conserva el id canónico de cada bloque de la entrevista para que el resultado se pueda reproducir.
 
@@ -655,6 +657,7 @@ Variables de entorno, nunca en el repositorio: `WHATSAPP_VERIFY_TOKEN`, `WHATSAP
 [umbrales]
 verde_hasta = 0.30
 amarillo_hasta = 0.40
+vivienda_primera_cuota = 0.40
 
 [limites]
 monto_minimo = 500000

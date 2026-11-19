@@ -154,7 +154,7 @@ def test_cargar_config_lee_umbrales_valores_y_aplicabilidad() -> None:
 
     assert config.verde_hasta == Decimal("0.30")
     assert config.amarillo_hasta == Decimal("0.40")
-    assert config.umbral_vivienda == Decimal("0.30")
+    assert config.umbral_vivienda_primera_cuota == Decimal("0.40")
     assert config.valores["ingresos.DE_5M_A_8M"] == Decimal(6_500_000)
     assert config.claves["gastos.DE_2M_A_3M"] == "gastos"
     assert "libre_inversion" in config.aplica_a["monto.DE_10M_A_20M"]
@@ -304,6 +304,8 @@ def test_laura_verde(raiz_tasas: Path) -> None:
     assert resultado.base_semaforo == "tasa_maxima"
     assert resultado.fuente_tasa == FUENTE
     assert "No es una aprobación" in resultado.aviso
+    assert "historial crediticio" in resultado.aviso
+    assert "1.1.2.27 c" in resultado.aviso
 
 
 def test_andres_rojo(raiz_tasas: Path) -> None:
@@ -457,7 +459,9 @@ def test_libranza_de_independiente_no_aplica(raiz_tasas: Path) -> None:
     assert resultado.semaforo is None
     assert resultado.cuota_mensual is None
     assert resultado.alertas == ["libranza_no_aplica"]
-    assert any("convenio" in motivo for motivo in resultado.motivos)
+    assert any("Ley 1527" in motivo for motivo in resultado.motivos)
+    assert any("contratistas" in motivo for motivo in resultado.motivos)
+    assert any("entidad pagadora" in motivo for motivo in resultado.motivos)
 
 
 def test_capacidad_negativa_es_rojo_sin_cuota(tmp_path: Path) -> None:
@@ -479,8 +483,26 @@ def test_capacidad_negativa_es_rojo_sin_cuota(tmp_path: Path) -> None:
     assert resultado.fuente_tasa is None
 
 
-def test_vivienda_sobre_el_30_por_ciento_alerta(raiz_tasas: Path) -> None:
-    """Vivienda con primera cuota sobre el 30 % del ingreso es rojo y avisa."""
+def test_vivienda_sobre_el_40_por_ciento_alerta(raiz_tasas: Path) -> None:
+    """Vivienda con primera cuota sobre el 40 % de los ingresos es rojo y avisa."""
+    entrada = EntradaDiagnostico(
+        producto="vivienda",
+        vinculacion="empleado",
+        ingreso_mensual=Decimal(8_000_000),
+        gastos_mensuales=Decimal(3_000_000),
+        cuotas_deudas=Decimal(0),
+        monto_credito=Decimal(220_000_000),
+        plazo_meses=240,
+    )
+    resultado = calcular(entrada, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
+
+    assert resultado.semaforo == "rojo"
+    assert resultado.alertas == ["vivienda_primera_cuota"]
+    assert any("Decreto 583 de 2025" in motivo for motivo in resultado.motivos)
+
+
+def test_vivienda_entre_30_y_40_por_ciento_no_alerta(raiz_tasas: Path) -> None:
+    """Con el umbral del 40 %, una cuota del 32,5 % no dispara la alerta."""
     entrada = EntradaDiagnostico(
         producto="vivienda",
         vinculacion="empleado",
@@ -492,8 +514,8 @@ def test_vivienda_sobre_el_30_por_ciento_alerta(raiz_tasas: Path) -> None:
     )
     resultado = calcular(entrada, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
 
-    assert resultado.semaforo == "rojo"
-    assert resultado.alertas == ["vivienda_30"]
+    assert resultado.semaforo == "amarillo"
+    assert "vivienda_primera_cuota" not in resultado.alertas
 
 
 def test_los_umbrales_salen_de_la_configuracion(raiz_tasas: Path) -> None:

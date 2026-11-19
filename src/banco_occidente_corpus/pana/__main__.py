@@ -86,7 +86,10 @@ EJEMPLO_AHORRO = DatosAhorro(
 
 EJEMPLO_NO_APLICA = DatosNoAplica(
     producto="Libranza",
-    razon="La libranza solo está disponible para empleados o pensionados con convenio de descuento.",
+    razon=(
+        "La libranza también cubre a contratistas por prestación de servicios "
+        "si hay una entidad pagadora con convenio."
+    ),
     alternativa="Puedes simular un préstamo de libre inversión o hablar con un asesor.",
 )
 """Libranza para una persona independiente: no se simula."""

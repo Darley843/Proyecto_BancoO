@@ -32,7 +32,7 @@ ProductoDiagnostico = Literal[
 Vinculacion = Literal["empleado", "independiente", "pensionado"]
 #: Motivos estructurados que acompañan a un resultado sin cuota de crédito.
 AlertaDiagnostico = Literal[
-    "vivienda_30",
+    "vivienda_primera_cuota",
     "libranza_no_aplica",
     "capacidad_negativa",
     "vigencia_vencida",
