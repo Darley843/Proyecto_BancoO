@@ -34,6 +34,7 @@ from banco_occidente_corpus.pana import (
 )
 from banco_occidente_corpus.pana.__main__ import (
     EJEMPLO_AHORRO,
+    EJEMPLO_ALERTA,
     EJEMPLO_CARTERA,
     EJEMPLO_DIAGNOSTICO,
     EJEMPLO_ESCENARIO,
@@ -127,7 +128,7 @@ def test_texto_del_diagnostico_lleva_los_mismos_datos() -> None:
         TITULO_SEMAFORO["amarillo"],
         "$150.000 – $170.000",
         "1,9 % mensual",
-        "Tablero de tasas",
+        "Tasas publicadas por el Banco de Occidente",
         "nov. 2026",
         "Portátil",
         "24 meses",
@@ -284,7 +285,7 @@ def test_pillow_tiene_version_fija() -> None:
 
 
 def test_muestras_se_guardan_solo_cuando_se_piden(tmp_path: Path) -> None:
-    """El comando de muestras escribe la foto, las tres caras y las dos tarjetas."""
+    """El comando de muestras escribe la foto, las tres caras y las seis tarjetas."""
     escritos = guardar_muestras(tmp_path / "muestras")
 
     assert sorted(ruta.name for ruta in escritos) == [
@@ -293,6 +294,7 @@ def test_muestras_se_guardan_solo_cuando_se_piden(tmp_path: Path) -> None:
         "pana-pensativo.png",
         "pana-perfil.png",
         "tarjeta-ahorro.png",
+        "tarjeta-alerta.png",
         "tarjeta-cartera.png",
         "tarjeta-diagnostico.png",
         "tarjeta-escenario.png",
@@ -385,9 +387,9 @@ def test_texto_del_ahorro_no_tiene_semaforo() -> None:
 
     for pieza in (
         "Puedes ahorrar hasta $350.000 al mes",
-        "CDT a 90 días: 8,2 % – 8,9 % E.A.",
-        "Cuenta de ahorros: 0,5 % E.A.",
-        "Tablero de tasas, nov. 2026",
+        "CDT a 90 días: 11 % E.A.",
+        "Cuenta de ahorros: 0,01 % E.A.",
+        "Tasas publicadas por el Banco de Occidente, nov. 2026",
         AVISO,
     ):
         assert pieza in texto, pieza
@@ -456,5 +458,32 @@ def test_main_guarda_muestras_e_imprime_las_rutas(
 
     assert main(["--muestras", str(destino)]) == 0
     impresas = capsys.readouterr().out.strip().splitlines()
-    assert len(impresas) == 9
+    assert len(impresas) == 10
     assert all(Path(linea).exists() for linea in impresas)
+
+
+def test_la_alerta_roja_no_es_neutra() -> None:
+    """La capacidad negativa se ve en rojo y su texto lo dice."""
+    texto = texto_no_aplica(EJEMPLO_ALERTA)
+    neutra = texto_no_aplica(EJEMPLO_NO_APLICA)
+
+    assert TITULO_SEMAFORO["rojo"] in texto
+    assert "no aplica" not in texto
+    assert "Lo que te recomiendo" in texto
+    assert "no aplica" in neutra
+    assert tarjeta_no_aplica(EJEMPLO_ALERTA) != tarjeta_no_aplica(
+        EJEMPLO_ALERTA.model_copy(update={"semaforo": None})
+    )
+
+
+def test_el_enlace_de_la_fuente_va_en_el_texto() -> None:
+    """El enlace al PDF se cita en el texto y solo se aceptan enlaces https."""
+    enlace = "https://www.bancodeoccidente.com.co/documents/d/guest/tasas-personas-bdo"
+    datos = EJEMPLO_DIAGNOSTICO.model_copy(update={"tasa_enlace": enlace})
+
+    assert enlace in texto_diagnostico(datos)
+    assert enlace not in texto_diagnostico(EJEMPLO_DIAGNOSTICO)
+    with pytest.raises(ValidationError):
+        DatosDiagnostico.model_validate(
+            {**EJEMPLO_DIAGNOSTICO.model_dump(), "tasa_enlace": "http://sin-tls.example"}
+        )

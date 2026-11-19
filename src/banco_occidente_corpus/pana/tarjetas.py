@@ -72,6 +72,11 @@ EXPRESION_SEMAFORO: dict[Semaforo, Expresion] = {
 }
 """Cara de Pana que acompaña a cada semáforo."""
 
+FUENTE_TASAS = "Tasas publicadas por el Banco de Occidente"
+"""Fuente que se muestra en la tarjeta: dice de dónde sale la tasa sin nombres internos."""
+
+_ENLACE = re.compile(r"https://[^\s]{1,300}")
+
 CREMA = (244, 236, 216)
 GUILLOCHE = (232, 221, 194)
 TINTA = (43, 42, 39)
@@ -111,6 +116,25 @@ def _sin_numeros_largos(valor: str) -> str:
     return valor.strip()
 
 
+def _enlace_https(valor: str | None) -> str | None:
+    """Acepta solo un enlace ``https://`` sin espacios (o ninguno).
+
+    Args:
+        valor: enlace al documento de tasas, o None.
+
+    Returns:
+        El enlace validado, o None.
+
+    Raises:
+        ValueError: si no es un enlace https de una sola pieza.
+    """
+    if valor is None:
+        return None
+    if not _ENLACE.fullmatch(valor):
+        raise ValueError("el enlace de la fuente debe ser https y sin espacios")
+    return valor
+
+
 class DatosDiagnostico(BaseModel):
     """Datos de la tarjeta del diagnóstico. Sin datos personales.
 
@@ -124,7 +148,10 @@ class DatosDiagnostico(BaseModel):
         razon: frase corta que explica el color.
         tasa_mensual_pct: tasa de referencia mensual, en porcentaje.
         tasa_vigencia: corte de la tasa («nov. 2026»).
-        tasa_fuente: de dónde sale la tasa («Tablero de tasas»).
+        tasa_fuente: de dónde sale la tasa, dicho para la persona
+            («Tasas publicadas por el Banco de Occidente»).
+        tasa_enlace: enlace al documento publicado de tasas; va solo en el
+            texto, para que la persona pueda abrirlo.
         ahorro_mensual: en compra de cartera, cuánto baja la cuota al mes al
             trasladar las deudas; ``None`` en los demás créditos.
     """
@@ -140,8 +167,22 @@ class DatosDiagnostico(BaseModel):
     razon: str = Field(min_length=1, max_length=110)
     tasa_mensual_pct: Decimal = Field(gt=0, lt=10)
     tasa_vigencia: str = Field(min_length=1, max_length=30)
-    tasa_fuente: str = Field(min_length=1, max_length=40)
+    tasa_fuente: str = Field(min_length=1, max_length=60)
+    tasa_enlace: str | None = None
     ahorro_mensual: Decimal | None = Field(default=None, gt=0)
+
+    @field_validator("tasa_enlace")
+    @classmethod
+    def _enlace_valido(cls, valor: str | None) -> str | None:
+        """Acepta solo un enlace https.
+
+        Args:
+            valor: enlace o None.
+
+        Returns:
+            El enlace validado.
+        """
+        return _enlace_https(valor)
 
     @field_validator("producto", "razon", "tasa_vigencia", "tasa_fuente")
     @classmethod
@@ -286,7 +327,8 @@ class DatosAhorro(BaseModel):
         razon: frase corta del motor («El ahorro no tiene semáforo…»).
         tasas: hasta tres tasas de ahorro o CDT de referencia.
         tasa_vigencia: corte de las tasas («nov. 2026»).
-        tasa_fuente: de dónde salen las tasas («Tablero de tasas»).
+        tasa_fuente: de dónde salen las tasas, dicho para la persona.
+        tasa_enlace: enlace al documento publicado de tasas (solo en el texto).
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -295,7 +337,21 @@ class DatosAhorro(BaseModel):
     razon: str = Field(min_length=1, max_length=110)
     tasas: list[TasaCaptacion] = Field(default_factory=list, max_length=3)
     tasa_vigencia: str = Field(min_length=1, max_length=30)
-    tasa_fuente: str = Field(min_length=1, max_length=40)
+    tasa_fuente: str = Field(min_length=1, max_length=60)
+    tasa_enlace: str | None = None
+
+    @field_validator("tasa_enlace")
+    @classmethod
+    def _enlace_valido(cls, valor: str | None) -> str | None:
+        """Acepta solo un enlace https.
+
+        Args:
+            valor: enlace o None.
+
+        Returns:
+            El enlace validado.
+        """
+        return _enlace_https(valor)
 
     @field_validator("razon", "tasa_vigencia", "tasa_fuente")
     @classmethod
@@ -315,12 +371,16 @@ class DatosNoAplica(BaseModel):
     """Datos de la tarjeta cuando el producto no se puede simular.
 
     Por ejemplo, la libranza para una persona independiente: no hay cuota ni
-    semáforo, solo la explicación y la alternativa.
+    semáforo, solo la explicación y la alternativa. Cuando el motor marca el
+    caso en rojo (gastos y cuotas que ya superan el ingreso), ``semaforo`` es
+    ``"rojo"`` y la tarjeta se pinta como alerta, no como neutra.
 
     Attributes:
         producto: nombre corto del producto («Libranza»).
         razon: por qué no aplica.
         alternativa: lo que sí se puede hacer.
+        semaforo: ``"rojo"`` si el motor lo marcó como alerta; ``None`` si
+            solo no aplica.
     """
 
     model_config = ConfigDict(frozen=True, extra="forbid")
@@ -328,6 +388,7 @@ class DatosNoAplica(BaseModel):
     producto: str = Field(min_length=1, max_length=40)
     razon: str = Field(min_length=1, max_length=140)
     alternativa: str = Field(min_length=1, max_length=110)
+    semaforo: Literal["rojo"] | None = None
 
     @field_validator("producto", "razon", "alternativa")
     @classmethod
@@ -424,13 +485,14 @@ def texto_diagnostico(datos: DatosDiagnostico) -> str:
         f"{datos.producto} · {monto_corto(datos.monto)} a {datos.plazo_meses} meses\n"
         f"{datos.razon}\n\n"
         f"Lo que pagarías al mes: *{rango_pesos(datos.cuota_min, datos.cuota_max)}*\n"
-        f"Tasa de referencia: {porcentaje(datos.tasa_mensual_pct)} mensual "
-        f"({datos.tasa_fuente}, {datos.tasa_vigencia})\n"
+        f"Tasa de referencia: {porcentaje(datos.tasa_mensual_pct)} mensual\n"
         + (
             f"Ahorro mensual estimado: *{pesos(datos.ahorro_mensual)}*\n"
             if datos.ahorro_mensual is not None
             else ""
         )
+        + f"Fuente: {datos.tasa_fuente}, {datos.tasa_vigencia}\n"
+        + (f"{datos.tasa_enlace}\n" if datos.tasa_enlace else "")
         + f"\n_{AVISO}_"
     )
 
@@ -495,7 +557,9 @@ def texto_ahorro(datos: DatosAhorro) -> str:
     """
     lineas = [f"*{_frase_capacidad(datos.capacidad_ahorro)}*", datos.razon, ""]
     lineas += [f"{tasa.etiqueta}: {_rango_ea(tasa)}" for tasa in datos.tasas]
-    lineas.append(f"Tasas: {datos.tasa_fuente}, {datos.tasa_vigencia}")
+    lineas.append(f"Fuente: {datos.tasa_fuente}, {datos.tasa_vigencia}")
+    if datos.tasa_enlace:
+        lineas.append(datos.tasa_enlace)
     return "\n".join(lineas) + f"\n\n_{AVISO}_"
 
 
@@ -508,6 +572,13 @@ def texto_no_aplica(datos: DatosNoAplica) -> str:
     Returns:
         Texto listo para WhatsApp con la razón, la alternativa y el aviso.
     """
+    if datos.semaforo == "rojo":
+        return (
+            f"*{TITULO_SEMAFORO['rojo']}* · {datos.producto}\n"
+            f"{datos.razon}\n\n"
+            f"Lo que te recomiendo: {datos.alternativa}\n\n"
+            f"_{AVISO}_"
+        )
     return (
         f"*{datos.producto}: esta opción no aplica*\n"
         f"{datos.razon}\n\n"
@@ -645,18 +716,43 @@ def _a_png(img: Image.Image) -> bytes:
 def _tabla(d: ImageDraw.ImageDraw, filas: list[tuple[str, str]], y: int, paso: int) -> None:
     """Dibuja filas «etiqueta … valor» con una línea debajo de cada una.
 
+    Si un valor largo (por ejemplo, una tasa vencida) chocaría con su
+    etiqueta, la letra del valor se achica hasta dejar 24 px de aire.
+
     Args:
         d: lienzo de dibujo.
         filas: pares ``(etiqueta, valor)``.
         y: altura de la primera fila.
         paso: separación entre filas en píxeles.
     """
-    fuente_valor = _fuente(30, negrita=True)
+    fuente_etiqueta = _fuente(30)
     for etiqueta, valor in filas:
-        d.text((92, y), etiqueta, font=_fuente(30), fill=TINTA)
-        d.text((LADO - 92 - fuente_valor.getlength(valor), y), valor, font=fuente_valor, fill=TINTA)
+        libre = LADO - 2 * 92 - fuente_etiqueta.getlength(etiqueta) - 24
+        tamano = 30
+        while tamano > 20 and _fuente(tamano, negrita=True).getlength(valor) > libre:
+            tamano -= 1
+        fuente_valor = _fuente(tamano, negrita=True)
+        d.text((92, y), etiqueta, font=fuente_etiqueta, fill=TINTA)
+        d.text(
+            (LADO - 92 - fuente_valor.getlength(valor), y + (30 - tamano) // 2),
+            valor,
+            font=fuente_valor,
+            fill=TINTA,
+        )
         y += paso
         d.line((92, y - 14, LADO - 92, y - 14), fill=LINEA, width=1)
+
+
+def _linea_fuente(d: ImageDraw.ImageDraw, y: int, fuente: str, vigencia: str) -> None:
+    """Escribe debajo de la tabla de dónde salen las tasas y su vigencia.
+
+    Args:
+        d: lienzo de dibujo.
+        y: altura de la línea.
+        fuente: fuente dicha para la persona.
+        vigencia: corte de la tasa («nov. 2026»).
+    """
+    _parrafo(d, (92, y), f"{fuente}, {vigencia}.", _fuente(25), LADO - 2 * 92, GRIS, 1.3)
 
 
 def _caja_mensaje(
@@ -723,11 +819,11 @@ def tarjeta_diagnostico(datos: DatosDiagnostico) -> bytes:
     filas = [
         ("Lo que pagarías al mes", rango_pesos(datos.cuota_min, datos.cuota_max)),
         ("Tasa de referencia", f"{porcentaje(datos.tasa_mensual_pct)} mensual"),
-        ("Fuente de la tasa", f"{datos.tasa_fuente}, {datos.tasa_vigencia}"),
     ]
     if datos.ahorro_mensual is not None:
         filas.append(("Ahorro mensual estimado", pesos(datos.ahorro_mensual)))
-    _tabla(d, filas, 690, 62 if len(filas) <= 3 else 56)
+    _tabla(d, filas, 690, 62)
+    _linea_fuente(d, 690 + 62 * len(filas) + 4, datos.tasa_fuente, datos.tasa_vigencia)
 
     _parrafo(d, (92, LADO - 150), AVISO, _fuente(23), ancho, GRIS_CLARO, 1.35)
     return _a_png(img)
@@ -822,8 +918,8 @@ def tarjeta_ahorro(datos: DatosAhorro) -> bytes:
     d.text((92, 356), "El ahorro no lleva semáforo", font=_fuente(32), fill=GRIS)
     _caja_mensaje(d, _frase_capacidad(datos.capacidad_ahorro), datos.razon, FONDO_NEUTRO, VERDE)
     filas = [(tasa.etiqueta, _rango_ea(tasa)) for tasa in datos.tasas]
-    filas.append(("Fuente de las tasas", f"{datos.tasa_fuente}, {datos.tasa_vigencia}"))
-    _tabla(d, filas, 690, 62 if len(filas) <= 3 else 56)
+    _tabla(d, filas, 690, 62)
+    _linea_fuente(d, 690 + 62 * len(filas) + 4, datos.tasa_fuente, datos.tasa_vigencia)
     _parrafo(d, (92, LADO - 150), AVISO, _fuente(23), LADO - 2 * 92, GRIS_CLARO, 1.35)
     return _a_png(img)
 
@@ -841,9 +937,15 @@ def tarjeta_no_aplica(datos: DatosNoAplica) -> bytes:
     _encabezado(img, d, "Sucursal 1965 · Pana", "calma")
     ancho = LADO - 2 * 92
     d.text((92, 270), datos.producto, font=_fuente(64, negrita=True), fill=TINTA)
-    d.text((92, 356), "Esta opción no aplica para ti", font=_fuente(32), fill=GRIS)
-    _caja_mensaje(d, "Calma, hay otro camino", datos.razon, (241, 238, 232), GRIS_CLARO)
-    d.text((92, 700), "Lo que sí puedes hacer", font=_fuente(30, negrita=True), fill=VERDE)
+    if datos.semaforo == "rojo":
+        rojo = COLOR_SEMAFORO["rojo"]
+        d.text((92, 356), "Hoy no se simula un crédito nuevo", font=_fuente(32), fill=GRIS)
+        _caja_mensaje(d, TITULO_SEMAFORO["rojo"], datos.razon, FONDO_SEMAFORO["rojo"], rojo)
+        d.text((92, 700), "Lo que te recomiendo", font=_fuente(30, negrita=True), fill=rojo)
+    else:
+        d.text((92, 356), "Esta opción no aplica para ti", font=_fuente(32), fill=GRIS)
+        _caja_mensaje(d, "Calma, hay otro camino", datos.razon, (241, 238, 232), GRIS_CLARO)
+        d.text((92, 700), "Lo que sí puedes hacer", font=_fuente(30, negrita=True), fill=VERDE)
     _parrafo(d, (92, 750), datos.alternativa, _fuente(32), ancho, TINTA, 1.35)
     _parrafo(d, (92, LADO - 150), AVISO, _fuente(23), ancho, GRIS_CLARO, 1.35)
     return _a_png(img)

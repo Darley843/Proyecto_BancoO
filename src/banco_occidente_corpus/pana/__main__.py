@@ -16,6 +16,7 @@ from pathlib import Path
 
 from .personaje import EXPRESIONES, dibujar_pana, foto_de_perfil
 from .tarjetas import (
+    FUENTE_TASAS,
     DatosAhorro,
     DatosDiagnostico,
     DatosEscenario,
@@ -38,7 +39,7 @@ EJEMPLO_DIAGNOSTICO = DatosDiagnostico(
     razon="El pago se lleva entre 30 % y 40 % de lo que te queda libre cada mes.",
     tasa_mensual_pct=Decimal("1.9"),
     tasa_vigencia="nov. 2026",
-    tasa_fuente="Tablero de tasas",
+    tasa_fuente=FUENTE_TASAS,
 )
 """Diagnóstico ficticio de la demo (Camila y el portátil)."""
 
@@ -64,7 +65,7 @@ EJEMPLO_CARTERA = DatosDiagnostico(
     razon="Al trasladar tus deudas, la cuota cabe con holgura en lo que te queda libre.",
     tasa_mensual_pct=Decimal("1.6"),
     tasa_vigencia="nov. 2026",
-    tasa_fuente="Tablero de tasas",
+    tasa_fuente=FUENTE_TASAS,
     ahorro_mensual=Decimal(140_000),
 )
 """Compra de cartera ficticia, con el ahorro mensual estimado."""
@@ -74,14 +75,12 @@ EJEMPLO_AHORRO = DatosAhorro(
     razon="El ahorro no tiene semáforo de crédito: se informa la capacidad mensual.",
     tasas=[
         TasaCaptacion(
-            etiqueta="Cuenta de ahorros", ea_min_pct=Decimal("0.5"), ea_max_pct=Decimal("0.5")
+            etiqueta="Cuenta de ahorros", ea_min_pct=Decimal("0.01"), ea_max_pct=Decimal("0.01")
         ),
-        TasaCaptacion(
-            etiqueta="CDT a 90 días", ea_min_pct=Decimal("8.2"), ea_max_pct=Decimal("8.9")
-        ),
+        TasaCaptacion(etiqueta="CDT a 90 días", ea_min_pct=Decimal("11"), ea_max_pct=Decimal("11")),
     ],
     tasa_vigencia="nov. 2026",
-    tasa_fuente="Tablero de tasas",
+    tasa_fuente=FUENTE_TASAS,
 )
 """Ahorro ficticio, sin semáforo."""
 
@@ -92,9 +91,17 @@ EJEMPLO_NO_APLICA = DatosNoAplica(
 )
 """Libranza para una persona independiente: no se simula."""
 
+EJEMPLO_ALERTA = DatosNoAplica(
+    producto="Libre inversión",
+    razon="Tus gastos y cuotas ya superan tu ingreso: no hay espacio para una cuota nueva.",
+    alternativa="Ordena primero tus gastos y deudas, y habla con un asesor para revisar tu caso.",
+    semaforo="rojo",
+)
+"""Capacidad negativa: el motor la marca en rojo y no simula el crédito."""
+
 
 def guardar_muestras(carpeta: Path) -> list[Path]:
-    """Escribe la foto de perfil, las tres caras y las cinco tarjetas.
+    """Escribe la foto de perfil, las tres caras y las seis tarjetas.
 
     Args:
         carpeta: carpeta de destino (se crea si no existe).
@@ -120,6 +127,7 @@ def guardar_muestras(carpeta: Path) -> list[Path]:
         ("tarjeta-cartera.png", tarjeta_diagnostico(EJEMPLO_CARTERA)),
         ("tarjeta-ahorro.png", tarjeta_ahorro(EJEMPLO_AHORRO)),
         ("tarjeta-no-aplica.png", tarjeta_no_aplica(EJEMPLO_NO_APLICA)),
+        ("tarjeta-alerta.png", tarjeta_no_aplica(EJEMPLO_ALERTA)),
     ):
         ruta = carpeta / nombre
         ruta.write_bytes(contenido)
