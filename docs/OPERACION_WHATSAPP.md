@@ -19,10 +19,11 @@ Sucursal: WhatsApp es un transporte, no otra inteligencia.
 | Identidad E.164 y huella HMAC | `canal/identidad.py` | completo |
 | Consentimiento Ley 1581 | `canal/consentimiento.py` | completo |
 | Envío falso y real | `canal/envio.py` | completo |
-| Deduplicación, cola y despachador | tareas 2.3 y 2.9 | en curso |
+| Deduplicación, cola y despachador | `canal/cola.py`, `canal/despachador.py` | completo |
 
-Mientras la cola y el despachador no estén en `main`, el webhook valida la firma
-y responde `200 EVENT_RECEIVED`, pero todavía no responde al usuario.
+Con la cola y el despachador, un mensaje autorizado recibe respuesta del grafo.
+En modo `falso` el envío se registra en `envios` pero no sale a WhatsApp; para
+que el usuario lo reciba hay que usar `WHATSAPP_MODO=real`.
 
 ## Puesta en marcha desde cero
 
@@ -240,8 +241,9 @@ Ambos deben devolver `12345`. Después, desde un número autorizado, escribe
 POST /webhooks/whatsapp HTTP/1.1" 200 OK
 ```
 
-Ese `POST 200` es la prueba de que Meta entrega, el túnel funciona y la firma es
-válida. La respuesta al usuario llega con las tareas 2.3 y 2.9.
+El `POST 200` es la prueba de que Meta entrega, el túnel funciona y la firma es
+válida. La respuesta del grafo sale por el enviador: en modo `falso` queda en la
+base; en modo `real` llega al WhatsApp del usuario.
 
 ## Estado verificado
 
