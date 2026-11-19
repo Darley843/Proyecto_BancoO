@@ -382,6 +382,20 @@ def test_vigencia_vencida_en_el_ahorro_alerta_y_lo_explica(tmp_path: Path) -> No
     assert any("18 de noviembre de 2026" in motivo for motivo in resultado.motivos)
 
 
+def test_diciembre_responde_el_diagnostico_con_alerta(raiz_tasas: Path) -> None:
+    """Una consulta de diciembre sigue respondiendo con la tabla de noviembre."""
+    entrada = entrada_desde_respuestas(_ids(_personas()["empleada_verde"]))
+    diciembre = date(2026, 12, 5)
+
+    resultado = calcular(entrada, fecha=diciembre, hoy=diciembre, raiz=raiz_tasas)
+
+    assert resultado.semaforo is not None
+    assert resultado.cuota_mensual is not None
+    assert "vigencia_vencida" in resultado.alertas
+    assert resultado.fuente_tasa is not None
+    assert resultado.vigencia_tasa_hasta == VIGENCIA_HASTA
+
+
 def test_carolina_compra_de_cartera_verde_con_ahorro(raiz_tasas: Path) -> None:
     """Carolina: compra de cartera verde y ahorro mensual de $471.120."""
     resultado = _diagnostico("compra_cartera", raiz_tasas)
@@ -435,7 +449,7 @@ def test_capacidad_negativa_es_rojo_sin_cuota(tmp_path: Path) -> None:
         monto_credito=Decimal(10_000_000),
         plazo_meses=36,
     )
-    resultado = calcular(entrada, raiz=tmp_path / "vacia")
+    resultado = calcular(entrada, hoy=FECHA_CONSULTA, raiz=tmp_path / "vacia")
 
     assert resultado.semaforo == "rojo"
     assert resultado.cuota_mensual is None
@@ -465,9 +479,12 @@ def test_los_umbrales_salen_de_la_configuracion(raiz_tasas: Path) -> None:
     entrada = entrada_desde_respuestas(_ids(_personas()["empleada_verde"]))
     config = cargar_config()
 
-    verde = calcular(entrada, raiz=raiz_tasas, config=config)
+    verde = calcular(entrada, hoy=FECHA_CONSULTA, raiz=raiz_tasas, config=config)
     estricto = calcular(
-        entrada, raiz=raiz_tasas, config=replace(config, verde_hasta=Decimal("0.05"))
+        entrada,
+        hoy=FECHA_CONSULTA,
+        raiz=raiz_tasas,
+        config=replace(config, verde_hasta=Decimal("0.05")),
     )
 
     assert verde.semaforo == "verde"
@@ -479,7 +496,7 @@ def test_tasa_ausente_se_detiene(tmp_path: Path) -> None:
     entrada = entrada_desde_respuestas(_ids(_personas()["empleada_verde"]))
 
     with pytest.raises(TasaNoDisponible):
-        calcular(entrada, raiz=tmp_path / "vacia")
+        calcular(entrada, hoy=FECHA_CONSULTA, raiz=tmp_path / "vacia")
 
 
 def test_resultado_reproducible_desde_el_json(raiz_tasas: Path) -> None:

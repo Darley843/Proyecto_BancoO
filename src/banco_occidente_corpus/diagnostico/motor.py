@@ -11,9 +11,11 @@ tasas; este módulo lo conecta con los contratos Pydantic del canal y con
   `EntradaDiagnostico`, tomando los valores de cálculo del TOML. Así el canal
   no conoce las cifras: solo transporta botones.
 
-La tasa se consulta en `data/gold/tasas/` y nunca se inventa. Si falta, la
-excepción `TasaNoDisponible` sube tal cual para que el canal responda
-`tasa_no_disponible`.
+La tasa se consulta en `data/gold/tasas/` y nunca se inventa. Si el producto no
+tiene ninguna tasa publicada, la excepción `TasaNoDisponible` sube tal cual para
+que el canal responda `tasa_no_disponible`. Si la tabla no cubre la fecha de
+hoy, se usa la más reciente y el resultado agrega la alerta
+`vigencia_vencida`: la app sigue respondiendo después del vencimiento.
 """
 
 from __future__ import annotations
@@ -211,7 +213,8 @@ def calcular(
         fecha: vigencia de la tasa consultada; por defecto la más reciente.
         hoy: fecha con la que se comprueba la vigencia de la tasa; por defecto
             la de hoy. Si la vigencia no la incluye, la alerta es
-            `vigencia_vencida`.
+            `vigencia_vencida` y la tasa informada es la de la tabla más
+            reciente.
         raiz: carpeta de tablas Gold alternativa; por defecto la del Tablero.
         config: umbrales ya cargados; por defecto se leen del TOML.
 
@@ -221,7 +224,7 @@ def calcular(
 
     Raises:
         ValueError: si la entrada no cumple el contrato del cálculo.
-        TasaNoDisponible: si el Tablero no publica la tasa del producto.
+        TasaNoDisponible: si el Tablero no publica ninguna tasa del producto.
         TasaFueraDeRango: si la tasa publicada está fuera de rango.
     """
     ajustes = config if config is not None else cargar_config()

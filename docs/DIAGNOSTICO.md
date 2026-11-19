@@ -160,7 +160,12 @@ Reglas adicionales:
 - **Vigencia:** si la vigencia de la tasa consultada no incluye la fecha de hoy
   (por ejemplo, la de ahorro del 4 al 9 de noviembre de 2026), el resultado
   agrega la alerta `vigencia_vencida` y un motivo que cita la vigencia publicada
-  y la fecha de la consulta. La tasa se informa igual, con la advertencia.
+  y la fecha de la consulta. La tasa se informa igual, con la advertencia. Si
+  ninguna tabla cubre hoy, la consulta usa la más reciente en lugar de detener
+  el diagnóstico: la app sigue respondiendo después del 30 de noviembre y el
+  aviso viaja en el Tablero (`TasaVigente.vigencia_vencida`), en el motor y en
+  el MCP. `TasaNoDisponible` queda solo para un producto sin ninguna tasa
+  publicada.
 
 ## Representación en `ResultadoDiagnostico`
 

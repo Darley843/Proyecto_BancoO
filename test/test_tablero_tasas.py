@@ -52,6 +52,8 @@ FIXTURE: Path = Path(__file__).parent / "fixtures" / "tasas-personas-muestra.txt
 SHA_EJEMPLO = "989be43a0ed19eb33e2057cd01c1ae612b6f15544eaaf41af6348846a6ff1b7f"
 #: Fecha de extracción de las pruebas.
 FECHA = date(2026, 11, 16)
+#: Fecha de consulta fija: dentro de la vigencia y sin depender del día de la corrida.
+FECHA_CONSULTA = date(2026, 11, 16)
 #: Productos del alcance que el PDF debe publicar.
 PRODUCTOS_ESPERADOS = {
     "libre_inversion",
@@ -541,7 +543,7 @@ def test_tasa_vigente_de_un_solo_segmento(tmp_path: Path) -> None:
         [fila_consulta("libre_inversion", mensual=("0.0157", "0.0209"))],
     )
 
-    tasa = tasa_vigente("libre_inversion", raiz=tmp_path)
+    tasa = tasa_vigente("libre_inversion", FECHA_CONSULTA, raiz=tmp_path)
 
     assert (tasa.tasa_ea_desde, tasa.tasa_ea_hasta) == (Decimal("0.2056"), Decimal("0.2817"))
     assert (tasa.tasa_mv_desde, tasa.tasa_mv_hasta) == (Decimal("0.0157"), Decimal("0.0209"))
@@ -564,7 +566,7 @@ def test_tasa_vigente_envuelve_los_segmentos_sin_promediar(tmp_path: Path) -> No
         ],
     )
 
-    tasa = tasa_vigente("libranza", raiz=tmp_path)
+    tasa = tasa_vigente("libranza", FECHA_CONSULTA, raiz=tmp_path)
 
     assert (tasa.tasa_ea_desde, tasa.tasa_ea_hasta) == (Decimal("0.143"), Decimal("0.2431"))
     assert tasa.segmento is None
@@ -582,7 +584,7 @@ def test_tasas_producto_conserva_las_filas_por_segmento(tmp_path: Path) -> None:
         ],
     )
 
-    filas = tasas_producto("Libranza", raiz=tmp_path)
+    filas = tasas_producto("Libranza", FECHA_CONSULTA, raiz=tmp_path)
 
     assert [(fila.segmento, fila.tasa_ea_hasta) for fila in filas] == [
         ("Libre inversión", Decimal("0.2431")),
@@ -610,7 +612,7 @@ def test_la_consulta_elige_la_vigencia_mas_reciente(tmp_path: Path) -> None:
         [fila_consulta("libre_inversion")],
     )
 
-    reciente = tasa_vigente("libre_inversion", raiz=tmp_path)
+    reciente = tasa_vigente("libre_inversion", FECHA_CONSULTA, raiz=tmp_path)
     octubre = tasa_vigente("libre_inversion", date(2026, 10, 15), raiz=tmp_path)
 
     assert reciente.tasa_ea_desde == Decimal("0.2056")
@@ -619,14 +621,26 @@ def test_la_consulta_elige_la_vigencia_mas_reciente(tmp_path: Path) -> None:
     assert octubre.vigencia_desde == date(2026, 10, 1)
 
 
-def test_la_consulta_fuera_de_vigencia_responde_tasa_no_disponible(tmp_path: Path) -> None:
-    """Una fecha que ninguna vigencia contiene no se responde con otra tabla."""
+def test_la_consulta_fuera_de_vigencia_usa_la_mas_reciente_y_avisa(
+    tmp_path: Path,
+) -> None:
+    """Una fecha que ninguna vigencia contiene usa la más reciente y lo advierte."""
     publicar(tmp_path, "tasas-personas-2026-11.jsonl", [fila_consulta("libre_inversion")])
 
-    with pytest.raises(TasaNoDisponible) as error:
-        tasa_vigente("libre_inversion", date(2026, 12, 15), raiz=tmp_path)
+    tasa = tasa_vigente("libre_inversion", date(2026, 12, 15), raiz=tmp_path)
 
-    assert error.value.codigo == "tasa_no_disponible"
+    assert tasa.vigencia_desde == date(2026, 11, 1)
+    assert tasa.tasa_ea_desde == Decimal("0.2056")
+    assert tasa.vigencia_vencida is True
+
+
+def test_la_consulta_dentro_de_vigencia_no_avisa(tmp_path: Path) -> None:
+    """Con una fecha que la vigencia contiene, la alerta queda apagada."""
+    publicar(tmp_path, "tasas-personas-2026-11.jsonl", [fila_consulta("libre_inversion")])
+
+    tasa = tasa_vigente("libre_inversion", FECHA_CONSULTA, raiz=tmp_path)
+
+    assert tasa.vigencia_vencida is False
 
 
 def test_la_consulta_sin_producto_responde_tasa_no_disponible(tmp_path: Path) -> None:
@@ -634,7 +648,7 @@ def test_la_consulta_sin_producto_responde_tasa_no_disponible(tmp_path: Path) ->
     publicar(tmp_path, "tasas-personas-2026-11.jsonl", [fila_consulta("libre_inversion")])
 
     with pytest.raises(TasaNoDisponible) as error:
-        tasa_vigente("credito_rotativo", raiz=tmp_path)
+        tasa_vigente("credito_rotativo", FECHA_CONSULTA, raiz=tmp_path)
 
     assert "credito_rotativo" in str(error.value)
 
@@ -667,8 +681,8 @@ def test_las_consultas_parten_de_las_tasas_fijas(tmp_path: Path) -> None:
         ],
     )
 
-    tasa = tasa_vigente("cdt", raiz=tmp_path)
-    filas = tasas_producto("cdt", raiz=tmp_path)
+    tasa = tasa_vigente("cdt", FECHA_CONSULTA, raiz=tmp_path)
+    filas = tasas_producto("cdt", FECHA_CONSULTA, raiz=tmp_path)
 
     assert (tasa.tasa_ea_desde, tasa.tasa_ea_hasta) == (Decimal("0.119"), Decimal("0.119"))
     assert [fila.segmento for fila in filas] == ["$100 MM - 499 MM"]
@@ -718,13 +732,14 @@ def test_la_consulta_funciona_offline_sobre_la_tabla_gold() -> None:
     """La consulta lee la tabla Gold local; la suite bloquea cualquier socket."""
     config = cargar_config_tasas()
 
-    tasa = tasa_vigente("Libre inversión")
-    filas = tasas_producto("libranza")
+    tasa = tasa_vigente("Libre inversión", FECHA_CONSULTA)
+    filas = tasas_producto("libranza", FECHA_CONSULTA)
 
     assert tasa.fuente == config.fuente
     assert tasa.sha256_pdf == config.sha256
     assert tasa.vigencia_desde == config.vigencia_desde
-    assert tasa_vigente("Libre inversión") == tasa
+    assert tasa.vigencia_vencida is False
+    assert tasa_vigente("Libre inversión", FECHA_CONSULTA) == tasa
     assert len(filas) == 3
 
 

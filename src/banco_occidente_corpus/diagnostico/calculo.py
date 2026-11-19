@@ -30,6 +30,7 @@ from pathlib import Path
 from typing import Literal
 
 from ..tablero.tasas import (
+    ALERTA_VIGENCIA_VENCIDA,
     BANDAS_MONTO,
     BandaMonto,
     FilaTasa,
@@ -37,6 +38,7 @@ from ..tablero.tasas import (
     TasaNoDisponible,
     banda_de_concepto,
     clave_producto,
+    esta_vigente,
     fecha_legible,
     nombre_producto,
     plazo_legible,
@@ -369,7 +371,8 @@ def tasa_de_tablero(
     fijas. El ahorro devuelve como referencia el tramo de saldo más bajo y el
     CDT el rango por plazo del monto mínimo, con la envolvente en
     `rango_completo_*`. La consulta es offline y conserva vigencia, fuente y
-    `sha256`.
+    `sha256`. Si la fecha quedó fuera de todas las vigencias, usa la más
+    reciente: el cálculo agrega la alerta `vigencia_vencida` en `evaluar`.
 
     Args:
         producto: clave o nombre del producto.
@@ -604,7 +607,9 @@ def calcular(
 
     No simula cuando la capacidad es negativa ni cuando la libranza no aplica;
     en esos casos no consulta la tasa. Para el ahorro solo informa la capacidad
-    de ahorro y las tasas de captación vigentes.
+    de ahorro y las tasas de captación vigentes. Si no hay tabla vigente para
+    la fecha consultada, usa la más reciente y agrega `vigencia_vencida`; nunca
+    se detiene por una vigencia expirada.
 
     Args:
         entrada: insumos normalizados del diagnóstico.
@@ -622,7 +627,7 @@ def calcular(
 
     Raises:
         ValueError: si la entrada no cumple el contrato.
-        TasaNoDisponible: si no hay tasa para el producto.
+        TasaNoDisponible: si el producto no tiene ninguna tasa publicada.
     """
     _validar(entrada)
     _validar_umbrales(verde_hasta, amarillo_hasta, umbral_vivienda)
@@ -724,6 +729,10 @@ def evaluar(
 def _con_vigencia(resultado: ResultadoCalculo, hoy: date | None) -> ResultadoCalculo:
     """Añade la alerta y el motivo cuando la tasa no cubre la fecha de hoy.
 
+    La consulta no se detiene cuando no hay tabla vigente: el cálculo usa la
+    más reciente y este paso deja la alerta `vigencia_vencida` con un motivo
+    que cita la vigencia publicada.
+
     Args:
         resultado: resultado del cálculo con sus tasas.
         hoy: fecha de contraste; por defecto la de hoy.
@@ -737,11 +746,11 @@ def _con_vigencia(resultado: ResultadoCalculo, hoy: date | None) -> ResultadoCal
     vencidas = [
         tasa
         for tasa in tasas
-        if tasa is not None and not tasa.vigencia_desde <= fecha <= tasa.vigencia_hasta
+        if tasa is not None and not esta_vigente(tasa.vigencia_desde, tasa.vigencia_hasta, fecha)
     ]
     if not vencidas:
         return resultado
-    alertas = (*resultado.alertas, "vigencia_vencida")
+    alertas = (*resultado.alertas, ALERTA_VIGENCIA_VENCIDA)
     motivos = (*resultado.motivos, *(_motivo_vigencia(tasa, fecha) for tasa in vencidas))
     return replace(resultado, alertas=alertas, motivos=motivos)
 

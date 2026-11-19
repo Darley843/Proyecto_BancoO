@@ -199,9 +199,13 @@ class TasaIncoherente(ErrorTasas):
 
 
 class TasaNoDisponible(ErrorTasas):
-    """No hay fila publicada para el producto y la fecha consultados."""
+    """No hay ninguna fila publicada para el producto consultado."""
 
     codigo = "tasa_no_disponible"
+
+
+#: Alerta que acompaña a la tasa cuya vigencia no cubre la fecha consultada.
+ALERTA_VIGENCIA_VENCIDA: str = "vigencia_vencida"
 
 
 class FilaTasa(BaseModel):
@@ -267,6 +271,27 @@ class TasaVigente(BaseModel):
     fuente: str
     sha256_pdf: str = Field(min_length=64, max_length=64)
     fecha_extraccion: date
+    #: La vigencia elegida no cubre la fecha consultada (por defecto, hoy): el
+    #: dato es el de la tabla más reciente y hay que advertirlo antes de usarlo.
+    vigencia_vencida: bool = False
+
+
+def esta_vigente(desde: date, hasta: date, fecha: date | None = None) -> bool:
+    """Indica si una vigencia incluye la fecha consultada.
+
+    La comparación incluye los dos extremos: el último día de la vigencia sigue
+    contando como vigente.
+
+    Args:
+        desde: primer día de la vigencia.
+        hasta: último día de la vigencia.
+        fecha: fecha consultada; por defecto, la de hoy.
+
+    Returns:
+        `True` si la fecha cae entre `desde` y `hasta`, ambos inclusive.
+    """
+    consulta = fecha if fecha is not None else date.today()
+    return desde <= consulta <= hasta
 
 
 @dataclass(frozen=True, slots=True)
@@ -995,7 +1020,9 @@ def tasas_producto(
     Parte de `tasas_fijas`: un spread sobre IPC o IBR no es «la tasa» del
     producto y solo se presenta con `describir_tasa`. Elige la vigencia más
     reciente que contenga la fecha consultada (por defecto, la más reciente de
-    la tabla) y no mezcla tasas de vigencias distintas.
+    la tabla) y no mezcla tasas de vigencias distintas. Si la fecha quedó fuera
+    de todas las vigencias, usa la más reciente en lugar de detenerse: el
+    consumidor informa el dato con la alerta `vigencia_vencida`.
 
     Args:
         producto: nombre o clave del producto.
@@ -1006,8 +1033,7 @@ def tasas_producto(
         Las filas por segmento de la vigencia elegida, en orden determinista.
 
     Raises:
-        TasaNoDisponible: si el producto no tiene tasa o ninguna vigencia
-            contiene la fecha consultada.
+        TasaNoDisponible: si el producto no tiene ninguna tasa publicada.
     """
     clave = clave_producto(producto)
     todas = [fila for ruta in tablas_gold(raiz) for fila in cargar_tabla(ruta)]
@@ -1040,7 +1066,8 @@ def tasa_vigente(
         raiz: carpeta de las tablas; por defecto la de `config/tasas.toml`.
 
     Returns:
-        La envolvente de la tasa en la vigencia elegida.
+        La envolvente de la tasa en la vigencia elegida, con
+        `vigencia_vencida` cuando la vigencia no cubre la fecha consultada.
 
     Raises:
         TasaNoDisponible: si el producto no tiene tasa publicado.
@@ -1077,19 +1104,43 @@ def tasa_vigente(
         fuente=filas[0].fuente,
         sha256_pdf=filas[0].sha256_pdf,
         fecha_extraccion=filas[0].fecha_extraccion,
+        vigencia_vencida=not esta_vigente(
+            min(fila.vigencia_desde for fila in filas),
+            max(fila.vigencia_hasta for fila in filas),
+            fecha,
+        ),
     )
 
 
 def _vigencia_elegida(filas: Sequence[FilaTasa], fecha: date | None) -> date:
-    """Elige la vigencia más reciente que contenga la fecha consultada."""
+    """Elige la vigencia más reciente que contenga la fecha consultada.
+
+    Si ninguna la contiene, devuelve la más reciente en lugar de detenerse: la
+    consulta informa el dato con la alerta `vigencia_vencida`. Solo un producto
+    sin filas queda sin tasa.
+
+    Args:
+        filas: filas publicadas del producto.
+        fecha: fecha consultada, o None para la vigencia más reciente.
+
+    Returns:
+        El primer día de la vigencia elegida.
+    """
     if fecha is None:
         return max(fila.vigencia_desde for fila in filas)
     candidatas = [
         fila.vigencia_desde for fila in filas if fila.vigencia_desde <= fecha <= fila.vigencia_hasta
     ]
-    if not candidatas:
-        raise TasaNoDisponible(f"{filas[0].producto}: sin tasa vigente el {fecha.isoformat()}")
-    return max(candidatas)
+    if candidatas:
+        return max(candidatas)
+    reciente = max(fila.vigencia_desde for fila in filas)
+    log.warning(
+        "%s: sin tasa vigente el %s; se usa la vigencia más reciente (%s)",
+        filas[0].producto,
+        fecha.isoformat(),
+        reciente.isoformat(),
+    )
+    return reciente
 
 
 def _numero_de_pesos(texto: str) -> Decimal:

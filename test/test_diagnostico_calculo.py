@@ -42,6 +42,8 @@ VIGENCIA_DESDE = date(2026, 11, 1)
 VIGENCIA_HASTA = date(2026, 11, 30)
 #: Fecha de extracción de la tabla de prueba.
 FECHA_EXTRACCION = date(2026, 11, 16)
+#: Fecha de consulta fija: dentro de la vigencia y sin depender del día de la corrida.
+FECHA_CONSULTA = date(2026, 11, 16)
 #: Tolerancia en pesos para comparar cuotas verificadas con PAGO de Excel.
 TOLERANCIA = Decimal(1)
 
@@ -215,7 +217,7 @@ def test_semaforo_rechaza_umbrales_invertidos() -> None:
 
 def test_tasa_de_tablero_lee_vigencia_y_fuente(raiz_tasas: Path) -> None:
     """La tasa se lee de la tabla Gold con su vigencia, fuente y sha256."""
-    tasa = tasa_de_tablero("libre_inversion", raiz=raiz_tasas)
+    tasa = tasa_de_tablero("libre_inversion", FECHA_CONSULTA, raiz=raiz_tasas)
     assert tasa.ea_desde == Decimal("0.2056")
     assert tasa.ea_hasta == Decimal("0.2817")
     assert tasa.vigencia_desde == VIGENCIA_DESDE
@@ -226,8 +228,8 @@ def test_tasa_de_tablero_lee_vigencia_y_fuente(raiz_tasas: Path) -> None:
 
 def test_tasa_de_tablero_filtra_segmentos(raiz_tasas: Path) -> None:
     """Vivienda usa crédito hipotecario y libranza usa libre inversión."""
-    vivienda = tasa_de_tablero("vivienda", raiz=raiz_tasas)
-    libranza = tasa_de_tablero("libranza", raiz=raiz_tasas)
+    vivienda = tasa_de_tablero("vivienda", FECHA_CONSULTA, raiz=raiz_tasas)
+    libranza = tasa_de_tablero("libranza", FECHA_CONSULTA, raiz=raiz_tasas)
     assert vivienda.segmento == "Crédito hipotecario"
     assert vivienda.ea_desde == Decimal("0.1517")
     assert vivienda.ea_hasta == Decimal("0.1854")
@@ -238,14 +240,14 @@ def test_tasa_de_tablero_filtra_segmentos(raiz_tasas: Path) -> None:
 
 def test_tasa_de_tablero_excluye_spreads(raiz_tasas: Path) -> None:
     """Un spread IPC no se presenta como tasa del producto."""
-    cdt = tasa_de_tablero("cdt", raiz=raiz_tasas)
+    cdt = tasa_de_tablero("cdt", FECHA_CONSULTA, raiz=raiz_tasas)
     assert cdt.ea_hasta == Decimal("0.1205")
     assert all(tramo.ea_hasta < Decimal("0.5") for tramo in cdt.tramos)
 
 
 def test_tasa_de_tablero_ahorro_usa_el_tramo_de_saldo_mas_bajo(raiz_tasas: Path) -> None:
     """La referencia del ahorro es el tramo más bajo, no el máximo del producto."""
-    tasa = tasa_de_tablero("ahorro", raiz=raiz_tasas)
+    tasa = tasa_de_tablero("ahorro", FECHA_CONSULTA, raiz=raiz_tasas)
 
     assert tasa.tramo == "De 0 a $5.000.000"
     assert (tasa.ea_desde, tasa.ea_hasta) == (Decimal("0.0001"), Decimal("0.0001"))
@@ -257,7 +259,7 @@ def test_tasa_de_tablero_ahorro_usa_el_tramo_de_saldo_mas_bajo(raiz_tasas: Path)
 
 def test_tasa_de_tablero_cdt_rango_por_plazo_del_monto_minimo(raiz_tasas: Path) -> None:
     """El CDT se informa por plazo para el monto mínimo, con la envolvente aparte."""
-    tasa = tasa_de_tablero("cdt", raiz=raiz_tasas)
+    tasa = tasa_de_tablero("cdt", FECHA_CONSULTA, raiz=raiz_tasas)
 
     assert tasa.tramo == "De $500 mil a $99 millones"
     assert (tasa.ea_desde, tasa.ea_hasta) == (Decimal("0.0005"), Decimal("0.1205"))
@@ -280,7 +282,7 @@ def test_tasa_de_tablero_sin_producto(tmp_path: Path) -> None:
 
 def test_laura_verde_con_cuota_en_rango(raiz_tasas: Path) -> None:
     """Valor verificado con PAGO de Excel: 498.002,71; tolerancia ±1 peso."""
-    resultado = calcular(_laura(), raiz=raiz_tasas)
+    resultado = calcular(_laura(), hoy=FECHA_CONSULTA, raiz=raiz_tasas)
     assert resultado.cuota_max is not None
     assert abs(resultado.cuota_max - Decimal("498002.71")) <= TOLERANCIA
     assert resultado.cuota_min is not None
@@ -305,9 +307,23 @@ def test_vigencia_vencida_en_credito_tambien_alerta(raiz_tasas: Path) -> None:
     assert any("no incluye la fecha de hoy" in motivo for motivo in resultado.motivos)
 
 
+def test_diciembre_consulta_la_vigencia_mas_reciente_con_alerta(raiz_tasas: Path) -> None:
+    """Una fecha de diciembre no detiene la consulta: usa noviembre y avisa."""
+    diciembre = date(2026, 12, 5)
+
+    tasa = tasa_de_tablero("libre_inversion", diciembre, raiz=raiz_tasas)
+    resultado = calcular(_laura(), fecha=diciembre, hoy=diciembre, raiz=raiz_tasas)
+
+    assert tasa.vigencia_hasta == VIGENCIA_HASTA
+    assert resultado.cuota_max is not None
+    assert resultado.semaforo == "verde"
+    assert "vigencia_vencida" in resultado.alertas
+    assert any("del 1 al 30 de noviembre de 2026" in motivo for motivo in resultado.motivos)
+
+
 def test_andres_rojo_porque_la_cuota_supera_la_capacidad(raiz_tasas: Path) -> None:
     """Valor verificado con PAGO de Excel: 1.393.022,71; tolerancia ±1 peso."""
-    resultado = calcular(_andres(), raiz=raiz_tasas)
+    resultado = calcular(_andres(), hoy=FECHA_CONSULTA, raiz=raiz_tasas)
     assert resultado.cuota_max is not None
     assert abs(resultado.cuota_max - Decimal("1393022.71")) <= TOLERANCIA
     assert resultado.razon_endeudamiento == Decimal("0.8572")
@@ -319,7 +335,7 @@ def test_andres_rojo_porque_la_cuota_supera_la_capacidad(raiz_tasas: Path) -> No
 
 def test_jaime_amarillo_con_libranza_de_pensionado(raiz_tasas: Path) -> None:
     """Valor verificado con PAGO de Excel: 572.541,25; tolerancia ±1 peso."""
-    resultado = calcular(_jaime(), raiz=raiz_tasas)
+    resultado = calcular(_jaime(), hoy=FECHA_CONSULTA, raiz=raiz_tasas)
     assert resultado.cuota_max is not None
     assert abs(resultado.cuota_max - Decimal("572541.25")) <= TOLERANCIA
     assert resultado.razon_endeudamiento == Decimal("0.3306")
@@ -340,7 +356,7 @@ def test_libranza_con_independiente_no_se_simula(raiz_tasas: Path) -> None:
         plazo_meses=36,
         vinculacion="independiente",
     )
-    resultado = calcular(entrada, raiz=raiz_tasas)
+    resultado = calcular(entrada, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
     assert resultado.semaforo is None
     assert resultado.cuota_max is None
     assert resultado.tasa is None
@@ -411,7 +427,7 @@ def test_compra_de_cartera_informa_ahorro_mensual(raiz_tasas: Path) -> None:
         plazo_meses=60,
         vinculacion="empleado",
     )
-    resultado = calcular(entrada, raiz=raiz_tasas)
+    resultado = calcular(entrada, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
     assert resultado.razon_endeudamiento == Decimal("0.2572")
     assert resultado.semaforo == "verde"
     assert resultado.ahorro_mensual is not None
@@ -431,7 +447,7 @@ def test_carolina_compra_de_cartera_ajusta_capacidad(raiz_tasas: Path) -> None:
         plazo_meses=60,
         vinculacion="empleado",
     )
-    resultado = calcular(entrada, raiz=raiz_tasas)
+    resultado = calcular(entrada, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
     assert resultado.cuota_max is not None
     assert abs(resultado.cuota_max - Decimal("1028880.28")) <= TOLERANCIA
     assert resultado.capacidad_pago == Decimal(2_500_000)
@@ -452,7 +468,7 @@ def test_capacidad_negativa_es_rojo_sin_simular(tmp_path: Path) -> None:
         plazo_meses=36,
         vinculacion="empleado",
     )
-    resultado = calcular(entrada, raiz=tmp_path / "vacia")
+    resultado = calcular(entrada, hoy=FECHA_CONSULTA, raiz=tmp_path / "vacia")
     assert resultado.semaforo == "rojo"
     assert resultado.cuota_max is None
     assert resultado.capacidad_pago == Decimal("-200000.00")
@@ -472,7 +488,7 @@ def test_vivienda_rojo_si_la_cuota_supera_el_30_por_ciento(raiz_tasas: Path) -> 
         plazo_meses=240,
         vinculacion="empleado",
     )
-    resultado = calcular(entrada, raiz=raiz_tasas)
+    resultado = calcular(entrada, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
     assert resultado.razon_endeudamiento == Decimal("0.3249")
     assert resultado.semaforo == "rojo"
     assert any("vivienda" in motivo.lower() for motivo in resultado.motivos)
@@ -501,7 +517,7 @@ def test_rango_de_cuota_con_tasa_minima_y_maxima() -> None:
         plazo_meses=36,
         vinculacion="empleado",
     )
-    resultado = evaluar(entrada, tasa)
+    resultado = evaluar(entrada, tasa, hoy=FECHA_CONSULTA)
     assert resultado.cuota_min is not None
     assert resultado.cuota_max is not None
     assert resultado.cuota_min < resultado.cuota_max
@@ -512,8 +528,8 @@ def test_rango_de_cuota_con_tasa_minima_y_maxima() -> None:
 
 def test_calculo_reproducible(raiz_tasas: Path) -> None:
     """Dos corridas con los mismos insumos producen exactamente lo mismo."""
-    primera = calcular(_laura(), raiz=raiz_tasas)
-    segunda = calcular(_laura(), raiz=raiz_tasas)
+    primera = calcular(_laura(), hoy=FECHA_CONSULTA, raiz=raiz_tasas)
+    segunda = calcular(_laura(), hoy=FECHA_CONSULTA, raiz=raiz_tasas)
     assert primera == segunda
 
 
@@ -528,4 +544,4 @@ def test_compra_de_cartera_exige_cuota_trasladada(raiz_tasas: Path) -> None:
         plazo_meses=60,
     )
     with pytest.raises(ValueError):
-        calcular(entrada, raiz=raiz_tasas)
+        calcular(entrada, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
