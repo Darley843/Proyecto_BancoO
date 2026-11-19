@@ -242,8 +242,27 @@ def test_amarillo_y_rojo_explican_el_color(raiz: Path) -> None:
     assert "cabe" in rojo.razon  # «no cabe» (sin margen) o «aprieta demasiado»
 
 
-def test_vivienda_sobre_el_30_explica_el_tope(raiz: Path) -> None:
+def test_vivienda_sobre_el_40_explica_el_tope(raiz: Path) -> None:
     """La alerta de vivienda manda sobre la frase del semáforo."""
+    datos = datos_diagnostico(
+        _credito(
+            raiz,
+            "vivienda",
+            ingreso=8_000_000,
+            gastos=4_000_000,
+            monto=220_000_000,
+            plazo=240,
+        )
+    )
+
+    assert datos.semaforo == "rojo"
+    assert datos.razon == FRASE_VIVIENDA
+    assert "40 %" in datos.razon
+    assert "Decreto 583 de 2025" in datos.razon
+
+
+def test_vivienda_entre_30_y_40_no_usa_la_frase_del_tope(raiz: Path) -> None:
+    """Con el umbral del 40 %, una cuota del 32,5 % sigue la frase del semáforo."""
     datos = datos_diagnostico(
         _credito(
             raiz,
@@ -255,8 +274,9 @@ def test_vivienda_sobre_el_30_explica_el_tope(raiz: Path) -> None:
         )
     )
 
-    assert datos.semaforo == "rojo"
-    assert datos.razon == FRASE_VIVIENDA
+    assert datos.semaforo == "amarillo"
+    assert datos.razon != FRASE_VIVIENDA
+    assert "cabe, pero justo" in datos.razon
 
 
 def test_compra_de_cartera_lleva_el_ahorro_mensual(raiz: Path) -> None:
@@ -318,11 +338,16 @@ def test_libranza_de_independiente_no_aplica(raiz: Path) -> None:
     """La libranza de un independiente da la tarjeta «no aplica»."""
     resultado = _credito(raiz, "libranza", vinculacion="independiente")
     datos = datos_tarjeta(resultado)
+    _, texto = tarjeta_y_texto(resultado)
 
     assert isinstance(datos, DatosNoAplica)
     assert datos.producto == "Libranza"
     assert datos.semaforo is None
-    assert "convenio" in datos.razon
+    assert "Ley 1527 de 2012" in datos.razon
+    assert "Ley 1902 de 2018" in datos.razon
+    assert "contratistas por prestación de servicios" in datos.razon
+    assert "entidad pagadora con convenio" in datos.razon
+    assert "entidad pagadora con convenio" in texto
     assert "libre inversión" in datos.alternativa
 
 
@@ -378,13 +403,14 @@ def test_tarjeta_y_texto_dan_png_y_texto_con_aviso(caso: str, raiz: Path) -> Non
         "ahorro_cero": lambda: _ahorro(raiz, ingreso=1_500_000, gastos=1_500_000),
         "libranza": lambda: _credito(raiz, "libranza", vinculacion="independiente"),
         "vivienda": lambda: _credito(
-            raiz, "vivienda", ingreso=10_000_000, gastos=4_000_000, monto=220_000_000, plazo=240
+            raiz, "vivienda", ingreso=8_000_000, gastos=4_000_000, monto=220_000_000, plazo=240
         ),
     }[caso]()
     png, texto = tarjeta_y_texto(resultado)
 
     assert _es_png_cuadrado(png)
     assert AVISO in texto
+    assert "historial crediticio" in texto
 
 
 def _comparacion(raiz: Path, plazo_nuevo: int) -> ComparacionEscenario:
