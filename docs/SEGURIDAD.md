@@ -422,7 +422,7 @@ una prueba lo detecte: las pruebas cubren las líneas reales conocidas, no todas
 las variantes futuras. Hasta que falle una pregunta de tabla, el valor incorrecto
 se publicaría igual.
 
-### 3.9 Servidor MCP de solo lectura
+### 3.10 Servidor MCP de solo lectura
 
 **Qué puede pasar.** Un cliente MCP podría intentar escribir en el corpus,
 ejecutar comandos, leer rutas del sistema o usar un fragmento del corpus como
@@ -443,13 +443,17 @@ no responde.
   `tasa_no_disponible` sin inventar una cifra. En el CDT sin plazo no publica
   una envolvente: indica que la tasa depende del plazo y del monto y agrupa por
   plazo; con `plazo_dias` y `monto` devuelve solo la banda que contiene el monto.
+  En un producto que no es CDT esos filtros no se aplican en silencio: la
+  respuesta conserva el rango completo y agrega `aviso_filtros`.
 - `buscar_en_boveda` devuelve cada fragmento con `tratamiento: "dato"` y un
-  aviso explícito. Cada fragmento trae `posicion` (orden del recuperador) y
-  `similitud_coseno` (que no ordena), y la herramienta avisa que no sirve para
-  tasas de interés: la Bóveda conserva textos de 2025 y la tasa vigente se
-  consulta con `consultar_tasa`. El servidor no concatena fragmentos en un
-  prompt, no los pasa a un `SystemMessage` y no los usa para elegir
-  herramientas: son contenido citado, igual que en `asistente/rag.py`.
+  aviso explícito. Cada fragmento trae `posicion` (orden del recuperador) y su
+  puntaje con `tipo_puntaje` (`coseno` o `bm25`): `similitud_coseno` en la
+  búsqueda híbrida y `puntaje_bm25` en el respaldo; ninguno ordena la lista. La
+  herramienta avisa que no sirve para tasas de interés: la Bóveda conserva
+  textos de 2025 y la tasa vigente se consulta con `consultar_tasa`. El servidor
+  no concatena fragmentos en un prompt, no los pasa a un `SystemMessage` y no
+  los usa para elegir herramientas: son contenido citado, igual que en
+  `asistente/rag.py`.
 - Límites: consulta o nombre de producto de 500 caracteres, `k` entre 1 y 5,
   15 s por recuperación y errores estructurados `{codigo, mensaje}`. Una ruta
   del sistema se trata como texto y no se abre ningún archivo.
@@ -471,6 +475,10 @@ no responde.
 `::test_buscar_en_boveda_trata_ruta_como_texto`,
 `::test_fragmento_malicioso_se_devuelve_como_dato`,
 `::test_buscar_en_boveda_usa_bm25_si_el_hibrido_falla`,
+`::test_buscar_en_boveda_hibrido_marca_puntaje_coseno`,
+`::test_buscar_en_boveda_bm25_marca_puntaje_bm25`,
+`::test_buscar_en_boveda_respaldo_registra_la_clase_del_error`,
+`::test_consultar_tasa_avisa_filtros_solo_del_cdt`,
 `::test_buscar_en_boveda_tiempo_agotado`,
 `::test_herramientas_no_escriben_en_la_boveda` y
 `::test_servidor_no_necesita_deepseek`. Regla de GGA: un fragmento de la Bóveda

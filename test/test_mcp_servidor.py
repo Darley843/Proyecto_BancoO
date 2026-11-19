@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import time
 from collections.abc import Sequence
 from datetime import date
@@ -182,6 +183,7 @@ def config_boveda(tmp_path: Path) -> Config:
     filas = [
         fragmento("frag:1", "Para abrir una cuenta de ahorros necesitas la cédula."),
         fragmento("frag:2", "Los requisitos de la cuenta de ahorros están en la sucursal."),
+        fragmento("frag:3", "El CDT paga intereses según el plazo y el monto."),
     ]
     with (carpeta / "fragmentos_base.jsonl").open("w", encoding="utf-8") as archivo:
         for fila in filas:
@@ -437,6 +439,52 @@ def test_buscar_en_boveda_usa_bm25_si_el_hibrido_falla(config_boveda: Config) ->
     assert resultado["total"] >= 1
 
 
+def test_buscar_en_boveda_hibrido_marca_puntaje_coseno(config_boveda: Config) -> None:
+    """La búsqueda híbrida informa una similitud coseno y lo declara."""
+    recuperador = RecuperadorFalso([fragmento("frag:1", "Texto", puntaje=0.91)])
+
+    resultado = _buscar_en_boveda(
+        "cuenta de ahorros", 1, recuperador=recuperador, config=config_boveda
+    )
+
+    primero = resultado["fragmentos"][0]
+    assert resultado["respaldo"] == "hibrido"
+    assert resultado["tipo_puntaje"] == "coseno"
+    assert primero["tipo_puntaje"] == "coseno"
+    assert primero["similitud_coseno"] == 0.91
+    assert "puntaje_bm25" not in primero
+
+
+def test_buscar_en_boveda_bm25_marca_puntaje_bm25(config_boveda: Config) -> None:
+    """El respaldo léxico informa un BM25 y no lo disfraza de similitud coseno."""
+    recuperador = RecuperadorFalso([], error=ConnectionError("Ollama no responde"))
+
+    resultado = _buscar_en_boveda(
+        "requisitos cuenta de ahorros", 1, recuperador=recuperador, config=config_boveda
+    )
+
+    primero = resultado["fragmentos"][0]
+    assert resultado["respaldo"] == "bm25"
+    assert resultado["tipo_puntaje"] == "bm25"
+    assert primero["tipo_puntaje"] == "bm25"
+    assert 0.0 < primero["puntaje_bm25"] <= 1.0
+    assert "similitud_coseno" not in primero
+
+
+def test_buscar_en_boveda_respaldo_registra_la_clase_del_error(
+    config_boveda: Config, caplog: pytest.LogCaptureFixture
+) -> None:
+    """El aviso del respaldo registra la clase y no el mensaje crudo."""
+    secreto = "consulta privada del cliente"
+    recuperador = RecuperadorFalso([], error=ConnectionError(secreto))
+
+    with caplog.at_level(logging.WARNING, logger=modulo.__name__):
+        _buscar_en_boveda("cuenta de ahorros", 1, recuperador=recuperador, config=config_boveda)
+
+    assert "ConnectionError" in caplog.text
+    assert secreto not in caplog.text
+
+
 def test_buscar_en_boveda_tiempo_agotado(
     config_boveda: Config, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -568,6 +616,48 @@ def test_consultar_tasa_valida_los_filtros(
     """Un plazo o un monto no positivos responden un error estructurado."""
     resultado = consultar_tasa("cdt", plazo_dias=plazo, monto=monto)
     assert resultado["error"]["codigo"] == codigo
+
+
+@pytest.mark.parametrize(
+    ("plazo", "monto", "esperado"),
+    [
+        (360, None, "plazo_dias solo aplica al CDT"),
+        (None, 200_000_000, "monto solo aplica al CDT"),
+        (360, 200_000_000, "plazo_dias y monto solo aplican al CDT"),
+    ],
+)
+def test_consultar_tasa_avisa_filtros_solo_del_cdt(
+    monkeypatch: pytest.MonkeyPatch,
+    plazo: int | None,
+    monto: int | None,
+    esperado: str,
+) -> None:
+    """En un producto que no es CDT, los filtros avisan y no se aplican."""
+    monkeypatch.setattr(modulo, "tasas_producto", lambda producto: [fila_tasa()])
+    monkeypatch.setattr(modulo, "tasa_vigente", lambda producto: vigente())
+    monkeypatch.setattr(modulo, "_spreads_producto", lambda producto, desde, plazo=None: [])
+
+    resultado = consultar_tasa("libre_inversion", plazo_dias=plazo, monto=monto)
+
+    assert "error" not in resultado
+    assert esperado in resultado["aviso_filtros"]
+    assert resultado["resumen"]["tasa_ea_desde"] == 0.2056
+
+
+def test_consultar_tasa_sin_filtros_no_agrega_aviso() -> None:
+    """Sin plazo ni monto no aparece el aviso de filtros del CDT."""
+    resultado = consultar_tasa("libre_inversion")
+
+    assert "error" not in resultado
+    assert "aviso_filtros" not in resultado
+
+
+def test_consultar_tasa_cdt_no_avisa_filtros() -> None:
+    """En el CDT los filtros se aplican y no hay aviso de otro producto."""
+    resultado = consultar_tasa("cdt", plazo_dias=360, monto=200_000_000)
+
+    assert "error" not in resultado
+    assert "aviso_filtros" not in resultado
 
 
 def test_consultar_tasa_cdt_sin_banda_para_el_monto() -> None:
