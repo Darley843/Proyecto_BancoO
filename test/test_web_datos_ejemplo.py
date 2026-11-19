@@ -1,6 +1,7 @@
 """Pruebas sin red ni navegador de la app web de la sucursal (PR 12).
 
-Comprueban la tarea 15.1 (armazón y seis vistas sin framework) y la forma de
+Comprueban la tarea 15.1 (armazón y vistas sin framework; ocho desde la
+entrega final) y la forma de
 los datos de ejemplo de la tarea 15.2 contra el contrato de ``design.md``.
 Cuando el PR 10 publique los modelos Pydantic de la API, la comparación de
 campos se hará contra esos modelos en lugar de las claves escritas aquí.
@@ -21,7 +22,16 @@ RAIZ = Path(__file__).resolve().parents[1]
 WEB = RAIZ / "app" / "web"
 DATOS = WEB / "datos-ejemplo"
 
-VISTAS = ("vestibulo", "ventanilla", "boveda", "tablero", "camara", "arqueo")
+VISTAS = (
+    "vestibulo",
+    "ventanilla",
+    "boveda",
+    "tablero",
+    "camara",
+    "arqueo",
+    "operacion",
+    "roba",
+)
 
 # Claves de primer nivel de cada respuesta, copiadas del contrato "API JSON".
 CONTRATO: dict[str, set[str]] = {
@@ -54,6 +64,17 @@ CONTRATO: dict[str, set[str]] = {
     "pipeline": {"etapas", "fuentes", "repeticiones", "indexacion"},
     "arqueo": {"disponible", "datos", "error"},
     "vestibulo": {"hitos"},
+    "operacion": {
+        "generado",
+        "canal",
+        "mensajes",
+        "consentimientos",
+        "casos",
+        "latencia",
+        "latencia_cache",
+        "roba",
+    },
+    "roba": {"sesion", "limite", "marcador", "intentos"},
 }
 
 CAMPOS_FILA = {
@@ -114,7 +135,7 @@ def test_datos_ejemplo_tienen_las_claves_del_contrato(nombre: str) -> None:
 
 
 def test_no_sobran_archivos_de_ejemplo() -> None:
-    """Solo existen los siete archivos que pide la tarea 15.2."""
+    """Solo existen los archivos del contrato (15.2 y entrega final 8.8)."""
     assert {ruta.stem for ruta in DATOS.glob("*.json")} == set(CONTRATO)
 
 
@@ -151,7 +172,7 @@ def test_vistas_existen_y_exportan_render() -> None:
         assert "export async function render(contenedor, estado)" in codigo
 
 
-def test_navegacion_lleva_a_las_seis_vistas() -> None:
+def test_navegacion_lleva_a_las_ocho_vistas() -> None:
     """``index.html`` tiene un enlace y un contenedor por cada vista."""
     html = (WEB / "index.html").read_text(encoding="utf-8")
     for vista in VISTAS:

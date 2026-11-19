@@ -1,0 +1,60 @@
+{
+  "generado": "2026-11-18T19:30:00-05:00",
+  "canal": {
+    "configurado": true,
+    "modo": "falso",
+    "numeros_autorizados": 5
+  },
+  "mensajes": {
+    "recibidos": 42,
+    "respondidos": 40,
+    "errores": 2,
+    "pendientes": 0,
+    "duplicados": 3
+  },
+  "consentimientos": {
+    "aceptados": 5,
+    "pendientes": 0,
+    "revocados": 0
+  },
+  "casos": {
+    "pendientes": 2,
+    "contactados": 1,
+    "descartados": 1,
+    "lista": [
+      {
+        "id": "caso-7f3a",
+        "motivo": "semaforo_rojo",
+        "semaforo": "rojo",
+        "estado": "pendiente",
+        "creado": "2026-11-18T18:52:00-05:00"
+      },
+      {
+        "id": "caso-91c4",
+        "motivo": "solicitud_usuario",
+        "semaforo": "amarillo",
+        "estado": "pendiente",
+        "creado": "2026-11-18T19:10:00-05:00"
+      }
+    ]
+  },
+  "latencia": {
+    "webhook": {"p50_ms": 180, "p95_ms": 420, "n": 30, "suficiente": true},
+    "diagnostico": {"p50_ms": 900, "p95_ms": 1800, "n": 30, "suficiente": true},
+    "hitl": {"p50_ms": 650, "p95_ms": 1200, "n": 12, "suficiente": false},
+    "mcp": {"p50_ms": 95, "p95_ms": 210, "n": 31, "suficiente": true}
+  },
+  "latencia_cache": {
+    "webhook": {"p50_ms": 40, "p95_ms": 85, "n": 30, "suficiente": true}
+  },
+  "roba": {
+    "intentos": 12,
+    "exitos": 3,
+    "puntos": 7,
+    "por_categoria": {
+      "inyeccion": 1,
+      "extraccion_prompt": 1,
+      "fuera_dominio": 1
+    }
+  }
+}
