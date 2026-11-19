@@ -24,6 +24,8 @@ from banco_occidente_corpus.canal.contratos import (
     RangoDecimal,
     RespuestaCanal,
     ResultadoDiagnostico,
+    TasaCaptacion,
+    TramoTasa,
 )
 
 AHORA = datetime(2026, 11, 16, 12, 0, tzinfo=UTC)
@@ -46,6 +48,7 @@ def _entrada(**cambios: Any) -> EntradaDiagnostico:
     """Construye una entrada de diagnóstico válida con los cambios pedidos."""
     datos: dict[str, Any] = {
         "producto": "libre_inversion",
+        "vinculacion": "empleado",
         "ingreso_mensual": Decimal("5000000"),
         "gastos_mensuales": Decimal("2000000"),
         "cuotas_deudas": Decimal("300000"),
@@ -73,7 +76,11 @@ def _resultado(**cambios: Any) -> ResultadoDiagnostico:
         "vigencia_tasa_desde": date(2026, 11, 1),
         "vigencia_tasa_hasta": date(2026, 11, 30),
         "sha256_pdf": "a" * 64,
-        "umbrales": {"verde": Decimal("0.30"), "amarillo": Decimal("0.40")},
+        "umbrales": {
+            "verde_hasta": Decimal("0.30"),
+            "amarillo_hasta": Decimal("0.40"),
+            "vivienda_hasta": Decimal("0.30"),
+        },
         "aviso": "Orientativo, no es una aprobación de crédito.",
     }
     datos.update(cambios)
@@ -207,6 +214,137 @@ def test_semaforo_fuera_de_los_tres_colores_falla() -> None:
     """El semáforo solo admite verde, amarillo o rojo."""
     with pytest.raises(ValidationError):
         _resultado(semaforo="azul")
+
+
+def test_producto_fuera_del_diagnostico_falla() -> None:
+    """Solo los siete objetivos de docs/DIAGNOSTICO.md son válidos."""
+    with pytest.raises(ValidationError):
+        _entrada(producto="tarjeta_credito")
+    with pytest.raises(ValidationError):
+        _entrada(producto="credito_rotativo")
+
+
+def test_vinculacion_invalida_falla() -> None:
+    """La libranza depende de una vinculación conocida."""
+    with pytest.raises(ValidationError):
+        _entrada(vinculacion="desempleado")
+
+
+def test_credito_sin_monto_o_sin_plazo_falla() -> None:
+    """Un producto de crédito exige monto y plazo para simular."""
+    with pytest.raises(ValidationError):
+        _entrada(monto_credito=None)
+    with pytest.raises(ValidationError):
+        _entrada(plazo_meses=None)
+
+
+def test_ahorro_no_lleva_monto_ni_plazo() -> None:
+    """El ahorro no se simula: sin monto y sin plazo, y con ambos falla."""
+    ahorro = _entrada(
+        producto="ahorro",
+        monto_credito=None,
+        plazo_meses=None,
+        cuotas_deudas=Decimal("0"),
+    )
+
+    assert ahorro.monto_credito is None
+    assert ahorro.plazo_meses is None
+    with pytest.raises(ValidationError):
+        _entrada(producto="ahorro")
+    with pytest.raises(ValidationError):
+        _entrada(producto="ahorro", monto_credito=None)
+
+
+def test_montos_negativos_fallan() -> None:
+    """Ingreso, gastos, cuotas y cuota trasladada no admiten negativos."""
+    for campo in (
+        "ingreso_mensual",
+        "gastos_mensuales",
+        "cuotas_deudas",
+        "monto_credito",
+        "cuota_trasladar",
+    ):
+        with pytest.raises(ValidationError):
+            _entrada(**{campo: Decimal("-1")})
+
+
+def test_cuota_trasladar_es_opcional() -> None:
+    """Solo la compra de cartera necesita la cuota que se traslada."""
+    assert _entrada().cuota_trasladar is None
+    assert _entrada(cuota_trasladar=Decimal("300000")).cuota_trasladar == Decimal("300000")
+
+
+def test_resultado_de_ahorro_no_tiene_semaforo_ni_cuota() -> None:
+    """El ahorro informa capacidad y tasas de captación, sin semáforo."""
+    ahorro = _entrada(
+        producto="ahorro",
+        monto_credito=None,
+        plazo_meses=None,
+        cuotas_deudas=Decimal("0"),
+    )
+    resultado = _resultado(
+        entrada=ahorro,
+        tasa_ea=None,
+        tasa_mensual=None,
+        cuota_mensual=None,
+        total_intereses=None,
+        total_pagado=None,
+        razon_endeudamiento=None,
+        margen_despues_cuota=None,
+        semaforo=None,
+        capacidad_pago=Decimal("0"),
+        fuente_tasa=None,
+        vigencia_tasa_desde=None,
+        vigencia_tasa_hasta=None,
+        sha256_pdf=None,
+    )
+
+    assert resultado.semaforo is None
+    assert resultado.cuota_mensual is None
+    assert resultado.alertas == []
+    assert resultado.ahorro_mensual_estimado is None
+
+
+def test_alertas_solo_admiten_los_motivos_conocidos() -> None:
+    """Las alertas son un conjunto cerrado y se guardan como lista."""
+    resultado = _resultado(alertas=["capacidad_negativa", "vigencia_vencida"])
+
+    assert resultado.alertas == ["capacidad_negativa", "vigencia_vencida"]
+    with pytest.raises(ValidationError):
+        _resultado(alertas=["otra_cosa"])
+
+
+def test_tasa_captacion_separa_la_referencia_del_rango_completo() -> None:
+    """El CDT lleva la referencia del monto mínimo y el detalle por plazo."""
+    tasa = TasaCaptacion(
+        producto="cdt",
+        tasa_ea=RangoDecimal(desde=Decimal("0.0005"), hasta=Decimal("0.1205")),
+        referencia="De $500 mil a $99 millones",
+        rango_completo=RangoDecimal(desde=Decimal("0.0005"), hasta=Decimal("0.1215")),
+        tramos=[
+            TramoTasa(
+                etiqueta="30 días (1 mes)",
+                tasa_ea=RangoDecimal(desde=Decimal("0.0005"), hasta=Decimal("0.0005")),
+            )
+        ],
+        vigencia_desde=date(2026, 11, 1),
+        vigencia_hasta=date(2026, 11, 30),
+        fuente="https://www.bancodeoccidente.com.co/tasas",
+    )
+
+    assert tasa.referencia == "De $500 mil a $99 millones"
+    assert tasa.rango_completo is not None
+    assert tasa.rango_completo.hasta == Decimal("0.1215")
+    assert tasa.tramos[0].etiqueta == "30 días (1 mes)"
+
+
+def test_tasa_captacion_rechaza_un_tramo_sin_etiqueta() -> None:
+    """El tramo siempre se puede nombrar en el texto."""
+    with pytest.raises(ValidationError):
+        TramoTasa(
+            etiqueta="",
+            tasa_ea=RangoDecimal(desde=Decimal("0.01"), hasta=Decimal("0.01")),
+        )
 
 
 def test_caso_asesor_nace_pendiente_y_sin_resultado() -> None:
