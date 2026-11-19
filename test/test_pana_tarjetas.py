@@ -385,8 +385,8 @@ def test_texto_del_ahorro_no_tiene_semaforo() -> None:
 
     for pieza in (
         "Puedes ahorrar hasta $350.000 al mes",
-        "CDT a 90 días: 8,2 % – 8,9 % E.A.",
-        "Cuenta de ahorros: 0,5 % E.A.",
+        "CDT a 90 días: 11 % E.A.",
+        "Cuenta de ahorros: 0,01 % E.A.",
         "Tablero de tasas, nov. 2026",
         AVISO,
     ):

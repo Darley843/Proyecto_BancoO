@@ -645,16 +645,29 @@ def _a_png(img: Image.Image) -> bytes:
 def _tabla(d: ImageDraw.ImageDraw, filas: list[tuple[str, str]], y: int, paso: int) -> None:
     """Dibuja filas «etiqueta … valor» con una línea debajo de cada una.
 
+    Si un valor largo (por ejemplo, una tasa vencida) chocaría con su
+    etiqueta, la letra del valor se achica hasta dejar 24 px de aire.
+
     Args:
         d: lienzo de dibujo.
         filas: pares ``(etiqueta, valor)``.
         y: altura de la primera fila.
         paso: separación entre filas en píxeles.
     """
-    fuente_valor = _fuente(30, negrita=True)
+    fuente_etiqueta = _fuente(30)
     for etiqueta, valor in filas:
-        d.text((92, y), etiqueta, font=_fuente(30), fill=TINTA)
-        d.text((LADO - 92 - fuente_valor.getlength(valor), y), valor, font=fuente_valor, fill=TINTA)
+        libre = LADO - 2 * 92 - fuente_etiqueta.getlength(etiqueta) - 24
+        tamano = 30
+        while tamano > 20 and _fuente(tamano, negrita=True).getlength(valor) > libre:
+            tamano -= 1
+        fuente_valor = _fuente(tamano, negrita=True)
+        d.text((92, y), etiqueta, font=fuente_etiqueta, fill=TINTA)
+        d.text(
+            (LADO - 92 - fuente_valor.getlength(valor), y + (30 - tamano) // 2),
+            valor,
+            font=fuente_valor,
+            fill=TINTA,
+        )
         y += paso
         d.line((92, y - 14, LADO - 92, y - 14), fill=LINEA, width=1)
 

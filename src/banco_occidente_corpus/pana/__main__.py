@@ -74,10 +74,10 @@ EJEMPLO_AHORRO = DatosAhorro(
     razon="El ahorro no tiene semáforo de crédito: se informa la capacidad mensual.",
     tasas=[
         TasaCaptacion(
-            etiqueta="Cuenta de ahorros", ea_min_pct=Decimal("0.5"), ea_max_pct=Decimal("0.5")
+            etiqueta="Cuenta de ahorros", ea_min_pct=Decimal("0.01"), ea_max_pct=Decimal("0.01")
         ),
         TasaCaptacion(
-            etiqueta="CDT a 90 días", ea_min_pct=Decimal("8.2"), ea_max_pct=Decimal("8.9")
+            etiqueta="CDT a 90 días", ea_min_pct=Decimal("11"), ea_max_pct=Decimal("11")
         ),
     ],
     tasa_vigencia="nov. 2026",
