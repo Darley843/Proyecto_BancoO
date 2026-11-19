@@ -81,9 +81,15 @@ LINEA = (185, 173, 143)
 
 _DIGITOS_LARGOS = re.compile(r"\d{7,}")
 
+_MONTO_EN_PESOS = re.compile(r"-?\$\s?\d[\d.]*(?:,\d+)?")
+"""Montos con signo de pesos («$1.393.023», «$1393023»): no son teléfonos."""
+
 
 def _sin_numeros_largos(valor: str) -> str:
     """Rechaza textos con 7 o más dígitos seguidos (teléfono o cédula).
+
+    Los montos que empiezan con ``$`` se permiten, porque el motor del
+    diagnóstico los escribe en sus motivos («reduce la cuota en $1.393.023»).
 
     Args:
         valor: texto libre de la tarjeta.
@@ -93,12 +99,13 @@ def _sin_numeros_largos(valor: str) -> str:
 
     Raises:
         ValueError: si el texto queda vacío sin los espacios de los extremos,
-            o si (sin espacios, puntos ni guiones) tiene una secuencia de 7 o
-            más dígitos.
+            o si (sin montos en pesos, espacios, puntos ni guiones) tiene una
+            secuencia de 7 o más dígitos.
     """
     if not valor.strip():
         raise ValueError("el texto no puede estar vacío")
-    compacto = re.sub(r"[\s.\-()+]", "", valor)
+    sin_montos = _MONTO_EN_PESOS.sub("", valor)
+    compacto = re.sub(r"[\s.\-()+]", "", sin_montos)
     if _DIGITOS_LARGOS.search(compacto):
         raise ValueError("la tarjeta no puede llevar números de teléfono ni de documento")
     return valor.strip()

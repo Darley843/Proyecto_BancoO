@@ -301,3 +301,26 @@ def test_rechaza_tarjetas_de_un_mega_o_mas(monkeypatch: pytest.MonkeyPatch) -> N
     monkeypatch.setattr(tarjetas, "PESO_MAXIMO", peso_real)
     with pytest.raises(RuntimeError, match="1 MB"):
         tarjetas.tarjeta_diagnostico(EJEMPLO_DIAGNOSTICO)
+
+
+@pytest.mark.parametrize(
+    "razon",
+    [
+        "El traslado reduce la cuota en $1.393.023 al mes.",
+        "Te sobran $1393023 al mes después de la cuota.",
+        "La capacidad es de -$2.500.000 al mes.",
+    ],
+)
+def test_acepta_montos_en_pesos_del_motor(razon: str) -> None:
+    """Los montos con signo de pesos no se confunden con teléfonos."""
+    assert _diagnostico(razon=razon).razon == razon
+
+
+@pytest.mark.parametrize(
+    "razon",
+    ["Cédula 1.234.567.890 registrada", "Escríbeme al 300 123 4567", "Pago $50.000 y CC 12345678"],
+)
+def test_sigue_rechazando_documentos_junto_a_montos(razon: str) -> None:
+    """Quitar los montos no deja pasar cédulas ni teléfonos."""
+    with pytest.raises(ValidationError, match="teléfono"):
+        _diagnostico(razon=razon)
