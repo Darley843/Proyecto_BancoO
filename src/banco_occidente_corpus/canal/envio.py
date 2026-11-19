@@ -10,8 +10,10 @@ Dos implementaciones detrás del ``Protocol`` :class:`Enviador`:
   el destino esté entre las huellas autorizadas.
 
 Los textos largos se parten por párrafos en bloques de 4.096 caracteres; los
-botones van en un mensaje interactivo y el título se recorta a 20. El token y el
-número nunca se registran en los logs. Las pruebas viven en
+botones van en un mensaje interactivo y el título se recorta a 20. La tarjeta
+de Pana se sube como media y se envía como imagen después del texto: si la
+imagen falla, el texto ya salió y la respuesta no se corta. El token, el número
+y los bytes de la imagen nunca se registran en los logs. Las pruebas viven en
 ``test/test_canal_envio.py``.
 """
 
@@ -93,9 +95,15 @@ def partir_texto(texto: str, limite: int = LARGO_MAXIMO) -> list[str]:
 
 @dataclass
 class EnviadorFalso:
-    """Enviador local que registra el envío y no toca la red."""
+    """Enviador local que registra el envío y no toca la red.
+
+    ``registro`` guarda, en orden, lo que se habría enviado: ``("texto", texto)``
+    y, si la respuesta trae tarjeta, ``("imagen", sha256 del PNG)``. Sirve para
+    comprobar que el texto sale antes que la imagen.
+    """
 
     ruta: Path
+    registro: list[tuple[str, str]] = field(default_factory=list)
 
     def __post_init__(self) -> None:
         """Crea la carpeta y las tablas del almacén si faltan."""
@@ -110,7 +118,10 @@ class EnviadorFalso:
         Returns:
             Un identificador ``fake:<uuid>``.
         """
-        digesto = hashlib.sha256(respuesta.texto.encode("utf-8")).hexdigest()
+        material = respuesta.texto.encode("utf-8")
+        if respuesta.imagen is not None:
+            material += b"|" + hashlib.sha256(respuesta.imagen).hexdigest().encode("ascii")
+        digesto = hashlib.sha256(material).hexdigest()
         clave = hashlib.sha256(f"{respuesta.id_mensaje_origen}|{digesto}".encode()).hexdigest()
         with conectar(self.ruta) as conexion:
             conexion.execute(
@@ -124,6 +135,9 @@ class EnviadorFalso:
                     datetime.now(UTC).isoformat(),
                 ),
             )
+        self.registro.append(("texto", respuesta.texto))
+        if respuesta.tipo == "imagen" and respuesta.imagen is not None:
+            self.registro.append(("imagen", hashlib.sha256(respuesta.imagen).hexdigest()))
         return f"fake:{uuid4()}"
 
 
@@ -152,11 +166,12 @@ class EnviadorMeta:
 
         Returns:
             El ``messages[0].id`` de la respuesta de Meta, o cadena vacía si no
-            viene.
+            viene. Si la respuesta trae tarjeta y la imagen falla, devuelve el
+            id del texto: la persona ya recibió la respuesta.
 
         Raises:
             ErrorEnvio: si el destino no está autorizado, si Meta responde 4xx
-                o si se agotan los reintentos de 429/5xx.
+                al texto o si se agotan los reintentos de 429/5xx.
         """
         if self.usuario_id not in self.huellas:
             raise ErrorEnvio("destino no autorizado para el modo real")
@@ -170,6 +185,12 @@ class EnviadorMeta:
                 ultima = indice == len(partes) - 1
                 botones = respuesta.botones if ultima and respuesta.tipo == "botones" else []
                 salida = self._enviar_parte(cliente, parte, botones)
+            if respuesta.tipo == "imagen" and respuesta.imagen is not None:
+                try:
+                    media_id = self._subir_imagen(cliente, respuesta.imagen)
+                    self._enviar_imagen(cliente, media_id)
+                except ErrorEnvio:
+                    logger.warning("no se pudo enviar la tarjeta; el texto ya salió")
             return salida
         finally:
             if propio:
@@ -202,24 +223,52 @@ class EnviadorMeta:
             cuerpo["text"] = {"body": texto}
         return cuerpo
 
-    def _enviar_parte(self, cliente: httpx.Client, texto: str, botones: list[BotonCanal]) -> str:
-        """Envía una parte con reintentos acotados y sin filtrar secretos."""
-        url = f"{URL_META}/{self.version_api}/{self.phone_number_id}/messages"
+    def _publicar(
+        self,
+        cliente: httpx.Client,
+        url: str,
+        *,
+        json: dict[str, Any] | None = None,
+        data: dict[str, str] | None = None,
+        files: dict[str, tuple[str, bytes, str]] | None = None,
+    ) -> httpx.Response:
+        """Hace una petición a Meta con reintentos acotados y sin secretos.
+
+        Args:
+            cliente: cliente HTTP ya construido con ``timeout``.
+            url: destino en ``graph.facebook.com``.
+            json: cuerpo JSON del mensaje, si aplica.
+            data: campos del formulario multipart, si aplica.
+            files: archivo del formulario multipart, si aplica.
+
+        Returns:
+            La respuesta con estado menor que 400.
+
+        Raises:
+            ErrorEnvio: si hay un fallo de red, si Meta responde 4xx o si se
+                agotan los reintentos de 429/5xx.
+        """
         cabeceras = {
             "Authorization": f"Bearer {self.token}",
             "User-Agent": self.user_agent,
             "From": self.remitente,
         }
-        cuerpo = self._cuerpo(texto, botones)
 
         for intento in range(1, self.intentos + 1):
             try:
-                respuesta = cliente.post(url, json=cuerpo, headers=cabeceras, timeout=self.timeout)
+                respuesta = cliente.post(
+                    url,
+                    json=json,
+                    data=data,
+                    files=files,
+                    headers=cabeceras,
+                    timeout=self.timeout,
+                )
             except httpx.HTTPError as error:
                 raise ErrorEnvio("fallo de red al enviar a Meta") from error
 
             if respuesta.status_code < 400:
-                return _id_salida(respuesta)
+                return respuesta
             reintentable = respuesta.status_code == 429 or respuesta.status_code >= 500
             if reintentable and intento < self.intentos:
                 self.espera(ESPERA_SEGUNDOS * intento)
@@ -228,6 +277,61 @@ class EnviadorMeta:
             raise ErrorEnvio(f"Meta respondió {respuesta.status_code}")
 
         raise ErrorEnvio("Meta no respondió")
+
+    def _enviar_parte(self, cliente: httpx.Client, texto: str, botones: list[BotonCanal]) -> str:
+        """Envía una parte con reintentos acotados y sin filtrar secretos."""
+        url = f"{URL_META}/{self.version_api}/{self.phone_number_id}/messages"
+        respuesta = self._publicar(cliente, url, json=self._cuerpo(texto, botones))
+        return _id_salida(respuesta)
+
+    def _subir_imagen(self, cliente: httpx.Client, png: bytes) -> str:
+        """Sube el PNG a Meta y devuelve su ``media_id``.
+
+        Args:
+            cliente: cliente HTTP de la petición.
+            png: bytes de la tarjeta, generados en memoria.
+
+        Returns:
+            El identificador de media que asigna Meta.
+
+        Raises:
+            ErrorEnvio: si Meta no responde con un id válido.
+        """
+        url = f"{URL_META}/{self.version_api}/{self.phone_number_id}/media"
+        respuesta = self._publicar(
+            cliente,
+            url,
+            data={"messaging_product": "whatsapp", "type": "image/png"},
+            files={"file": ("pana.png", png, "image/png")},
+        )
+        try:
+            datos = respuesta.json()
+        except ValueError as error:
+            raise ErrorEnvio("Meta no devolvió el id de la imagen") from error
+        media_id = datos.get("id") if isinstance(datos, dict) else None
+        if not isinstance(media_id, str) or not media_id:
+            raise ErrorEnvio("Meta no devolvió el id de la imagen")
+        return media_id
+
+    def _enviar_imagen(self, cliente: httpx.Client, media_id: str) -> str:
+        """Envía la tarjeta como mensaje de imagen, sin repetir el texto.
+
+        Args:
+            cliente: cliente HTTP de la petición.
+            media_id: identificador devuelto por la subida.
+
+        Returns:
+            El id del mensaje de imagen, o cadena vacía si Meta no lo envía.
+        """
+        url = f"{URL_META}/{self.version_api}/{self.phone_number_id}/messages"
+        cuerpo = {
+            "messaging_product": "whatsapp",
+            "recipient_type": "individual",
+            "to": self.destino,
+            "type": "image",
+            "image": {"id": media_id},
+        }
+        return _id_salida(self._publicar(cliente, url, json=cuerpo))
 
 
 def _id_salida(respuesta: httpx.Response) -> str:
