@@ -1,6 +1,6 @@
 {
   "version": 2,
-  "nota": "Personas alineadas con docs/DIAGNOSTICO.md (ids canónicos, valores de cálculo = puntos medios, semáforo con la tasa máxima). Los semáforos esperados se verificaron para cualquier E.A. entre 10 % y 28,34 % (usura nov. 2026), salvo donde la nota dice que dependen de la tasa. Los títulos de lista respetan el máximo de 24 caracteres de WhatsApp; el texto completo del guion va en la descripción. El consentimiento y la confirmación los pone el canal (preámbulo del simulador).",
+  "nota": "Personas alineadas con docs/DIAGNOSTICO.md (ids canónicos, valores de cálculo = puntos medios, semáforo con la tasa máxima). Los semáforos esperados se verificaron para cualquier E.A. entre 10 % y 28,34 % (usura nov. 2026). Los títulos de lista respetan el máximo de 24 caracteres de WhatsApp; el texto completo del guion va en la descripción. El consentimiento y la confirmación los pone el canal (preámbulo del simulador).",
   "personas": [
     {
       "id": "empleada_verde",
@@ -257,9 +257,9 @@
         }
       ],
       "esperado": {
-        "semaforo": null,
+        "semaforo": "verde",
         "deriva_asesor": false,
-        "nota": "Semáforo depende de la tasa: con la fórmula del guion la capacidad (1.000.000) no suma la cuota trasladada; es verde hasta ~26 % E.A. y rojo a la tasa de usura (cuota 1.031.661 > capacidad). Se confirma con el motor y la tasa máxima vigente. Debe informar el ahorro mensual estimado."
+        "nota": "Valores de cálculo: ingreso 4.000.000, gastos 1.500.000, cuotas 1.500.000 (todas se trasladan), monto 35.000.000, 60 meses. La capacidad excluye las cuotas trasladadas (4.000.000 - 1.500.000 - 0 = 2.500.000): verde con cualquier tasa publicada, RE de 25,7 % a 25,8 % hasta la usura (docs/DIAGNOSTICO.md). Debe informar el ahorro mensual estimado (471.120 con la tasa máxima)."
       }
     },
     {
