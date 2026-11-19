@@ -78,7 +78,14 @@ su `sha256_pdf`.
 - Si la tabla publicada ya no cubre la fecha de hoy, agrega
   `vigencia_vencida` a `alertas` y sigue respondiendo con la vigencia más
   reciente.
-- El resultado es orientativo y no es una aprobación ni una oferta de crédito.
+- El resultado es orientativo, no incluye tu historial crediticio (que el banco
+  evalúa obligatoriamente: Circular Básica Financiera, Circular Externa 004 de
+  2026 de la Superfinanciera, párrafo 1.1.2.27 c) y no es una aprobación ni una
+  oferta de crédito.
+- `simular_cuota` no recibe ingresos y por eso no evalúa la regla de vivienda:
+  la alerta `vivienda_primera_cuota` (primera cuota sobre el 40 % de los
+  ingresos familiares, Decreto 583 de 2025) solo la emite el diagnóstico
+  guiado.
 
 ## Límites y errores
 

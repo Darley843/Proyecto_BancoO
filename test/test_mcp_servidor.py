@@ -765,6 +765,8 @@ def test_simular_cuota_devuelve_rango_dos_tasas_y_trazabilidad() -> None:
     assert resultado["vigencia_vencida"] is False
     assert resultado["alertas"] == []
     assert "orientativo" in resultado["aviso"]
+    assert "historial crediticio" in resultado["aviso"]
+    assert "1.1.2.27 c" in resultado["aviso"]
 
 
 def test_simular_cuota_coincide_con_el_diagnostico() -> None:

@@ -1,9 +1,12 @@
 # Diagnóstico financiero: umbrales del semáforo, catálogo de productos y
 # rangos de la entrevista.
 #
-# Los umbrales son la razón de endeudamiento (cuotas actuales más cuota nueva
-# sobre el ingreso mensual). Se ajustan sin tocar código; los valores de
-# partida son 0,30 y 0,40.
+# Los umbrales `verde_hasta` y `amarillo_hasta` son la razón de endeudamiento
+# (cuotas actuales más cuota nueva sobre el ingreso mensual). Se ajustan sin
+# tocar código; los valores de partida son 0,30 y 0,40.
+# `vivienda_primera_cuota` es el límite legal de la primera cuota sobre los
+# ingresos familiares (Decreto 583 de 2025, que modificó el Decreto 1077 de
+# 2015): 0,40 desde 2025; antes era 0,30 para No VIS.
 #
 # Los rangos, sus ids y sus valores de cálculo salen del guion de la entrevista
 # (docs/DIAGNOSTICO.md, cambio OpenSpec `corresponsal-whatsapp`). Los ids son el
@@ -18,6 +21,7 @@
 [umbrales]
 verde_hasta = 0.30
 amarillo_hasta = 0.40
+vivienda_primera_cuota = 0.40
 
 # Frontera del monto del crédito, en pesos, para el diagnóstico, los escenarios
 # «¿Y si…?» y el MCP. No son los valores de cálculo de los rangos de la

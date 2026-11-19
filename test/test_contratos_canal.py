@@ -79,7 +79,7 @@ def _resultado(**cambios: Any) -> ResultadoDiagnostico:
         "umbrales": {
             "verde_hasta": Decimal("0.30"),
             "amarillo_hasta": Decimal("0.40"),
-            "vivienda_hasta": Decimal("0.30"),
+            "vivienda_primera_cuota": Decimal("0.40"),
         },
         "aviso": "Orientativo, no es una aprobación de crédito.",
     }

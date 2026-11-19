@@ -39,8 +39,9 @@ PESO_MAXIMO = 1_000_000
 """La tarjeta debe pesar menos que esto (bytes); WhatsApp acepta 5 MB, así carga rápido."""
 
 AVISO = (
-    "Orientativo, no es una aprobación de crédito. Pana es el asistente de un "
-    "proyecto académico de la UAO, no del Banco de Occidente."
+    "Orientativo, no es una aprobación de crédito y no incluye tu historial "
+    "crediticio. Pana es el asistente de un proyecto académico de la UAO, no "
+    "del Banco de Occidente."
 )
 """Aviso que llevan la imagen y el texto."""
 
