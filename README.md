@@ -520,35 +520,87 @@ cliente.
 
 La Sucursal también atiende por WhatsApp Cloud API, con webhook propio en el
 mismo FastAPI (Vía 2, sin N8N). El canal valida la firma de Meta, identifica al
-usuario con una huella HMAC de su número, pide consentimiento de la Ley 1581 y
-entrega el turno al grafo existente. La guía completa está en
+usuario con una huella HMAC de su número, pide consentimiento de la Ley 1581,
+entrega el turno al grafo existente y responde por el enviador real o falso.
+
+La guía completa, con Meta paso a paso, está en
 [`docs/OPERACION_WHATSAPP.md`](docs/OPERACION_WHATSAPP.md).
 
+### Levantarlo en tres ventanas
+
+**Ventana 1 — la app** (desde la raíz del repositorio):
+
 ```powershell
-# 1. Cargar los secretos en la sesión (nunca en el repositorio)
-$env:WHATSAPP_VERIFY_TOKEN = "..."
-$env:WHATSAPP_APP_SECRET = "..."
-$env:WHATSAPP_ACCESS_TOKEN = "..."
-$env:WHATSAPP_PHONE_NUMBER_ID = "..."
-$env:WHATSAPP_ID_SALT = "..."
-$env:WHATSAPP_MODO = "falso"
-
-# 2. Levantar la Sucursal (solo 127.0.0.1:8000)
+. "..\whatsapp-env.ps1"
+$env:WHATSAPP_MODO = "real"   # "falso" registra el envío sin salir a WhatsApp
 make app
+```
 
-# 3. Exponer el webhook con un túnel HTTPS
+**Ventana 2 — el túnel** (desde cualquier carpeta):
+
+```powershell
 cloudflared tunnel --url http://127.0.0.1:8000
 ```
 
-- **Variables:** `.env.example` lista los nombres; el proyecto **no** lee
-  `.env` (ver `docs/SEGURIDAD.md` §4).
-- **Callback en Meta:** `https://<túnel>/webhooks/whatsapp`, con el mismo token
-  de verificación y suscripción a `messages`.
-- **Números autorizados:** se guardan como huellas, no en claro:
-  `uv run python -m banco_occidente_corpus.canal.identidad --huella "+57..."`.
-- **Modos:** `falso` registra el envío sin red (suite y ensayos); `real` usa la
-  API de Meta y exige que el destino esté autorizado.
-- **Límites del número de prueba:** cinco destinatarios y ventana de 24 horas.
+Copia la URL `https://....trycloudflare.com`. El túnel rápido no tiene URL fija:
+si se reinicia, cambia y hay que actualizarla en Meta.
+
+**Ventana 3 — comprobaciones**:
+
+```powershell
+. "..\whatsapp-env.ps1"
+curl.exe "http://127.0.0.1:8000/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=$env:WHATSAPP_VERIFY_TOKEN&hub.challenge=12345"
+```
+
+Debe devolver `12345`.
+
+### Configurar Meta (una sola vez)
+
+- **Webhooks → `Whatsapp Business Account`:** URL
+  `https://<túnel>/webhooks/whatsapp`, el token de `WHATSAPP_VERIFY_TOKEN` y
+  `messages` suscrito.
+- **Publicar la app** (App Mode: Live). En modo Desarrollo, Meta no entrega
+  mensajes reales.
+- **Suscribir la cuenta a la app** con `subscribed_apps` (ver la guía).
+
+### Autorizar un número
+
+1. Agregarlo en **WhatsApp → Paso 1 → To** y verificar el código.
+2. Calcular su huella y pegarla en `config/whatsapp.toml`:
+
+```powershell
+uv run python -m banco_occidente_corpus.canal.identidad --huella "+57 300 123 4567"
+```
+
+Sin la huella, el canal responde «no autorizado» y el envío real se bloquea.
+
+### Qué esperar
+
+1. `hola` → aviso de la Ley 1581 con **Acepto** y **Ahora no**.
+2. **Acepto** → confirmación y consentimiento guardado.
+3. Una pregunta del alcance → respuesta del grafo con sus fuentes.
+
+### Variables y modos
+
+- `.env.example` lista los nombres; el proyecto **no** lee `.env`
+  (`docs/SEGURIDAD.md` §4).
+- `WHATSAPP_MODO=falso`: el envío queda en `data/asistente/whatsapp.sqlite` y no
+  sale a Meta. Es el modo de la suite y de los ensayos.
+- `WHATSAPP_MODO=real`: envía por la API de Meta y exige que el destino esté en
+  las huellas.
+- Límites del número de prueba: cinco destinatarios y ventana de 24 horas.
+
+### Comprobar qué pasó
+
+```powershell
+@'
+import sqlite3
+with sqlite3.connect("data/asistente/whatsapp.sqlite") as c:
+    print(c.execute("SELECT estado, COUNT(*) FROM mensajes GROUP BY estado").fetchall())
+    print("consentimientos:", c.execute("SELECT COUNT(*) FROM consentimientos").fetchone()[0])
+    print("envios:", c.execute("SELECT COUNT(*) FROM envios").fetchone()[0])
+'@ | uv run python -
+```
 
 ## Capturas
 
