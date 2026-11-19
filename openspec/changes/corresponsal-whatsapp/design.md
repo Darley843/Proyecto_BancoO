@@ -454,8 +454,8 @@ class ResultadoDiagnostico(BaseModel):
     margen_despues_cuota: Decimal | None = None
     ahorro_mensual_estimado: Decimal | None = None
     semaforo: Literal["verde", "amarillo", "rojo"] | None = None
-    alertas: list[Literal["vivienda_30", "libranza_no_aplica", "capacidad_negativa"]] = (
-        Field(default_factory=list)
+    alertas: list[Literal["vivienda_30", "libranza_no_aplica", "capacidad_negativa"]] = Field(
+        default_factory=list
     )
     motivos: list[str] = Field(default_factory=list)
     recomendaciones: list[str]
