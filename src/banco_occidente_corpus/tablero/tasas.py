@@ -1062,7 +1062,9 @@ def tasa_vigente(
 
     Args:
         producto: nombre o clave del producto.
-        fecha: fecha consultada; por defecto, la vigencia más reciente.
+        fecha: fecha consultada; por defecto la vigencia más reciente. La
+            alerta `vigencia_vencida` compara esa fecha con la vigencia elegida
+            y, si no se indica, con la fecha de hoy.
         raiz: carpeta de las tablas; por defecto la de `config/tasas.toml`.
 
     Returns:
