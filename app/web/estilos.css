@@ -1819,6 +1819,12 @@ main:focus {
   color: var(--texto-suave);
 }
 
+.ventanilla__ticket--d {
+  border-color: var(--exito);
+  background: color-mix(in srgb, var(--exito) 12%, var(--superficie));
+  color: var(--exito);
+}
+
 .ventanilla__pregunta {
   margin: 0;
   color: var(--texto);
