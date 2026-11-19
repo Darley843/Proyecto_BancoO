@@ -1,0 +1,39 @@
+{
+  "object": "whatsapp_business_account",
+  "entry": [
+    {
+      "id": "200000000000001",
+      "changes": [
+        {
+          "value": {
+            "messaging_product": "whatsapp",
+            "metadata": {
+              "display_phone_number": "15550000000",
+              "phone_number_id": "100000000000001"
+            },
+            "contacts": [
+              {
+                "profile": {
+                  "name": "Persona simulada"
+                },
+                "wa_id": "570000000001"
+              }
+            ],
+            "messages": [
+              {
+                "from": "570000000001",
+                "id": "wamid.SIM7cd36d7b70526bc21c4cb1c15dc940651b6a2949",
+                "timestamp": "1794787200",
+                "type": "text",
+                "text": {
+                  "body": "Hola, quiero hacer el diagnóstico"
+                }
+              }
+            ]
+          },
+          "field": "messages"
+        }
+      ]
+    }
+  ]
+}
