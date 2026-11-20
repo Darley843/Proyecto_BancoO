@@ -226,11 +226,14 @@ def test_revocar_sin_consentimiento_no_crea_filas(tmp_path: Path) -> None:
 
 
 def test_el_aviso_cumple_el_deber_de_informar() -> None:
-    """El aviso nombra responsable, datos, finalidad, destinatario, plazo y derechos."""
+    """El aviso nombra responsable, datos, finalidad, destinatarios (incluido el
+    proveedor de IA y su transferencia internacional), plazo y derechos."""
     for fragmento in (
         "Responsable",
         "rangos de ingresos, gastos y deudas",
         "asesor",
+        "DeepSeek",
+        "fuera de Colombia",
         "No guardamos tu número",
         "30 días",
         "conocer, actualizar, rectificar o suprimir",

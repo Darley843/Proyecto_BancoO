@@ -12,8 +12,10 @@ versión del aviso y las fechas. El perfil del store lo borra la tarea 2.6 y el
 id de deduplicación se conserva porque no contiene datos personales.
 
 El aviso cumple el deber de informar (Ley 1581 de 2012, art. 12): responsable,
-datos que se tratan, finalidad, a quién se comparten, conservación, derechos
-del titular y cómo ejercerlos.
+datos que se tratan, finalidad, a quién se comparten (el asesor del equipo y el
+proveedor de IA, DeepSeek, que procesa fuera de Colombia: transferencia
+internacional del art. 26), conservación, derechos del titular y cómo
+ejercerlos.
 """
 
 from __future__ import annotations
@@ -62,7 +64,10 @@ def texto_aviso(retencion_dias: int = RETENCION_POR_DEFECTO) -> str:
         "oficial del Banco de Occidente. Responsable: equipo Sucursal 1965 (UAO). "
         "Para orientarte trataremos tu nombre (opcional), tu rol, los rangos de "
         "ingresos, gastos y deudas que elijas y el resultado del diagnóstico; si lo "
-        "pides, lo verá un asesor del equipo. No guardamos tu número, solo una "
+        "pides, lo verá un asesor del equipo. Algunas respuestas las redacta un "
+        "proveedor externo de inteligencia artificial (DeepSeek), con servidores fuera "
+        "de Colombia: le enviamos solo el texto necesario para responder, nunca tu "
+        "número. No guardamos tu número, solo una "
         f"huella cifrada, y conservamos los datos máximo {retencion_dias} días. "
         "Puedes conocer, actualizar, rectificar o suprimir tus datos escribiendo "
         "aquí, y revocar esta autorización con «olvida mis datos». "
