@@ -1,6 +1,6 @@
 """Pruebas del almacén SQLite del canal.
 
-Fijan el esquema del diseño: cuatro tablas, sin columnas para el número, el
+Fijan el esquema del diseño: cinco tablas, sin columnas para el número, el
 nombre ni el texto, y una inicialización idempotente que no borra datos.
 """
 
@@ -11,8 +11,8 @@ from pathlib import Path
 
 from banco_occidente_corpus.canal.almacen import inicializar_almacen
 
-TABLAS = {"mensajes", "consentimientos", "envios", "casos"}
-"""Las cuatro tablas que debe crear la inicialización."""
+TABLAS = {"mensajes", "consentimientos", "envios", "casos", "entrevistas"}
+"""Las cinco tablas que debe crear la inicialización."""
 
 COLUMNAS_PROHIBIDAS = {"numero", "remitente", "nombre", "texto", "telefono"}
 """Ninguna tabla puede guardar datos personales ni el cuerpo del mensaje."""
@@ -32,8 +32,8 @@ def _columnas(ruta: Path, tabla: str) -> list[str]:
     return [fila[1] for fila in filas]
 
 
-def test_crea_las_cuatro_tablas(tmp_path: Path) -> None:
-    """La inicialización deja mensajes, consentimientos, envíos y casos."""
+def test_crea_las_cinco_tablas(tmp_path: Path) -> None:
+    """La inicialización deja mensajes, consentimientos, envíos, casos y entrevistas."""
     ruta = tmp_path / "whatsapp.sqlite"
 
     inicializar_almacen(ruta)

@@ -18,8 +18,9 @@ from typing import Any, Literal
 import httpx
 import pytest
 
-from banco_occidente_corpus.canal.contratos import BotonCanal, RespuestaCanal
+from banco_occidente_corpus.canal.contratos import BotonCanal, OpcionLista, RespuestaCanal
 from banco_occidente_corpus.canal.envio import (
+    CAPTION_MAXIMO,
     LARGO_MAXIMO,
     EnviadorFalso,
     EnviadorMeta,
@@ -36,7 +37,7 @@ TOKEN = "token-de-prueba"
 AHORA = datetime(2026, 11, 17, 12, 0, tzinfo=UTC)
 """Instante fijo de las pruebas."""
 
-TipoRespuesta = Literal["texto", "botones", "error", "imagen"]
+TipoRespuesta = Literal["texto", "botones", "error", "imagen", "lista"]
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"tarjeta-de-pana"
 """Bytes ficticios de una tarjeta; el enviador no decodifica el PNG."""
@@ -47,6 +48,7 @@ def _respuesta(
     *,
     tipo: TipoRespuesta = "texto",
     botones: list[BotonCanal] | None = None,
+    opciones: list[OpcionLista] | None = None,
     imagen: bytes | None = None,
 ) -> RespuestaCanal:
     """Construye una respuesta válida del canal."""
@@ -56,6 +58,7 @@ def _respuesta(
         texto=texto,
         tipo=tipo,
         botones=botones or [],
+        opciones=opciones or [],
         imagen=imagen,
     )
 
@@ -199,6 +202,42 @@ def test_enviador_meta_envia_botones() -> None:
     cliente.close()
 
 
+def test_enviador_meta_envia_lista_interactiva() -> None:
+    """La lista viaja como mensaje interactivo con sus filas y descripciones."""
+    llamadas: list[httpx.Request] = []
+    cliente = _cliente(lambda _: httpx.Response(200, json={"messages": [{"id": "x"}]}), llamadas)
+    opciones = [
+        OpcionLista(id="objetivo.libre_inversion", titulo="Libre inversión"),
+        OpcionLista(
+            id="objetivo.compra_cartera",
+            titulo="Compra de cartera",
+            descripcion="Pasar mis deudas a una mejor tasa",
+        ),
+    ]
+
+    _meta(cliente).enviar(
+        _respuesta(
+            "¿Qué te gustaría revisar?",
+            tipo="lista",
+            opciones=opciones,
+        )
+    )
+
+    cuerpo = json.loads(llamadas[0].content)
+    interactivo = cuerpo["interactive"]
+    assert cuerpo["type"] == "interactive"
+    assert interactivo["type"] == "list"
+    assert interactivo["body"]["text"] == "¿Qué te gustaría revisar?"
+    assert interactivo["action"]["button"] == "Ver opciones"
+    filas = interactivo["action"]["sections"][0]["rows"]
+    assert [fila["id"] for fila in filas] == [
+        "objetivo.libre_inversion",
+        "objetivo.compra_cartera",
+    ]
+    assert filas[1]["description"] == "Pasar mis deudas a una mejor tasa"
+    cliente.close()
+
+
 def test_enviador_meta_reintenta_429_y_5xx() -> None:
     """Un 429 seguido de 200 se reintenta y termina bien."""
     llamadas: list[httpx.Request] = []
@@ -286,6 +325,51 @@ def test_enviador_falso_registra_texto_y_despues_imagen(tmp_path: Path) -> None:
     assert [tipo for tipo, _ in enviador.registro] == ["texto", "imagen"]
     assert enviador.registro[0][1] == "Tu diagnóstico"
     assert enviador.registro[1][1] == hashlib.sha256(PNG).hexdigest()
+
+
+def test_enviador_falso_registra_texto_y_despues_lista(tmp_path: Path) -> None:
+    """El falso deja constancia del texto y de los ids de la lista."""
+    enviador = EnviadorFalso(tmp_path / "whatsapp.sqlite")
+    opciones = [
+        OpcionLista(id="ingresos.DE_2M_A_3M", titulo="$2 a $3 millones"),
+        OpcionLista(id="ingresos.DE_3M_A_5M", titulo="$3 a $5 millones"),
+    ]
+
+    enviador.enviar(_respuesta("¿Ingresos?", tipo="lista", opciones=opciones))
+
+    assert [tipo for tipo, _ in enviador.registro] == ["texto", "lista"]
+    assert enviador.registro[1][1] == "ingresos.DE_2M_A_3M|ingresos.DE_3M_A_5M"
+
+
+def test_la_imagen_no_lleva_el_texto_como_caption() -> None:
+    """El texto largo va en mensajes aparte; la imagen no lleva caption."""
+    llamadas: list[httpx.Request] = []
+
+    def manejador(peticion: httpx.Request) -> httpx.Response:
+        if peticion.url.path.endswith("/media"):
+            return httpx.Response(200, json={"id": "media-1"})
+        return httpx.Response(200, json={"messages": [{"id": "x"}]})
+
+    cliente = _cliente(manejador, llamadas)
+    texto = "Diagnóstico orientativo y trazable. " * 100
+
+    _meta(cliente).enviar(_respuesta(texto, tipo="imagen", imagen=PNG))
+
+    cuerpos = [
+        json.loads(peticion.content)
+        for peticion in llamadas
+        if peticion.url.path.endswith("/messages")
+    ]
+    textos = [cuerpo for cuerpo in cuerpos if cuerpo["type"] == "text"]
+    imagenes = [cuerpo for cuerpo in cuerpos if cuerpo["type"] == "image"]
+    assert len(textos) == 1
+    assert len(textos[0]["text"]["body"]) > CAPTION_MAXIMO
+    assert textos[0]["text"]["body"] == texto
+    assert len(imagenes) == 1
+    caption = imagenes[0]["image"].get("caption", "")
+    assert len(caption) <= CAPTION_MAXIMO
+    assert "caption" not in imagenes[0]["image"]
+    cliente.close()
 
 
 def test_enviador_meta_sube_la_imagen_y_la_envia_despues_del_texto() -> None:

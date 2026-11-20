@@ -36,6 +36,7 @@ class ConfiguracionCanal:
     version_aviso: str = "2026-11"
     limite_intentos_roba: int = 20
     retencion_dias: int = 30
+    entrevista_ttl_minutos: int = 30
     huellas: tuple[str, ...] = ()
 
 
@@ -72,6 +73,7 @@ def cargar_configuracion_canal(ruta: Path | None = None) -> ConfiguracionCanal:
         version_aviso=str(canal.get("version_aviso", "2026-11")),
         limite_intentos_roba=int(canal.get("limite_intentos_roba", 20)),
         retencion_dias=int(canal.get("retencion_dias", 30)),
+        entrevista_ttl_minutos=int(canal.get("entrevista_ttl_minutos", 30)),
         huellas=tuple(str(huella) for huella in autorizados.get("huellas", [])),
     )
 

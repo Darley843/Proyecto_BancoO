@@ -44,6 +44,15 @@ SemaforoDiagnostico = Literal["verde", "amarillo", "rojo"]
 #: hasta 5 MB, pero la tarjeta se genera por debajo de 1 MB.
 PESO_MAXIMO_IMAGEN: int = 1_000_000
 
+#: Filas máximas de una lista interactiva de WhatsApp.
+MAXIMO_FILAS_LISTA: int = 10
+#: Largo máximo del título de una fila de lista.
+MAXIMO_TITULO_FILA: int = 24
+#: Largo máximo del título de la descripción de una fila.
+MAXIMO_DESCRIPCION_FILA: int = 72
+#: Largo máximo del botón que abre la lista.
+MAXIMO_TITULO_LISTA: int = 20
+
 
 class BotonCanal(BaseModel):
     """Un botón de respuesta rápida de WhatsApp."""
@@ -52,6 +61,20 @@ class BotonCanal(BaseModel):
 
     id: str = Field(min_length=1, max_length=256)
     titulo: str = Field(min_length=1, max_length=20)
+
+
+class OpcionLista(BaseModel):
+    """Una fila de la lista interactiva de WhatsApp.
+
+    WhatsApp muestra hasta diez filas por lista; el título no pasa de 24
+    caracteres y la descripción de 72.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, max_length=256)
+    titulo: str = Field(min_length=1, max_length=MAXIMO_TITULO_FILA)
+    descripcion: str | None = Field(default=None, max_length=MAXIMO_DESCRIPCION_FILA)
 
 
 class MensajeEntrante(BaseModel):
@@ -70,9 +93,10 @@ class MensajeEntrante(BaseModel):
 class RespuestaCanal(BaseModel):
     """Respuesta que el canal envía al usuario.
 
-    Una respuesta de tipo ``imagen`` lleva además el PNG de Pana en memoria:
-    el texto viaja primero y la imagen después. El PNG se excluye de la
-    representación para que sus bytes no terminen en un log.
+    Una respuesta de tipo ``lista`` lleva hasta diez opciones y un botón que
+    abre la lista; una de tipo ``imagen`` lleva además el PNG de Pana en
+    memoria: el texto viaja primero y la imagen después. El PNG se excluye de
+    la representación para que sus bytes no terminen en un log.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -80,8 +104,10 @@ class RespuestaCanal(BaseModel):
     usuario_id: str
     id_mensaje_origen: str
     texto: str = Field(min_length=1, max_length=4096)
-    tipo: Literal["texto", "botones", "error", "imagen"] = "texto"
+    tipo: Literal["texto", "botones", "error", "imagen", "lista"] = "texto"
     botones: list[BotonCanal] = Field(default_factory=list, max_length=3)
+    opciones: list[OpcionLista] = Field(default_factory=list, max_length=MAXIMO_FILAS_LISTA)
+    titulo_lista: str = Field(default="Ver opciones", min_length=1, max_length=MAXIMO_TITULO_LISTA)
     metadatos: dict[str, str] = Field(default_factory=dict)
     imagen: bytes | None = Field(default=None, repr=False)
 
@@ -97,18 +123,40 @@ class RespuestaCanal(BaseModel):
             La respuesta validada.
 
         Raises:
-            ValueError: si falta el PNG, si sobra, si lleva botones o si pesa
-                1 MB o más.
+            ValueError: si falta el PNG, si sobra, si lleva botones u
+                opciones, o si pesa 1 MB o más.
         """
         if self.tipo == "imagen":
             if self.imagen is None:
                 raise ValueError("la respuesta de tipo imagen necesita el PNG")
             if self.botones:
                 raise ValueError("la respuesta de tipo imagen no lleva botones")
+            if self.opciones:
+                raise ValueError("la respuesta de tipo imagen no lleva opciones")
         elif self.imagen is not None:
             raise ValueError("solo la respuesta de tipo imagen lleva PNG")
         if self.imagen is not None and len(self.imagen) >= PESO_MAXIMO_IMAGEN:
             raise ValueError("la imagen del canal pesa 1 MB o más")
+        return self
+
+    @model_validator(mode="after")
+    def _lista_coherente(self) -> Self:
+        """Exige opciones en la lista y las prohíbe en los demás tipos.
+
+        Returns:
+            La respuesta validada.
+
+        Raises:
+            ValueError: si una lista no trae opciones, si trae botones o si
+                otra respuesta lleva opciones.
+        """
+        if self.tipo == "lista":
+            if not self.opciones:
+                raise ValueError("la respuesta de tipo lista necesita opciones")
+            if self.botones:
+                raise ValueError("la respuesta de tipo lista no lleva botones")
+        elif self.opciones:
+            raise ValueError("solo la respuesta de tipo lista lleva opciones")
         return self
 
 

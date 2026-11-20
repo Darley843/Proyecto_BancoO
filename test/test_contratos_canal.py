@@ -16,11 +16,13 @@ import pytest
 from pydantic import ValidationError
 
 from banco_occidente_corpus.canal.contratos import (
+    MAXIMO_FILAS_LISTA,
     PESO_MAXIMO_IMAGEN,
     BotonCanal,
     CasoAsesor,
     EntradaDiagnostico,
     MensajeEntrante,
+    OpcionLista,
     PerfilUsuario,
     RangoDecimal,
     RespuestaCanal,
@@ -147,6 +149,73 @@ def test_titulo_de_boton_de_21_caracteres_falla() -> None:
     """El título visible de un botón no pasa de 20 caracteres."""
     with pytest.raises(ValidationError):
         BotonCanal(id="asesor", titulo="x" * 21)
+
+
+def _opcion(indice: int) -> OpcionLista:
+    """Construye una fila de lista válida para las pruebas."""
+    return OpcionLista(id=f"opcion.{indice}", titulo=f"Opción {indice}")
+
+
+def test_respuesta_de_lista_admite_diez_filas_y_rechaza_once() -> None:
+    """WhatsApp muestra como máximo diez filas en una lista interactiva."""
+    respuesta = RespuestaCanal(
+        usuario_id="u" * 32,
+        id_mensaje_origen="wamid.SIM123",
+        texto="Elige una opción",
+        tipo="lista",
+        opciones=[_opcion(i) for i in range(MAXIMO_FILAS_LISTA)],
+    )
+
+    assert len(respuesta.opciones) == MAXIMO_FILAS_LISTA
+    with pytest.raises(ValidationError):
+        RespuestaCanal(
+            usuario_id="u" * 32,
+            id_mensaje_origen="wamid.SIM123",
+            texto="Elige una opción",
+            tipo="lista",
+            opciones=[_opcion(i) for i in range(MAXIMO_FILAS_LISTA + 1)],
+        )
+
+
+def test_respuesta_de_lista_exige_opciones_y_no_lleva_botones() -> None:
+    """La lista se distingue de los botones y no puede ir vacía."""
+    with pytest.raises(ValidationError):
+        RespuestaCanal(
+            usuario_id="u" * 32,
+            id_mensaje_origen="wamid.SIM123",
+            texto="Elige una opción",
+            tipo="lista",
+        )
+    with pytest.raises(ValidationError):
+        RespuestaCanal(
+            usuario_id="u" * 32,
+            id_mensaje_origen="wamid.SIM123",
+            texto="Elige una opción",
+            tipo="lista",
+            opciones=[_opcion(1)],
+            botones=[BotonCanal(id="b1", titulo="Uno")],
+        )
+
+
+def test_opciones_solo_en_el_tipo_lista() -> None:
+    """Una respuesta de texto no lleva filas de lista por accidente."""
+    with pytest.raises(ValidationError):
+        RespuestaCanal(
+            usuario_id="u" * 32,
+            id_mensaje_origen="wamid.SIM123",
+            texto="Hola",
+            opciones=[_opcion(1)],
+        )
+
+
+def test_titulo_y_descripcion_de_fila_respetan_los_limites() -> None:
+    """El título de una fila no pasa de 24 caracteres y la descripción de 72."""
+    assert OpcionLista(id="fila", titulo="x" * 24).titulo == "x" * 24
+    assert OpcionLista(id="fila", titulo="ok", descripcion="d" * 72).descripcion == "d" * 72
+    with pytest.raises(ValidationError):
+        OpcionLista(id="fila", titulo="x" * 25)
+    with pytest.raises(ValidationError):
+        OpcionLista(id="fila", titulo="ok", descripcion="d" * 73)
 
 
 def test_respuesta_sin_texto_falla() -> None:

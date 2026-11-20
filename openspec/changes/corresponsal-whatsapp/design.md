@@ -44,7 +44,7 @@ Se crean cinco subpaquetes nuevos de `banco_occidente_corpus`:
 | `mcp_servidor/` | Servidor MCP de solo lectura con tres herramientas |
 | `roba/` | Clasificación de intentos, marcador y API de la terminal |
 
-El grafo actual no se reescribe: el despachador decide si el mensaje va al grafo de preguntas (`responder_turno`), al grafo de diagnóstico o a un flujo de consentimiento. Cada paquete se prueba sin los demás y comparte solo los contratos de la sección **Contratos**.
+El grafo actual no se reescribe: el despachador decide si el mensaje va al grafo de preguntas (`responder_turno`), a la entrevista de diagnóstico (`EntrevistaCanal`) o a un flujo de consentimiento. Cada paquete se prueba sin los demás y comparte solo los contratos de la sección **Contratos**.
 
 Alternativa descartada: un único paquete `whatsapp/` con todo dentro. Evita imports cruzados, pero impide que cuatro personas trabajen en paralelo y mezcla el canal con la lógica financiera, que el Arqueo necesita medir por separado.
 
@@ -124,39 +124,22 @@ Alternativa descartada: usar `net.py` para el envío. Impone 1,5 s y una pausa c
 El despachador recibe un `MensajeEntrante` ya validado y decide en este orden:
 
 1. Si no hay consentimiento, ejecuta el flujo de consentimiento.
-2. Si el mensaje es «asesor» o «hablar con alguien», crea un `CasoAsesor` directo y responde sin diagnóstico.
-3. Si el hilo de diagnóstico está activo (estado con `etapa` distinta de `terminado`), envía el mensaje al grafo de diagnóstico.
-4. Si el texto pide «diagnóstico», «simular crédito», «capacidad de pago» o «¿cuánto puedo deber?», inicia el diagnóstico.
-5. En cualquier otro caso, llama a `responder_turno` del grafo actual con `thread_id=wa:<usuario_id>` y `perfil=huella_perfil(usuario_id)`.
+2. Si la entrevista del diagnóstico está activa, la resuelve: «nuevo», «cancelar» o «asesor» se atienden antes de avanzar, un botón o una fila avanza y un texto libre repite la pregunta.
+3. Si no hay entrevista, llama a `responder_turno` del grafo actual con `thread_id=wa:<usuario_id>` y `perfil=huella_perfil(usuario_id)`. Cuando el grafo devuelve la ruta D (aviso `diagnostico`), arranca la entrevista en lugar de enviar la invitación.
 
-La respuesta se envuelve en `RespuestaCanal` y se entrega al `Enviador`. El despachador no decide rutas del Digiturno ni redacta: eso sigue en el grafo. La intención de diagnóstico es una regla estrecha y configurable; una pregunta de tasas o tarifas sigue yendo al Tablero, que responde con la tabla 2026. La Bóveda no se usa para tasas y conserva el PDF 2025 hasta el reindexado opcional.
+La respuesta se envuelve en `RespuestaCanal` y se entrega al `Enviador`. El despachador no decide rutas del Digiturno ni redacta: eso sigue en el grafo. La intención de diagnóstico es una regla estrecha; una pregunta de tasas o tarifas sigue yendo al Tablero, que responde con la tabla 2026. La Bóveda no se usa para tasas y conserva el PDF 2025 hasta el reindexado opcional.
 
-Alternativa descartada: añadir el diagnóstico como nodo del grafo actual. El diagnóstico necesita `interrupt()`, reanudación y bifurcación, y mezclar esos estados con el grafo de preguntas complica el `checkpointer` y las pruebas del Digiturno.
+Alternativa descartada: añadir la entrevista como nodo del grafo actual. Mezclaría el estado de la entrevista con el del Digiturno y con el `checkpointer` de preguntas; la máquina separada se prueba sin el modelo y sin la Bóveda.
 
-### 8. Grafo de diagnóstico con `interrupt()` y reanudación
+### 8. Entrevista de diagnóstico con estado en el almacén del canal
 
-El diagnóstico se compila como un `StateGraph` propio con `SqliteSaver` en `data/asistente/diagnostico.sqlite`. Estado:
+La entrevista no se compila como un `StateGraph` con su propio `SqliteSaver`: vive en `canal/entrevista.py` y guarda el avance en la tabla `entrevistas` de `data/asistente/whatsapp.sqlite`, junto al resto del estado del canal. Cada fila tiene `usuario_id`, `paso`, `respuestas_json` (solo ids canónicos) y `actualizado_en`; no guarda nombre, número ni texto libre.
 
-```python
-class EstadoDiagnostico(TypedDict, total=False):
-    """Estado de una entrevista y su resultado."""
+Pasos: objetivo, vinculación, ingresos, gastos, cuotas, `cuota_trasladar` (solo compra de cartera), monto y plazo (según producto; el ahorro los omite). Una pregunta por turno, botones cuando hay tres opciones o menos y lista de hasta diez filas en los demás casos. Los comandos `nuevo`, `cancelar` y `asesor` se resuelven antes de avanzar; cualquier otro texto repite la pregunta con sus opciones. El avance vence a los `entrevista_ttl_minutos` configurados.
 
-    messages: Annotated[list[BaseMessage], add_messages]
-    etapa: str  # inicio | entrevista | calculo | semaforo | hitl | resultado | terminado
-    indice_pregunta: int
-    respuestas: dict[str, str]
-    entrada: dict[str, Any]
-    resultado: dict[str, Any]
-    caso: dict[str, Any]
-    escenario: dict[str, Any]
-    avisos: list[str]
-```
+Al completar, la entrevista llama al motor determinista con `entrada_desde_respuestas`, convoca al comité si el semáforo es amarillo o rojo con cuota y arma la respuesta con `tarjeta_y_texto`: el texto completo (hasta 4.096 caracteres, partido si hace falta) va en mensajes aparte y después la imagen, sin caption. Si el comité falla o se abstiene, se responde con el diagnóstico sin comité.
 
-Nodos: `iniciar`, `preguntar`, `validar`, `calcular`, `semaforo`, `hitl`, `cerrar`. `hitl` llama a `interrupt({"tipo": "asesor", "caso": ...})` cuando el semáforo es rojo o el usuario pidió asesor. La reanudación llega como `Command(resume={"accion": "contactar"|"descartar"})`; el nodo crea o cierra el `CasoAsesor` y sigue a `cerrar`.
-
-Cada mensaje del usuario invoca el grafo con el mismo `thread_id`; la etapa indica si toca preguntar, validar o esperar la reanudación. Una reanudación sobre un hilo sin interrupción devuelve un error explicable. El `interrupt` no guarda el texto libre del usuario en el payload: solo el resultado estructurado y el motivo.
-
-Alternativa descartada: usar `interrupt()` para cada pregunta de la entrevista. Multiplica los checkpoints y hace que un mensaje perdido deje el hilo bloqueado; la etapa explícita es más robusta para WhatsApp.
+Motivo del diseño: el estado es pequeño y efímero; una tabla con el paso y los ids basta para reanudar tras un reinicio, mantiene el mismo almacén y el mismo respaldo que el resto del canal y evita un segundo checkpointer con su propio ciclo de vida. El HITL de las tareas 4.1–4.5 sigue siendo el punto donde se evalúa `interrupt()` y `Command(resume=...)` para el caso de asesor.
 
 ### 9. Motor financiero determinista y tasas 2026 del Tablero
 
@@ -210,7 +193,7 @@ texto = "Menos de 1 SMLMV"
 valor = 650000
 ```
 
-La entrevista usa el punto medio del rango como valor de cálculo y lo declara en el resultado; si el usuario escribe una cifra exacta, se usa la cifra. Las preguntas son: ingreso, gastos, cuotas de deudas, monto solicitado, plazo y producto. Se permiten opciones de «no sé» y «prefiero un asesor»; la segunda deriva al HITL.
+La entrevista del canal usa el punto medio del rango como valor de cálculo y lo declara en el resultado; no acepta cifras exactas por texto libre: repite la pregunta con sus opciones. El contrato `EntradaDiagnostico` sí admite una cifra exacta para otros consumidores. Las preguntas son: objetivo, vinculación, ingreso, gastos, cuotas de deudas, monto, plazo y, solo en compra de cartera, la cuota que se traslada. «prefiero un asesor» detiene la entrevista y ofrece revisión humana.
 
 Las recomendaciones son una tabla determinista por semáforo y por factor: reducir cuotas, alargar plazo, bajar monto, revisar gastos, considerar compra de cartera o hablar con un asesor. No las redacta el modelo. El resultado siempre incluye el aviso orientativo y la frase de que no es una aprobación.
 
@@ -220,11 +203,11 @@ Alternativa descartada: pedir al modelo que redacte el diagnóstico. Duplicaría
 
 El `CasoAsesor` se crea solo con `usuario_id`, motivo, semáforo, resultado estructurado, fecha y estado. No incluye nombre, número ni texto de la conversación.
 
-«Contactar» reanuda con `Command(resume={"accion": "contactar"})`, crea el caso en `casos` y responde que un asesor lo revisará. «Descartar» reanuda con `{"accion": "descartar"}`, cierra el caso y agradece. Una segunda reanudación del mismo `interrupt` devuelve error y no duplica.
+«Contactar» y «Descartar» quedan para las tareas 4.1–4.5. El caso se guarda en `casos` con `usuario_id`, motivo, semáforo, `resultado_json`, fecha y estado; no incluye nombre, número ni texto de la conversación.
 
-Para «¿Y si…?», el servicio lee el estado terminado del hilo original (`get_state`), crea un `thread_id` nuevo `diag:<usuario_id>:esc:<n>` y escribe el mismo estado con `update_state`, cambiando el insumo del escenario y marcando `escenario_de`. Ejecuta el cálculo y devuelve una comparación. El hilo original no se toca.
+Para «¿Y si…?», el servicio parte del `ResultadoDiagnostico` guardado y de su `EntradaDiagnostico`, aplica el cambio y vuelve a calcular con el motor; no necesita un `StateGraph` ni un checkpointer. El original no se toca. El detalle queda para 8.2.
 
-Alternativa descartada: copiar el checkpoint con `checkpointer.put`. Acopla el código al esquema interno de LangGraph y a la versión del `SqliteSaver`.
+Alternativa descartada: bifurcar un checkpoint de LangGraph. Acopla el código al esquema interno del `SqliteSaver` y a una versión del grafo; el motor ya es determinista y reproducible desde su entrada.
 
 ### 12. Comité de crédito de una ronda y síntesis determinista
 
@@ -765,7 +748,7 @@ class ResultadoComite(BaseModel):
 10. **Arqueo (20–21 nov)**: casos de dominio, Wilson, matriz, latencia y reporte. Congelamiento el sábado 21 con `make check`, `make demo`, `make arqueo` y las pruebas del canal en verde.
 11. **Cierre (22–23 nov)**: experimento de llamada, documentación (`CONSTITUTION.md`, `AGENTS.md`, `docs/SEGURIDAD.md`, `docs/ARQUEO.md`, `docs/OPERACION_WHATSAPP.md`), sustentación y revisión final de `git status`.
 
-Rollback: el canal se apaga con `WHATSAPP_MODO=falso` o quitando las huellas autorizadas; las bases `data/asistente/whatsapp.sqlite`, `diagnostico.sqlite` y `roba.sqlite` se pueden borrar y se regeneran. El Tablero se regenera con `make tablero`; la tabla Gold de tasas se reconstruye desde el PDF de Bronze con el mismo módulo y no se edita a mano, y el resto de Gold no se toca. La Bóveda conserva el índice 2025 si no se reindexa. El MCP y Roba la Bóveda son aditivos y no bloquean la Sucursal si se retiran.
+Rollback: el canal se apaga con `WHATSAPP_MODO=falso` o quitando las huellas autorizadas; las bases `data/asistente/whatsapp.sqlite` y `data/asistente/roba.sqlite` se pueden borrar y se regeneran. El Tablero se regenera con `make tablero`; la tabla Gold de tasas se reconstruye desde el PDF de Bronze con el mismo módulo y no se edita a mano, y el resto de Gold no se toca. La Bóveda conserva el índice 2025 si no se reindexa. El MCP y Roba la Bóveda son aditivos y no bloquean la Sucursal si se retiran.
 
 ## Open Questions
 
