@@ -57,3 +57,5 @@ desktop.ini
 
 # Logs
 *.log
+# Roba la Bóveda
+data/asistente/roba_memoria.sqlite
