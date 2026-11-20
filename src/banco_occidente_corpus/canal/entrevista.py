@@ -21,6 +21,12 @@ Al completar: ``entrada_desde_respuestas`` → ``calcular`` → comité (solo
 amarillo o rojo con cuota) → ``tarjeta_y_texto``. El texto sale primero y la
 imagen después. Si el comité falla, se responde con el diagnóstico sin comité.
 
+«¿Y si…?»: el último resultado se guarda por huella en
+``resultados_diagnostico`` durante ``VIGENCIA_RESULTADO`` (24 horas). Si la
+persona escribe después «¿y si lo pago en 60 meses?», `escenario` recalcula con
+el motor y responde con la tarjeta de antes y después; el original no cambia.
+Sin un resultado vigente, el mensaje sigue su camino normal hacia el grafo.
+
 Las pruebas viven en ``test/test_canal_entrevista.py``.
 """
 
@@ -39,8 +45,13 @@ from langchain_core.language_models import BaseChatModel
 
 from ..config import PROJECT_ROOT
 from ..diagnostico import comite, motor
-from ..diagnostico.escenarios import formatear_rango
-from ..pana.desde_diagnostico import SinTarjeta, tarjeta_y_texto
+from ..diagnostico.escenarios import (
+    EscenarioFueraDeRango,
+    comparar_resultado,
+    formatear_rango,
+    interpretar_pedido,
+)
+from ..pana.desde_diagnostico import SinTarjeta, escenario_y_texto, tarjeta_y_texto
 from ..tablero.tasas import TasaNoDisponible
 from .almacen import conectar, inicializar_almacen
 from .contratos import (
@@ -76,6 +87,13 @@ TEXTO_NO_ENTENDI = "No alcancé a entender esa respuesta. Elige una de estas opc
 TEXTO_SIN_TASA = (
     "En este momento no tengo una tasa vigente para ese producto, así que no puedo "
     "calcular tu diagnóstico. Inténtalo más tarde o pregúntame por otra opción."
+)
+#: Tiempo durante el que se puede pedir un «¿Y si…?» sobre el último resultado.
+VIGENCIA_RESULTADO = timedelta(hours=24)
+#: Texto cuando el «¿Y si…?» no se puede recalcular (sin tasa vigente).
+TEXTO_ESCENARIO_SIN_CALCULO = (
+    "No pude recalcular ese «¿Y si…?» en este momento. Inténtalo más tarde o "
+    "escribe «quiero hacer el diagnóstico» para empezar de nuevo."
 )
 #: Oferta de asesor que se agrega al resultado rojo sin comité.
 OFERTA_ASESOR = "Puedes hablar con un asesor para revisar tu caso."
@@ -515,6 +533,7 @@ class EntrevistaCanal:
             )
         except TasaNoDisponible:
             return self._texto(usuario_id, id_mensaje, TEXTO_SIN_TASA)
+        self._guardar_resultado(usuario_id, resultado)
         deliberacion = self._deliberar(entrada, resultado)
         try:
             png, texto_tarjeta = tarjeta_y_texto(resultado)
@@ -531,6 +550,107 @@ class EntrevistaCanal:
             tipo="imagen",
             imagen=png,
         )
+
+    def escenario(self, mensaje: MensajeEntrante, usuario_id: str) -> RespuestaCanal | None:
+        """Responde un «¿Y si…?» sobre el último diagnóstico de la persona.
+
+        Args:
+            mensaje: mensaje de texto, por ejemplo «¿y si lo pago en 60 meses?».
+            usuario_id: huella del número.
+
+        Returns:
+            La tarjeta de antes y después con su texto, la explicación del
+            límite si el cambio no cabe, o ``None`` si el mensaje no es un
+            «¿Y si…?» o no hay un diagnóstico vigente (sigue hacia el grafo).
+        """
+        if mensaje.id_boton:
+            return None
+        cambio = interpretar_pedido(mensaje.texto)
+        if cambio is None:
+            return None
+        original = self.ultimo_resultado(usuario_id)
+        if original is None:
+            return None
+        try:
+            _, comparacion = comparar_resultado(
+                original,
+                cambio,
+                origen=f"wa:{usuario_id}",
+                calcular=lambda entrada: motor.calcular(
+                    entrada,
+                    hoy=self.hoy.date() if self.hoy is not None else None,
+                    raiz=self.raiz,
+                    config=self._ajustes(),
+                ),
+            )
+            png, texto = escenario_y_texto(comparacion, original.entrada.plazo_meses or 0)
+        except EscenarioFueraDeRango as error:
+            return self._texto(usuario_id, mensaje.id_mensaje, error.mensaje)
+        except (TasaNoDisponible, ValueError):
+            logger.warning("evento=escenario_sin_calculo")
+            return self._texto(usuario_id, mensaje.id_mensaje, TEXTO_ESCENARIO_SIN_CALCULO)
+        return RespuestaCanal(
+            usuario_id=usuario_id,
+            id_mensaje_origen=mensaje.id_mensaje,
+            texto=texto,
+            tipo="imagen",
+            imagen=png,
+        )
+
+    def ultimo_resultado(self, usuario_id: str) -> ResultadoDiagnostico | None:
+        """Devuelve el último diagnóstico vigente; si venció, lo borra.
+
+        Args:
+            usuario_id: huella del número.
+
+        Returns:
+            El resultado guardado, o ``None`` si no hay uno de las últimas 24 horas.
+        """
+        with conectar(self.ruta) as conexion:
+            fila = conexion.execute(
+                "SELECT resultado_json, guardado_en FROM resultados_diagnostico "
+                "WHERE usuario_id = ?",
+                (usuario_id,),
+            ).fetchone()
+        if fila is None:
+            return None
+        try:
+            guardado = datetime.fromisoformat(str(fila[1]))
+            if guardado.tzinfo is None:
+                guardado = guardado.replace(tzinfo=UTC)
+            vigente = self.reloj() - guardado < VIGENCIA_RESULTADO
+            resultado = ResultadoDiagnostico.model_validate_json(str(fila[0])) if vigente else None
+        except ValueError:
+            resultado = None
+        if resultado is None:
+            self.olvidar_resultado(usuario_id)
+        return resultado
+
+    def olvidar_resultado(self, usuario_id: str) -> None:
+        """Borra el último diagnóstico guardado de la persona.
+
+        Args:
+            usuario_id: huella del número.
+        """
+        with conectar(self.ruta) as conexion:
+            conexion.execute(
+                "DELETE FROM resultados_diagnostico WHERE usuario_id = ?", (usuario_id,)
+            )
+
+    def _guardar_resultado(self, usuario_id: str, resultado: ResultadoDiagnostico) -> None:
+        """Guarda el resultado para un «¿Y si…?» posterior; no lleva el número.
+
+        Args:
+            usuario_id: huella del número.
+            resultado: diagnóstico recién calculado.
+        """
+        with conectar(self.ruta) as conexion:
+            conexion.execute(
+                "INSERT INTO resultados_diagnostico (usuario_id, resultado_json, guardado_en) "
+                "VALUES (?, ?, ?) ON CONFLICT(usuario_id) DO UPDATE SET "
+                "resultado_json = excluded.resultado_json, guardado_en = excluded.guardado_en",
+                (usuario_id, resultado.model_dump_json(), self.reloj().isoformat()),
+            )
 
     def _deliberar(
         self,

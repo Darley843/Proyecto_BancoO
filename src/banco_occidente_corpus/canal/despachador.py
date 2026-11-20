@@ -8,10 +8,12 @@ Es la pieza que convierte un mensaje de WhatsApp en una respuesta:
 4. Si la entrevista del diagnóstico está activa, el botón o la fila avanza la
    entrevista; un texto libre repite la pregunta. Al completar, calcula el
    diagnóstico y envía la tarjeta.
-5. Si no hay entrevista, entrega la pregunta al grafo de la Sucursal con
+5. Si hay un diagnóstico de las últimas 24 horas y el texto es un «¿Y si…?»
+   («¿y si lo pago en 60 meses?»), responde con la tarjeta de antes y después.
+6. Si no, entrega la pregunta al grafo de la Sucursal con
    ``thread_id = wa:<usuario_id>``. Cuando el grafo devuelve la ruta D, arranca
    la entrevista en lugar de la invitación.
-6. Envía la respuesta con el enviador configurado (falso o Meta).
+7. Envía la respuesta con el enviador configurado (falso o Meta).
 
 El número y el texto nunca se registran en logs; el estado del mensaje vive en
 ``data/asistente/whatsapp.sqlite``. Las pruebas viven en
@@ -136,6 +138,8 @@ class Despachador:
             respuesta = self.maquina.decidir(mensaje, usuario_id)
             if respuesta is None:
                 respuesta = self._turno_entrevista(mensaje, usuario_id)
+            if respuesta is None and self.entrevista is not None:
+                respuesta = self.entrevista.escenario(mensaje, usuario_id)
             if respuesta is None:
                 resultado = _respuesta_del_grafo(
                     self.responder(

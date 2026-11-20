@@ -61,6 +61,12 @@ CREATE TABLE IF NOT EXISTS entrevistas (
     respuestas_json TEXT NOT NULL,
     actualizado_en TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS resultados_diagnostico (
+    usuario_id TEXT PRIMARY KEY,
+    resultado_json TEXT NOT NULL,
+    guardado_en TEXT NOT NULL
+);
 """
 
 
@@ -78,7 +84,7 @@ def conectar(ruta: Path = RUTA_ALMACEN) -> sqlite3.Connection:
 
 
 def inicializar_almacen(ruta: Path = RUTA_ALMACEN) -> None:
-    """Crea las cinco tablas del canal si no existen.
+    """Crea las tablas del canal si no existen.
 
     Es idempotente: llamarla dos veces deja el mismo esquema y conserva los
     datos ya escritos.

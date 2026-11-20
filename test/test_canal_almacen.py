@@ -11,8 +11,8 @@ from pathlib import Path
 
 from banco_occidente_corpus.canal.almacen import inicializar_almacen
 
-TABLAS = {"mensajes", "consentimientos", "envios", "casos", "entrevistas"}
-"""Las cinco tablas que debe crear la inicialización."""
+TABLAS = {"mensajes", "consentimientos", "envios", "casos", "entrevistas", "resultados_diagnostico"}
+"""Las seis tablas que debe crear la inicialización."""
 
 COLUMNAS_PROHIBIDAS = {"numero", "remitente", "nombre", "texto", "telefono"}
 """Ninguna tabla puede guardar datos personales ni el cuerpo del mensaje."""

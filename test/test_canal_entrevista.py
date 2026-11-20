@@ -29,7 +29,11 @@ from banco_occidente_corpus.canal.consentimiento import MaquinaConsentimiento
 from banco_occidente_corpus.canal.contratos import MensajeEntrante
 from banco_occidente_corpus.canal.despachador import Despachador, RespuestaGrafo
 from banco_occidente_corpus.canal.entrada import extraer_mensajes
-from banco_occidente_corpus.canal.entrevista import TEXTO_SIN_TASA, EntrevistaCanal
+from banco_occidente_corpus.canal.entrevista import (
+    TEXTO_SIN_TASA,
+    VIGENCIA_RESULTADO,
+    EntrevistaCanal,
+)
 from banco_occidente_corpus.canal.envio import EnviadorFalso
 from banco_occidente_corpus.canal.identidad import calcular_usuario_id
 from banco_occidente_corpus.config import PROJECT_ROOT
@@ -571,3 +575,141 @@ def test_al_completar_se_guarda_la_tarjeta_y_no_el_numero(tmp_path: Path, raiz_t
     with sqlite3.connect(str(ruta)) as conexion:
         respuestas = conexion.execute("SELECT respuestas_json FROM entrevistas").fetchall()
     assert respuestas == []
+
+
+RESPUESTAS_CREDITO = {
+    "objetivo": "objetivo.libre_inversion",
+    "vinculacion": "vinculacion.empleado",
+    "ingresos": "ingresos.DE_5M_A_8M",
+    "gastos": "gastos.DE_2M_A_3M",
+    "cuotas": "cuotas.NINGUNA",
+    "monto": "monto.DE_10M_A_20M",
+    "plazo": "plazo.48",
+}
+"""Respuestas de un crédito de libre inversión a 48 meses."""
+
+
+def _entrevista_con_reloj(ruta: Path, raiz: Path, instante: list[datetime]) -> EntrevistaCanal:
+    """Entrevista con un reloj que la prueba puede adelantar."""
+    return EntrevistaCanal(ruta, hoy=FECHA_CONSULTA, raiz=raiz, reloj=lambda: instante[0])
+
+
+def test_y_si_compara_contra_el_ultimo_diagnostico(tmp_path: Path, raiz_tasas: Path) -> None:
+    """Tras el diagnóstico, «¿y si lo pago en 60 meses?» trae la tarjeta de antes y después."""
+    entrevista = EntrevistaCanal(tmp_path / "whatsapp.sqlite", hoy=FECHA_CONSULTA, raiz=raiz_tasas)
+    usuario = "u" * 64
+    entrevista.completar(usuario, "wamid.1", RESPUESTAS_CREDITO)
+    original = entrevista.ultimo_resultado(usuario)
+
+    respuesta = entrevista.escenario(_mensaje("¿y si lo pago en 60 meses?", indice=2), usuario)
+
+    assert respuesta is not None
+    assert respuesta.tipo == "imagen"
+    assert respuesta.imagen is not None and respuesta.imagen.startswith(b"\x89PNG")
+    assert "60" in respuesta.texto
+    assert entrevista.ultimo_resultado(usuario) == original
+
+
+def test_y_si_fuera_de_rango_explica_el_limite(tmp_path: Path, raiz_tasas: Path) -> None:
+    """Un plazo imposible no se calcula: se responde el límite en texto."""
+    entrevista = EntrevistaCanal(tmp_path / "whatsapp.sqlite", hoy=FECHA_CONSULTA, raiz=raiz_tasas)
+    usuario = "u" * 64
+    entrevista.completar(usuario, "wamid.1", RESPUESTAS_CREDITO)
+
+    respuesta = entrevista.escenario(_mensaje("¿y si lo pago en 900 meses?", indice=2), usuario)
+
+    assert respuesta is not None
+    assert respuesta.tipo == "texto"
+    assert "el plazo va de" in respuesta.texto
+
+
+def test_sin_diagnostico_o_sin_pedido_el_y_si_no_responde(tmp_path: Path) -> None:
+    """Sin resultado guardado, o con un texto normal, el turno sigue hacia el grafo."""
+    entrevista = EntrevistaCanal(tmp_path / "whatsapp.sqlite")
+    usuario = "u" * 64
+
+    assert entrevista.escenario(_mensaje("¿y si lo pago en 36 meses?"), usuario) is None
+    assert entrevista.escenario(_mensaje("¿cuál es la cuota de manejo?"), usuario) is None
+
+
+def test_el_resultado_vence_a_las_24_horas(tmp_path: Path, raiz_tasas: Path) -> None:
+    """Pasadas 24 horas el resultado se borra y el «¿Y si…?» ya no responde."""
+    instante = [FECHA_CONSULTA]
+    entrevista = _entrevista_con_reloj(tmp_path / "whatsapp.sqlite", raiz_tasas, instante)
+    usuario = "u" * 64
+    entrevista.completar(usuario, "wamid.1", RESPUESTAS_CREDITO)
+
+    instante[0] = FECHA_CONSULTA + VIGENCIA_RESULTADO - timedelta(minutes=1)
+    assert entrevista.ultimo_resultado(usuario) is not None
+    instante[0] = FECHA_CONSULTA + VIGENCIA_RESULTADO + timedelta(minutes=1)
+    assert entrevista.escenario(_mensaje("¿y si lo pago en 60 meses?"), usuario) is None
+    with sqlite3.connect(str(tmp_path / "whatsapp.sqlite")) as conexion:
+        assert conexion.execute("SELECT COUNT(*) FROM resultados_diagnostico").fetchone()[0] == 0
+
+
+def test_el_ahorro_no_tiene_y_si(tmp_path: Path, raiz_tasas: Path) -> None:
+    """Un plan de ahorro no simula cuota: se explica en texto."""
+    entrevista = EntrevistaCanal(tmp_path / "whatsapp.sqlite", hoy=FECHA_CONSULTA, raiz=raiz_tasas)
+    usuario = "u" * 64
+    entrevista.completar(
+        usuario,
+        "wamid.1",
+        {
+            "objetivo": "objetivo.ahorro",
+            "vinculacion": "vinculacion.empleado",
+            "ingresos": "ingresos.DE_2M_A_3M",
+            "gastos": "gastos.DE_1M_A_2M",
+            "cuotas": "cuotas.NINGUNA",
+        },
+    )
+
+    respuesta = entrevista.escenario(_mensaje("¿y si gano 5 millones?"), usuario)
+
+    assert respuesta is not None
+    assert respuesta.tipo == "texto"
+    assert "no hay escenario que comparar" in respuesta.texto
+
+
+def test_y_si_por_whatsapp_de_punta_a_punta(tmp_path: Path, raiz_tasas: Path) -> None:
+    """Después de la tarjeta, el «¿Y si…?» llega por el despachador sin pasar por el grafo."""
+    persona = _persona("pensionado_amarillo")
+    ruta = tmp_path / "whatsapp.sqlite"
+    enviador = EnviadorFalso(ruta)
+    usuario_id = calcular_usuario_id(persona.numero, SAL)
+    llamadas: list[str] = []
+
+    def responder(pregunta: str, _thread_id: str, _perfil: str) -> RespuestaGrafo:
+        """Doble del grafo: devuelve la ruta D y anota la pregunta."""
+        llamadas.append(pregunta)
+        return RespuestaGrafo(texto="Invitación de la ruta D", avisos=("diagnostico",))
+
+    despachador = Despachador(
+        config=ConfiguracionCanal(huellas=(usuario_id,)),
+        sal=SAL,
+        ruta_almacen=ruta,
+        maquina=MaquinaConsentimiento(ruta),
+        cola=ColaMensajes(),
+        crear_enviador=lambda _usuario, _destino: enviador,
+        responder=responder,
+        entrevista=EntrevistaCanal(
+            ruta, modelo=ModeloComite(), hoy=FECHA_CONSULTA, raiz=raiz_tasas
+        ),
+    )
+    for payload in conversacion(persona, preambulo=(CONSENTIMIENTO,)):
+        _enviar(payload, despachador)
+    enviados = len(enviador.registro)
+
+    pedido = MensajeEntrante(
+        id_mensaje="wamid.YSI1",
+        remitente=persona.numero,
+        texto="¿Y si lo pago en 72 meses?",
+        tipo="texto",
+        recibido_en=FECHA_CONSULTA,
+    )
+    despachador.recibir(pedido)
+    despachador.procesar(pedido)
+
+    assert llamadas == ["Hola, quiero hacer el diagnóstico"]
+    assert [tipo for tipo, _ in enviador.registro[enviados:]] == ["texto", "imagen"]
+    assert "72" in enviador.registro[enviados][1]
+    assert _sin_numero_en_la_base(ruta, persona.numero)
