@@ -132,6 +132,9 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | `.../canal/entrada.py` | Extrae y normaliza texto, botones y listas del payload de Meta |
 | `.../canal/cola.py` | Cola de un trabajador para procesar fuera del webhook |
 | `.../canal/despachador.py` | Identidad, autorización, consentimiento y respuesta del canal |
+| `.../canal/diagnostico.py` | Entrevista del diagnóstico en WhatsApp: invitación, pasos, cancelar, asesor y tarjeta |
+| `.../diagnostico/entrevista.py` | Guion de la entrevista: paso pendiente, opciones y comandos |
+| `.../diagnostico/sesiones.py` | Sesiones de la entrevista en `data/asistente/diagnostico.sqlite` |
 | `.../sucursal/grafo.py` | StateGraph con memoria, rutas y redacción |
 | `.../sucursal/ajustes.py` | Tope de gasto, TTL y modo demo |
 | `.../sucursal/costo.py` | Tarifas valle/pico, gasto diario y caché |

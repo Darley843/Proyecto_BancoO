@@ -202,6 +202,37 @@ Los ids de la entrevista se convierten en la entrada con
 de `config/diagnostico.toml`; el canal nunca conoce las cifras. El cálculo se
 ejecuta con `diagnostico.motor.calcular`.
 
+## La entrevista en el canal
+
+Tres piezas, cada una con una responsabilidad:
+
+| Pieza | Archivo | Qué hace |
+|---|---|---|
+| Guion | `diagnostico/entrevista.py` | Dice cuál es el paso pendiente, valida la opción y reconoce «cancelar» y «asesor». No conoce WhatsApp. |
+| Sesión | `diagnostico/sesiones.py` | Guarda las respuestas por `usuario_id` en `data/asistente/diagnostico.sqlite`. Solo ids canónicos. |
+| Transporte | `canal/diagnostico.py` | Convierte el paso en botones o lista, y al cerrar llama al motor y a la tarjeta de Pana. |
+
+El recorrido es el del guion: `objetivo → vinculacion → ingresos → gastos →
+cuotas` y, según el producto, `cuota_trasladar`, `monto` (o `monto_vehiculo`,
+`monto_vivienda`) y `plazo` (o `plazo_vivienda`). El ahorro cierra en el paso 5.
+La entrevista no repite preguntas: el paso pendiente se deduce de las respuestas
+guardadas, así que un reinicio del proceso no pierde el avance.
+
+Reglas de forma, por los límites de WhatsApp:
+
+- Hasta tres opciones viajan como **botones**; de cuatro a diez, como **lista**
+  (título de fila de 24 caracteres y descripción de 72).
+- Toda respuesta avanza con una confirmación breve («Anotado: …»).
+- Un texto que no es una de las opciones no avanza: se repite la pregunta con el
+  aviso. La cuota a trasladar no puede superar las cuotas actuales.
+- «Cancelar» borra la sesión; «asesor» deja un caso en la tabla `casos` del canal
+  (sin nombre ni número) y también borra la sesión.
+
+Al cerrar, el motor produce el `ResultadoDiagnostico`, `pana/desde_diagnostico.py`
+genera el PNG y el texto equivalente, y el canal envía el texto primero y la
+tarjeta como imagen después. Las pruebas están en
+`test/test_diagnostico_entrevista.py` y `test/test_canal_diagnostico.py`.
+
 ## Recomendaciones por color
 
 - **Verde:** la cuota cabe con margen. Sugerir comparar plazos (el más corto

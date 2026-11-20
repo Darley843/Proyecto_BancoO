@@ -272,6 +272,15 @@ Con `WHATSAPP_MODO=real` y la huella del número en `config/whatsapp.toml`:
 2. **Acepto** → confirmación; el consentimiento queda guardado.
 3. Una pregunta del alcance (por ejemplo, «¿cuál es la cuota de manejo de la
    tarjeta débito?») → respuesta del grafo, con sus fuentes.
+4. «Quiero hacer el diagnóstico» → invitación con **Empezar** y **Ahora no**.
+5. **Empezar** → primera pregunta de la entrevista con lista de objetivos; las
+   respuestas siguientes llegan como botones (tres opciones) o listas.
+6. Al terminar, el canal envía el texto del resultado y la tarjeta de Pana como
+   imagen. «Cancelar» borra la entrevista y «asesor» deja un caso para una
+   persona, sin nombre ni número.
+
+La entrevista vive en `data/asistente/diagnostico.sqlite`; se borra al terminar
+o al cancelar. El detalle de los pasos está en `docs/DIAGNOSTICO.md`.
 
 Si aparece `ErrorEnvio: destino no autorizado`, falta la huella del paso 6 o la
 sal cambió desde que se generó.
@@ -347,8 +356,9 @@ $env:WHATSAPP_MODO = "real"
 3. El número se normaliza a E.164 y se convierte en `usuario_id`.
 4. Sin consentimiento, se envía el aviso de la Ley 1581 con «Acepto» y «Ahora
    no»; sin aceptación no se invoca el grafo.
-5. Con consentimiento, el despachador decide si el turno va al grafo de
-   preguntas, al diagnóstico o a un asesor.
+5. Con consentimiento, el despachador decide si el turno va al servicio del
+   diagnóstico (entrevista, sesión y tarjeta) o al grafo de preguntas. Si el
+   servicio no lo atiende, el grafo clasifica el turno como siempre.
 
 ## Problemas frecuentes
 
