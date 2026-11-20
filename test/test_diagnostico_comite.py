@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import inspect
 import json
+import re
 import threading
 from collections.abc import Mapping, Sequence
 from datetime import date
@@ -58,6 +59,8 @@ PREFIJOS = frozenset(
 )
 #: Tareas de los tres prompts del comité.
 TAREAS_COMITE = ("comite_riesgo", "comite_comercial", "comite_auditor")
+#: Identificador o código interno que no debe llegar al texto de la persona.
+CODIGO_INTERNO = re.compile(r"\b[a-z0-9]+(?:_[a-z0-9]+)+\b")
 
 
 def _fila(
@@ -457,6 +460,55 @@ def test_la_linea_del_auditor_se_resume_para_la_persona(raiz_tasas: Path) -> Non
     assert auditor.argumentos == [argumento]
 
 
+def test_texto_para_la_persona_quita_codigos_internos() -> None:
+    """Los corchetes de escenario y el snake_case se escriben en lenguaje natural."""
+    texto = (
+        "Comercial: con_condiciones — [plazo_mas_largo] Revisa el plazo y la razon_endeudamiento."
+    )
+
+    limpio = comite_mod.texto_para_la_persona(texto)
+
+    assert limpio == ("Comercial: con condiciones — Revisa el plazo y la razon endeudamiento.")
+
+
+def test_posturas_se_escriben_en_lenguaje_natural(raiz_tasas: Path) -> None:
+    """La persona lee «con condiciones» y ningún código; la deliberación no cambia."""
+    entrada, resultado = _diagnostico("pensionado_amarillo", raiz_tasas)
+    modelo = ModeloComite(
+        {
+            "riesgo": [
+                _postura(
+                    "riesgo",
+                    "con_condiciones",
+                    ["La razón de endeudamiento supera el límite verde."],
+                )
+            ],
+            "comercial": [
+                _postura(
+                    "comercial",
+                    "con_condiciones",
+                    ["[plazo_mas_largo] El siguiente plazo reduce la cuota."],
+                )
+            ],
+            "auditor": [_postura("auditor", "conforme", ["Las cifras coinciden."])],
+        }
+    )
+
+    deliberacion = deliberar(entrada, resultado, modelo=modelo)
+
+    assert deliberacion is not None
+    assert "Riesgo: con condiciones" in deliberacion.recomendacion
+    assert "Comercial: con condiciones" in deliberacion.recomendacion
+    assert "con_condiciones" not in deliberacion.recomendacion
+    assert "[plazo_mas_largo]" not in deliberacion.recomendacion
+    assert not CODIGO_INTERNO.search(deliberacion.recomendacion)
+    # La deliberación interna conserva el vocabulario del contrato.
+    assert {postura.postura for postura in deliberacion.posturas} == {
+        "con_condiciones",
+        "conforme",
+    }
+
+
 def test_auditor_revisa_las_posturas_de_riesgo_y_comercial(raiz_tasas: Path) -> None:
     """Riesgo y comercial van en paralelo; el auditor los revisa después."""
     entrada, resultado = _diagnostico("pensionado_amarillo", raiz_tasas)
@@ -551,6 +603,8 @@ def test_rol_faltante_queda_en_abstencion_y_pide_asesor(raiz_tasas: Path) -> Non
     assert deliberacion is not None
     riesgo = next(postura for postura in deliberacion.posturas if postura.agente == "riesgo")
     assert riesgo.postura == "abstencion"
+    assert "Riesgo: se abstuvo" in deliberacion.recomendacion
+    assert "abstencion" not in deliberacion.recomendacion
     assert deliberacion.recomendacion.startswith(
         "El comité de crédito no logró una postura completa"
     )

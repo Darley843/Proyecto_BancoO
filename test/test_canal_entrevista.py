@@ -12,6 +12,7 @@ La tabla Gold se crea en un directorio temporal con las tasas de la vigencia
 
 from __future__ import annotations
 
+import re
 import sqlite3
 from datetime import UTC, date, datetime, timedelta
 from decimal import Decimal
@@ -55,6 +56,8 @@ FECHA_CONSULTA = datetime(2026, 11, 16, 12, 0, tzinfo=UTC)
 
 SHA_EJEMPLO = "989be43a0ed19eb33e2057cd01c1ae612b6f15544eaaf41af6348846a6ff1b7f"
 FUENTE = "https://www.bancodeoccidente.com.co/documents/d/guest/tasas-personas-bdo"
+#: Código interno (snake_case) que no debe llegar al texto de WhatsApp.
+CODIGO_INTERNO = re.compile(r"\b[a-z0-9]+(?:_[a-z0-9]+)+\b")
 
 CONSENTIMIENTO = Turno(tipo="boton", valor="consentimiento.acepto", titulo="Acepto")
 """Primer turno del canal: la aceptación de la Ley 1581."""
@@ -492,6 +495,7 @@ def test_persona_completa_la_entrevista_y_recibe_su_semaforo(
     assert llamadas == ["Hola, quiero hacer el diagnóstico"]
     assert [tipo for tipo, _ in enviador.registro[-2:]] == ["texto", "imagen"]
     texto_final = enviador.registro[-2][1]
+    assert not CODIGO_INTERNO.search(texto_final)
     esperado = persona.esperado.semaforo
     if esperado is None:
         assert "Cuenta de ahorros" in texto_final or "CDT" in texto_final
@@ -501,6 +505,7 @@ def test_persona_completa_la_entrevista_y_recibe_su_semaforo(
         assert "asesor" in texto_final.casefold()
     if persona.esperado.semaforo is SemaforoEsperado.AMARILLO:
         assert "comité" in texto_final.casefold()
+        assert "con condiciones" in texto_final
         assert len(modelo.llamadas) == 3
     if persona.esperado.semaforo in {SemaforoEsperado.VERDE, None}:
         assert modelo.llamadas == []
