@@ -108,7 +108,13 @@ def crear_app(
     despachador: Despachador | None = None
 
     if sal:
-        maquina = MaquinaConsentimiento(ruta_canal, version=canal.version_aviso)
+        maquina = MaquinaConsentimiento(
+            ruta_canal,
+            version=canal.version_aviso,
+            retencion_dias=canal.retencion_dias,
+        )
+        # El aviso promete un plazo de conservación: se cumple al arrancar.
+        maquina.purgar_casos_vencidos()
 
         def fabrica_enviador(usuario_id: str, destino: str) -> Enviador:
             """Devuelve el enviador falso o el cliente real de Meta."""
