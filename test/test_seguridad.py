@@ -429,3 +429,37 @@ def test_seguridad_documenta_el_interruptor_de_la_demo() -> None:
 
     assert "SUCURSAL_DEMO_INYECCION" in texto
     assert "demo://blindaje" in texto
+
+
+def test_seguridad_documenta_la_excepcion_de_red_del_canal() -> None:
+    """El cliente de Meta es la excepción de red: timeout, UA y `From`."""
+    seguridad = (RAIZ / "docs" / "SEGURIDAD.md").read_text(encoding="utf-8")
+    agentes = (RAIZ / "AGENTS.md").read_text(encoding="utf-8")
+    constitucion = (RAIZ / "CONSTITUTION.md").read_text(encoding="utf-8")
+
+    assert "graph.facebook.com" in agentes
+    assert "graph.facebook.com" in constitucion
+    assert "3.9 Canal de WhatsApp" in seguridad
+    for riesgo in ("Firma", "Repetición", "PII", "Inyección", "Token"):
+        assert f"**{riesgo}.**" in seguridad
+    assert "X-Hub-Signature-256" in seguridad
+    assert "compare_digest" in seguridad
+
+
+def test_ningun_cliente_http_desactiva_la_verificacion_tls() -> None:
+    """Ningún módulo de ``src/`` pasa ``verify=False`` a un cliente HTTP."""
+    hallazgos: list[str] = []
+    for ruta in modulos_python():
+        arbol = ast.parse(ruta.read_text(encoding="utf-8"))
+        for nodo in ast.walk(arbol):
+            if not isinstance(nodo, ast.Call):
+                continue
+            for clave in nodo.keywords:
+                if (
+                    clave.arg == "verify"
+                    and isinstance(clave.value, ast.Constant)
+                    and clave.value.value is False
+                ):
+                    hallazgos.append(f"{ruta.relative_to(RAIZ).as_posix()}:{nodo.lineno}")
+
+    assert hallazgos == [], "\n".join(hallazgos)
