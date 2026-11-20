@@ -17,6 +17,8 @@ La app web vive en ``app/web/`` y consume la API; la lógica del asistente está
 
 from __future__ import annotations
 
+import os
+import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -26,7 +28,18 @@ from fastapi import FastAPI, Response
 from fastapi.staticfiles import StaticFiles
 
 from banco_occidente_corpus.boveda.mapa import ServicioMapa
-from banco_occidente_corpus.canal.webhook import router as router_canal
+from banco_occidente_corpus.canal.almacen import marcar_procesando_como_error
+from banco_occidente_corpus.canal.cola import ColaMensajes
+from banco_occidente_corpus.canal.configuracion import cargar_configuracion_canal
+from banco_occidente_corpus.canal.consentimiento import MaquinaConsentimiento
+from banco_occidente_corpus.canal.despachador import Despachador
+from banco_occidente_corpus.canal.envio import (
+    Enviador,
+    EnviadorFalso,
+    EnviadorMeta,
+    ErrorEnvio,
+)
+from banco_occidente_corpus.canal.webhook import crear_router_canal
 from banco_occidente_corpus.config import Config, load_config
 from banco_occidente_corpus.sucursal.ajustes import (
     ConfiguracionSucursal,
@@ -38,7 +51,8 @@ from banco_occidente_corpus.sucursal.api import (
     salud_operativa,
 )
 from banco_occidente_corpus.sucursal.costo import CacheRespuestas, GastoDiario
-from banco_occidente_corpus.sucursal.preguntar import PiezasGrafo
+from banco_occidente_corpus.sucursal.grafo import responder_turno
+from banco_occidente_corpus.sucursal.preguntar import PiezasGrafo, construir_piezas
 from banco_occidente_corpus.sucursal.transmision import cerrar_transmisiones
 
 HOST = "127.0.0.1"
@@ -86,10 +100,86 @@ def crear_app(
     configuracion = config or load_config()
     parametros = ajustes or cargar_configuracion_sucursal()
     gasto = GastoDiario(configuracion.paths.root / "data/asistente/gasto.sqlite")
+
+    canal = cargar_configuracion_canal()
+    sal = os.getenv("WHATSAPP_ID_SALT", "").strip()
+    ruta_canal = configuracion.paths.root / "data/asistente/whatsapp.sqlite"
+    cola = ColaMensajes()
+    despachador: Despachador | None = None
+
+    if sal:
+        maquina = MaquinaConsentimiento(ruta_canal, version=canal.version_aviso)
+
+        def fabrica_enviador(usuario_id: str, destino: str) -> Enviador:
+            """Devuelve el enviador falso o el cliente real de Meta."""
+            if canal.modo != "real":
+                return EnviadorFalso(ruta_canal)
+            token = os.getenv("WHATSAPP_ACCESS_TOKEN", "").strip()
+            phone = os.getenv("WHATSAPP_PHONE_NUMBER_ID", "").strip()
+            if not token or not phone:
+                raise ErrorEnvio("faltan credenciales de Meta para el modo real")
+            return EnviadorMeta(
+                usuario_id=usuario_id,
+                destino=destino,
+                phone_number_id=phone,
+                token=token,
+                user_agent=configuracion.site.user_agent,
+                remitente=configuracion.site.contact,
+                huellas=canal.huellas,
+                version_api=canal.version_api,
+            )
+
+        piezas_canal: list[PiezasGrafo] = []
+        candado = threading.Lock()
+
+        def obtener_piezas() -> PiezasGrafo:
+            """Construye el grafo la primera vez que llega un mensaje."""
+            if piezas is not None:
+                return piezas()
+            with candado:
+                if not piezas_canal:
+                    piezas_canal.append(construir_piezas(configuracion, parametros))
+                return piezas_canal[0]
+
+        def responder(pregunta: str, thread_id: str, perfil: str) -> str:
+            """Entrega una pregunta al grafo y devuelve su respuesta."""
+            actuales = obtener_piezas()
+            estado = responder_turno(
+                actuales.grafo,
+                actuales.dependencias,
+                pregunta,
+                thread_id,
+                perfil,
+            )
+            return str(estado.get("respuesta") or "")
+
+        despachador = Despachador(
+            config=canal,
+            sal=sal,
+            ruta_almacen=ruta_canal,
+            maquina=maquina,
+            cola=cola,
+            crear_enviador=fabrica_enviador,
+            responder=responder,
+        )
+
+    @asynccontextmanager
+    async def ciclo(_: FastAPI) -> AsyncIterator[None]:
+        """Arranca y detiene el trabajador del canal con la app."""
+        if despachador is not None:
+            marcar_procesando_como_error(ruta_canal)
+            cola.iniciar(despachador.procesar)
+        try:
+            yield
+        finally:
+            if despachador is not None:
+                cola.detener()
+            cerrar_transmisiones()
+
     app = FastAPI(
         title="Sucursal 1965",
         description="Asistente de conocimiento sobre Banco de Occidente (proyecto TAAML, UAO).",
-        lifespan=_ciclo_de_vida,
+        lifespan=ciclo,
     )
     app.include_router(
         crear_router(
@@ -101,7 +191,7 @@ def crear_app(
             mapa_boveda=mapa_boveda,
         )
     )
-    app.include_router(router_canal)
+    app.include_router(crear_router_canal(despachador.recibir if despachador is not None else None))
 
     @app.get("/health", response_model=SaludRespuesta, tags=["salud"])
     def salud(response: Response) -> SaludRespuesta:

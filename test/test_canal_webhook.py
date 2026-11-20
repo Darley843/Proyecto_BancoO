@@ -16,8 +16,9 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from banco_occidente_corpus.canal.contratos import MensajeEntrante
 from banco_occidente_corpus.canal.firma import calcular_firma
-from banco_occidente_corpus.canal.webhook import router
+from banco_occidente_corpus.canal.webhook import crear_router_canal, router
 
 RAIZ = Path(__file__).resolve().parents[1]
 """Raíz del repositorio, para cargar ``app.py`` por ruta."""
@@ -228,6 +229,24 @@ def test_post_con_json_invalido_responde_400(
     respuesta = cliente.post("/webhooks/whatsapp", content=cuerpo, headers=_cabecera(cuerpo))
 
     assert respuesta.status_code == 400
+
+
+def test_post_entrega_los_mensajes_al_despachador(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un evento válido se normaliza y se entrega antes de responder 200."""
+    monkeypatch.setenv("WHATSAPP_APP_SECRET", SECRETO)
+    recibidos: list[MensajeEntrante] = []
+    aplicacion = FastAPI()
+    aplicacion.include_router(crear_router_canal(recibidos.append))
+    cliente = TestClient(aplicacion)
+    cuerpo = _cuerpo()
+
+    respuesta = cliente.post("/webhooks/whatsapp", content=cuerpo, headers=_cabecera(cuerpo))
+
+    assert respuesta.status_code == 200
+    assert [mensaje.id_mensaje for mensaje in recibidos] == ["wamid.SIM1"]
+    assert recibidos[0].texto == "hola"
 
 
 def test_la_app_monta_el_webhook() -> None:
