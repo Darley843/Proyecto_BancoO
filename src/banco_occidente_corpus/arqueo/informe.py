@@ -78,6 +78,7 @@ from .experimentos import (
     medir_configuracion,
     vectorial_directo,
 )
+from .latencia import markdown_latencia, ruta_por_defecto, seccion_latencia
 from .metricas import (
     ALFA,
     ResultadoMcNemar,
@@ -411,6 +412,7 @@ def ejecutar_arqueo(
         vectorial=directo,
         avisos=avisos,
         sensibilidad=sensibilidad,
+        latencia=seccion_latencia(ruta_por_defecto(config.paths.root)),
     )
     texto = render_markdown(arqueo, ficha)
 
@@ -434,6 +436,7 @@ def construir_arqueo(
     vectorial: Mapping[int, Sequence[str]] | None = None,
     avisos: Sequence[str] = (),
     sensibilidad: Sensibilidad | None = None,
+    latencia: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Arma el diccionario determinista de ``arqueo.json``.
 
@@ -449,6 +452,8 @@ def construir_arqueo(
         avisos: notas de la corrida que se agregan a las generadas aqui.
         sensibilidad: escenario alterno de la revision v2; si falta, el reporte
             no incluye el bloque ``sensibilidad``.
+        latencia: seccion de `latencia.seccion_latencia`; si falta, el bloque
+            ``latencia`` no se incluye.
 
     Returns:
         El diccionario listo para serializar.
@@ -642,6 +647,7 @@ def construir_arqueo(
             "medido": medido,
         },
         "avisos": lista_avisos,
+        **({"latencia": dict(latencia)} if latencia is not None else {}),
     }
 
 
@@ -1209,6 +1215,7 @@ def render_markdown(arqueo: Mapping[str, Any], ficha: FichaCorrida) -> str:
         "- Las preguntas de ruta T responden desde el Tablero: su hit@5 no mide la "
         "Boveda y se reporta con y sin ellas.",
         "",
+        *(markdown_latencia(arqueo["latencia"]) if "latencia" in arqueo else []),
         "## Comando",
         "",
         "```bash",
