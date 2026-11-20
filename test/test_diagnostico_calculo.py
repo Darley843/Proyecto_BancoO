@@ -296,6 +296,8 @@ def test_laura_verde_con_cuota_en_rango(raiz_tasas: Path) -> None:
     assert resultado.tasa.fuente == FUENTE
     assert "orientativo" in resultado.aviso
     assert "No es una aprobación" in resultado.aviso
+    assert "historial crediticio" in resultado.aviso
+    assert "1.1.2.27 c" in resultado.aviso
 
 
 def test_vigencia_vencida_en_credito_tambien_alerta(raiz_tasas: Path) -> None:
@@ -477,11 +479,11 @@ def test_capacidad_negativa_es_rojo_sin_simular(tmp_path: Path) -> None:
     assert any("capacidad" in motivo for motivo in resultado.motivos)
 
 
-def test_vivienda_rojo_si_la_cuota_supera_el_30_por_ciento(raiz_tasas: Path) -> None:
-    """En vivienda, una cuota sobre 30 % del ingreso fuerza rojo."""
+def test_vivienda_rojo_si_la_cuota_supera_el_40_por_ciento(raiz_tasas: Path) -> None:
+    """En vivienda, una primera cuota sobre el 40 % de los ingresos fuerza rojo."""
     entrada = EntradaCalculo(
         producto="vivienda",
-        ingreso_mensual=Decimal(10_000_000),
+        ingreso_mensual=Decimal(8_000_000),
         gastos_mensuales=Decimal(4_000_000),
         cuotas_deudas=Decimal(0),
         monto_credito=Decimal(220_000_000),
@@ -489,9 +491,11 @@ def test_vivienda_rojo_si_la_cuota_supera_el_30_por_ciento(raiz_tasas: Path) -> 
         vinculacion="empleado",
     )
     resultado = calcular(entrada, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
-    assert resultado.razon_endeudamiento == Decimal("0.3249")
+    assert resultado.razon_endeudamiento == Decimal("0.4061")
     assert resultado.semaforo == "rojo"
+    assert resultado.alertas == ("vivienda_primera_cuota",)
     assert any("vivienda" in motivo.lower() for motivo in resultado.motivos)
+    assert any("Decreto 583 de 2025" in motivo for motivo in resultado.motivos)
     assert resultado.tasa is not None
     assert resultado.tasa.segmento == "Crédito hipotecario"
 

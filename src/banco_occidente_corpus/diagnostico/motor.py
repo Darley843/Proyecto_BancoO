@@ -22,7 +22,7 @@ from __future__ import annotations
 
 import tomllib
 from collections.abc import Iterable, Mapping
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -39,11 +39,12 @@ from ..canal.contratos import (
     TramoTasa as TramoTasaContrato,
 )
 from ..config import PROJECT_ROOT
+from ..tablero.tasas import clave_producto
 from .calculo import (
     PRODUCTOS_DIAGNOSTICO,
     UMBRAL_AMARILLO,
     UMBRAL_VERDE,
-    UMBRAL_VIVIENDA,
+    UMBRAL_VIVIENDA_PRIMERA_CUOTA,
     VINCULACIONES,
     EntradaCalculo,
     ResultadoCalculo,
@@ -56,8 +57,38 @@ from .calculo import (
 #: Archivo versionado con umbrales y valores de cálculo de la entrevista.
 RUTA_CONFIG = PROJECT_ROOT / "config" / "diagnostico.toml"
 
+#: Frontera por defecto del monto del crédito, en pesos, si el TOML no la trae.
+MONTO_MINIMO = Decimal(500_000)
+MONTO_MAXIMO = Decimal(2_000_000_000)
+
 #: Bloques de la entrevista que no viven en el TOML porque son listas fijas.
 BLOQUES_FIJOS = frozenset({"objetivo", "vinculacion"})
+
+
+@dataclass(frozen=True, slots=True)
+class BloqueRango:
+    """Extremos de un bloque de la entrevista y los productos a los que aplica.
+
+    El bloque agrupa las opciones de un paso (`monto`, `monto_vivienda`,
+    `plazo`, …). `minimo` y `maximo` son el extremo inferior y el superior de
+    todas sus opciones; una opción abierta («hasta $5 millones», «más de $50
+    millones») aporta su `valor` de cálculo en el extremo que no declara.
+    """
+
+    clave: str
+    minimo: Decimal
+    maximo: Decimal
+    productos: frozenset[str]
+
+
+@dataclass(frozen=True, slots=True)
+class LimitesCredito:
+    """Rango de monto y plazo que la entrevista admite para un producto."""
+
+    monto_minimo: Decimal
+    monto_maximo: Decimal
+    plazo_minimo: int
+    plazo_maximo: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -66,10 +97,13 @@ class ConfigDiagnostico:
 
     verde_hasta: Decimal
     amarillo_hasta: Decimal
-    umbral_vivienda: Decimal
+    umbral_vivienda_primera_cuota: Decimal
     valores: Mapping[str, Decimal]
     claves: Mapping[str, str]
     aplica_a: Mapping[str, tuple[str, ...]]
+    bloques: Mapping[str, BloqueRango] = field(default_factory=dict)
+    monto_minimo: Decimal = MONTO_MINIMO
+    monto_maximo: Decimal = MONTO_MAXIMO
 
 
 def cargar_config(ruta: Path | None = None) -> ConfigDiagnostico:
@@ -91,24 +125,87 @@ def cargar_config(ruta: Path | None = None) -> ConfigDiagnostico:
         datos = tomllib.load(fh)
 
     umbrales = dict(datos.get("umbrales", {}))
+    limites = dict(datos.get("limites", {}))
     valores: dict[str, Decimal] = {}
     claves: dict[str, str] = {}
     aplica_a: dict[str, tuple[str, ...]] = {}
+    bloques: dict[str, BloqueRango] = {}
     for rango in datos.get("rango", []):
         clave = str(rango["clave"])
         productos = tuple(str(producto) for producto in rango.get("aplica_a", []))
+        minimo: Decimal | None = None
+        maximo: Decimal | None = None
         for opcion in rango.get("opcion", []):
             ident = str(opcion["id"])
-            valores[ident] = Decimal(str(opcion["valor"]))
+            valor = Decimal(str(opcion["valor"]))
+            inferior = Decimal(str(opcion.get("desde", valor)))
+            superior = Decimal(str(opcion.get("hasta", valor)))
+            valores[ident] = valor
             claves[ident] = clave
             aplica_a[ident] = productos
+            minimo = inferior if minimo is None else min(minimo, inferior)
+            maximo = superior if maximo is None else max(maximo, superior)
+        if minimo is not None and maximo is not None:
+            bloques[clave] = BloqueRango(
+                clave=clave,
+                minimo=minimo,
+                maximo=maximo,
+                productos=frozenset(productos),
+            )
     return ConfigDiagnostico(
         verde_hasta=Decimal(str(umbrales.get("verde_hasta", UMBRAL_VERDE))),
         amarillo_hasta=Decimal(str(umbrales.get("amarillo_hasta", UMBRAL_AMARILLO))),
-        umbral_vivienda=Decimal(str(umbrales.get("vivienda_hasta", UMBRAL_VIVIENDA))),
+        umbral_vivienda_primera_cuota=Decimal(
+            str(umbrales.get("vivienda_primera_cuota", UMBRAL_VIVIENDA_PRIMERA_CUOTA))
+        ),
         valores=valores,
         claves=claves,
         aplica_a=aplica_a,
+        bloques=bloques,
+        monto_minimo=Decimal(str(limites.get("monto_minimo", MONTO_MINIMO))),
+        monto_maximo=Decimal(str(limites.get("monto_maximo", MONTO_MAXIMO))),
+    )
+
+
+def limites_credito(
+    producto: str,
+    *,
+    config: ConfigDiagnostico | None = None,
+) -> LimitesCredito:
+    """Devuelve los límites de monto y plazo que acepta la simulación.
+
+    El monto usa la frontera de `[limites]` de `config/diagnostico.toml` —la
+    misma que aplican el diagnóstico y los escenarios «¿Y si…?»—, no los valores
+    de cálculo de los rangos, que son representativos. El plazo sale de los
+    bloques `plazo*` que declaran el producto en `aplica_a`.
+
+    Args:
+        producto: clave canónica del producto (`libre_inversion`, `vivienda`,
+            …). No se acepta ahorro, que no simula cuota de crédito.
+        config: configuración ya cargada; por defecto se lee el TOML.
+
+    Returns:
+        La frontera de monto, en pesos, y los extremos de plazo, en meses.
+
+    Raises:
+        ValueError: si el producto no tiene bloque de plazo, es decir, si no es
+            un producto de crédito con cuota fija.
+    """
+    clave = clave_producto(producto)
+    ajustes = config if config is not None else cargar_config()
+    plazos = [
+        bloque
+        for bloque in ajustes.bloques.values()
+        if (bloque.clave == "plazo" or bloque.clave.startswith("plazo_"))
+        and clave in bloque.productos
+    ]
+    if not plazos:
+        raise ValueError(f"«{producto}» no es un producto de crédito con cuota fija")
+    return LimitesCredito(
+        monto_minimo=ajustes.monto_minimo,
+        monto_maximo=ajustes.monto_maximo,
+        plazo_minimo=int(min(bloque.minimo for bloque in plazos)),
+        plazo_maximo=int(max(bloque.maximo for bloque in plazos)),
     )
 
 
@@ -244,7 +341,7 @@ def calcular(
         raiz=raiz,
         verde_hasta=ajustes.verde_hasta,
         amarillo_hasta=ajustes.amarillo_hasta,
-        umbral_vivienda=ajustes.umbral_vivienda,
+        umbral_vivienda_primera_cuota=ajustes.umbral_vivienda_primera_cuota,
     )
     return _resultado(entrada, interno, ajustes)
 
@@ -312,7 +409,7 @@ def _resultado(
         umbrales={
             "verde_hasta": config.verde_hasta,
             "amarillo_hasta": config.amarillo_hasta,
-            "vivienda_hasta": config.umbral_vivienda,
+            "vivienda_primera_cuota": config.umbral_vivienda_primera_cuota,
         },
         tasas_captacion=[_captacion(tasa) for tasa in interno.tasas_captacion],
         aviso=interno.aviso,

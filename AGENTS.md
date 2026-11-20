@@ -129,10 +129,14 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | `.../sucursal/perfil.py` | Memoria de perfil (nombre y empresa) sobre el store de LangGraph |
 | `.../canal/identidad.py` | Número en E.164 y `usuario_id` HMAC; comando `--huella` para autorizar números |
 | `.../canal/consentimiento.py` | Aviso de la Ley 1581, aceptación, rechazo y revocación con borrado |
+| `.../canal/entrada.py` | Extrae y normaliza texto, botones y listas del payload de Meta |
+| `.../canal/cola.py` | Cola de un trabajador para procesar fuera del webhook |
+| `.../canal/despachador.py` | Identidad, autorización, consentimiento y respuesta del canal |
 | `.../sucursal/grafo.py` | StateGraph con memoria, rutas y redacción |
 | `.../sucursal/ajustes.py` | Tope de gasto, TTL y modo demo |
 | `.../sucursal/costo.py` | Tarifas valle/pico, gasto diario y caché |
 | `.../sucursal/api.py` | Endpoints de estado, datos y trazabilidad |
+| `.../mcp_servidor/servidor.py` | Servidor MCP de solo lectura: tasas, cuota y búsqueda en la Bóveda |
 | `.../live_capture.py` | Captura en vivo en carpeta temporal, con etapas para la app |
 | `app.py` | Arranque de FastAPI y la app web en `127.0.0.1:8000` |
 | `app/web/` | App web de la Sucursal 1965 (HTML/CSS/JS) que consume la API |

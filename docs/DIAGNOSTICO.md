@@ -99,6 +99,11 @@ puede ser mayor que la respuesta del paso 5.
 | Vehículo | `monto.DE_30M_A_60M`, `monto.DE_60M_A_100M`, `monto.MAS_100M` | 45M, 80M, 120M |
 | Vivienda | `monto.DE_100M_A_200M`, `monto.DE_200M_A_350M`, `monto.MAS_350M` | 150M, 275M, 400M |
 
+El **valor de cálculo** de cada rango es representativo y no un límite del
+producto. Los escenarios «¿Y si…?» y el MCP aceptan montos de **$500.000 a
+$2.000 millones** (`[limites]` de `config/diagnostico.toml`), y el plazo sigue
+los rangos de cada objetivo.
+
 ### plazo (meses)
 
 | Objetivo | Ids |
@@ -130,16 +135,22 @@ Con los valores de cálculo de cada rango, con precisión decimal de 28 dígitos
 | Amarillo | `margen ≥ 0` y `30 % < RE ≤ 40 %` |
 | Verde | `margen ≥ 0` y `RE ≤ 30 %` |
 
-Umbrales configurables en `config/diagnostico.toml` (por defecto 0,30 y 0,40).
+Umbrales configurables en `config/diagnostico.toml`: `verde_hasta` 0,30,
+`amarillo_hasta` 0,40 y `vivienda_primera_cuota` 0,40.
 
 Reglas adicionales:
 
-- **Vivienda:** además, la primera cuota no debe superar el 30 % de los
-  ingresos; si lo supera, el resultado es rojo. (Verificar la norma vigente
-  antes de la sustentación.)
-- **Libranza:** solo para `empleado` o `pensionado`. Si es `independiente`, se
-  explica que la libranza requiere convenio con el empleador o pagador y se
-  ofrece simular libre inversión.
+- **Vivienda:** además, la primera cuota no debe superar el **40 % de los
+  ingresos familiares**; si lo supera, el resultado es rojo con la alerta
+  `vivienda_primera_cuota`. Es el límite del Decreto 583 de 2025, que modificó
+  el Decreto 1077 de 2015 (antes era del 30 % para No VIS). La entrevista usa el
+  ingreso declarado como referencia de los ingresos familiares.
+- **Libranza:** la Ley 1527 de 2012, modificada por la Ley 1902 de 2018, cubre
+  a empleados, pensionados y contratistas por prestación de servicios; lo que se
+  exige es una **entidad pagadora con convenio**. La entrevista todavía no
+  pregunta por esa entidad, así que el motor solo simula libranza para
+  `empleado` o `pensionado`. Si es `independiente`, explica la regla y ofrece
+  simular libre inversión.
 - **Compra de cartera:** la capacidad comparable descuenta las cuotas que se
   trasladan y el margen se calcula con la cuota nueva. Además se informa el
   ahorro mensual estimado `cuota_trasladar − cuota_nueva`; si es negativo, se
@@ -178,7 +189,7 @@ cuota. El motor lo representa así:
 | Ahorro (`objetivo.ahorro`) | `None` | `None`; `capacidad_pago` es la capacidad de ahorro y `tasas_captacion` lista ahorro y CDT | Ninguna |
 | Libranza de independiente | `None` | `None` | `libranza_no_aplica` |
 | Capacidad negativa | `rojo` (regla del guion) | `None`: no se simula | `capacidad_negativa` |
-| Vivienda sobre el 30 % del ingreso | `rojo` | Con valor | `vivienda_30` |
+| Vivienda sobre el 40 % de los ingresos familiares (Decreto 583 de 2025) | `rojo` | Con valor | `vivienda_primera_cuota` |
 | Tasa cuya vigencia no cubre hoy | El del producto | Con el valor publicado | `vigencia_vencida` |
 
 `TasaCaptacion` guarda `producto`, `tasa_ea` (la referencia), `referencia` (el
@@ -213,9 +224,28 @@ ejecuta con `diagnostico.motor.calcular`.
 ## Texto de aviso (obligatorio)
 
 > Este resultado es orientativo y se basa en rangos aproximados y en las tasas
-> publicadas por el Banco de Occidente para [vigencia]. No es una aprobación ni
-> una oferta de crédito; la tasa final depende del monto, el plazo y tu perfil.
-> Proyecto académico de la UAO, no es un canal oficial del banco.
+> publicadas por el Banco de Occidente, vigentes [vigencia]. No incluye tu
+> historial crediticio, que un banco evalúa obligatoriamente (Circular Básica
+> Financiera, Circular Externa 004 de 2026 de la Superfinanciera, párrafo
+> 1.1.2.27 c). No es una aprobación ni una oferta de crédito; la tasa final
+> depende del monto, el plazo y tu perfil. Proyecto académico de la UAO, no es
+> un canal oficial del banco.
+
+## Referencias normativas
+
+- **Decreto 583 de 2025**, que modificó el Decreto 1077 de 2015: la primera
+  cuota de un crédito de vivienda no puede superar el **40 % de los ingresos
+  familiares**. Antes el límite era del 30 % para vivienda No VIS.
+- **Ley 1527 de 2012**, modificada por la **Ley 1902 de 2018**: la libranza
+  cubre a empleados, pensionados y contratistas por prestación de servicios
+  siempre que exista una **entidad pagadora con convenio**.
+- **Circular Básica Financiera (CBF)**, Circular Externa 004 de 2026 de la
+  Superintendencia Financiera de Colombia, párrafos **1.1.2.20**, **1.1.2.26**
+  y **1.1.2.27**: evaluación de la capacidad de pago y del historial
+  crediticio. Esta referencia reemplaza a la anterior «Circular Básica Contable
+  y Financiera». El diagnóstico no consulta el historial: por eso el aviso lo
+  declara fuera del alcance y el resultado nunca sustituye la evaluación del
+  banco.
 
 ## Personas sintéticas sugeridas para pruebas
 

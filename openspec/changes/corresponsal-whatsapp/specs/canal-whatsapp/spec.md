@@ -156,7 +156,7 @@ El canal SHALL enviar respuestas por la API de Meta con `timeout` explícito cua
 
 ### Requirement: Contratos compartidos del canal
 
-El canal SHALL validar los mensajes y las respuestas con los modelos Pydantic `MensajeEntrante`, `RespuestaCanal` y `PerfilUsuario`. `MensajeEntrante` MUST rechazar payloads sin id, remitente o texto; `RespuestaCanal` MUST distinguir texto, botones y error; `PerfilUsuario` MUST limitar el rol a `cliente` o `asesor`.
+El canal SHALL validar los mensajes y las respuestas con los modelos Pydantic `MensajeEntrante`, `RespuestaCanal` y `PerfilUsuario`. `MensajeEntrante` MUST rechazar payloads sin id, remitente o texto; `RespuestaCanal` MUST distinguir texto, botones, error e imagen; `PerfilUsuario` MUST limitar el rol a `cliente` o `asesor`.
 
 #### Scenario: Payload válido
 - **WHEN** llega un texto con id, remitente y cuerpo
@@ -189,6 +189,10 @@ El webhook SHALL servirse desde la misma app FastAPI que escucha solo en `127.0.
 ### Requirement: Tarjetas de Pana con imagen
 
 El canal SHALL poder acompañar el diagnóstico y el «¿Y si…?» con una tarjeta PNG de Pana, el personaje del asistente. La tarjeta MUST acompañar al texto y MUST NOT reemplazarlo: el texto lleva los mismos datos (semáforo, cuota en rango, tasa con vigencia y fuente, y el aviso). La imagen MUST NOT llevar nombre, número ni documento de la persona, MUST generarse en memoria y MUST NOT guardarse en disco después del envío. El aviso MUST decir que Pana es el asistente de un proyecto académico, no del banco. Se usa Pillow con versión fija y una fuente libre versionada en el repositorio con su licencia. Los stickers quedan fuera de este cambio.
+
+#### Scenario: Texto antes que la imagen
+- **WHEN** la respuesta trae tarjeta y el canal está en modo real o falso
+- **THEN** el texto sale primero y la imagen después, con los mismos datos
 
 #### Scenario: Texto completo aunque falle la imagen
 - **WHEN** el envío de la tarjeta falla

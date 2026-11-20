@@ -465,6 +465,72 @@ ya vigila lo segundo en todo `src/`.
 
 **Residual.** El túnel HTTPS es externo y cambia de URL; mientras esté abierto,
 la superficie pública es la de Meta. Se apaga al terminar cada ensayo.
+### 3.10 Servidor MCP de solo lectura
+
+**Qué puede pasar.** Un cliente MCP podría intentar escribir en el corpus,
+ejecutar comandos, leer rutas del sistema o usar un fragmento del corpus como
+instrucción para el agente que consulta. También podría intentar agotar el
+tiempo del servidor con una consulta enorme o dejar el proceso colgado si Ollama
+no responde.
+
+**Mitigación.**
+
+- El servidor (`mcp_servidor/servidor.py`) usa **stdio**: no abre puertos, no
+  necesita token y se lanza en el entorno de `uv`. Solo declara dos herramientas
+  de consulta —`consultar_tasa` y `buscar_en_boveda`— y ninguna de escritura,
+  administración o ejecución de comandos. `simular_cuota` queda pendiente del
+  motor del diagnóstico y no se registra hasta que exista.
+- `consultar_tasa` lee la tabla Gold versionada y devuelve vigencia, fuente y
+  `sha256_pdf`. Un spread sobre IPC o IBR se presenta con `describir_tasa`
+  («IPC + 3,80 puntos») y nunca como tasa E.A.; un producto ausente responde
+  `tasa_no_disponible` sin inventar una cifra. En el CDT sin plazo no publica
+  una envolvente: indica que la tasa depende del plazo y del monto y agrupa por
+  plazo; con `plazo_dias` y `monto` devuelve solo la banda que contiene el monto.
+  En un producto que no es CDT esos filtros no se aplican en silencio: la
+  respuesta conserva el rango completo y agrega `aviso_filtros`.
+- `buscar_en_boveda` devuelve cada fragmento con `tratamiento: "dato"` y un
+  aviso explícito. Cada fragmento trae `posicion` (orden del recuperador) y su
+  puntaje con `tipo_puntaje` (`coseno` o `bm25`): `similitud_coseno` en la
+  búsqueda híbrida y `puntaje_bm25` en el respaldo; ninguno ordena la lista. La
+  herramienta avisa que no sirve para tasas de interés: la Bóveda conserva
+  textos de 2025 y la tasa vigente se consulta con `consultar_tasa`. El servidor
+  no concatena fragmentos en un prompt, no los pasa a un `SystemMessage` y no
+  los usa para elegir herramientas: son contenido citado, igual que en
+  `asistente/rag.py`.
+- Límites: consulta o nombre de producto de 500 caracteres, `k` entre 1 y 5,
+  15 s por recuperación y errores estructurados `{codigo, mensaje}`. Una ruta
+  del sistema se trata como texto y no se abre ningún archivo.
+- Si Ollama no responde, la búsqueda cae al resultado BM25 local y lo declara en
+  `respaldo: "bm25"`; no inventa fragmentos. La vectorización usa el cliente de
+  `langchain-ollama` con `timeout` y solo habla con `127.0.0.1`.
+- El servidor no lee `.env`, no usa `DEEPSEEK_API_KEY`, no llama a DeepSeek y no
+  accede al sitio del banco. Tampoco escribe en Gold, Knowledge, la Bóveda, el
+  Tablero ni las bases del asistente.
+
+**Evidencia.** `test/test_mcp_servidor.py::test_listado_solo_declara_consultas`,
+`::test_consultar_tasa_presenta_spreads_como_puntos`,
+`::test_consultar_tasa_cdt_sin_plazo_no_publica_envolvente`,
+`::test_consultar_tasa_cdt_con_plazo_y_monto_devuelve_una_banda`,
+`::test_consultar_tasa_usa_etiquetas_legibles_del_tablero`,
+`::test_consultar_tasa_sin_coincidencias_no_inventa`,
+`::test_buscar_en_boveda_numera_las_posiciones`,
+`::test_descripcion_de_buscar_avisa_no_usar_para_tasas`,
+`::test_buscar_en_boveda_trata_ruta_como_texto`,
+`::test_fragmento_malicioso_se_devuelve_como_dato`,
+`::test_buscar_en_boveda_usa_bm25_si_el_hibrido_falla`,
+`::test_buscar_en_boveda_hibrido_marca_puntaje_coseno`,
+`::test_buscar_en_boveda_bm25_marca_puntaje_bm25`,
+`::test_buscar_en_boveda_respaldo_registra_la_clase_del_error`,
+`::test_consultar_tasa_avisa_filtros_solo_del_cdt`,
+`::test_buscar_en_boveda_tiempo_agotado`,
+`::test_herramientas_no_escriben_en_la_boveda` y
+`::test_servidor_no_necesita_deepseek`. Regla de GGA: un fragmento de la Bóveda
+es dato, nunca instrucción.
+
+**Residual.** El servidor entrega el corpus público a cualquier cliente local que
+lo arranque: es su propósito. La protección es de alcance y de escritura, no de
+confidencialidad. Un cliente MCP malicioso puede seguir haciendo muchas
+consultas; el límite de tiempo y `k` acota cada una, pero no hay cuota global.
 
 ## 4. Por qué no usamos `.env` ni `python-dotenv`
 

@@ -11,6 +11,7 @@ from __future__ import annotations
 import re
 from collections.abc import Iterable
 from dataclasses import dataclass
+from decimal import Decimal, InvalidOperation
 
 from .contexto_prompt import CanalOficial, normalizar_digitos
 
@@ -118,13 +119,77 @@ def normalizar_cifra(token: str) -> str:
     return re.sub(r"\D", "", normalizar_digitos(token))
 
 
+def normalizar_cifra_numerica(token: str) -> str:
+    """Lleva una cifra a una forma canónica que equipara decimales y porcentajes.
+
+    ``0.30`` y ``30 %`` dan ``0.3``; ``0.8572`` y ``85,72 %`` dan ``0.8572``.
+    Los puntos o comas de miles se eliminan cuando separan grupos de tres
+    dígitos (``$1.393.023``) y se conservan como separador decimal en el resto
+    de los casos. El signo negativo solo se reconoce antes del primer dígito.
+
+    Args:
+        token: cifra tal como aparece en un texto, con o sin ``$`` o ``%``.
+
+    Returns:
+        La cifra canónica sin ceros sobrantes, o una cadena vacía si no tiene
+        ningún dígito.
+    """
+    texto = token.translate(str.maketrans("０１２３４５６７８９％．，", "0123456789%.,")).strip()
+    inicio = re.search(r"\d", texto)
+    if inicio is None:
+        return ""
+    prefijo = texto[: inicio.start()]
+    signo = "-" if "-" in prefijo or "−" in prefijo else ""
+    es_porcentaje = "%" in texto or "％" in texto
+    cuerpo = re.sub(r"[^0-9.,]", "", texto)
+
+    if "," in cuerpo and "." in cuerpo:
+        if cuerpo.rfind(",") > cuerpo.rfind("."):
+            cuerpo = cuerpo.replace(".", "").replace(",", ".")
+        else:
+            cuerpo = cuerpo.replace(",", "")
+    elif "," in cuerpo:
+        partes = cuerpo.split(",")
+        if len(partes) > 2 or (len(partes[-1]) == 3 and partes[0] not in {"", "0"}):
+            cuerpo = "".join(partes)
+        else:
+            cuerpo = f"{partes[0]}.{partes[-1]}"
+    elif "." in cuerpo:
+        partes = cuerpo.split(".")
+        if len(partes) > 2:
+            if all(len(parte) == 3 for parte in partes[1:]):
+                cuerpo = "".join(partes)
+            else:
+                cuerpo = f"{''.join(partes[:-1])}.{partes[-1]}"
+        elif len(partes[-1]) == 3 and partes[0] not in {"", "0"}:
+            cuerpo = "".join(partes)
+        else:
+            cuerpo = f"{partes[0]}.{partes[-1]}"
+
+    try:
+        valor = Decimal(cuerpo)
+    except InvalidOperation:
+        return ""
+    if es_porcentaje:
+        valor = valor / Decimal(100)
+    if signo == "-":
+        valor = -valor
+    if valor == 0:
+        return "0"
+    return f"{valor.normalize():f}"
+
+
 def _sin_urls(texto: str) -> str:
     """Quita las URLs para que sus digitos no cuenten como cifras."""
     return _URL.sub(" ", texto)
 
 
 def cifras_duras(texto: str) -> set[str]:
-    """Cifras normalizadas: porcentajes, montos y numeros de tres o mas digitos."""
+    """Cifras normalizadas: porcentajes, montos y numeros de tres o mas digitos.
+
+    La normalizacion equipara la forma decimal y la porcentual: ``0.8572`` y
+    ``85,72 %`` producen la misma cifra canonica.
+    """
     cifras: set[str] = set()
     for match in _CIFRA.finditer(_sin_urls(texto)):
         token = match.group(0)
@@ -133,8 +198,8 @@ def cifras_duras(texto: str) -> set[str]:
             continue
         marca = "%" in token or "％" in token or "$" in token or "cop" in token.casefold()
         if marca or len(digitos) >= 3:
-            cifras.add(digitos)
-    return cifras
+            cifras.add(normalizar_cifra_numerica(token))
+    return {cifra for cifra in cifras if cifra}
 
 
 def cifras_inventadas(

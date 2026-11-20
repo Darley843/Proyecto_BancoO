@@ -19,12 +19,19 @@ import yaml
 from .. import config as config_mod
 
 #: Tareas que tienen prompt propio.
-TAREAS: tuple[str, ...] = ("qa", "faq", "resumen")
+TAREAS: tuple[str, ...] = (
+    "qa",
+    "faq",
+    "resumen",
+    "comite_riesgo",
+    "comite_comercial",
+    "comite_auditor",
+)
 
 #: Version por defecto cuando no se pasa ``--version``.
 VERSION_POR_DEFECTO = "v1"
 
-_NOMBRE = re.compile(r"^(?P<tarea>[a-z]+)_(?P<version>v\d+)\.md$")
+_NOMBRE = re.compile(r"^(?P<tarea>[a-z_]+)_(?P<version>v\d+)\.md$")
 _FRONTMATTER = re.compile(r"^---\s*\n(?P<meta>.*?)\n---\s*\n", re.DOTALL)
 _SECCION = re.compile(r"^##\s+(?P<nombre>Sistema|Recordatorio)\s*$", re.MULTILINE)
 

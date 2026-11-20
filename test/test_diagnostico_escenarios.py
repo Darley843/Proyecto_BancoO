@@ -265,6 +265,20 @@ def test_vivienda_admite_plazos_largos() -> None:
         aplicar_cambio(entrada_base(), cambio)
 
 
+def test_el_monto_comparte_la_frontera_del_mcp() -> None:
+    """«¿Y si…?» y el MCP aceptan montos de $500.000 a $2.000 millones."""
+    original = entrada_base()
+    nuevo = aplicar_cambio(
+        original, CambioEscenario(campo="monto_credito", valor=Decimal(80_000_000))
+    )
+
+    assert nuevo.monto_credito == Decimal(80_000_000)
+    with pytest.raises(EscenarioFueraDeRango, match=r"\$500\.000"):
+        aplicar_cambio(
+            original, CambioEscenario(campo="monto_credito", valor=Decimal(3_000_000_000))
+        )
+
+
 def test_aplicar_cambio_no_modifica_la_entrada_original() -> None:
     """La entrada original sigue igual después de aplicar el cambio."""
     original = entrada_base()
@@ -382,6 +396,8 @@ def test_por_defecto_usa_el_motor_del_diagnostico(
 def test_formatos_en_pesos() -> None:
     """Pesos con punto de miles; un rango con extremos iguales es una cifra."""
     assert formatear_pesos(Decimal("1250000.4")) == "$1.250.000"
+    assert formatear_pesos(Decimal("-1643023")) == "-$1.643.023"
+    assert formatear_pesos(Decimal("-524")) == "-$524"
     assert (
         formatear_rango(RangoDecimal(desde=Decimal(410_000), hasta=Decimal(455_000)))
         == "$410.000–$455.000"

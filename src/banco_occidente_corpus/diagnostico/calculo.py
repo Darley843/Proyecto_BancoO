@@ -57,8 +57,10 @@ BASE_SEMAFORO: Literal["tasa_maxima"] = "tasa_maxima"
 UMBRAL_VERDE = Decimal("0.30")
 #: Umbral por defecto entre amarillo y rojo.
 UMBRAL_AMARILLO = Decimal("0.40")
-#: En vivienda, la primera cuota no debe superar este porcentaje del ingreso.
-UMBRAL_VIVIENDA = Decimal("0.30")
+#: En vivienda, la primera cuota no debe superar este porcentaje de los
+#: ingresos familiares (Decreto 583 de 2025, que modificó el Decreto 1077 de
+#: 2015: 40 % desde 2025; antes era 30 % para No VIS).
+UMBRAL_VIVIENDA_PRIMERA_CUOTA = Decimal("0.40")
 #: Precisión decimal de las fórmulas.
 PRECISION = 28
 #: Doce meses de un año para la equivalencia de tasas.
@@ -601,7 +603,7 @@ def calcular(
     raiz: Path | None = None,
     verde_hasta: Decimal = UMBRAL_VERDE,
     amarillo_hasta: Decimal = UMBRAL_AMARILLO,
-    umbral_vivienda: Decimal = UMBRAL_VIVIENDA,
+    umbral_vivienda_primera_cuota: Decimal = UMBRAL_VIVIENDA_PRIMERA_CUOTA,
 ) -> ResultadoCalculo:
     """Calcula el diagnóstico y, si hace falta, lee la tasa del Tablero.
 
@@ -620,7 +622,8 @@ def calcular(
         raiz: carpeta de tablas Gold alternativa.
         verde_hasta: umbral verde de la razón de endeudamiento.
         amarillo_hasta: umbral amarillo de la razón de endeudamiento.
-        umbral_vivienda: porcentaje máximo de la cuota sobre el ingreso.
+        umbral_vivienda_primera_cuota: porcentaje máximo de la primera cuota
+            sobre los ingresos familiares (Decreto 583 de 2025).
 
     Returns:
         El resultado con cuota en rango, semáforo y motivos explicables.
@@ -630,7 +633,7 @@ def calcular(
         TasaNoDisponible: si el producto no tiene ninguna tasa publicada.
     """
     _validar(entrada)
-    _validar_umbrales(verde_hasta, amarillo_hasta, umbral_vivienda)
+    _validar_umbrales(verde_hasta, amarillo_hasta, umbral_vivienda_primera_cuota)
     clave = clave_producto(entrada.producto)
     if clave == "ahorro":
         captacion = _tasas_captacion(fecha, raiz)
@@ -640,7 +643,7 @@ def calcular(
             hoy=hoy,
             verde_hasta=verde_hasta,
             amarillo_hasta=amarillo_hasta,
-            umbral_vivienda=umbral_vivienda,
+            umbral_vivienda_primera_cuota=umbral_vivienda_primera_cuota,
         )
     capacidad = capacidad_pago(
         entrada.ingreso_mensual,
@@ -655,7 +658,7 @@ def calcular(
             hoy=hoy,
             verde_hasta=verde_hasta,
             amarillo_hasta=amarillo_hasta,
-            umbral_vivienda=umbral_vivienda,
+            umbral_vivienda_primera_cuota=umbral_vivienda_primera_cuota,
         )
     rango = tasa if tasa is not None else tasa_de_tablero(clave, fecha, raiz=raiz)
     return evaluar(
@@ -664,7 +667,7 @@ def calcular(
         hoy=hoy,
         verde_hasta=verde_hasta,
         amarillo_hasta=amarillo_hasta,
-        umbral_vivienda=umbral_vivienda,
+        umbral_vivienda_primera_cuota=umbral_vivienda_primera_cuota,
     )
 
 
@@ -676,7 +679,7 @@ def evaluar(
     hoy: date | None = None,
     verde_hasta: Decimal = UMBRAL_VERDE,
     amarillo_hasta: Decimal = UMBRAL_AMARILLO,
-    umbral_vivienda: Decimal = UMBRAL_VIVIENDA,
+    umbral_vivienda_primera_cuota: Decimal = UMBRAL_VIVIENDA_PRIMERA_CUOTA,
 ) -> ResultadoCalculo:
     """Evalúa una entrada con una tasa ya resuelta, sin leer archivos.
 
@@ -688,7 +691,8 @@ def evaluar(
             la de hoy.
         verde_hasta: umbral verde de la razón de endeudamiento.
         amarillo_hasta: umbral amarillo de la razón de endeudamiento.
-        umbral_vivienda: porcentaje máximo de la cuota sobre el ingreso.
+        umbral_vivienda_primera_cuota: porcentaje máximo de la primera cuota
+            sobre los ingresos familiares (Decreto 583 de 2025).
 
     Returns:
         El resultado determinista del diagnóstico, con la alerta
@@ -698,7 +702,7 @@ def evaluar(
         ValueError: si la entrada no cumple el contrato o falta la tasa.
     """
     _validar(entrada)
-    _validar_umbrales(verde_hasta, amarillo_hasta, umbral_vivienda)
+    _validar_umbrales(verde_hasta, amarillo_hasta, umbral_vivienda_primera_cuota)
     clave = clave_producto(entrada.producto)
     capacidad = capacidad_pago(
         entrada.ingreso_mensual,
@@ -721,7 +725,7 @@ def evaluar(
             capacidad,
             verde_hasta=verde_hasta,
             amarillo_hasta=amarillo_hasta,
-            umbral_vivienda=umbral_vivienda,
+            umbral_vivienda_primera_cuota=umbral_vivienda_primera_cuota,
         )
     return _con_vigencia(resultado, hoy)
 
@@ -780,7 +784,7 @@ def _resultado_credito(
     *,
     verde_hasta: Decimal,
     amarillo_hasta: Decimal,
-    umbral_vivienda: Decimal,
+    umbral_vivienda_primera_cuota: Decimal,
 ) -> ResultadoCalculo:
     """Simula el crédito en los dos extremos del rango y aplica el semáforo."""
     clave = clave_producto(entrada.producto)
@@ -820,14 +824,16 @@ def _resultado_credito(
 
     alertas: list[str] = []
     if clave == "vivienda":
-        limite = _peso(Decimal(entrada.ingreso_mensual) * Decimal(umbral_vivienda))
+        limite = _peso(Decimal(entrada.ingreso_mensual) * Decimal(umbral_vivienda_primera_cuota))
         if cuota_max > limite:
             color = "rojo"
-            alertas.append("vivienda_30")
+            alertas.append("vivienda_primera_cuota")
             motivos.append(
                 f"En vivienda la primera cuota no debe superar el "
-                f"{_porcentaje(umbral_vivienda)} del ingreso: {_pesos(cuota_max)} > "
-                f"{_pesos(limite)}."
+                f"{_porcentaje(umbral_vivienda_primera_cuota)} de los ingresos "
+                f"familiares (Decreto 583 de 2025): {_pesos(cuota_max)} > "
+                f"{_pesos(limite)}. El cálculo usa el ingreso declarado como "
+                "referencia."
             )
 
     ahorro_mensual: Decimal | None = None
@@ -845,7 +851,7 @@ def _resultado_credito(
     if clave == "vivienda" and color == "rojo":
         recomendaciones.append(
             "Revisa el monto o amplía el plazo para que la primera cuota no "
-            "supere el 30 % del ingreso."
+            "supere el 40 % de los ingresos familiares (Decreto 583 de 2025)."
         )
     return ResultadoCalculo(
         producto=clave,
@@ -1034,7 +1040,13 @@ def _resultado_libranza_no_disponible(
     capacidad: Decimal,
     tasa: TasaProducto | None,
 ) -> ResultadoCalculo:
-    """Explica que la libranza exige convenio y ofrece simular libre inversión."""
+    """Explica que la libranza exige una entidad pagadora con convenio.
+
+    La Ley 1527 de 2012, modificada por la Ley 1902 de 2018, también cubre a
+    los contratistas por prestación de servicios. La entrevista no pregunta por
+    la entidad pagadora, así que el motor solo simula libranza para empleados y
+    pensionados y aquí ofrece la libre inversión como alternativa.
+    """
     return ResultadoCalculo(
         producto="libranza",
         version_formula=VERSION_FORMULA,
@@ -1056,9 +1068,11 @@ def _resultado_libranza_no_disponible(
         semaforo=None,
         alertas=("libranza_no_aplica",),
         motivos=(
-            "La libranza solo está disponible para empleados o pensionados con "
-            "convenio de descuento.",
-            "Con vinculación independiente no se puede simular libranza.",
+            "La libranza de la Ley 1527 de 2012, modificada por la Ley 1902 de "
+            "2018, también cubre a los contratistas por prestación de servicios: "
+            "lo que se exige es una entidad pagadora con convenio.",
+            "Con vinculación independiente no se puede simular libranza hasta "
+            "confirmar que existe esa entidad pagadora con convenio.",
         ),
         recomendaciones=(
             "Puedes simular un préstamo de libre inversión.",
@@ -1118,7 +1132,7 @@ def _validar(entrada: EntradaCalculo) -> None:
 def _validar_umbrales(
     verde_hasta: Decimal,
     amarillo_hasta: Decimal,
-    umbral_vivienda: Decimal,
+    umbral_vivienda_primera_cuota: Decimal,
 ) -> None:
     """Comprueba que los umbrales del semáforo y de vivienda sean válidos.
 
@@ -1128,7 +1142,7 @@ def _validar_umbrales(
     """
     verde = Decimal(verde_hasta)
     amarillo = Decimal(amarillo_hasta)
-    vivienda = Decimal(umbral_vivienda)
+    vivienda = Decimal(umbral_vivienda_primera_cuota)
     if not Decimal(0) <= verde <= amarillo <= Decimal(1):
         raise ValueError(f"umbrales inválidos: verde={verde}, amarillo={amarillo}")
     if not Decimal(0) <= vivienda <= Decimal(1):
@@ -1165,13 +1179,15 @@ def _porcentaje(valor: Decimal) -> str:
 def _aviso(tasa: TasaProducto | None) -> str:
     """Arma el aviso orientativo obligatorio citando la vigencia de la tasa."""
     if tasa is None:
-        vigencia = "la vigencia publicada"
+        referencia = "en la vigencia publicada"
     else:
-        vigencia = vigencia_legible(tasa.vigencia_desde, tasa.vigencia_hasta)
+        referencia = f"vigentes {vigencia_legible(tasa.vigencia_desde, tasa.vigencia_hasta)}"
     return (
         "Este resultado es orientativo y se basa en rangos aproximados y en las "
-        f"tasas publicadas por el Banco de Occidente para {vigencia}. No es una "
-        "aprobación ni una oferta de crédito; la tasa final depende del monto, el "
-        "plazo y tu perfil. Proyecto académico de la UAO, no es un canal oficial "
-        "del banco."
+        f"tasas publicadas por el Banco de Occidente, {referencia}. No incluye "
+        "tu historial crediticio, que un banco evalúa obligatoriamente (Circular "
+        "Básica Financiera, Circular Externa 004 de 2026 de la Superfinanciera, "
+        "párrafo 1.1.2.27 c). No es una aprobación ni una oferta de crédito; la "
+        "tasa final depende del monto, el plazo y tu perfil. Proyecto académico "
+        "de la UAO, no es un canal oficial del banco."
     )
