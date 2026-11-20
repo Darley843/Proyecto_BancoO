@@ -5,9 +5,11 @@ Es la pieza que convierte un mensaje de WhatsApp en una respuesta:
 1. Calcula ``usuario_id`` con la huella HMAC del número.
 2. Descarta números que no estén en las huellas autorizadas.
 3. Pasa por la máquina de consentimiento de la Ley 1581.
-4. Si ya hay consentimiento, entrega la pregunta al grafo de la Sucursal con
+4. Si hay una entrevista de diagnóstico en curso —o el mensaje la pide— la
+   atiende el servicio del diagnóstico (botones, listas y tarjeta de Pana).
+5. Si no, entrega la pregunta al grafo de la Sucursal con
    ``thread_id = wa:<usuario_id>``.
-5. Envía la respuesta con el enviador configurado (falso o Meta).
+6. Envía la respuesta con el enviador configurado (falso o Meta).
 
 El número y el texto nunca se registran en logs; el estado del mensaje vive en
 ``data/asistente/whatsapp.sqlite``. Las pruebas viven en
@@ -27,6 +29,7 @@ from .cola import ColaMensajes
 from .configuracion import ConfiguracionCanal
 from .consentimiento import MaquinaConsentimiento
 from .contratos import MensajeEntrante, RespuestaCanal
+from .diagnostico import ServicioDiagnostico
 from .envio import Enviador
 from .identidad import calcular_usuario_id
 
@@ -53,6 +56,7 @@ class Despachador:
     cola: ColaMensajes
     crear_enviador: Callable[[str, str], Enviador]
     responder: Callable[[str, str, str], str]
+    diagnostico: ServicioDiagnostico | None = None
 
     def recibir(self, mensaje: MensajeEntrante) -> None:
         """Registra y encola un mensaje, sin bloquear la respuesta a Meta.
@@ -95,6 +99,8 @@ class Despachador:
                 return
 
             respuesta = self.maquina.decidir(mensaje, usuario_id)
+            if respuesta is None and self.diagnostico is not None:
+                respuesta = self.diagnostico.atender(mensaje, usuario_id)
             if respuesta is None:
                 texto = self.responder(
                     mensaje.texto,

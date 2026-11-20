@@ -17,7 +17,7 @@ from banco_occidente_corpus.canal.almacen import contar_mensajes
 from banco_occidente_corpus.canal.cola import ColaMensajes
 from banco_occidente_corpus.canal.configuracion import ConfiguracionCanal
 from banco_occidente_corpus.canal.consentimiento import ID_ACEPTO, MaquinaConsentimiento
-from banco_occidente_corpus.canal.contratos import MensajeEntrante, RespuestaCanal
+from banco_occidente_corpus.canal.contratos import MensajeEntrante, OpcionCanal, RespuestaCanal
 from banco_occidente_corpus.canal.despachador import (
     AVISO_NO_AUTORIZADO,
     TEXTO_ERROR,
@@ -173,6 +173,38 @@ def test_deduplica_por_id_de_mensaje(tmp_path: Path) -> None:
     banco.despachador.recibir(mensaje)
 
     assert contar_mensajes(banco.ruta) == {"recibido": 1}
+
+
+def test_el_diagnostico_atiende_antes_del_grafo(tmp_path: Path) -> None:
+    """Si el servicio del diagnóstico responde, el grafo no se llama."""
+    banco = _banco(tmp_path)
+    banco.maquina.aceptar(banco.usuario_id, AHORA)
+    atendidos: list[str] = []
+
+    class ServicioFalso:
+        """Doble del servicio: contesta el primer paso de la entrevista."""
+
+        def atender(self, mensaje: MensajeEntrante, usuario_id: str) -> RespuestaCanal:
+            """Devuelve una lista con una fila y guarda el texto atendido."""
+            atendidos.append(mensaje.texto)
+            return RespuestaCanal(
+                usuario_id=usuario_id,
+                id_mensaje_origen=mensaje.id_mensaje,
+                texto="¿Qué te gustaría revisar?",
+                tipo="lista",
+                opciones=[OpcionCanal(id="objetivo.ahorro", titulo="Solo ahorrar")],
+            )
+
+    banco.despachador.diagnostico = ServicioFalso()  # type: ignore[assignment]
+    mensaje = _mensaje("quiero hacer el diagnóstico")
+
+    banco.despachador.recibir(mensaje)
+    banco.despachador.procesar(mensaje)
+
+    assert atendidos == ["quiero hacer el diagnóstico"]
+    assert banco.llamadas == []
+    assert banco.enviadas[0].tipo == "lista"
+    assert contar_mensajes(banco.ruta) == {"respondido": 1}
 
 
 def test_error_del_grafo_envia_texto_de_respaldo(

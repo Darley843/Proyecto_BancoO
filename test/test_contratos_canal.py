@@ -21,6 +21,7 @@ from banco_occidente_corpus.canal.contratos import (
     CasoAsesor,
     EntradaDiagnostico,
     MensajeEntrante,
+    OpcionCanal,
     PerfilUsuario,
     RangoDecimal,
     RespuestaCanal,
@@ -205,6 +206,60 @@ def test_imagen_de_un_megabyte_o_mas_falla() -> None:
     """El contrato corta el PNG que llega al límite antes de salir a la red."""
     with pytest.raises(ValidationError):
         _respuesta_imagen(imagen=b"x" * PESO_MAXIMO_IMAGEN)
+
+
+def _respuesta_lista(**cambios: Any) -> RespuestaCanal:
+    """Construye una respuesta con lista y los cambios pedidos."""
+    datos: dict[str, Any] = {
+        "usuario_id": "u" * 32,
+        "id_mensaje_origen": "wamid.SIM123",
+        "texto": "¿Cuánto necesitas?",
+        "tipo": "lista",
+        "opciones": [OpcionCanal(id=f"monto.{i}", titulo=f"Rango {i}") for i in range(3)],
+    }
+    datos.update(cambios)
+    return RespuestaCanal(**datos)
+
+
+def test_respuesta_de_lista_admite_diez_filas_y_rechaza_once() -> None:
+    """WhatsApp permite hasta diez filas por lista interactiva."""
+    diez = [OpcionCanal(id=f"fila.{i}", titulo=f"Opción {i}") for i in range(10)]
+
+    respuesta = _respuesta_lista(opciones=diez)
+
+    assert len(respuesta.opciones) == 10
+    with pytest.raises(ValidationError):
+        _respuesta_lista(opciones=[*diez, OpcionCanal(id="fila.11", titulo="Otra")])
+
+
+def test_respuesta_de_lista_sin_filas_falla() -> None:
+    """Una lista vacía no se puede enviar."""
+    with pytest.raises(ValidationError):
+        _respuesta_lista(opciones=[])
+
+
+def test_lista_y_botones_no_se_mezclan() -> None:
+    """Cada interactivo viaja en su propio tipo de mensaje."""
+    with pytest.raises(ValidationError):
+        _respuesta_lista(botones=[BotonCanal(id="asesor", titulo="Asesor")])
+
+
+def test_opciones_solo_van_en_la_lista() -> None:
+    """Un texto suelto no arrastra filas de lista."""
+    with pytest.raises(ValidationError):
+        _respuesta_lista(tipo="texto")
+
+
+def test_imagen_no_admite_filas_de_lista() -> None:
+    """La tarjeta de Pana no reemplaza a la lista."""
+    with pytest.raises(ValidationError):
+        _respuesta_imagen(opciones=[OpcionCanal(id="fila.1", titulo="Opción")])
+
+
+def test_titulo_de_fila_de_25_caracteres_falla() -> None:
+    """El título de una fila no pasa de 24 caracteres."""
+    with pytest.raises(ValidationError):
+        OpcionCanal(id="fila", titulo="x" * 25)
 
 
 def test_perfil_por_defecto_es_cliente_sin_consentimiento() -> None:

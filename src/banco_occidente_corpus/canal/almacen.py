@@ -14,6 +14,7 @@ from __future__ import annotations
 import sqlite3
 from datetime import UTC, datetime
 from pathlib import Path
+from uuid import uuid4
 
 #: Ruta por defecto de la base del canal.
 RUTA_ALMACEN: Path = Path("data/asistente/whatsapp.sqlite")
@@ -163,3 +164,49 @@ def contar_mensajes(ruta: Path) -> dict[str, int]:
     with conectar(ruta) as conexion:
         filas = conexion.execute("SELECT estado, COUNT(*) FROM mensajes GROUP BY estado").fetchall()
     return {str(estado): int(total) for estado, total in filas}
+
+
+def registrar_caso(
+    ruta: Path,
+    usuario_id: str,
+    motivo: str,
+    *,
+    semaforo: str = "pendiente",
+    resultado_json: str = "{}",
+    ahora: datetime | None = None,
+) -> str:
+    """Registra un caso para un asesor humano y devuelve su id.
+
+    El caso guarda solo la huella del usuario, el motivo, el semáforo y el
+    resultado del diagnóstico si ya existe: ni nombre, ni número, ni texto
+    libre.
+
+    Args:
+        ruta: archivo SQLite del canal.
+        usuario_id: huella HMAC del número.
+        motivo: causa del caso (`asesor_solicitado`, `semaforo_rojo`, …).
+        semaforo: color del diagnóstico, o ``pendiente`` si aún no hay cálculo.
+        resultado_json: resultado del diagnóstico serializado; ``{}`` si no hay.
+        ahora: instante de creación; por defecto la hora UTC actual.
+
+    Returns:
+        El identificador del caso creado.
+    """
+    inicializar_almacen(ruta)
+    id_caso = f"caso:{uuid4().hex[:12]}"
+    with conectar(ruta) as conexion:
+        conexion.execute(
+            "INSERT INTO casos "
+            "(id_caso, usuario_id, motivo, semaforo, resultado_json, estado, creado_en) "
+            "VALUES (?, ?, ?, ?, ?, ?, ?)",
+            (
+                id_caso,
+                usuario_id,
+                motivo,
+                semaforo,
+                resultado_json,
+                "abierto",
+                (ahora or datetime.now(UTC)).isoformat(),
+            ),
+        )
+    return id_caso

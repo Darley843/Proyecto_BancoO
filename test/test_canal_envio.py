@@ -18,7 +18,7 @@ from typing import Any, Literal
 import httpx
 import pytest
 
-from banco_occidente_corpus.canal.contratos import BotonCanal, RespuestaCanal
+from banco_occidente_corpus.canal.contratos import BotonCanal, OpcionCanal, RespuestaCanal
 from banco_occidente_corpus.canal.envio import (
     LARGO_MAXIMO,
     EnviadorFalso,
@@ -36,7 +36,7 @@ TOKEN = "token-de-prueba"
 AHORA = datetime(2026, 11, 17, 12, 0, tzinfo=UTC)
 """Instante fijo de las pruebas."""
 
-TipoRespuesta = Literal["texto", "botones", "error", "imagen"]
+TipoRespuesta = Literal["texto", "botones", "lista", "error", "imagen"]
 
 PNG = b"\x89PNG\r\n\x1a\n" + b"tarjeta-de-pana"
 """Bytes ficticios de una tarjeta; el enviador no decodifica el PNG."""
@@ -47,6 +47,7 @@ def _respuesta(
     *,
     tipo: TipoRespuesta = "texto",
     botones: list[BotonCanal] | None = None,
+    opciones: list[OpcionCanal] | None = None,
     imagen: bytes | None = None,
 ) -> RespuestaCanal:
     """Construye una respuesta válida del canal."""
@@ -56,6 +57,7 @@ def _respuesta(
         texto=texto,
         tipo=tipo,
         botones=botones or [],
+        opciones=opciones or [],
         imagen=imagen,
     )
 
@@ -196,6 +198,43 @@ def test_enviador_meta_envia_botones() -> None:
         "consent:acepto",
         "consent:rechazo",
     ]
+    cliente.close()
+
+
+def test_enviador_meta_envia_lista_con_filas() -> None:
+    """Las opciones de la entrevista viajan como lista interactiva."""
+    llamadas: list[httpx.Request] = []
+    cliente = _cliente(lambda _: httpx.Response(200, json={"messages": [{"id": "x"}]}), llamadas)
+    opciones = [
+        OpcionCanal(id="objetivo.vivienda", titulo="Vivienda", descripcion="Crédito hipotecario"),
+        OpcionCanal(id="objetivo.ahorro", titulo="Solo ahorrar"),
+    ]
+
+    _meta(cliente).enviar(_respuesta("¿Qué quieres revisar?", tipo="lista", opciones=opciones))
+
+    cuerpo = json.loads(llamadas[0].content)
+    interactivo = cuerpo["interactive"]
+    assert cuerpo["type"] == "interactive"
+    assert interactivo["type"] == "list"
+    assert interactivo["action"]["button"] == "Elige una opción"
+    filas = interactivo["action"]["sections"][0]["rows"]
+    assert [fila["id"] for fila in filas] == ["objetivo.vivienda", "objetivo.ahorro"]
+    assert filas[0]["description"] == "Crédito hipotecario"
+    assert "description" not in filas[1]
+    cliente.close()
+
+
+def test_enviador_meta_recorta_titulos_de_la_lista() -> None:
+    """El envío aplica los topes de Meta aunque el contrato los valide antes."""
+    llamadas: list[httpx.Request] = []
+    cliente = _cliente(lambda _: httpx.Response(200, json={"messages": [{"id": "x"}]}), llamadas)
+    opcion = OpcionCanal(id="fila", titulo="x" * 24, descripcion="y" * 72)
+
+    _meta(cliente).enviar(_respuesta("Elige", tipo="lista", opciones=[opcion]))
+
+    fila = json.loads(llamadas[0].content)["interactive"]["action"]["sections"][0]["rows"][0]
+    assert len(fila["title"]) == 24
+    assert len(fila["description"]) == 72
     cliente.close()
 
 

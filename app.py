@@ -33,6 +33,7 @@ from banco_occidente_corpus.canal.cola import ColaMensajes
 from banco_occidente_corpus.canal.configuracion import cargar_configuracion_canal
 from banco_occidente_corpus.canal.consentimiento import MaquinaConsentimiento
 from banco_occidente_corpus.canal.despachador import Despachador
+from banco_occidente_corpus.canal.diagnostico import crear_servicio
 from banco_occidente_corpus.canal.envio import (
     Enviador,
     EnviadorFalso,
@@ -161,6 +162,11 @@ def crear_app(
             cola=cola,
             crear_enviador=fabrica_enviador,
             responder=responder,
+            diagnostico=crear_servicio(
+                configuracion.paths.root / "data/asistente/diagnostico.sqlite",
+                ruta_canal,
+                raiz=configuracion.paths.root,
+            ),
         )
 
     @asynccontextmanager

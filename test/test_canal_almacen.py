@@ -9,7 +9,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-from banco_occidente_corpus.canal.almacen import inicializar_almacen
+from banco_occidente_corpus.canal.almacen import inicializar_almacen, registrar_caso
 
 TABLAS = {"mensajes", "consentimientos", "envios", "casos"}
 """Las cuatro tablas que debe crear la inicialización."""
@@ -105,3 +105,18 @@ def test_crea_la_carpeta_padre(tmp_path: Path) -> None:
 
     assert ruta.exists()
     assert _tablas(ruta) == TABLAS
+
+
+def test_registrar_caso_guarda_solo_lo_permitido(tmp_path: Path) -> None:
+    """Un caso de asesor nace abierto y sin nombre, número ni texto libre."""
+    ruta = tmp_path / "whatsapp.sqlite"
+
+    id_caso = registrar_caso(ruta, "u" * 64, "asesor_solicitado")
+
+    with sqlite3.connect(str(ruta)) as conexion:
+        fila = conexion.execute(
+            "SELECT id_caso, usuario_id, motivo, semaforo, estado FROM casos WHERE id_caso = ?",
+            (id_caso,),
+        ).fetchone()
+    assert fila == (id_caso, "u" * 64, "asesor_solicitado", "pendiente", "abierto")
+    assert id_caso.startswith("caso:")
