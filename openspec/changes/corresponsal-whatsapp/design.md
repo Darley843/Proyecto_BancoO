@@ -228,11 +228,11 @@ Alternativa descartada: copiar el checkpoint con `checkpointer.put`. Acopla el c
 
 ### 12. Comité de crédito de una ronda y síntesis determinista
 
-El comité se convoca solo para rojo o amarillo. Hace tres llamadas en paralelo, una por rol, con `with_structured_output(OpinionComite)` y prompts separados en `config/prompts/comite_riesgo_v1.md`, `comite_comercial_v1.md` y `comite_auditor_v1.md`.
+El comité se convoca solo para rojo o amarillo. Riesgo y comercial hacen dos llamadas en paralelo con `with_structured_output(PosturaAgente)`; el auditor corre después, ya con las dos posturas, y revisa cifras, promesas y complacencia. Los prompts separados viven en `config/prompts/comite_riesgo_v1.md`, `comite_comercial_v1.md` y `comite_auditor_v1.md`.
 
-`OpinionComite` incluye `rol`, `veredicto` (`favorable`, `con_condiciones`, `desfavorable`, `abstencion`), `confianza` (0–1), `evidencias` (lista de `{campo, valor, fuente}`), `condiciones`, `riesgos` y `aviso`. La síntesis es determinista: un `desfavorable` de riesgo produce `no_apto`; una abstención o un fallo produce `requiere_asesor`; condiciones comerciales producen `apto_con_condiciones`; si no, `apto`. No hay una cuarta llamada ni una segunda ronda.
+`PosturaAgente` incluye `agente`, `postura`, `argumentos` (máximo tres) y `evidencia`; `DeliberacionComite` agrega la recomendación, hasta dos alternativas, los hallazgos y la oferta de asesor. La síntesis es determinista: un `desfavorable` de riesgo produce `no_apto`; una abstención o un fallo produce `requiere_asesor`; condiciones comerciales producen `apto_con_condiciones`; si no, `apto`. Si el auditor objeta hay una única corrección (cuarta llamada); si vuelve a objetar, se responde con el texto del diagnóstico. No hay segunda ronda.
 
-Si un rol falla o devuelve un esquema inválido, se registra la abstención y se entrega el resultado con las otras dos. El comité no escribe en la Bóveda ni modifica el diagnóstico. El uso de tokens de las tres llamadas se suma al turno.
+Si un rol falla o devuelve un esquema inválido, se registra la abstención y se entrega el resultado con las otras dos. El comité no escribe en la Bóveda ni modifica el diagnóstico. El uso de tokens de las llamadas se suma al turno.
 
 Alternativa descartada: un debate de varias rondas. El taller pide una ronda y el costo se dispara; además, un desacuerdo no se resuelve necesariamente con más llamadas.
 

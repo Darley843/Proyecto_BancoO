@@ -50,6 +50,7 @@ PARAMETROS_POR_TAREA: dict[str, ParametrosTarea] = {
     "qa": ParametrosTarea(temperatura=0.0, max_tokens=2_000),
     "faq": ParametrosTarea(temperatura=0.0, max_tokens=8_000),
     "resumen": ParametrosTarea(temperatura=0.2, max_tokens=4_000),
+    "comite": ParametrosTarea(temperatura=0.0, max_tokens=1_200),
 }
 
 

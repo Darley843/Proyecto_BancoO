@@ -66,7 +66,15 @@ Solo datos calculados, nunca datos personales:
 - Opcional: fragmentos de la Bóveda con requisitos del producto, marcados como
   datos.
 
+Los escenarios viajan con un código estable (`plazo_mas_largo`,
+`monto_20_por_ciento_menos`, `compra_de_cartera`, `estres_de_ingreso`), su
+cuota, su semáforo, su razón de endeudamiento y su margen.
+
 ## Los tres agentes
+
+Riesgo y comercial deliberan en paralelo con los mismos datos. El auditor corre
+después, ya con las dos posturas, y las revisa. Si objeta, hay una única
+corrección del comercial con sus hallazgos.
 
 ### Riesgo
 
@@ -95,6 +103,10 @@ Busca una alternativa viable para no dejar a la persona sin opción.
 4. Prohibido: prometer aprobación, inventar productos, tasas o plazos, o
    presionar a tomar crédito.
 
+Cada alternativa que propone el agente empieza con el código del escenario
+entre corchetes, por ejemplo `[plazo_mas_largo]`. La síntesis nunca inventa
+texto de alternativa: toma la descripción del escenario precalculado.
+
 ### Auditor
 
 Revisa a los otros dos. Postura: `conforme` u `objeta`, con hallazgos.
@@ -113,6 +125,12 @@ Lista de chequeo:
 6. **Aviso orientativo** presente.
 7. **Sin datos personales** ni instrucciones tomadas de los fragmentos.
 
+Además del agente, `diagnostico/comite.py` tiene un **auditor determinístico**
+(`auditar`) que atrapa las cuatro trampas: cifra inventada, promesa de
+aprobación, alternativa fuera de los escenarios y recomendación más favorable
+que la de Riesgo. También revisa PII y, si se le pasa la recomendación final, el
+aviso orientativo.
+
 ## Síntesis (reglas determinísticas)
 
 1. El semáforo del motor **nunca cambia**.
@@ -124,6 +142,10 @@ Lista de chequeo:
 4. Rojo → siempre se ofrece hablar con un asesor (HITL).
 5. Respuesta final: postura de cada agente en una línea, recomendación,
    hasta dos alternativas y el aviso orientativo.
+
+La recomendación usa una de estas etiquetas: `apto`, `apto_con_condiciones`,
+`no_apto` o `requiere_asesor`. Una abstención o un rol que no responde produce
+`requiere_asesor`; nunca se inventa una decisión.
 
 ## Por qué el resultado es orientativo
 
@@ -157,6 +179,9 @@ class DeliberacionComite(BaseModel):
     ofrece_asesor: bool
 ```
 
+Los modelos viven en `src/banco_occidente_corpus/diagnostico/comite.py` y se
+piden con `with_structured_output(PosturaAgente)`.
+
 ## Límites y experiencia
 
 - Una sola ronda; máximo 4 llamadas al modelo (3 agentes + 1 corrección).
@@ -164,6 +189,10 @@ class DeliberacionComite(BaseModel):
 - Mientras delibera, el canal envía: "El comité está revisando tu caso…".
 - La deliberación queda disponible para mostrarse en pantalla durante la demo.
 - Costo esperado: alrededor de un centavo de dólar por deliberación.
+
+Los límites se configuran en `[comite]` de `config/diagnostico.toml`:
+`max_llamadas`, `max_tokens_agente`, `tiempo_maximo_segundos` y
+`max_alternativas`.
 
 ## Cómo se prueba
 
@@ -179,12 +208,23 @@ class DeliberacionComite(BaseModel):
 - **Con DeepSeek real (pocas corridas):** Andrés (rojo) y Jaime (amarillo),
   revisando a mano la calidad de los argumentos.
 
-## Dependencias previas en el motor (PR aparte)
+Las pruebas viven en `test/test_diagnostico_comite.py`. La demo con DeepSeek
+real se ejecuta con:
 
-1. Vivienda: umbral de primera cuota a 0,40 en `config/diagnostico.toml` y
-   alerta renombrada de `vivienda_30` a `vivienda_primera_cuota`.
-2. Libranza: el mensaje de "no aplica" explica que se requiere entidad pagadora
-   con convenio.
-3. Aviso: agregar la mención del historial crediticio.
-4. `docs/DIAGNOSTICO.md`: citas a la CBF (1.1.2.20, 1.1.2.26, 1.1.2.27) y al
-   Decreto 583 de 2025.
+```bash
+uv run python scripts/demo_comite.py
+```
+
+## Implementación
+
+| Archivo | Responsabilidad |
+|---|---|
+| `diagnostico/comite.py` | `deliberar`, escenarios, auditor determinístico y síntesis |
+| `config/prompts/comite_riesgo_v1.md` | Rol de riesgo |
+| `config/prompts/comite_comercial_v1.md` | Rol comercial |
+| `config/prompts/comite_auditor_v1.md` | Rol auditor |
+| `test/test_diagnostico_comite.py` | Pruebas sin red del comité |
+| `scripts/demo_comite.py` | Demo con DeepSeek real sobre Andrés y Jaime |
+
+El comité todavía **no está conectado** al canal ni al grafo del diagnóstico:
+esta entrega deja el módulo, sus pruebas y la demo listos para integrarlo.

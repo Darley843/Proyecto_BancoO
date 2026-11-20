@@ -1,0 +1,1323 @@
+"""Comité de crédito de una ronda y síntesis determinista.
+
+El comité **no decide el semáforo**: el semáforo lo calcula el motor del
+diagnóstico. El comité delibera qué recomendarle a la persona cuando su caso es
+amarillo o rojo, con tres miradas que se controlan entre sí
+(`docs/COMITE.md`):
+
+- **Riesgo** evalúa la sostenibilidad de la cuota, el endeudamiento y la prueba
+  de estrés de ingreso.
+- **Comercial** propone hasta dos alternativas, solo de los escenarios que el
+  motor precalculó antes de llamar al modelo.
+- **Auditor** revisa cifras, promesas, complacencia, alternativas y aviso.
+
+El auditor también existe en código (`auditar`): ninguna cifra inventada, frase
+de aprobación, alternativa fuera de los escenarios ni recomendación más
+favorable que la de riesgo pasa la deliberación. La síntesis es determinística:
+el semáforo no cambia, gana la postura más prudente y, si el auditor vuelve a
+objetar tras una única corrección, se responde con el texto del diagnóstico.
+
+Límites: una sola ronda, máximo cuatro llamadas al modelo (tres agentes y una
+corrección), tope de tokens por agente y 30 s en total. El módulo no escribe en
+la Bóveda ni modifica el diagnóstico, y solo recibe el `ResultadoDiagnostico` y
+los escenarios calculados, nunca el nombre ni el número de la persona.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+import threading
+import time
+import tomllib
+from collections.abc import Callable, Iterator, Mapping, Sequence
+from concurrent.futures import Future, ThreadPoolExecutor, as_completed
+from dataclasses import dataclass, field
+from datetime import date
+from decimal import ROUND_HALF_UP, Decimal, InvalidOperation
+from pathlib import Path
+from typing import Any, Literal
+
+from langchain_core.language_models import BaseChatModel
+from langchain_core.messages import BaseMessage, HumanMessage, SystemMessage
+from pydantic import BaseModel, ConfigDict, Field, ValidationError
+
+from ..asistente.metricas import extraer_metricas
+from ..asistente.modelo import crear_modelo
+from ..asistente.prompts import cargar_prompt
+from ..asistente.validacion import cifras_duras, detectar_pii, normalizar_cifra
+from ..canal.contratos import EntradaDiagnostico, RangoDecimal, ResultadoDiagnostico
+from ..config import PROJECT_ROOT
+from ..tablero.tasas import NOMBRES_PRODUCTO
+from . import motor
+from .escenarios import formatear_pesos, formatear_rango
+
+#: Archivo versionado con los límites del comité.
+RUTA_CONFIG = PROJECT_ROOT / "config" / "diagnostico.toml"
+
+#: Roles del comité, en el orden en que se sintetizan.
+ROLES: tuple[str, ...] = ("riesgo", "comercial", "auditor")
+#: Roles que deliberan en paralelo; el auditor revisa después sus posturas.
+ROLES_INICIALES: tuple[str, ...] = ("riesgo", "comercial")
+
+#: Códigos de los escenarios que el motor precalcula para el comité.
+CODIGOS_ESCENARIO: tuple[str, ...] = (
+    "plazo_mas_largo",
+    "monto_20_por_ciento_menos",
+    "compra_de_cartera",
+    "estres_de_ingreso",
+)
+
+#: Códigos que el comercial puede ofrecer; el estrés es una prueba, no una oferta.
+CODIGOS_ALTERNATIVA: tuple[str, ...] = tuple(
+    codigo for codigo in CODIGOS_ESCENARIO if codigo != "estres_de_ingreso"
+)
+
+#: Posturas válidas por rol. `abstencion` cubre el fallo o la falta de evidencia.
+POSTURAS_RIESGO: frozenset[str] = frozenset(
+    {"favorable", "con_condiciones", "desfavorable", "abstencion"}
+)
+POSTURAS_AUDITOR: frozenset[str] = frozenset({"conforme", "objeta", "abstencion"})
+
+#: Orden de prudencia: menor es más prudente y manda en la síntesis.
+ORDEN_POSTURA: dict[str, int] = {
+    "desfavorable": 0,
+    "con_condiciones": 1,
+    "favorable": 2,
+}
+
+#: Valores por defecto si el TOML no trae la sección `[comite]`.
+MAX_LLAMADAS = 4
+MAX_TOKENS_AGENTE = 1_200
+TIEMPO_MAXIMO_SEGUNDOS = 30.0
+MAX_ALTERNATIVAS = 2
+
+#: Frases que prometen una aprobación; el auditor las rechaza.
+_PROMESAS = re.compile(
+    r"\b("
+    r"aprobad[oa]s?|aprobaci[oó]n|aprobamos|preaprobad[oa]|"
+    r"garantizad[oa]s?|garantizamos|"
+    r"te lo dan|te la dan|te lo aprueban|te la aprueban|"
+    r"sin problema|seguro que|definitiv[oa]"
+    r")\b",
+    re.IGNORECASE,
+)
+_NEGACIONES = ("no ", "nunca ", "ni ", "sin ", "ninguna ", "jamás ", "jamas ")
+_CODIGO = re.compile(r"\[([a-z0-9_]+)\]")
+_FECHA_ISO = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
+
+#: Números estructurales que no son cifras del caso (conteos y porcentajes).
+_CIFRAS_ESTRUCTURALES = frozenset({"0", "1", "2", "3", "10", "20", "30", "40", "100"})
+
+
+class PosturaAgente(BaseModel):
+    """Opinión estructurada de un rol del comité.
+
+    La postura es texto porque cada rol tiene su propio vocabulario: riesgo y
+    comercial usan `favorable`, `con_condiciones`, `desfavorable` o
+    `abstencion`; el auditor usa `conforme`, `objeta` o `abstencion`.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    agente: Literal["riesgo", "comercial", "auditor"]
+    postura: str = Field(min_length=1)
+    argumentos: list[str] = Field(default_factory=list, max_length=3)
+    evidencia: list[str] = Field(default_factory=list)
+
+
+class DeliberacionComite(BaseModel):
+    """Resultado de una ronda del comité y su síntesis determinista."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    posturas: list[PosturaAgente] = Field(min_length=3, max_length=3)
+    recomendacion: str = Field(min_length=1)
+    alternativas: list[str] = Field(default_factory=list, max_length=MAX_ALTERNATIVAS)
+    hallazgos_auditor: list[str] = Field(default_factory=list)
+    ofrece_asesor: bool
+
+
+class EscenarioComite(BaseModel):
+    """Escenario que el motor precalculó antes de llamar al modelo."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    codigo: Literal[
+        "plazo_mas_largo",
+        "monto_20_por_ciento_menos",
+        "compra_de_cartera",
+        "estres_de_ingreso",
+    ]
+    descripcion: str
+    cuota_mensual: RangoDecimal | None = None
+    semaforo: Literal["verde", "amarillo", "rojo"] | None = None
+    razon_endeudamiento: Decimal | None = None
+    margen_despues_cuota: Decimal | None = None
+
+
+@dataclass(frozen=True, slots=True)
+class LimitesComite:
+    """Límites de la deliberación: llamadas, tokens por agente y reloj total."""
+
+    max_llamadas: int = MAX_LLAMADAS
+    max_tokens_agente: int = MAX_TOKENS_AGENTE
+    tiempo_maximo_segundos: float = TIEMPO_MAXIMO_SEGUNDOS
+    max_alternativas: int = MAX_ALTERNATIVAS
+
+
+@dataclass(slots=True)
+class RegistroComite:
+    """Uso de cada llamada al modelo, para mostrar tokens y costo en la demo."""
+
+    llamadas: list[dict[str, Any]] = field(default_factory=list)
+
+    @property
+    def total_llamadas(self) -> int:
+        """Número de llamadas al modelo registradas, incluidas las fallidas."""
+        return len(self.llamadas)
+
+    def anotar(
+        self,
+        agente: str,
+        metricas: Mapping[str, Any] | None,
+        segundos: float,
+        error: str | None = None,
+    ) -> None:
+        """Guarda el uso y el tiempo de una llamada al modelo.
+
+        Args:
+            agente: rol que hizo la llamada.
+            metricas: uso devuelto por LangChain, en el formato de
+                `asistente.metricas.extraer_metricas`.
+            segundos: duración de la llamada.
+            error: mensaje si la llamada falló; vacío o `None` si fue bien.
+        """
+        self.llamadas.append(
+            {
+                "agente": agente,
+                "metricas": dict(metricas or {}),
+                "segundos": segundos,
+                "error": error or "",
+            }
+        )
+
+
+def cargar_limites(ruta: Path | None = None) -> LimitesComite:
+    """Lee los límites del comité de `config/diagnostico.toml`.
+
+    Args:
+        ruta: archivo TOML alternativo; por defecto `config/diagnostico.toml`.
+
+    Returns:
+        Los límites con los valores por defecto completados.
+
+    Raises:
+        FileNotFoundError: si el archivo no existe.
+    """
+    archivo = Path(ruta) if ruta is not None else RUTA_CONFIG
+    with archivo.open("rb") as fh:
+        datos = tomllib.load(fh)
+    seccion = dict(datos.get("comite", {}))
+    return LimitesComite(
+        max_llamadas=int(seccion.get("max_llamadas", MAX_LLAMADAS)),
+        max_tokens_agente=int(seccion.get("max_tokens_agente", MAX_TOKENS_AGENTE)),
+        tiempo_maximo_segundos=float(seccion.get("tiempo_maximo_segundos", TIEMPO_MAXIMO_SEGUNDOS)),
+        max_alternativas=int(seccion.get("max_alternativas", MAX_ALTERNATIVAS)),
+    )
+
+
+def deliberar(
+    entrada: EntradaDiagnostico,
+    resultado: ResultadoDiagnostico,
+    *,
+    modelo: BaseChatModel | None = None,
+    calcular: Callable[[EntradaDiagnostico], ResultadoDiagnostico] | None = None,
+    hoy: date | None = None,
+    raiz: Path | None = None,
+    limites: LimitesComite | None = None,
+    registro: RegistroComite | None = None,
+) -> DeliberacionComite | None:
+    """Convoca el comité para un diagnóstico amarillo o rojo con cuota.
+
+    En verde, en rojo por capacidad negativa (sin cuota) y en los productos que
+    no simulan crédito devuelve `None` sin llamar al modelo.
+
+    Args:
+        entrada: insumos del diagnóstico, ya validados.
+        resultado: resultado del motor; su semáforo no se modifica.
+        modelo: modelo de chat; por defecto se crea el DeepSeek del comité.
+        calcular: motor determinista para los escenarios; por defecto
+            `diagnostico.motor.calcular`.
+        hoy: fecha con la que se comprueba la vigencia de la tasa.
+        raiz: carpeta de tablas Gold alternativa.
+        limites: límites de llamadas, tokens y tiempo; por defecto el TOML.
+        registro: colector opcional de tokens y tiempos de cada llamada.
+
+    Returns:
+        La deliberación con las tres posturas, la recomendación, las
+        alternativas y los hallazgos del auditor; `None` si no hay comité.
+
+    Raises:
+        ValueError: si la entrada no coincide con la del resultado.
+    """
+    if resultado.semaforo not in {"amarillo", "rojo"}:
+        return None
+    if resultado.cuota_mensual is None:
+        return None
+    if entrada != resultado.entrada:
+        raise ValueError("la entrada no coincide con la del resultado del diagnóstico")
+
+    ajustes = limites if limites is not None else cargar_limites()
+    escenarios = construir_escenarios(
+        entrada,
+        resultado,
+        calcular=calcular,
+        hoy=hoy,
+        raiz=raiz,
+    )
+    if modelo is None:
+        modelo = crear_modelo(
+            temperatura=0.0,
+            max_tokens=ajustes.max_tokens_agente,
+            timeout=ajustes.tiempo_maximo_segundos,
+        )
+
+    presupuesto = _Presupuesto(ajustes.max_llamadas, ajustes.tiempo_maximo_segundos)
+    contexto = _contexto_del_caso(resultado, escenarios)
+    posturas = _ronda_inicial(modelo, contexto, ajustes, presupuesto, registro)
+    posturas["riesgo"] = _ajustar_riesgo_por_estres(posturas["riesgo"], escenarios)
+    posturas["auditor"] = _revisar(modelo, contexto, posturas, presupuesto, registro)
+
+    hallazgos = auditar(list(posturas.values()), resultado, escenarios)
+    if posturas["auditor"].postura == "objeta" or hallazgos:
+        hallazgos = _corregir(
+            modelo,
+            contexto,
+            posturas,
+            resultado,
+            escenarios,
+            ajustes,
+            presupuesto,
+            registro,
+            hallazgos,
+        )
+        observaciones = _hallazgos_del_auditor(posturas["auditor"])
+        if hallazgos:
+            return _respuesta_sin_comite(
+                posturas, resultado, _sin_repetir([*observaciones, *hallazgos])
+            )
+        hallazgos = _sin_repetir([*observaciones, *hallazgos])
+
+    alternativas = _elegir_alternativas(posturas["comercial"], escenarios, ajustes.max_alternativas)
+    return _sintetizar(posturas, resultado, alternativas, hallazgos, escenarios)
+
+
+def construir_escenarios(
+    entrada: EntradaDiagnostico,
+    resultado: ResultadoDiagnostico,
+    *,
+    calcular: Callable[[EntradaDiagnostico], ResultadoDiagnostico] | None = None,
+    hoy: date | None = None,
+    raiz: Path | None = None,
+    config: motor.ConfigDiagnostico | None = None,
+) -> list[EscenarioComite]:
+    """Precalcula con el motor los escenarios que verá el comité.
+
+    Son el siguiente plazo de la entrevista, un monto 20 % menor, la compra de
+    cartera si hay cuotas actuales y la prueba de estrés de ingreso (−10 % para
+    empleado o pensionado y −20 % para independiente) con la misma cuota.
+
+    Args:
+        entrada: insumos del diagnóstico original.
+        resultado: resultado del motor original.
+        calcular: motor determinista; por defecto `diagnostico.motor.calcular`.
+        hoy: fecha con la que se comprueba la vigencia de la tasa.
+        raiz: carpeta de tablas Gold alternativa.
+        config: configuración ya cargada de `config/diagnostico.toml`.
+
+    Returns:
+        Los escenarios que se pudieron calcular, en orden estable.
+
+    Raises:
+        ValueError: si el resultado no tiene una cuota simulada.
+    """
+    if resultado.cuota_mensual is None:
+        raise ValueError("el comité solo se convoca con una cuota simulada")
+    ajustes = config if config is not None else motor.cargar_config()
+    motor_calculo = calcular if calcular is not None else _motor_por_defecto(hoy, raiz)
+    escenarios: list[EscenarioComite] = []
+
+    if entrada.monto_credito is not None and entrada.plazo_meses is not None:
+        siguiente = _siguiente_plazo(entrada, ajustes)
+        if siguiente is not None:
+            otro = motor_calculo(entrada.model_copy(update={"plazo_meses": siguiente}))
+            escenarios.append(
+                _escenario(
+                    "plazo_mas_largo",
+                    f"Ampliar el plazo a {siguiente} meses",
+                    otro,
+                    resultado.cuota_mensual,
+                )
+            )
+
+        menor = (entrada.monto_credito * Decimal("0.8")).quantize(
+            Decimal(1), rounding=ROUND_HALF_UP
+        )
+        if menor >= ajustes.monto_minimo:
+            otro = motor_calculo(entrada.model_copy(update={"monto_credito": menor}))
+            escenarios.append(
+                _escenario(
+                    "monto_20_por_ciento_menos",
+                    f"Reducir el monto a {formatear_pesos(menor)} (20 % menos)",
+                    otro,
+                    resultado.cuota_mensual,
+                )
+            )
+
+    if entrada.cuotas_deudas > 0 and entrada.producto != "compra_cartera":
+        trasladar = entrada.cuota_trasladar or entrada.cuotas_deudas
+        otro = motor_calculo(
+            entrada.model_copy(
+                update={
+                    "producto": "compra_cartera",
+                    "cuota_trasladar": min(trasladar, entrada.cuotas_deudas),
+                }
+            )
+        )
+        escenarios.append(
+            _escenario(
+                "compra_de_cartera",
+                "Trasladar las cuotas actuales a una compra de cartera",
+                otro,
+                resultado.cuota_mensual,
+            )
+        )
+
+    factor = Decimal("0.8") if entrada.vinculacion == "independiente" else Decimal("0.9")
+    ingreso_estres = (entrada.ingreso_mensual * factor).quantize(Decimal(1), rounding=ROUND_HALF_UP)
+    otro = motor_calculo(entrada.model_copy(update={"ingreso_mensual": ingreso_estres}))
+    porcentaje = 20 if entrada.vinculacion == "independiente" else 10
+    escenarios.append(
+        _escenario(
+            "estres_de_ingreso",
+            f"Prueba de estrés: ingreso {porcentaje} % menor "
+            f"({formatear_pesos(ingreso_estres)}), misma cuota",
+            otro,
+            resultado.cuota_mensual,
+        )
+    )
+    return escenarios
+
+
+def auditar(
+    posturas: Sequence[PosturaAgente],
+    resultado: ResultadoDiagnostico,
+    escenarios: Sequence[EscenarioComite],
+    *,
+    recomendacion: str | None = None,
+) -> list[str]:
+    """Aplica la lista de chequeo del auditor de forma determinística.
+
+    Revisa cifras, promesas de aprobación, alternativas fuera de los escenarios,
+    complacencia frente a la postura de riesgo, datos personales y, cuando se
+    pasa la recomendación final, el aviso orientativo.
+
+    Args:
+        posturas: opiniones de los tres agentes.
+        resultado: resultado del motor que sostiene las cifras.
+        escenarios: escenarios precalculados.
+        recomendacion: texto final, si ya se sintetizó.
+
+    Returns:
+        Los hallazgos en español; una lista vacía significa que el auditor no
+        objeta.
+    """
+    hallazgos: list[str] = []
+    permitidas = _cifras_permitidas(resultado, escenarios)
+    productos = _productos_permitidos(resultado, escenarios)
+
+    for postura in posturas:
+        if postura.agente == "auditor":
+            continue
+        texto = _texto_de(postura)
+        for cifra in sorted(cifras_duras(texto)):
+            if cifra not in permitidas:
+                hallazgos.append(f"Cifra no presente en la entrada: {cifra}")
+        for frase in _promesas(texto):
+            hallazgos.append(f"Promesa de aprobación: «{frase}»")
+        for codigo in _CODIGO.findall(texto.casefold()):
+            if codigo not in CODIGOS_ESCENARIO:
+                hallazgos.append(f"Alternativa fuera de los escenarios: [{codigo}]")
+        for producto in _productos_mencionados(texto):
+            if producto not in productos:
+                hallazgos.append(f"Producto fuera de los escenarios: {producto}")
+        if detectar_pii(texto) is not None:
+            hallazgos.append(f"Datos personales en la postura de {postura.agente}")
+
+    riesgo = _buscar_postura(posturas, "riesgo")
+    comercial = _buscar_postura(posturas, "comercial")
+    if (
+        riesgo is not None
+        and comercial is not None
+        and riesgo.postura in ORDEN_POSTURA
+        and comercial.postura in ORDEN_POSTURA
+        and _orden(comercial.postura) > _orden(riesgo.postura)
+    ):
+        hallazgos.append("La postura del comercial es más favorable que la de riesgo.")
+
+    if recomendacion is not None:
+        etiqueta = _etiqueta_recomendacion(recomendacion)
+        if (
+            riesgo is not None
+            and etiqueta in {"apto", "apto_con_condiciones"}
+            and _orden(riesgo.postura) < ORDEN_POSTURA["favorable"]
+        ):
+            hallazgos.append("La recomendación es más favorable que la postura de riesgo.")
+        if resultado.aviso not in recomendacion:
+            hallazgos.append("Falta el aviso orientativo.")
+        if detectar_pii(recomendacion) is not None:
+            hallazgos.append("Datos personales en la recomendación.")
+
+    return _sin_repetir(hallazgos)
+
+
+def _siguiente_plazo(entrada: EntradaDiagnostico, config: motor.ConfigDiagnostico) -> int | None:
+    """Busca el siguiente plazo de la entrevista para el producto.
+
+    Args:
+        entrada: insumos con el plazo actual.
+        config: configuración con los valores de cada opción.
+
+    Returns:
+        El plazo inmediatamente mayor, o `None` si ya está en el máximo.
+    """
+    if entrada.plazo_meses is None:
+        return None
+    opciones = [
+        int(valor)
+        for ident, valor in config.valores.items()
+        if ident.startswith("plazo.")
+        and entrada.producto in config.aplica_a.get(ident, ())
+        and valor > entrada.plazo_meses
+    ]
+    return min(opciones) if opciones else None
+
+
+def _motor_por_defecto(
+    hoy: date | None, raiz: Path | None
+) -> Callable[[EntradaDiagnostico], ResultadoDiagnostico]:
+    """Envuelve el motor real con la fecha y la raíz pedidas.
+
+    Args:
+        hoy: fecha de contraste de la vigencia.
+        raiz: carpeta de tablas Gold alternativa.
+
+    Returns:
+        Una función que calcula un diagnóstico completo.
+    """
+
+    def calcular(entrada: EntradaDiagnostico) -> ResultadoDiagnostico:
+        """Calcula el diagnóstico con el motor real y la fecha fijada."""
+        return motor.calcular(entrada, hoy=hoy, raiz=raiz)
+
+    return calcular
+
+
+def _escenario(
+    codigo: Literal[
+        "plazo_mas_largo",
+        "monto_20_por_ciento_menos",
+        "compra_de_cartera",
+        "estres_de_ingreso",
+    ],
+    descripcion: str,
+    otro: ResultadoDiagnostico,
+    cuota_original: RangoDecimal,
+) -> EscenarioComite:
+    """Arma un escenario con la cuota, el semáforo y el margen recalculados.
+
+    Cuando el motor no simula (por ejemplo, si el estrés deja la capacidad
+    negativa), se conserva la cuota original y se calcula el margen con ella:
+    así la prueba sigue mostrando el impacto del ingreso estresado.
+
+    Args:
+        codigo: código del escenario.
+        descripcion: texto determinístico con los datos del escenario.
+        otro: resultado del motor para el escenario.
+        cuota_original: cuota del diagnóstico original.
+
+    Returns:
+        El escenario listo para el modelo y para el auditor.
+    """
+    cuota = otro.cuota_mensual or cuota_original
+    margen = otro.margen_despues_cuota
+    if margen is None:
+        margen = (otro.capacidad_pago - cuota.hasta).quantize(Decimal(1), rounding=ROUND_HALF_UP)
+    razon = otro.razon_endeudamiento or _razon_de(otro, cuota)
+    detalle = f"cuota de {formatear_rango(cuota)}"
+    if otro.semaforo is not None:
+        detalle += f" y semáforo {otro.semaforo}"
+    return EscenarioComite(
+        codigo=codigo,
+        descripcion=f"{descripcion}: {detalle}.",
+        cuota_mensual=cuota,
+        semaforo=otro.semaforo,
+        razon_endeudamiento=razon,
+        margen_despues_cuota=margen,
+    )
+
+
+def _razon_de(otro: ResultadoDiagnostico, cuota: RangoDecimal) -> Decimal | None:
+    """Calcula la razón de endeudamiento cuando el motor no la pudo dar.
+
+    Args:
+        otro: resultado del escenario.
+        cuota: cuota usada para la comparación.
+
+    Returns:
+        La razón redondeada a cuatro decimales, o `None` si el ingreso es cero.
+    """
+    ingreso = otro.entrada.ingreso_mensual
+    if ingreso <= 0:
+        return None
+    numerador = otro.entrada.cuotas_deudas + cuota.hasta - (otro.entrada.cuota_trasladar or 0)
+    if numerador < 0:
+        return None
+    return (numerador / ingreso).quantize(Decimal("0.0001"), rounding=ROUND_HALF_UP)
+
+
+def _contexto_del_caso(
+    resultado: ResultadoDiagnostico, escenarios: Sequence[EscenarioComite]
+) -> dict[str, Any]:
+    """Arma el JSON que reciben los agentes, sin nombre ni número.
+
+    Args:
+        resultado: diagnóstico completo del motor.
+        escenarios: escenarios precalculados.
+
+    Returns:
+        El caso con el diagnóstico y los escenarios en formato JSON.
+    """
+    return {
+        "diagnostico": resultado.model_dump(mode="json"),
+        "escenarios": [escenario.model_dump(mode="json") for escenario in escenarios],
+    }
+
+
+@dataclass(slots=True)
+class _Presupuesto:
+    """Controla las llamadas y el reloj total de la deliberación."""
+
+    maximo: int
+    tiempo_maximo: float
+    inicio: float = field(default_factory=time.monotonic)
+    usadas: int = 0
+    _candado: threading.Lock = field(default_factory=threading.Lock, repr=False)
+
+    def restante(self) -> float:
+        """Segundos que quedan del reloj total."""
+        return max(0.0, self.tiempo_maximo - (time.monotonic() - self.inicio))
+
+    def consumir(self) -> bool:
+        """Reserva una llamada si quedan presupuesto y tiempo."""
+        with self._candado:
+            if self.usadas >= self.maximo or self.restante() <= 0:
+                return False
+            self.usadas += 1
+            return True
+
+
+def _ronda_inicial(
+    modelo: BaseChatModel,
+    contexto: Mapping[str, Any],
+    limites: LimitesComite,
+    presupuesto: _Presupuesto,
+    registro: RegistroComite | None,
+) -> dict[str, PosturaAgente]:
+    """Hace las llamadas de riesgo y comercial, en paralelo.
+
+    El auditor no corre aquí: necesita las dos posturas para revisarlas y se
+    convoca después (`_revisar`). Un rol que falla, agota su tiempo o devuelve
+    un esquema inválido queda como `abstencion`; no se repite la llamada ni se
+    abre una segunda ronda.
+
+    Args:
+        modelo: modelo de chat con salida estructurada.
+        contexto: diagnóstico y escenarios del caso.
+        limites: límites de la deliberación.
+        presupuesto: control de llamadas y tiempo.
+        registro: colector opcional de uso.
+
+    Returns:
+        La postura de riesgo y la de comercial.
+    """
+    posturas: dict[str, PosturaAgente] = {}
+    ejecutor = ThreadPoolExecutor(max_workers=len(ROLES_INICIALES), thread_name_prefix="comite")
+    futuros: dict[Future[PosturaAgente], str] = {
+        ejecutor.submit(
+            _consultar,
+            modelo,
+            rol,
+            contexto,
+            presupuesto=presupuesto,
+            registro=registro,
+        ): rol
+        for rol in ROLES_INICIALES
+    }
+    try:
+        for futuro in as_completed(futuros, timeout=limites.tiempo_maximo_segundos):
+            rol = futuros[futuro]
+            try:
+                posturas[rol] = futuro.result()
+            except Exception as exc:  # noqa: BLE001 - el rol queda en abstención
+                posturas[rol] = _abstencion(rol, f"Fallo del agente: {exc}")
+    except TimeoutError:
+        pass
+    finally:
+        ejecutor.shutdown(wait=False, cancel_futures=True)
+    for rol in ROLES_INICIALES:
+        posturas.setdefault(rol, _abstencion(rol, "El comité agotó el tiempo."))
+    return posturas
+
+
+def _revisar(
+    modelo: BaseChatModel,
+    contexto: Mapping[str, Any],
+    posturas: Mapping[str, PosturaAgente],
+    presupuesto: _Presupuesto,
+    registro: RegistroComite | None,
+) -> PosturaAgente:
+    """Llama al auditor después de riesgo y comercial, con sus dos posturas.
+
+    Args:
+        modelo: modelo de chat.
+        contexto: diagnóstico y escenarios.
+        posturas: posturas de riesgo y comercial.
+        presupuesto: control de llamadas y tiempo.
+        registro: colector opcional de uso.
+
+    Returns:
+        La postura del auditor; una abstención si no hubo llamada o falló.
+    """
+    return _consultar(
+        modelo,
+        "auditor",
+        contexto,
+        revision=[posturas["riesgo"], posturas["comercial"]],
+        presupuesto=presupuesto,
+        registro=registro,
+    )
+
+
+def _corregir(
+    modelo: BaseChatModel,
+    contexto: Mapping[str, Any],
+    posturas: dict[str, PosturaAgente],
+    resultado: ResultadoDiagnostico,
+    escenarios: Sequence[EscenarioComite],
+    limites: LimitesComite,
+    presupuesto: _Presupuesto,
+    registro: RegistroComite | None,
+    hallazgos: Sequence[str],
+) -> list[str]:
+    """Hace la única corrección del comercial con los hallazgos del auditor.
+
+    Args:
+        modelo: modelo de chat.
+        contexto: diagnóstico y escenarios.
+        posturas: posturas de la ronda; se reemplaza la del comercial.
+        resultado: resultado del motor.
+        escenarios: escenarios precalculados.
+        limites: límites de la deliberación.
+        presupuesto: control de llamadas y tiempo.
+        registro: colector opcional de uso.
+        hallazgos: hallazgos que motivan la corrección.
+
+    Returns:
+        Los hallazgos que quedan después de la corrección.
+    """
+    correccion = _consultar(
+        modelo,
+        "comercial",
+        contexto,
+        hallazgos=list(hallazgos),
+        presupuesto=presupuesto,
+        registro=registro,
+    )
+    posturas["comercial"] = correccion
+    return auditar(list(posturas.values()), resultado, escenarios)
+
+
+def _consultar(
+    modelo: BaseChatModel,
+    rol: str,
+    contexto: Mapping[str, Any],
+    *,
+    hallazgos: Sequence[str] | None = None,
+    revision: Sequence[PosturaAgente] | None = None,
+    presupuesto: _Presupuesto,
+    registro: RegistroComite | None,
+) -> PosturaAgente:
+    """Llama a un agente con salida estructurada y normaliza su postura.
+
+    Args:
+        modelo: modelo de chat.
+        rol: `riesgo`, `comercial` o `auditor`.
+        contexto: diagnóstico y escenarios.
+        hallazgos: hallazgos del auditor para la corrección, si hay.
+        revision: posturas que el auditor debe revisar, si las hay.
+        presupuesto: control de llamadas y tiempo.
+        registro: colector opcional de uso.
+
+    Returns:
+        La postura validada, o una abstención si no hubo llamada o falló.
+    """
+    if not presupuesto.consumir():
+        return _abstencion(rol, "El comité agotó las llamadas o el tiempo.")
+
+    prompt = cargar_prompt(f"comite_{rol}")
+    sistema = prompt.sistema
+    if prompt.recordatorio:
+        sistema = f"{sistema}\n\n{prompt.recordatorio}"
+    humano = _mensaje_humano(contexto, hallazgos, revision)
+    mensajes = [SystemMessage(content=sistema), HumanMessage(content=humano)]
+
+    inicio = time.monotonic()
+    metricas: Mapping[str, Any] | None = None
+    try:
+        runnable = modelo.with_structured_output(PosturaAgente, include_raw=True)
+        salida = runnable.invoke(mensajes)
+    except Exception as exc:  # noqa: BLE001 - el rol queda en abstención
+        segundos = time.monotonic() - inicio
+        if registro is not None:
+            registro.anotar(rol, metricas, segundos, str(exc))
+        return _abstencion(rol, f"Fallo del agente {rol}: {exc}")
+
+    segundos = time.monotonic() - inicio
+    postura, metricas, error = _leer_salida(salida)
+    if registro is not None:
+        registro.anotar(rol, metricas, segundos, error)
+    if postura is None:
+        return _abstencion(rol, error or f"El agente {rol} no devolvió una postura válida.")
+    return _normalizar(postura, rol)
+
+
+def _leer_salida(
+    salida: Any,
+) -> tuple[PosturaAgente | None, Mapping[str, Any] | None, str | None]:
+    """Extrae la postura y las métricas de la salida estructurada.
+
+    Args:
+        salida: resultado del runnable, con o sin `include_raw`.
+
+    Returns:
+        La postura, las métricas del mensaje crudo y el error de validación.
+    """
+    metricas: Mapping[str, Any] | None = None
+    error: str | None = None
+    if isinstance(salida, dict) and "parsed" in salida:
+        crudo = salida.get("raw")
+        if isinstance(crudo, BaseMessage):
+            metricas = extraer_metricas(crudo)
+        fallo = salida.get("parsing_error")
+        if fallo is not None:
+            error = str(fallo)
+        salida = salida.get("parsed")
+    if salida is None:
+        return None, metricas, error
+    try:
+        postura = (
+            salida if isinstance(salida, PosturaAgente) else PosturaAgente.model_validate(salida)
+        )
+    except ValidationError as exc:
+        return None, metricas, str(exc)
+    return postura, metricas, error
+
+
+def _mensaje_humano(
+    contexto: Mapping[str, Any],
+    hallazgos: Sequence[str] | None,
+    revision: Sequence[PosturaAgente] | None = None,
+) -> str:
+    """Arma el mensaje con el caso, las posturas a revisar y los hallazgos.
+
+    Args:
+        contexto: diagnóstico y escenarios.
+        hallazgos: hallazgos del auditor.
+        revision: posturas de riesgo y comercial que revisa el auditor.
+
+    Returns:
+        El texto que recibe el agente.
+    """
+    partes = [
+        "Datos del caso (solo cifras calculadas; no hay datos personales):",
+        json.dumps(contexto, ensure_ascii=False, indent=2, default=str),
+    ]
+    if revision:
+        partes.append("\nPosturas a revisar:")
+        for postura in revision:
+            partes.append(f"- {postura.agente}: {postura.postura}")
+            partes.extend(f"  - {argumento}" for argumento in postura.argumentos)
+            if postura.evidencia:
+                partes.append(f"  - Evidencia: {', '.join(postura.evidencia)}")
+    if hallazgos:
+        partes.append(
+            "\nEl auditor objetó con estos hallazgos; corrige tu postura y no repitas el error:"
+        )
+        partes.extend(f"- {hallazgo}" for hallazgo in hallazgos)
+    partes.append(
+        "\nResponde solo con el esquema PosturaAgente y usa únicamente las "
+        "cifras y los escenarios anteriores."
+    )
+    return "\n".join(partes)
+
+
+def _abstencion(rol: str, motivo: str) -> PosturaAgente:
+    """Construye una postura de abstención para un rol que no respondió.
+
+    Args:
+        rol: rol del comité.
+        motivo: explicación breve.
+
+    Returns:
+        La postura con `abstencion` y el motivo como argumento.
+    """
+    agente: Literal["riesgo", "comercial", "auditor"] = "riesgo"
+    if rol == "comercial":
+        agente = "comercial"
+    elif rol == "auditor":
+        agente = "auditor"
+    return PosturaAgente(
+        agente=agente,
+        postura="abstencion",
+        argumentos=[motivo[:300]],
+        evidencia=[],
+    )
+
+
+def _normalizar(postura: PosturaAgente, rol: str) -> PosturaAgente:
+    """Valida que la postura pertenezca al rol y la deja en abstención si no.
+
+    Args:
+        postura: salida del modelo.
+        rol: rol esperado.
+
+    Returns:
+        La postura validada o una abstención.
+    """
+    if postura.agente != rol:
+        return _abstencion(rol, f"El agente respondió como «{postura.agente}».")
+    validas = POSTURAS_AUDITOR if rol == "auditor" else POSTURAS_RIESGO
+    if postura.postura not in validas:
+        return _abstencion(rol, f"Postura no reconocida: «{postura.postura}».")
+    return postura
+
+
+def _ajustar_riesgo_por_estres(
+    postura: PosturaAgente, escenarios: Sequence[EscenarioComite]
+) -> PosturaAgente:
+    """Impide una postura de riesgo favorable si el estrés aprieta el margen.
+
+    Si con el ingreso estresado el margen se vuelve negativo o el semáforo pasa
+    a rojo, riesgo no puede quedar en `favorable`: se baja a `con_condiciones`.
+
+    Args:
+        postura: postura del agente de riesgo.
+        escenarios: escenarios precalculados.
+
+    Returns:
+        La misma postura, ajustada si el estrés lo exige.
+    """
+    if postura.postura != "favorable":
+        return postura
+    estres = next(
+        (escenario for escenario in escenarios if escenario.codigo == "estres_de_ingreso"),
+        None,
+    )
+    if estres is None:
+        return postura
+    if estres.semaforo != "rojo" and (estres.margen_despues_cuota or 0) >= 0:
+        return postura
+    argumentos = list(postura.argumentos)
+    detalle = "La prueba de estrés de ingreso no deja margen suficiente."
+    if len(argumentos) < 3:
+        argumentos.append(detalle)
+    return postura.model_copy(update={"postura": "con_condiciones", "argumentos": argumentos})
+
+
+def _elegir_alternativas(
+    comercial: PosturaAgente, escenarios: Sequence[EscenarioComite], maximo: int
+) -> list[str]:
+    """Elige hasta dos alternativas, solo de los escenarios precalculados.
+
+    Primero respeta los códigos que propuso el comercial; si faltan, completa
+    con los escenarios que mejoran el semáforo y la razón de endeudamiento.
+
+    Args:
+        comercial: postura del agente comercial.
+        escenarios: escenarios precalculados.
+        maximo: número máximo de alternativas.
+
+    Returns:
+        Las descripciones de las alternativas elegidas.
+    """
+    disponibles: dict[str, EscenarioComite] = {
+        escenario.codigo: escenario
+        for escenario in escenarios
+        if escenario.codigo in CODIGOS_ALTERNATIVA
+    }
+    elegidos: list[str] = []
+    for codigo in _CODIGO.findall(_texto_de(comercial).casefold()):
+        if codigo in disponibles and codigo not in elegidos:
+            elegidos.append(codigo)
+        if len(elegidos) >= maximo:
+            break
+
+    orden = {codigo: posicion for posicion, codigo in enumerate(CODIGOS_ALTERNATIVA)}
+    resto = sorted(
+        (codigo for codigo in disponibles if codigo not in elegidos),
+        key=lambda codigo: (
+            _orden_semaforo(disponibles[codigo].semaforo),
+            disponibles[codigo].razon_endeudamiento
+            if disponibles[codigo].razon_endeudamiento is not None
+            else Decimal(99),
+            orden[codigo],
+        ),
+    )
+    elegidos.extend(resto[: max(0, maximo - len(elegidos))])
+    return [disponibles[codigo].descripcion for codigo in elegidos]
+
+
+def _sintetizar(
+    posturas: Mapping[str, PosturaAgente],
+    resultado: ResultadoDiagnostico,
+    alternativas: Sequence[str],
+    hallazgos: Sequence[str],
+    escenarios: Sequence[EscenarioComite],
+) -> DeliberacionComite:
+    """Aplica las reglas determinísticas de síntesis de `docs/COMITE.md`.
+
+    Args:
+        posturas: posturas de los tres roles.
+        resultado: resultado del motor; su semáforo no cambia.
+        alternativas: descripciones elegidas de los escenarios.
+        hallazgos: hallazgos finales del auditor.
+        escenarios: escenarios precalculados, para citar el estrés.
+
+    Returns:
+        La deliberación con la recomendación y la oferta de asesor.
+    """
+    riesgo = posturas["riesgo"]
+    comercial = posturas["comercial"]
+    auditor = posturas["auditor"]
+    etiqueta = _etiqueta(riesgo, comercial)
+    ofrece = resultado.semaforo == "rojo" or etiqueta == "requiere_asesor"
+
+    lineas = [
+        f"{etiqueta}: recomendación del comité de crédito. Es una opinión del "
+        "comité y no una aprobación; la decisión final corresponde a un asesor "
+        "humano del banco.",
+        f"Semáforo del motor: {resultado.semaforo} (no cambia).",
+        _linea_postura(riesgo),
+        _linea_postura(comercial),
+        _linea_postura(auditor),
+    ]
+    if alternativas:
+        lineas.append("Alternativas: " + " | ".join(alternativas))
+    estres = next(
+        (escenario for escenario in escenarios if escenario.codigo == "estres_de_ingreso"),
+        None,
+    )
+    if estres is not None and estres.margen_despues_cuota is not None:
+        lineas.append(
+            f"Estrés de ingreso: margen de {formatear_pesos(estres.margen_despues_cuota)}."
+        )
+    if ofrece:
+        lineas.append("Puedes hablar con un asesor para revisar tu caso.")
+    lineas.append(resultado.aviso)
+
+    return DeliberacionComite(
+        posturas=[riesgo, comercial, auditor],
+        recomendacion="\n".join(lineas),
+        alternativas=list(alternativas)[:MAX_ALTERNATIVAS],
+        hallazgos_auditor=list(hallazgos),
+        ofrece_asesor=ofrece,
+    )
+
+
+def _etiqueta(riesgo: PosturaAgente, comercial: PosturaAgente) -> str:
+    """Elige la recomendación con la postura más prudente.
+
+    Args:
+        riesgo: postura del agente de riesgo.
+        comercial: postura del agente comercial.
+
+    Returns:
+        `requiere_asesor`, `no_apto`, `apto_con_condiciones` o `apto`.
+    """
+    if "abstencion" in {riesgo.postura, comercial.postura}:
+        return "requiere_asesor"
+    if "desfavorable" in {riesgo.postura, comercial.postura}:
+        return "no_apto"
+    if "con_condiciones" in {riesgo.postura, comercial.postura}:
+        return "apto_con_condiciones"
+    return "apto"
+
+
+def _linea_postura(postura: PosturaAgente) -> str:
+    """Escribe la postura de un agente en una línea.
+
+    Args:
+        postura: opinión del agente.
+
+    Returns:
+        Texto con el rol, la postura y su primer argumento.
+    """
+    detalle = f" — {postura.argumentos[0]}" if postura.argumentos else ""
+    return f"{postura.agente.capitalize()}: {postura.postura}{detalle}"
+
+
+def _respuesta_sin_comite(
+    posturas: Mapping[str, PosturaAgente],
+    resultado: ResultadoDiagnostico,
+    hallazgos: Sequence[str],
+) -> DeliberacionComite:
+    """Responde con el texto determinístico del diagnóstico, sin comité.
+
+    Es la salida cuando el auditor vuelve a objetar después de la única
+    corrección permitida.
+
+    Args:
+        posturas: posturas de los tres roles.
+        resultado: resultado del motor.
+        hallazgos: hallazgos que impiden confiar en la deliberación.
+
+    Returns:
+        La deliberación con la recomendación directa del diagnóstico.
+    """
+    lineas = [
+        "El comité no logró una deliberación conforme; te damos el resultado "
+        "directo del diagnóstico.",
+        f"Semáforo: {resultado.semaforo}.",
+        *resultado.motivos,
+        *resultado.recomendaciones,
+    ]
+    if resultado.semaforo == "rojo":
+        lineas.append("Puedes hablar con un asesor para revisar tu caso.")
+    lineas.append(resultado.aviso)
+    return DeliberacionComite(
+        posturas=[posturas[rol] for rol in ROLES],
+        recomendacion="\n".join(lineas),
+        alternativas=[],
+        hallazgos_auditor=list(hallazgos),
+        ofrece_asesor=resultado.semaforo == "rojo",
+    )
+
+
+def _cifras_permitidas(
+    resultado: ResultadoDiagnostico, escenarios: Sequence[EscenarioComite]
+) -> set[str]:
+    """Construye el conjunto de cifras que el caso autoriza citar.
+
+    Args:
+        resultado: resultado del motor.
+        escenarios: escenarios precalculados.
+
+    Returns:
+        Cifras normalizadas (solo dígitos) que aparecen en la entrada.
+    """
+    textos = [resultado.model_dump_json()]
+    textos.extend(escenario.model_dump_json() for escenario in escenarios)
+    permitidas = cifras_duras("\n".join(textos))
+    permitidas.update(_CIFRAS_ESTRUCTURALES)
+    for fecha in _FECHA_ISO.findall("\n".join(textos)):
+        permitidas.update({str(int(parte)) for parte in fecha})
+    for valor in _decimales(resultado.model_dump(mode="json")):
+        for cifra in (valor, valor * 100):
+            permitidas.add(normalizar_cifra(_formatear_decimal(cifra)))
+    for escenario in escenarios:
+        for valor in _decimales(escenario.model_dump(mode="json")):
+            for cifra in (valor, valor * 100):
+                permitidas.add(normalizar_cifra(_formatear_decimal(cifra)))
+    return {cifra for cifra in permitidas if cifra}
+
+
+def _decimales(valor: Any) -> Iterator[Decimal]:
+    """Recorre un JSON y devuelve los números como `Decimal`.
+
+    Args:
+        valor: dato del `model_dump`.
+
+    Yields:
+        Cada número encontrado; los textos se ignoran.
+    """
+    if isinstance(valor, Mapping):
+        for item in valor.values():
+            yield from _decimales(item)
+    elif isinstance(valor, (list, tuple)):
+        for item in valor:
+            yield from _decimales(item)
+    elif isinstance(valor, bool) or valor is None:
+        return
+    elif isinstance(valor, (int, float, Decimal)):
+        yield Decimal(str(valor))
+
+
+def _productos_permitidos(
+    resultado: ResultadoDiagnostico, escenarios: Sequence[EscenarioComite]
+) -> frozenset[str]:
+    """Nombres de producto que el caso autoriza mencionar.
+
+    Args:
+        resultado: resultado del motor.
+        escenarios: escenarios precalculados.
+
+    Returns:
+        Nombres en minúsculas del producto actual y de la compra de cartera si
+        es un escenario.
+    """
+    claves = {resultado.entrada.producto}
+    if any(escenario.codigo == "compra_de_cartera" for escenario in escenarios):
+        claves.add("compra_cartera")
+    return frozenset(NOMBRES_PRODUCTO.get(clave, clave).casefold() for clave in claves)
+
+
+def _productos_mencionados(texto: str) -> Iterator[str]:
+    """Busca nombres de producto del Tablero dentro de un texto.
+
+    Args:
+        texto: argumentos y evidencias de un agente.
+
+    Yields:
+        Cada nombre de producto encontrado, en minúsculas y sin repetir.
+    """
+    minusculas = texto.casefold()
+    for nombre in NOMBRES_PRODUCTO.values():
+        if nombre.casefold() in minusculas:
+            yield nombre.casefold()
+
+
+def _promesas(texto: str) -> Iterator[str]:
+    """Encuentra frases de promesa que no estén negadas.
+
+    Args:
+        texto: argumentos y evidencias de un agente.
+
+    Yields:
+        Cada frase de promesa encontrada.
+    """
+    for coincidencia in _PROMESAS.finditer(texto):
+        previo = texto[max(0, coincidencia.start() - 25) : coincidencia.start()].casefold()
+        if any(negacion in previo for negacion in _NEGACIONES):
+            continue
+        yield coincidencia.group(0)
+
+
+def _buscar_postura(posturas: Sequence[PosturaAgente], rol: str) -> PosturaAgente | None:
+    """Busca la postura de un rol concreto.
+
+    Args:
+        posturas: opiniones del comité.
+        rol: rol buscado.
+
+    Returns:
+        La postura o `None` si no está.
+    """
+    return next((postura for postura in posturas if postura.agente == rol), None)
+
+
+def _hallazgos_del_auditor(auditor: PosturaAgente) -> list[str]:
+    """Recoge los hallazgos que dejó el agente auditor en su postura.
+
+    Args:
+        auditor: postura del agente auditor.
+
+    Returns:
+        Sus argumentos si objeta; una lista vacía en cualquier otro caso.
+    """
+    if auditor.postura != "objeta":
+        return []
+    return [argumento for argumento in auditor.argumentos if argumento.strip()]
+
+
+def _orden(postura: str) -> int:
+    """Traduce una postura a su orden de prudencia.
+
+    Args:
+        postura: texto de la postura.
+
+    Returns:
+        `0` para desfavorable, `1` para con condiciones, `2` para favorable y
+        `-1` para abstención o valores desconocidos.
+    """
+    return ORDEN_POSTURA.get(postura, -1)
+
+
+def _orden_semaforo(semaforo: str | None) -> int:
+    """Ordena los semáforos de mejor a peor.
+
+    Args:
+        semaforo: color del escenario.
+
+    Returns:
+        `0` para verde, `1` para amarillo, `2` para rojo y `3` para sin dato.
+    """
+    return {"verde": 0, "amarillo": 1, "rojo": 2}.get(semaforo or "", 3)
+
+
+def _texto_de(postura: PosturaAgente) -> str:
+    """Junta argumentos y evidencias de una postura.
+
+    Args:
+        postura: opinión del agente.
+
+    Returns:
+        El texto revisado por el auditor.
+    """
+    return "\n".join([*postura.argumentos, *postura.evidencia])
+
+
+def _etiqueta_recomendacion(recomendacion: str) -> str:
+    """Lee la etiqueta inicial de una recomendación.
+
+    Args:
+        recomendacion: texto de la síntesis.
+
+    Returns:
+        La etiqueta antes de los dos puntos, o el texto entero si no hay.
+    """
+    return recomendacion.split(":", 1)[0].strip().casefold()
+
+
+def _sin_repetir(hallazgos: Sequence[str]) -> list[str]:
+    """Quita hallazgos repetidos conservando el orden.
+
+    Args:
+        hallazgos: lista original.
+
+    Returns:
+        La lista sin repetidos.
+    """
+    vistos: set[str] = set()
+    unicos: list[str] = []
+    for hallazgo in hallazgos:
+        if hallazgo not in vistos:
+            vistos.add(hallazgo)
+            unicos.append(hallazgo)
+    return unicos
+
+
+def _formatear_decimal(valor: Decimal) -> str:
+    """Formatea un decimal sin notación científica para los mensajes.
+
+    Args:
+        valor: número decimal.
+
+    Returns:
+        El texto del número.
+    """
+    try:
+        return f"{valor.normalize():f}"
+    except InvalidOperation:
+        return str(valor)

@@ -30,6 +30,16 @@ vivienda_primera_cuota = 0.40
 monto_minimo = 500000
 monto_maximo = 2000000000
 
+# Límites del comité de crédito (docs/COMITE.md). La deliberación hace una sola
+# ronda de tres agentes y, si el auditor objeta, una única corrección: nunca
+# más de cuatro llamadas al modelo. `max_tokens_agente` es el tope de cada
+# respuesta y `tiempo_maximo_segundos` el reloj total de la deliberación.
+[comite]
+max_llamadas = 4
+max_tokens_agente = 1200
+tiempo_maximo_segundos = 30
+max_alternativas = 2
+
 [productos]
 libre_inversion = "Libre inversión"
 compra_cartera = "Compra de cartera"
