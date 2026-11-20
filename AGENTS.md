@@ -75,10 +75,21 @@ Viven en `.opencode/skills/` y se cargan bajo demanda:
 | `corpus-extraction` | Captura, regeneración y diagnóstico del pipeline (Bronze/Silver/Gold) |
 | `semantic-extraction` | Convertir Gold en entidades/hechos/relaciones con cita y validación |
 | `boveda-rag` | Operar, medir y diagnosticar la Bóveda RAG (fragmentos, Chroma y Ollama) |
+| `polanco-standard-auditor` | Auditar el repo contra el estándar Python + IA de Jan Polanco y proponer un roadmap no destructivo (vendor; fuera de `ruff`) |
 
 Úsalas antes de tocar el pipeline o la capa Knowledge; no dupliques sus reglas
-aquí. Se pueden mencionar como `@corpus-extraction`, `@semantic-extraction` y
-`@boveda-rag`.
+aquí. Se pueden mencionar como `@corpus-extraction`, `@semantic-extraction`,
+`@boveda-rag` y `@polanco-standard-auditor`.
+
+`polanco-standard-auditor` es código de terceros en `.opencode/skills/` y está
+excluida del lint en `pyproject.toml` (`extend-exclude`): no se reformatea con
+`make fmt`. Su evaluador es stdlib puro y se ejecuta con
+`uv run python .opencode/skills/polanco-standard-auditor/scripts/evaluate_polanco_standard.py .`
+
+Origen: `github.com/stiwardprieto/stiward-prieto-skills` (MIT, ver
+`.opencode/skills/polanco-standard-auditor/LICENSE`), commit `8610f0b`. Para
+actualizarla, copiar la carpeta completa: no es un solo `SKILL.md`, también
+trae `references/` y `scripts/`.
 
 ## Herramientas del agente (MCP)
 
