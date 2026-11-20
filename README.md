@@ -518,79 +518,196 @@ cliente.
 
 ## Canal de WhatsApp
 
-La Sucursal también atiende por WhatsApp Cloud API, con webhook propio en el
-mismo FastAPI (Vía 2, sin N8N). El canal valida la firma de Meta, identifica al
-usuario con una huella HMAC de su número, pide consentimiento de la Ley 1581,
-entrega el turno al grafo existente y responde por el enviador real o falso.
+La Sucursal atiende por WhatsApp Cloud API con webhook propio en el mismo
+FastAPI (Vía 2, sin N8N). El canal:
 
-La guía completa, con Meta paso a paso, está en
-[`docs/OPERACION_WHATSAPP.md`](docs/OPERACION_WHATSAPP.md).
+1. Verifica la firma `X-Hub-Signature-256` de Meta.
+2. Deduplica por `id_mensaje` y responde 200 de inmediato.
+3. Convierte el número en `usuario_id = HMAC-SHA256(número, sal)`.
+4. Exige el consentimiento de la Ley 1581 antes de invocar el grafo.
+5. Entrega el turno al grafo con `thread_id = wa:<usuario_id>`.
+6. Envía la respuesta con el enviador real (`graph.facebook.com`) o el falso.
 
-### Levantarlo en tres ventanas
+Guía detallada y diagnóstico: [`docs/OPERACION_WHATSAPP.md`](docs/OPERACION_WHATSAPP.md).
 
-**Ventana 1 — la app** (desde la raíz del repositorio):
+### 1. Requisitos previos
+
+- Cuenta de Facebook con correo y teléfono verificados y 2FA.
+- App de Meta tipo Business, publicada.
+- Producto WhatsApp con número de prueba.
+- Los cinco números autorizados en Meta (los cuatro del grupo y el del profesor).
+- `uv` funcionando en el repositorio y `cloudflared` instalado.
+
+### 2. Crear la app y obtener credenciales (Meta, una vez)
+
+1. `developers.facebook.com/apps` → **Create app** → caso de uso de WhatsApp.
+2. Nombre, correo y portafolio comercial (`Sucursal 1965 UAO`).
+3. **WhatsApp → Configurar → Paso 1. Pruébalo**. Anota:
+
+| Dato | Dónde | ¿Secreto? |
+|---|---|---|
+| Número de prueba | Paso 1 | No |
+| **Phone Number ID** | debajo del número | No |
+| **WABA ID** | «Identificador de la cuenta de mensajes» | No |
+| Token temporal | «Token de acceso» | Sí (24 h) |
+
+4. **Configuración de la app → Básica → Clave secreta de la app** (App Secret).
+5. Token permanente: **Business settings → Usuarios → Usuarios del sistema** →
+   agregar `sucursal-1965-bot` → **Generar token** → app `Prueba1` → caducidad
+   60 días → permisos `whatsapp_business_messaging` y
+   `whatsapp_business_management`.
+   Si dice «No hay permisos disponibles», asigna la app al usuario del sistema en
+   **Activos asignados → Apps → Administrar app**.
+6. Inventa el **Verify Token**: cadena **alfanumérica** (sin `ñ`, tildes,
+   espacios ni signos), porque viaja en una URL.
+
+### 3. Variables de entorno (PowerShell, fuera del repo)
+
+Crea `whatsapp-env.ps1` un nivel arriba de `ProyectoAvance1`:
+
+```powershell
+$env:WHATSAPP_PHONE_NUMBER_ID = "<phone-number-id>"
+$env:WHATSAPP_APP_SECRET      = "<app-secret>"
+$env:WHATSAPP_VERIFY_TOKEN    = "<token-alfanumerico>"
+$env:WHATSAPP_ACCESS_TOKEN    = "<token-permanente>"
+$env:WHATSAPP_ID_SALT         = "<cadena-aleatoria-larga>"
+$env:WHATSAPP_MODO            = "falso"
+```
+
+Cárgalo en cada ventana donde lo necesites:
 
 ```powershell
 . "..\whatsapp-env.ps1"
-$env:WHATSAPP_MODO = "real"   # "falso" registra el envío sin salir a WhatsApp
-make app
 ```
 
-**Ventana 2 — el túnel** (desde cualquier carpeta):
+Comprueba que las seis existen:
 
 ```powershell
-cloudflared tunnel --url http://127.0.0.1:8000
+@("WHATSAPP_APP_SECRET","WHATSAPP_VERIFY_TOKEN","WHATSAPP_PHONE_NUMBER_ID","WHATSAPP_ACCESS_TOKEN","WHATSAPP_ID_SALT") |
+  ForEach-Object { "$_ = $([bool](Get-Item "env:$_" -ErrorAction SilentlyContinue))" }
 ```
 
-Copia la URL `https://....trycloudflare.com`. El túnel rápido no tiene URL fija:
-si se reinicia, cambia y hay que actualizarla en Meta.
+`.env.example` lista los nombres; el proyecto **no** lee `.env`
+(`docs/SEGURIDAD.md` §4). Los valores reales nunca se versionan.
 
-**Ventana 3 — comprobaciones**:
+### 4. Autorizar los números (Meta + configuración)
 
-```powershell
-. "..\whatsapp-env.ps1"
-curl.exe "http://127.0.0.1:8000/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=$env:WHATSAPP_VERIFY_TOKEN&hub.challenge=12345"
-```
-
-Debe devolver `12345`.
-
-### Configurar Meta (una sola vez)
-
-- **Webhooks → `Whatsapp Business Account`:** URL
-  `https://<túnel>/webhooks/whatsapp`, el token de `WHATSAPP_VERIFY_TOKEN` y
-  `messages` suscrito.
-- **Publicar la app** (App Mode: Live). En modo Desarrollo, Meta no entrega
-  mensajes reales.
-- **Suscribir la cuenta a la app** con `subscribed_apps` (ver la guía).
-
-### Autorizar un número
-
-1. Agregarlo en **WhatsApp → Paso 1 → To** y verificar el código.
-2. Calcular su huella y pegarla en `config/whatsapp.toml`:
+1. **WhatsApp → Paso 1 → Envío de mensaje → To → Manage phone number list**.
+2. Agrega cada número en formato internacional y verifica el código que llega
+   por WhatsApp. El límite del número de prueba es **5 destinatarios**.
+3. Calcula la huella de cada número:
 
 ```powershell
 uv run python -m banco_occidente_corpus.canal.identidad --huella "+57 300 123 4567"
 ```
 
-Sin la huella, el canal responde «no autorizado» y el envío real se bloquea.
+4. Pega la huella en `config/whatsapp.toml`, reemplazando un marcador:
 
-### Qué esperar
+```toml
+[autorizados]
+huellas = [
+  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "0000000000000000000000000000000000000000000000000000000000000002",
+  # ...
+]
+```
+
+Sin huella, el número queda como no autorizado y el envío real se bloquea con
+`ErrorEnvio: destino no autorizado`.
+
+### 5. Publicar y suscribir la app (Meta, una vez)
+
+1. **Publicar**: activa el interruptor **«Activo»** (App Mode: Live). En modo
+   Desarrollo, Meta no entrega mensajes reales, solo los eventos del botón
+   «Probar».
+2. **Suscribir la WABA a la app**:
+
+```powershell
+$uri = "https://graph.facebook.com/v23.0/<WABA_ID>/subscribed_apps?access_token=$($env:WHATSAPP_ACCESS_TOKEN)"
+Invoke-RestMethod $uri | ConvertTo-Json -Depth 5       # debe listar Prueba1
+Invoke-RestMethod -Method Post $uri | ConvertTo-Json   # suscribe
+```
+
+### 6. Levantar la app (ventana 1)
+
+```powershell
+cd "D:\...\ProyectoAvance1"
+. "..\whatsapp-env.ps1"
+$env:WHATSAPP_MODO = "real"   # "falso" registra el envío sin salir a WhatsApp
+make app
+```
+
+Debe quedar en `http://127.0.0.1:8000`. **No cierres esta ventana**: Meta debe
+alcanzarla cuando registres el callback.
+
+### 7. Montar el túnel (ventana 2)
+
+```powershell
+& "$HOME\cloudflared.exe" tunnel --url http://127.0.0.1:8000
+```
+
+Si no lo tienes instalado:
+
+```powershell
+winget install --id Cloudflare.cloudflared -e
+# o
+Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" -OutFile "$HOME\cloudflared.exe"
+```
+
+Copia la URL del recuadro:
+
+```
+https://algo-nuevo.trycloudflare.com
+```
+
+**No cierres esta ventana.** El túnel rápido cambia de URL en cada arranque; si
+se reinicia, hay que actualizarla en Meta. ngrok ya no ofrece dominio estático
+gratis.
+
+### 8. Registrar el callback en Meta (navegador)
+
+En `Prueba1` → **Webhooks** → objeto **`Whatsapp Business Account`** (no `User`):
+
+| Campo de Meta | Qué pegar |
+|---|---|
+| **URL de devolución de llamada** | `https://algo-nuevo.trycloudflare.com/webhooks/whatsapp` |
+| **Token de verificación** | el valor de `WHATSAPP_VERIFY_TOKEN` |
+| **Campos del webhook** | activar **Suscribirse** en `messages` |
+
+Pulsa **Verificar y guardar**. Meta hace un `GET` y en la ventana 1 aparece
+`GET /webhooks/whatsapp ... 200 OK`.
+
+> Guardar la URL no suscribe la cuenta: son dos pasos distintos (paso 5 y este).
+
+### 9. Comprobar (ventana 3)
+
+```powershell
+cd "D:\...\ProyectoAvance1"
+. "..\whatsapp-env.ps1"
+
+curl.exe "http://127.0.0.1:8000/health"
+curl.exe "http://127.0.0.1:8000/webhooks/whatsapp?hub.mode=subscribe&hub.verify_token=$env:WHATSAPP_VERIFY_TOKEN&hub.challenge=12345"
+curl.exe "https://algo-nuevo.trycloudflare.com/health"
+```
+
+El segundo comando debe devolver `12345`.
+
+### 10. Probar la conversación
+
+Desde un número autorizado escribe `hola` al número de prueba:
 
 1. `hola` → aviso de la Ley 1581 con **Acepto** y **Ahora no**.
 2. **Acepto** → confirmación y consentimiento guardado.
 3. Una pregunta del alcance → respuesta del grafo con sus fuentes.
 
-### Variables y modos
+Cada mensaje deja `POST /webhooks/whatsapp ... 200 OK` en la ventana 1.
 
-- `.env.example` lista los nombres; el proyecto **no** lee `.env`
-  (`docs/SEGURIDAD.md` §4).
-- `WHATSAPP_MODO=falso`: el envío queda en `data/asistente/whatsapp.sqlite` y no
-  sale a Meta. Es el modo de la suite y de los ensayos.
-- `WHATSAPP_MODO=real`: envía por la API de Meta y exige que el destino esté en
-  las huellas.
-- Límites del número de prueba: cinco destinatarios y ventana de 24 horas.
+El primer mensaje tarda unos segundos: ahí se construyen el índice, el
+recuperador y el modelo; el `200` ya se respondió a Meta.
 
-### Comprobar qué pasó
+### 11. Diagnóstico
+
+El texto no se guarda ni se registra: solo la huella y el estado.
 
 ```powershell
 @'
@@ -601,6 +718,35 @@ with sqlite3.connect("data/asistente/whatsapp.sqlite") as c:
     print("envios:", c.execute("SELECT COUNT(*) FROM envios").fetchone()[0])
 '@ | uv run python -
 ```
+
+| Estado | Significado |
+|---|---|
+| `recibido` | registrado y encolado |
+| `procesando` | el trabajador lo tomó |
+| `respondido` | la respuesta se entregó al enviador |
+| `ignorado` | número no autorizado o duplicado |
+| `error` | falló el grafo o el envío |
+
+| Síntoma | Causa |
+|---|---|
+| Meta no verifica el callback | App o túnel apagados, URL sin `/webhooks/whatsapp` o token distinto |
+| `GET` 503 | Falta `WHATSAPP_VERIFY_TOKEN` en la ventana de la app |
+| «Invalid HTTP request received» | Token con `ñ`, espacios o signos |
+| «Probar» genera `POST 200` pero los mensajes reales no | App en modo Desarrollo o WABA sin `subscribed_apps` |
+| `POST` 401 | `WHATSAPP_APP_SECRET` distinto |
+| `POST` 503 | Falta `WHATSAPP_APP_SECRET` |
+| Un check gris | El número remitente no está autorizado en Meta |
+| `ErrorEnvio: destino no autorizado` | Falta la huella en `config/whatsapp.toml` o cambió la sal |
+| El bot no responde | `WHATSAPP_MODO=falso`, falta `WHATSAPP_ID_SALT` o no reiniciaste la app |
+
+### 12. Modos y límites
+
+- `WHATSAPP_MODO=falso`: el envío se registra en `envios` y no sale a Meta. Es
+  el modo de la suite y de los ensayos.
+- `WHATSAPP_MODO=real`: envía por la API de Meta y exige la huella autorizada.
+- Número de prueba: cinco destinatarios y ventana de 24 horas.
+- La cola es en memoria: si reinicias la app, los pendientes se marcan `error`.
+- Solo una persona puede tener el túnel activo para la misma app.
 
 ## Capturas
 
