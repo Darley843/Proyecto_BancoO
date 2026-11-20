@@ -19,9 +19,11 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from langchain_core.exceptions import OutputParserException
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.runnables import RunnableLambda
 
+from banco_occidente_corpus.asistente.metricas import leer_uso
 from banco_occidente_corpus.asistente.prompts import cargar_prompt
 from banco_occidente_corpus.asistente.validacion import detectar_pii
 from banco_occidente_corpus.canal.contratos import EntradaDiagnostico, ResultadoDiagnostico
@@ -33,6 +35,7 @@ from banco_occidente_corpus.diagnostico.comite import (
     PosturaAgente,
     RegistroComite,
     auditar,
+    cargar_limites,
     construir_escenarios,
     deliberar,
 )
@@ -206,6 +209,30 @@ def _error_400() -> RuntimeError:
     )
 
 
+def _error_longitud() -> BaseException:
+    """Reproduce ``LengthFinishReasonError`` con la completion truncada.
+
+    Returns:
+        Una excepción con nombre de OpenAI, `finish_reason` y uso del caso real.
+    """
+    from types import SimpleNamespace
+
+    completion = SimpleNamespace(
+        choices=[SimpleNamespace(finish_reason="length")],
+        usage=SimpleNamespace(
+            prompt_tokens=500,
+            completion_tokens=1_200,
+            total_tokens=1_700,
+            prompt_cache_hit_tokens=0,
+            completion_tokens_details=SimpleNamespace(reasoning_tokens=1_200),
+        ),
+    )
+    clase = type("LengthFinishReasonError", (RuntimeError,), {})
+    error = clase("se agotó max_tokens")
+    error.completion = completion  # type: ignore[attr-defined]
+    return error
+
+
 def _rol(sistema: str) -> str:
     """Deduce el rol del comité a partir del prompt del sistema.
 
@@ -227,12 +254,13 @@ class ModeloComite:
 
     def __init__(
         self,
-        respuestas: Mapping[str, Sequence[Mapping[str, Any] | BaseException]],
+        respuestas: Mapping[str, Sequence[Mapping[str, Any] | BaseException | None]],
     ) -> None:
         """Guarda la cola de respuestas por rol.
 
         Args:
-            respuestas: payloads o excepciones por rol, en orden de uso.
+            respuestas: payloads, excepciones o `None` por rol, en orden de uso.
+                Un `None` simula un JSON inválido con `parsing_error`.
         """
         self._respuestas = {rol: list(valores) for rol, valores in respuestas.items()}
         self._candado = threading.Lock()
@@ -265,15 +293,31 @@ class ModeloComite:
                 payload = cola.pop(0) if cola else _postura(rol, "abstencion")
             if isinstance(payload, BaseException):
                 raise payload
+            crudo = AIMessage(
+                content="ok",
+                usage_metadata={
+                    "input_tokens": 100,
+                    "output_tokens": 50,
+                    "total_tokens": 150,
+                },
+            )
+            if payload is None:
+                return {
+                    "raw": AIMessage(
+                        content='{"agente": "riesgo", "postura"',
+                        usage_metadata={
+                            "input_tokens": 100,
+                            "output_tokens": 3_000,
+                            "total_tokens": 3_100,
+                            "output_token_details": {"reasoning": 2_900},
+                        },
+                        response_metadata={"finish_reason": "length"},
+                    ),
+                    "parsed": None,
+                    "parsing_error": OutputParserException("JSON truncado"),
+                }
             return {
-                "raw": AIMessage(
-                    content="ok",
-                    usage_metadata={
-                        "input_tokens": 100,
-                        "output_tokens": 50,
-                        "total_tokens": 150,
-                    },
-                ),
+                "raw": crudo,
                 "parsed": schema.model_validate(payload),
                 "parsing_error": None,
             }
@@ -376,7 +420,10 @@ def test_amarillo_convoca_tres_posturas_y_una_ronda(raiz_tasas: Path) -> None:
         "auditor",
     }
     assert all(postura.postura != "abstencion" for postura in deliberacion.posturas)
-    assert deliberacion.recomendacion.startswith("apto_con_condiciones:")
+    assert deliberacion.recomendacion.startswith(
+        "El comité de crédito considera viable la solicitud, con condiciones."
+    )
+    assert "apto_con_condiciones:" not in deliberacion.recomendacion
     assert deliberacion.ofrece_asesor is False
     assert len(deliberacion.alternativas) == 2
     assert any(
@@ -451,7 +498,10 @@ def test_rojo_ofrece_asesor_y_no_apto(raiz_tasas: Path) -> None:
 
     assert deliberacion is not None
     assert resultado.semaforo == "rojo"
-    assert deliberacion.recomendacion.startswith("no_apto:")
+    assert deliberacion.recomendacion.startswith(
+        "El comité de crédito no recomienda este crédito con las condiciones actuales."
+    )
+    assert "no_apto:" not in deliberacion.recomendacion
     assert deliberacion.ofrece_asesor is True
     assert "asesor" in deliberacion.recomendacion
     assert len(modelo.llamadas) == 3
@@ -476,9 +526,15 @@ def test_rol_faltante_queda_en_abstencion_y_pide_asesor(raiz_tasas: Path) -> Non
     assert deliberacion is not None
     riesgo = next(postura for postura in deliberacion.posturas if postura.agente == "riesgo")
     assert riesgo.postura == "abstencion"
-    assert deliberacion.recomendacion.startswith("requiere_asesor:")
+    assert deliberacion.recomendacion.startswith(
+        "El comité de crédito no logró una postura completa"
+    )
+    assert "requiere_asesor:" not in deliberacion.recomendacion
     assert deliberacion.ofrece_asesor is True
-    assert len(modelo.llamadas) == 3
+    # El esquema incompleto se reintenta una vez; el segundo intento también
+    # queda en abstención (payload por defecto del modelo de prueba).
+    assert modelo.llamadas.count("riesgo") == 2
+    assert len(modelo.llamadas) == 4
 
 
 def test_estres_de_ingreso_cambia_la_postura(raiz_tasas: Path) -> None:
@@ -513,7 +569,9 @@ def test_estres_de_ingreso_cambia_la_postura(raiz_tasas: Path) -> None:
     riesgo = next(postura for postura in deliberacion.posturas if postura.agente == "riesgo")
     assert riesgo.postura == "con_condiciones"
     assert riesgo.postura != "favorable"
-    assert deliberacion.recomendacion.startswith("apto_con_condiciones:")
+    assert deliberacion.recomendacion.startswith(
+        "El comité de crédito considera viable la solicitud, con condiciones."
+    )
     assert len(modelo.llamadas) == 4
 
 
@@ -628,7 +686,8 @@ def test_error_400_deepseek_devuelve_respuesta_deterministica(raiz_tasas: Path) 
 
     assert deliberacion is not None
     assert set(modelo.metodos) == {"json_mode"}
-    assert len(modelo.llamadas) == 3
+    # Sin posturas de riesgo ni comercial no se convoca al auditor.
+    assert sorted(modelo.llamadas) == ["comercial", "riesgo"]
     assert deliberacion.recomendacion.startswith("El comité no logró")
     assert deliberacion.alternativas == []
     assert deliberacion.hallazgos_auditor == []
@@ -714,8 +773,11 @@ def test_demo_andres_no_cae_al_texto_de_respaldo(raiz_tasas: Path) -> None:
     assert deliberacion is not None
     assert sorted(modelo.llamadas) == ["auditor", "comercial", "riesgo"]
     assert deliberacion.hallazgos_auditor == []
-    assert deliberacion.recomendacion.startswith("no_apto:")
+    assert deliberacion.recomendacion.startswith(
+        "El comité de crédito no recomienda este crédito con las condiciones actuales."
+    )
     assert "El comité no logró" not in deliberacion.recomendacion
+    assert "no_apto:" not in deliberacion.recomendacion
     assert deliberacion.ofrece_asesor is True
 
 
@@ -746,7 +808,9 @@ def test_correccion_unica_y_sin_segunda_ronda(raiz_tasas: Path) -> None:
     assert deliberacion is not None
     assert len(modelo.llamadas) == 4
     assert modelo.llamadas.count("comercial") == 2
-    assert deliberacion.recomendacion.startswith("apto_con_condiciones:")
+    assert deliberacion.recomendacion.startswith(
+        "El comité de crédito considera viable la solicitud, con condiciones."
+    )
     assert deliberacion.hallazgos_auditor
     assert any("promesa" in hallazgo.casefold() for hallazgo in deliberacion.hallazgos_auditor)
 
@@ -815,3 +879,206 @@ def test_el_estres_cambia_el_resultado_con_el_mismo_escenario(
     assert estres.razon_endeudamiento is not None
     assert resultado.razon_endeudamiento is not None
     assert estres.razon_endeudamiento > resultado.razon_endeudamiento
+
+
+def test_auditor_no_confunde_alertas_con_productos(raiz_tasas: Path) -> None:
+    """`vivienda_primera_cuota` en Riesgo es una alerta, no un producto ofrecido."""
+    entrada, resultado = _diagnostico("independiente_rojo", raiz_tasas)
+    escenarios = construir_escenarios(entrada, resultado, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
+    posturas = [
+        PosturaAgente.model_validate(
+            _postura(
+                "riesgo",
+                "desfavorable",
+                [
+                    "La alerta vivienda_primera_cuota está presente y el margen es negativo.",
+                    "La razón de endeudamiento supera el umbral amarillo.",
+                ],
+                ["alertas[vivienda_primera_cuota]", "razon_endeudamiento"],
+            )
+        ),
+        PosturaAgente.model_validate(
+            _postura(
+                "comercial",
+                "desfavorable",
+                ["[compra_de_cartera] El traslado no alcanza para este monto."],
+                ["escenarios[compra_de_cartera]"],
+            )
+        ),
+        PosturaAgente.model_validate(_postura("auditor", "conforme", ["Sin hallazgos."])),
+    ]
+
+    hallazgos = auditar(posturas, resultado, escenarios)
+
+    assert not any("Producto fuera de los escenarios" in hallazgo for hallazgo in hallazgos)
+
+
+def test_sin_riesgo_ni_comercial_no_convoca_al_auditor(raiz_tasas: Path) -> None:
+    """Si ambos roles iniciales se abstienen, responde el diagnóstico directo."""
+    entrada, resultado = _diagnostico("independiente_rojo", raiz_tasas)
+    modelo = ModeloComite(
+        {
+            "riesgo": [_postura("riesgo", "abstencion", ["No pude verificar el caso."])],
+            "comercial": [_postura("comercial", "abstencion", ["No pude verificar el caso."])],
+            "auditor": [_postura("auditor", "conforme", ["No debía llamarse."])],
+        }
+    )
+    registro = RegistroComite()
+
+    deliberacion = deliberar(entrada, resultado, modelo=modelo, registro=registro)
+
+    assert deliberacion is not None
+    assert sorted(modelo.llamadas) == ["comercial", "riesgo"]
+    assert "auditor" not in modelo.llamadas
+    assert registro.total_llamadas == 2
+    assert deliberacion.recomendacion.startswith("El comité no logró")
+    auditor = next(postura for postura in deliberacion.posturas if postura.agente == "auditor")
+    assert auditor.postura == "abstencion"
+    assert "No se convocó" in auditor.argumentos[0]
+
+
+def test_recomendacion_no_empieza_con_codigo_interno(raiz_tasas: Path) -> None:
+    """La recomendación deliberada abre en lenguaje de la persona, no con `no_apto:`."""
+    entrada, resultado = _diagnostico("independiente_rojo", raiz_tasas)
+    modelo = ModeloComite(
+        {
+            "riesgo": [
+                _postura("riesgo", "desfavorable", ["El margen después de la cuota es negativo."])
+            ],
+            "comercial": [
+                _postura("comercial", "desfavorable", ["[compra_de_cartera] No alcanza."])
+            ],
+            "auditor": [_postura("auditor", "conforme", ["Sin hallazgos."])],
+        }
+    )
+
+    deliberacion = deliberar(entrada, resultado, modelo=modelo)
+
+    assert deliberacion is not None
+    primera = deliberacion.recomendacion.splitlines()[0]
+    assert not primera.casefold().startswith(
+        ("no_apto", "apto", "apto_con_condiciones", "requiere_asesor")
+    )
+    assert "no_apto:" not in deliberacion.recomendacion
+    assert primera.startswith("El comité de crédito")
+
+
+def test_reintento_unico_ante_json_invalido(raiz_tasas: Path) -> None:
+    """Un JSON truncado tiene un solo reintento y el registro guarda la causa."""
+    entrada, resultado = _diagnostico("pensionado_amarillo", raiz_tasas)
+    modelo = ModeloComite(
+        {
+            "riesgo": [
+                None,
+                _postura("riesgo", "con_condiciones", ["La cuota deja poco margen."]),
+            ],
+            "comercial": [
+                _postura("comercial", "con_condiciones", ["[plazo_mas_largo] Revisa el plazo."])
+            ],
+            "auditor": [_postura("auditor", "conforme", ["Sin hallazgos."])],
+        }
+    )
+    registro = RegistroComite()
+
+    deliberacion = deliberar(entrada, resultado, modelo=modelo, registro=registro)
+
+    assert deliberacion is not None
+    assert modelo.llamadas.count("riesgo") == 2
+    riesgo = next(postura for postura in deliberacion.posturas if postura.agente == "riesgo")
+    assert riesgo.postura == "con_condiciones"
+    fallo = next(llamada for llamada in registro.llamadas if llamada["clase_error"])
+    assert fallo["clase_error"] == "OutputParserException"
+    uso = leer_uso(fallo["metricas"])
+    assert uso.finish_reason == "length"
+    assert uso.salida == 3_000
+    assert uso.razonamiento == 2_900
+    assert "no fue JSON válido" in modelo.mensajes_por_rol["riesgo"][1]
+
+
+def test_reintento_tras_error_de_longitud(raiz_tasas: Path) -> None:
+    """Un `LengthFinishReasonError` se reintenta y deja la causa en el registro."""
+    entrada, resultado = _diagnostico("pensionado_amarillo", raiz_tasas)
+    modelo = ModeloComite(
+        {
+            "riesgo": [
+                _error_longitud(),
+                _postura("riesgo", "con_condiciones", ["La cuota deja poco margen."]),
+            ],
+            "comercial": [
+                _postura("comercial", "con_condiciones", ["[plazo_mas_largo] Revisa el plazo."])
+            ],
+            "auditor": [_postura("auditor", "conforme", ["Sin hallazgos."])],
+        }
+    )
+    registro = RegistroComite()
+
+    deliberacion = deliberar(entrada, resultado, modelo=modelo, registro=registro)
+
+    assert deliberacion is not None
+    assert modelo.llamadas.count("riesgo") == 2
+    riesgo = next(postura for postura in deliberacion.posturas if postura.agente == "riesgo")
+    assert riesgo.postura == "con_condiciones"
+    fallo = next(
+        llamada
+        for llamada in registro.llamadas
+        if llamada["clase_error"] == "LengthFinishReasonError"
+    )
+    uso = leer_uso(fallo["metricas"])
+    assert uso.finish_reason == "length"
+    assert uso.salida == 1_200
+    assert uso.razonamiento == 1_200
+
+
+def test_un_solo_reintento_por_agente(raiz_tasas: Path) -> None:
+    """Si el reintento también falla, el rol se abstiene sin abrir otra ronda."""
+    entrada, resultado = _diagnostico("pensionado_amarillo", raiz_tasas)
+    modelo = ModeloComite(
+        {
+            "riesgo": [None, None],
+            "comercial": [
+                _postura("comercial", "con_condiciones", ["[plazo_mas_largo] Revisa el plazo."])
+            ],
+            "auditor": [_postura("auditor", "conforme", ["Sin hallazgos."])],
+        }
+    )
+
+    deliberacion = deliberar(entrada, resultado, modelo=modelo)
+
+    assert deliberacion is not None
+    assert modelo.llamadas.count("riesgo") == 2
+    assert len(modelo.llamadas) == 4
+    riesgo = next(postura for postura in deliberacion.posturas if postura.agente == "riesgo")
+    assert riesgo.postura == "abstencion"
+
+
+def test_limites_del_comite_cubren_el_razonamiento() -> None:
+    """El tope por agente deja espacio al razonamiento y conserva costo y reloj."""
+    limites = cargar_limites()
+
+    assert limites.max_tokens_agente == 3_000
+    assert limites.max_llamadas == 4
+    assert limites.tiempo_maximo_segundos == 30.0
+
+
+def test_metricas_de_longitud_salen_de_la_excepcion() -> None:
+    """El diagnóstico de la demo lee `finish_reason` y tokens del error de longitud."""
+    from types import SimpleNamespace
+
+    completion = SimpleNamespace(
+        choices=[SimpleNamespace(finish_reason="length")],
+        usage=SimpleNamespace(
+            prompt_tokens=1_000,
+            completion_tokens=1_200,
+            total_tokens=2_200,
+            prompt_cache_hit_tokens=0,
+            completion_tokens_details=SimpleNamespace(reasoning_tokens=1_150),
+        ),
+    )
+    error = type("LengthFinishReasonError", (RuntimeError,), {"completion": completion})()
+
+    metricas = comite_mod._metricas_de_error(error)
+    uso = leer_uso(metricas)
+
+    assert uso.finish_reason == "length"
+    assert uso.salida == 1_200
+    assert uso.razonamiento == 1_150

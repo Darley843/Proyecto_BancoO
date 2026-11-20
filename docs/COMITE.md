@@ -131,8 +131,10 @@ Lista de chequeo:
 Además del agente, `diagnostico/comite.py` tiene un **auditor determinístico**
 (`auditar`) que atrapa las cuatro trampas: cifra inventada, promesa de
 aprobación, alternativa fuera de los escenarios y recomendación más favorable
-que la de Riesgo. También revisa PII y, si se le pasa la recomendación final, el
-aviso orientativo.
+que la de Riesgo. La revisión de producto solo se aplica a las alternativas de
+Comercial: una alerta como `vivienda_primera_cuota` mencionada por Riesgo no es
+un producto ofrecido. También revisa PII y, si se le pasa la recomendación
+final, el aviso orientativo.
 
 ## Síntesis (reglas determinísticas)
 
@@ -142,15 +144,17 @@ aviso orientativo.
 3. Si el Auditor **objeta**, se corrige una vez con sus hallazgos; si vuelve a
    objetar, se responde con el texto determinístico del diagnóstico (sin
    comité). Si Riesgo y Comercial se abstienen, también se responde con ese
-   texto: el auditor determinístico no revisa los mensajes de error.
+   texto y **no se convoca al auditor**: no hay posturas que revisar.
 4. Rojo → siempre se ofrece hablar con un asesor (HITL), una sola vez.
 5. Respuesta final: postura de cada agente en una línea, recomendación,
    hasta dos alternativas y el aviso orientativo.
 
-La recomendación usa una de estas etiquetas: `apto`, `apto_con_condiciones`,
-`no_apto` o `requiere_asesor`. Una abstención o un rol que no responde produce
-`requiere_asesor`; si Riesgo y Comercial se abstienen a la vez, se usa el texto
-del diagnóstico. Nunca se inventa una decisión.
+Las etiquetas internas de la síntesis son `apto`, `apto_con_condiciones`,
+`no_apto` y `requiere_asesor`; el texto que recibe la persona abre con una
+frase en su lenguaje y **nunca empieza con el código** (`no_apto:`). Una
+abstención o un rol que no responde produce `requiere_asesor`; si Riesgo y
+Comercial se abstienen a la vez, se usa el texto del diagnóstico. Nunca se
+inventa una decisión.
 
 ## Por qué el resultado es orientativo
 
@@ -188,11 +192,16 @@ Los modelos viven en `src/banco_occidente_corpus/diagnostico/comite.py` y se
 piden con `with_structured_output(PosturaAgente, method="json_mode")`: el
 esquema viaja en el prompt y la respuesta se valida con Pydantic. No se fuerza
 `tool_choice`, porque el modo de razonamiento de DeepSeek lo rechaza con un 400.
+Si la salida no es JSON válido, cada agente tiene **un solo reintento** dentro
+del mismo presupuesto de llamadas y del reloj total.
 
 ## Límites y experiencia
 
-- Una sola ronda; máximo 4 llamadas al modelo (3 agentes + 1 corrección).
-- Tope de tokens por agente y tiempo máximo de la deliberación (30 s).
+- Una sola ronda; máximo 4 llamadas al modelo (3 agentes + 1 corrección). Los
+  reintentos por JSON inválido comparten ese tope, así que el costo total no
+  crece.
+- Tope de 3.000 tokens por agente —el razonamiento consume ese tope— y tiempo
+  máximo de la deliberación (30 s).
 - Mientras delibera, el canal envía: "El comité está revisando tu caso…".
 - La deliberación queda disponible para mostrarse en pantalla durante la demo.
 - Costo esperado: alrededor de un centavo de dólar por deliberación.
@@ -213,7 +222,12 @@ Los límites se configuran en `[comite]` de `config/diagnostico.toml`:
   recomendación más favorable que Riesgo). El auditor determinístico debe
   atraparlas todas.
 - **Con DeepSeek real (pocas corridas):** Andrés (rojo) y Jaime (amarillo),
-  revisando a mano la calidad de los argumentos.
+  revisando a mano la calidad de los argumentos. La demo compara tres rondas
+  con razonamiento y tres sin razonamiento, reporta abstención, costo y tiempo,
+  y se queda con la configuración más estable. La corrida final usa por defecto
+  el modo sin razonamiento, que fue el más estable y barato en la comparación.
+  También imprime la causa técnica de cada abstención (clase del error,
+  `finish_reason` y tokens de salida); ese detalle no llega a la recomendación.
 
 Las pruebas viven en `test/test_diagnostico_comite.py`. La demo con DeepSeek
 real se ejecuta con:
@@ -231,7 +245,7 @@ uv run python scripts/demo_comite.py
 | `config/prompts/comite_comercial_v1.md` | Rol comercial |
 | `config/prompts/comite_auditor_v1.md` | Rol auditor |
 | `test/test_diagnostico_comite.py` | Pruebas sin red del comité |
-| `scripts/demo_comite.py` | Demo con DeepSeek real sobre Andrés y Jaime |
+| `scripts/demo_comite.py` | Demo con DeepSeek real sobre Andrés y Jaime, y comparación de configuraciones |
 
 El comité todavía **no está conectado** al canal ni al grafo del diagnóstico:
 esta entrega deja el módulo, sus pruebas y la demo listos para integrarlo.

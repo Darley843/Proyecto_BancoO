@@ -17,10 +17,11 @@ favorable que la de riesgo pasa la deliberación. La síntesis es determinístic
 el semáforo no cambia, gana la postura más prudente y, si el auditor vuelve a
 objetar tras una única corrección, se responde con el texto del diagnóstico.
 
-Límites: una sola ronda, máximo cuatro llamadas al modelo (tres agentes y una
-corrección), tope de tokens por agente y 30 s en total. El módulo no escribe en
-la Bóveda ni modifica el diagnóstico, y solo recibe el `ResultadoDiagnostico` y
-los escenarios calculados, nunca el nombre ni el número de la persona.
+Límites: una sola ronda, máximo cuatro llamadas al modelo (tres agentes, una
+corrección y los reintentos por JSON inválido comparten ese tope), tope de
+tokens por agente y 30 s en total. El módulo no escribe en la Bóveda ni
+modifica el diagnóstico, y solo recibe el `ResultadoDiagnostico` y los
+escenarios calculados, nunca el nombre ni el número de la persona.
 """
 
 from __future__ import annotations
@@ -88,9 +89,21 @@ ORDEN_POSTURA: dict[str, int] = {
 
 #: Valores por defecto si el TOML no trae la sección `[comite]`.
 MAX_LLAMADAS = 4
-MAX_TOKENS_AGENTE = 1_200
+MAX_TOKENS_AGENTE = 3_000
 TIEMPO_MAXIMO_SEGUNDOS = 30.0
 MAX_ALTERNATIVAS = 2
+
+#: Intentos por agente: el primero y un reintento si la salida no es JSON válido.
+MAX_INTENTOS_AGENTE = 2
+
+#: Excepciones de salida que justifican el reintento por JSON inválido o truncado.
+_ERRORES_REINTENTABLES = frozenset(
+    {
+        "LengthFinishReasonError",
+        "ContentFilterFinishReasonError",
+        "OutputParserException",
+    }
+)
 
 #: Frases que prometen una aprobación; el auditor las rechaza.
 _PROMESAS = re.compile(
@@ -117,6 +130,24 @@ _OFERTA_ASESOR = "habla con un asesor"
 
 #: Motivo genérico de una abstención por fallo; nunca expone el error crudo.
 MOTIVO_FALLO = "El agente no pudo responder con los datos del caso."
+
+#: Motivo cuando riesgo y comercial se abstienen y el auditor no se convoca.
+MOTIVO_SIN_AUDITOR = "No se convocó: riesgo y comercial se abstuvieron."
+
+#: Primera línea de la recomendación, en lenguaje de la persona y sin códigos.
+APERTURA_RECOMENDACION: dict[str, str] = {
+    "apto": "El comité de crédito considera viable la solicitud con los datos del caso.",
+    "apto_con_condiciones": (
+        "El comité de crédito considera viable la solicitud, con condiciones."
+    ),
+    "no_apto": ("El comité de crédito no recomienda este crédito con las condiciones actuales."),
+    "requiere_asesor": (
+        "El comité de crédito no logró una postura completa; conviene revisar el caso."
+    ),
+}
+
+#: Identificadores snake_case (códigos de escenario y alertas del motor).
+_IDENTIFICADOR = re.compile(r"\b[a-z0-9]+(?:_[a-z0-9]+)+\b")
 
 
 class PosturaAgente(BaseModel):
@@ -206,6 +237,8 @@ class RegistroComite:
         metricas: Mapping[str, Any] | None,
         segundos: float,
         error: str | None = None,
+        *,
+        clase_error: str | None = None,
     ) -> None:
         """Guarda el uso y el tiempo de una llamada al modelo.
 
@@ -215,6 +248,8 @@ class RegistroComite:
                 `asistente.metricas.extraer_metricas`.
             segundos: duración de la llamada.
             error: mensaje si la llamada falló; vacío o `None` si fue bien.
+            clase_error: nombre de la clase de la excepción o del error de
+                validación; solo lo muestra la demo, nunca la recomendación.
         """
         self.llamadas.append(
             {
@@ -222,6 +257,7 @@ class RegistroComite:
                 "metricas": dict(metricas or {}),
                 "segundos": segundos,
                 "error": error or "",
+                "clase_error": clase_error or "",
             }
         )
 
@@ -310,11 +346,18 @@ def deliberar(
     contexto = _contexto_del_caso(resultado, escenarios)
     posturas = _ronda_inicial(modelo, contexto, ajustes, presupuesto, registro)
     posturas["riesgo"] = _ajustar_riesgo_por_estres(posturas["riesgo"], escenarios)
+    if _sin_posturas(posturas):
+        # Sin posturas de riesgo ni comercial no hay nada que auditar: el
+        # auditor no se convoca y se responde con el texto del diagnóstico.
+        posturas["auditor"] = _abstencion("auditor", MOTIVO_SIN_AUDITOR)
+        return _respuesta_sin_comite(
+            posturas,
+            resultado,
+            auditar(list(posturas.values()), resultado, escenarios),
+        )
     posturas["auditor"] = _revisar(modelo, contexto, posturas, presupuesto, registro)
 
     hallazgos = auditar(list(posturas.values()), resultado, escenarios)
-    if _sin_posturas(posturas):
-        return _respuesta_sin_comite(posturas, resultado, hallazgos)
     if posturas["auditor"].postura == "objeta" or hallazgos:
         hallazgos = _corregir(
             modelo,
@@ -444,9 +487,10 @@ def auditar(
 ) -> list[str]:
     """Aplica la lista de chequeo del auditor de forma determinística.
 
-    Revisa cifras, promesas de aprobación, alternativas fuera de los escenarios,
-    complacencia frente a la postura de riesgo, datos personales y, cuando se
-    pasa la recomendación final, el aviso orientativo.
+    Revisa cifras, promesas de aprobación, alternativas fuera de los escenarios
+    (solo en la postura del comercial), complacencia frente a la postura de
+    riesgo, datos personales y, cuando se pasa la recomendación final, el aviso
+    orientativo.
 
     Args:
         posturas: opiniones de los tres agentes.
@@ -474,9 +518,13 @@ def auditar(
         for codigo in _CODIGO.findall(texto.casefold()):
             if codigo not in CODIGOS_ESCENARIO:
                 hallazgos.append(f"Alternativa fuera de los escenarios: [{codigo}]")
-        for producto in _productos_mencionados(texto):
-            if producto not in productos:
-                hallazgos.append(f"Producto fuera de los escenarios: {producto}")
+        if postura.agente == "comercial":
+            # Solo las alternativas del comercial se contrastan con el
+            # catálogo: una alerta como `vivienda_primera_cuota` en la postura
+            # de riesgo no es un producto fuera de los escenarios.
+            for producto in _productos_mencionados(_sin_identificadores(texto)):
+                if producto not in productos:
+                    hallazgos.append(f"Producto fuera de los escenarios: {producto}")
         if detectar_pii(texto) is not None:
             hallazgos.append(f"Datos personales en la postura de {postura.agente}")
 
@@ -665,8 +713,8 @@ def _ronda_inicial(
 
     El auditor no corre aquí: necesita las dos posturas para revisarlas y se
     convoca después (`_revisar`). Un rol que falla, agota su tiempo o devuelve
-    un esquema inválido queda como `abstencion`; no se repite la llamada ni se
-    abre una segunda ronda.
+    un esquema inválido queda como `abstencion`; `_consultar` hace un único
+    reintento dentro del mismo presupuesto y no se abre una segunda ronda.
 
     Args:
         modelo: modelo de chat con salida estructurada.
@@ -775,6 +823,21 @@ def _corregir(
     return auditar(list(posturas.values()), resultado, escenarios)
 
 
+def _reintentable(exc: BaseException) -> bool:
+    """Indica si el fallo es una salida inválida o truncada.
+
+    Un 400, un timeout o un error de red no se reintentan: el reintento es solo
+    para el JSON que no llegó a formarse.
+
+    Args:
+        exc: excepción lanzada por el modelo o el parser.
+
+    Returns:
+        `True` si el fallo corresponde a la salida del modelo.
+    """
+    return isinstance(exc, ValidationError) or type(exc).__name__ in _ERRORES_REINTENTABLES
+
+
 def _consultar(
     modelo: BaseChatModel,
     rol: str,
@@ -786,6 +849,11 @@ def _consultar(
     registro: RegistroComite | None,
 ) -> PosturaAgente:
     """Llama a un agente con salida estructurada y normaliza su postura.
+
+    Si la salida no es JSON válido, hace un solo reintento dentro del mismo
+    presupuesto de llamadas y del reloj total. La clase del error queda en el
+    registro, para que la demo explique la abstención sin filtrarla al texto
+    que recibe la persona.
 
     Args:
         modelo: modelo de chat.
@@ -817,35 +885,88 @@ def _consultar(
             method=METODO_ESTRUCTURADO,
             include_raw=True,
         )
-        salida = runnable.invoke(mensajes)
-    except Exception:  # noqa: BLE001 - el rol queda en abstención
+    except Exception as exc:  # noqa: BLE001 - el rol queda en abstención
         segundos = time.monotonic() - inicio
         if registro is not None:
-            registro.anotar(rol, metricas, segundos, MOTIVO_FALLO)
+            registro.anotar(rol, metricas, segundos, MOTIVO_FALLO, clase_error=type(exc).__name__)
         return _abstencion(rol, MOTIVO_FALLO)
 
-    segundos = time.monotonic() - inicio
-    postura, metricas, error = _leer_salida(salida)
-    if registro is not None:
-        registro.anotar(rol, metricas, segundos, MOTIVO_FALLO if error else None)
-    if postura is None:
-        return _abstencion(rol, MOTIVO_FALLO)
-    return _normalizar(postura, rol)
+    for intento in range(MAX_INTENTOS_AGENTE):
+        mensajes_intento = mensajes
+        if intento:
+            mensajes_intento = [
+                *mensajes,
+                HumanMessage(
+                    content=(
+                        "La respuesta anterior no fue JSON válido. Responde solo "
+                        "con el objeto JSON del esquema."
+                    )
+                ),
+            ]
+        inicio = time.monotonic()
+        metricas = None
+        try:
+            salida = runnable.invoke(mensajes_intento)
+        except Exception as exc:  # noqa: BLE001 - el rol queda en abstención
+            segundos = time.monotonic() - inicio
+            if registro is not None:
+                registro.anotar(
+                    rol,
+                    _metricas_de_error(exc),
+                    segundos,
+                    MOTIVO_FALLO,
+                    clase_error=type(exc).__name__,
+                )
+            if _reintentable(exc) and intento + 1 < MAX_INTENTOS_AGENTE and presupuesto.consumir():
+                continue
+            return _abstencion(rol, MOTIVO_FALLO)
+
+        segundos = time.monotonic() - inicio
+        postura, metricas, error, clase_error = _leer_salida(salida)
+        if postura is not None:
+            normalizada = _normalizar(postura, rol)
+            fallo = normalizada.postura == "abstencion"
+            if registro is not None:
+                registro.anotar(
+                    rol,
+                    metricas,
+                    segundos,
+                    MOTIVO_FALLO if fallo else None,
+                    clase_error="postura_invalida" if fallo else None,
+                )
+            return normalizada
+
+        if registro is not None:
+            registro.anotar(
+                rol,
+                metricas,
+                segundos,
+                MOTIVO_FALLO,
+                clase_error=clase_error or "salida_invalida",
+            )
+        # Un solo reintento, y solo si el presupuesto de llamadas y el reloj
+        # todavía alcanzan: el tope total de costo no cambia.
+        if intento + 1 >= MAX_INTENTOS_AGENTE or not presupuesto.consumir():
+            return _abstencion(rol, MOTIVO_FALLO)
+
+    return _abstencion(rol, MOTIVO_FALLO)
 
 
 def _leer_salida(
     salida: Any,
-) -> tuple[PosturaAgente | None, Mapping[str, Any] | None, str | None]:
+) -> tuple[PosturaAgente | None, Mapping[str, Any] | None, str | None, str | None]:
     """Extrae la postura y las métricas de la salida estructurada.
 
     Args:
         salida: resultado del runnable, con o sin `include_raw`.
 
     Returns:
-        La postura, las métricas del mensaje crudo y el error de validación.
+        La postura, las métricas del mensaje crudo, el error de validación y la
+        clase de ese error; los dos últimos son `None` si no hubo fallo.
     """
     metricas: Mapping[str, Any] | None = None
     error: str | None = None
+    clase_error: str | None = None
     if isinstance(salida, dict) and "parsed" in salida:
         crudo = salida.get("raw")
         if isinstance(crudo, BaseMessage):
@@ -853,16 +974,74 @@ def _leer_salida(
         fallo = salida.get("parsing_error")
         if fallo is not None:
             error = str(fallo)
+            clase_error = type(fallo).__name__ if not isinstance(fallo, str) else None
         salida = salida.get("parsed")
     if salida is None:
-        return None, metricas, error
+        return None, metricas, error, clase_error or "salida_invalida"
     try:
         postura = (
             salida if isinstance(salida, PosturaAgente) else PosturaAgente.model_validate(salida)
         )
     except ValidationError as exc:
-        return None, metricas, str(exc)
-    return postura, metricas, error
+        return None, metricas, str(exc), type(exc).__name__
+    return postura, metricas, error, clase_error
+
+
+def _campo(objeto: Any, nombre: str) -> Any:
+    """Lee un atributo o una clave de ``model_extra`` sin depender del SDK.
+
+    Args:
+        objeto: respuesta del proveedor.
+        nombre: atributo buscado.
+
+    Returns:
+        El valor encontrado o `None`.
+    """
+    valor = getattr(objeto, nombre, None)
+    if valor is not None:
+        return valor
+    extra = getattr(objeto, "model_extra", None)
+    return extra.get(nombre) if isinstance(extra, Mapping) else None
+
+
+def _metricas_de_error(exc: BaseException) -> Mapping[str, Any] | None:
+    """Recupera el uso de una excepción que trae la respuesta del modelo.
+
+    `LengthFinishReasonError` de OpenAI adjunta la ``completion`` que no se pudo
+    parsear porque se agotó ``max_tokens``. De ahí salen `finish_reason` y los
+    tokens de salida y razonamiento que la demo muestra al diagnosticar.
+    Para el resto de excepciones devuelve `None`.
+
+    Args:
+        exc: excepción lanzada por el cliente del modelo.
+
+    Returns:
+        Métricas en el formato de `leer_uso`, o `None` si no trae respuesta.
+    """
+    completion = getattr(exc, "completion", None)
+    if completion is None:
+        return None
+    elecciones = _campo(completion, "choices") or []
+    finish = _campo(elecciones[0], "finish_reason") if elecciones else None
+    uso = _campo(completion, "usage")
+    if uso is None:
+        return {"respuesta": {"finish_reason": finish}} if finish else None
+    detalles = _campo(uso, "completion_tokens_details")
+    valores: dict[str, Any] = {
+        "input_tokens": _campo(uso, "prompt_tokens"),
+        "output_tokens": _campo(uso, "completion_tokens"),
+        "total_tokens": _campo(uso, "total_tokens"),
+    }
+    razonamiento = _campo(detalles, "reasoning_tokens") if detalles is not None else None
+    if razonamiento is not None:
+        valores["output_token_details"] = {"reasoning": razonamiento}
+    cache = _campo(uso, "prompt_cache_hit_tokens")
+    if cache is not None:
+        valores["input_token_details"] = {"cache_read": cache}
+    return {
+        "uso": {clave: valor for clave, valor in valores.items() if valor is not None},
+        "respuesta": {"finish_reason": finish},
+    }
 
 
 def _mensaje_humano(
@@ -1068,9 +1247,9 @@ def _sintetizar(
     ofrece = resultado.semaforo == "rojo" or etiqueta == "requiere_asesor"
 
     lineas = [
-        f"{etiqueta}: recomendación del comité de crédito. Es una opinión del "
-        "comité y no una aprobación; la decisión final corresponde a un asesor "
-        "humano del banco.",
+        f"{APERTURA_RECOMENDACION[etiqueta]} Es una opinión del comité de crédito "
+        "y no una aprobación; la decisión final corresponde a un asesor humano "
+        "del banco.",
         f"Semáforo del motor: {resultado.semaforo} (no cambia).",
         _linea_postura(riesgo),
         _linea_postura(comercial),
@@ -1138,7 +1317,8 @@ def _respuesta_sin_comite(
 ) -> DeliberacionComite:
     """Responde con el texto determinístico del diagnóstico, sin comité.
 
-    Es la salida cuando el auditor vuelve a objetar después de la única
+    Es la salida cuando riesgo y comercial se abstienen (no se convoca al
+    auditor) o cuando el auditor vuelve a objetar después de la única
     corrección permitida.
 
     Args:
@@ -1279,6 +1459,22 @@ def _productos_mencionados(texto: str) -> Iterator[str]:
             yield nombre.casefold()
 
 
+def _sin_identificadores(texto: str) -> str:
+    """Quita del texto los identificadores snake_case antes de buscar productos.
+
+    Las alertas del motor (`vivienda_primera_cuota`) y los códigos de escenario
+    (`plazo_mas_largo`) contienen nombres de producto como subcadena; no son
+    menciones del producto.
+
+    Args:
+        texto: argumentos y evidencias de una postura.
+
+    Returns:
+        El texto en minúsculas y sin identificadores.
+    """
+    return _IDENTIFICADOR.sub(" ", texto.casefold())
+
+
 def _promesas(texto: str) -> Iterator[str]:
     """Encuentra frases de promesa que no estén negadas.
 
@@ -1360,15 +1556,23 @@ def _texto_de(postura: PosturaAgente) -> str:
 
 
 def _etiqueta_recomendacion(recomendacion: str) -> str:
-    """Lee la etiqueta inicial de una recomendación.
+    """Lee la etiqueta interna de una recomendación ya sintetizada.
+
+    Acepta tanto la apertura en lenguaje de la persona como el formato antiguo
+    `etiqueta: ...`, que usan las pruebas del auditor.
 
     Args:
         recomendacion: texto de la síntesis.
 
     Returns:
-        La etiqueta antes de los dos puntos, o el texto entero si no hay.
+        `apto`, `apto_con_condiciones`, `no_apto`, `requiere_asesor` o el texto
+        antes de los dos puntos si no coincide con una apertura conocida.
     """
-    return recomendacion.split(":", 1)[0].strip().casefold()
+    primera = recomendacion.split("\n", 1)[0].strip()
+    for etiqueta, apertura in APERTURA_RECOMENDACION.items():
+        if primera.startswith(apertura):
+            return etiqueta
+    return primera.split(":", 1)[0].strip().casefold()
 
 
 def _sin_repetir(hallazgos: Sequence[str]) -> list[str]:

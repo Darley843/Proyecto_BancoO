@@ -262,6 +262,18 @@ def test_crear_modelo_usa_deepseek_flash(monkeypatch: pytest.MonkeyPatch) -> Non
     assert modelo.max_tokens == 512
 
 
+def test_crear_modelo_puede_desactivar_el_razonamiento(monkeypatch: pytest.MonkeyPatch) -> None:
+    """El comité compara el modo normal con `reasoning_effort="none"`."""
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "clave-falsa")
+
+    con_razonamiento = crear_modelo(max_tokens=3_000)
+    sin_razonamiento = crear_modelo(max_tokens=3_000, razonamiento=False)
+
+    assert con_razonamiento.reasoning_effort is None
+    assert sin_razonamiento.reasoning_effort == "none"
+    assert sin_razonamiento.max_tokens == 3_000
+
+
 # ---------------------------------------------------------------- prompts
 
 
