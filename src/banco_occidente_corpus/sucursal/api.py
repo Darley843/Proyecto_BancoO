@@ -27,11 +27,14 @@ from pydantic import BaseModel, Field
 from ..boveda.mapa import ServicioMapa
 from ..config import Config
 from ..panel import pipeline_summary
+from ..roba.api import Respondedor, crear_router_roba, limite_configurado
+from ..roba.marcador import MarcadorRoba
+from ..roba.respondedor import RespondedorSucursal
 from ..tablero.consultas import buscar_filas
 from ..tablero.tipos import Fila, leer_filas, ruta_tablero
 from .ajustes import ConfiguracionSucursal, tope_efectivo
 from .costo import CacheRespuestas, GastoDiario
-from .operacion import OperacionRespuesta, resumen_operacion
+from .operacion import RUTA_ROBA, OperacionRespuesta, resumen_operacion
 from .preguntar import (
     ErrorSucursal,
     PiezasGrafo,
@@ -223,6 +226,7 @@ def crear_router(
     cache: CacheRespuestas | None = None,
     piezas: Callable[[], PiezasGrafo] | None = None,
     mapa_boveda: ServicioMapa | None = None,
+    respondedor_roba: Respondedor | None = None,
 ) -> APIRouter:
     """Crea el router `/api` con las dependencias inyectadas.
 
@@ -235,9 +239,12 @@ def crear_router(
             construye de forma perezosa en la primera pregunta.
         mapa_boveda: servicio alternativo del mapa para las pruebas; por defecto
             lee `data/boveda/mapa.json` y usa Ollama y el recuperador real.
+        respondedor_roba: asistente alternativo de Roba la Bóveda para las
+            pruebas; por defecto la Sucursal en modo demo con el corpus sintético.
 
     Returns:
-        El router con los nueve endpoints de la Sucursal.
+        El router con los trece endpoints de la Sucursal, incluidos los cuatro de
+        Roba la Bóveda (`/api/roba`).
     """
     router = APIRouter(prefix="/api")
     fabrica = piezas or _fabrica_piezas(config, ajustes)
@@ -417,6 +424,12 @@ def crear_router(
             headers=ENCABEZADOS_SSE,
         )
 
+    router.include_router(
+        crear_router_roba(
+            MarcadorRoba(config.paths.root / RUTA_ROBA, limite_configurado()),
+            respondedor_roba or RespondedorSucursal(config, ajustes, gasto),
+        )
+    )
     return router
 
 

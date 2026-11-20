@@ -77,10 +77,10 @@
 - [ ] 7.3 Crear `config/evaluacion/casos_dominio.toml` con al menos 30 casos etiquetados dentro/fuera del alcance y sus categorías; verificar con una prueba de carga que los conteos son correctos y que no hay etiquetas faltantes.
 - [ ] 7.4 Implementar `arqueo/dominio.py` con la matriz de confusión, la tasa de fuga, la tasa de rechazo indebido y el intervalo de Wilson; verificar con `test/test_arqueo_dominio.py` casos conocidos de fuga, rechazo indebido, muestra pequeña y etiqueta faltante.
 - [ ] 7.5 Integrar las secciones `dominio` en `data/evaluacion/arqueo.json` y `docs/ARQUEO.md`; verificar que las cifras coinciden, que la ejecución es determinista y que no se incluye el texto completo de los casos.
-- [ ] 7.6 Implementar el clasificador de Roba la Bóveda (`inyeccion`, `extraccion_prompt`, `dato_personal`, `fuera_dominio`, `legitimo`) y las reglas de éxito; verificar con `test/test_roba_clasificador.py` un intento de cada categoría, uno resistido y uno legítimo.
-- [ ] 7.7 Implementar el marcador en `data/asistente/roba.sqlite`, el límite de 20 intentos por sesión y la exportación sin PII; verificar con pruebas el punto ganado, la defensa resistida, el reinicio y la exportación reproducible.
-- [ ] 7.8 Implementar los endpoints `POST /api/roba/intento`, `GET /api/roba`, `POST /api/roba/reiniciar` y `GET /api/roba/exportar`; verificar con `TestClient` que usan el corpus sintético y que no envían nada por WhatsApp.
-- [ ] 7.9 Documentar en `docs/ROBA_BOVEDA.md` las categorías, el puntaje, el límite y el carácter seguro del juego; verificar que el documento coincide con el clasificador y con el marcador.
+- [x] 7.6 Implementar el clasificador de Roba la Bóveda (`inyeccion`, `extraccion_prompt`, `dato_personal`, `fuera_dominio`, `legitimo`) y las reglas de éxito; verificar con `test/test_roba_clasificador.py` un intento de cada categoría, uno resistido y uno legítimo.
+- [x] 7.7 Implementar el marcador en `data/asistente/roba.sqlite`, el límite de 20 intentos por sesión y la exportación sin PII; verificar con pruebas el punto ganado, la defensa resistida, el reinicio y la exportación reproducible.
+- [x] 7.8 Implementar los endpoints `POST /api/roba/intento`, `GET /api/roba`, `POST /api/roba/reiniciar` y `GET /api/roba/exportar`; verificar con `TestClient` que usan el corpus sintético y que no envían nada por WhatsApp.
+- [x] 7.9 Documentar en `docs/ROBA_BOVEDA.md` las categorías, el puntaje, el límite y el carácter seguro del juego; verificar que el documento coincide con el clasificador y con el marcador.
 
 ## 8. Escenarios «¿Y si…?», latencia y operación — Yoldy (17–21 nov)
 
