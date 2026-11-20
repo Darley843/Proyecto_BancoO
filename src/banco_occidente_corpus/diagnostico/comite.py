@@ -15,7 +15,10 @@ El auditor también existe en código (`auditar`): ninguna cifra inventada, fras
 de aprobación, alternativa fuera de los escenarios ni recomendación más
 favorable que la de riesgo pasa la deliberación. La síntesis es determinística:
 el semáforo no cambia, gana la postura más prudente y, si el auditor vuelve a
-objetar tras una única corrección, se responde con el texto del diagnóstico.
+objetar tras una única corrección, se responde con el texto del diagnóstico. Si
+la corrección deja la validación determinística en limpio, la línea de la
+persona dice que el auditor está conforme aunque el agente haya objetado: su
+objeción original se conserva en `DeliberacionComite.posturas` para la pantalla.
 
 Límites: una sola ronda, máximo cuatro llamadas al modelo (tres agentes, una
 corrección y los reintentos por JSON inválido comparten ese tope), tope de
@@ -94,6 +97,8 @@ TIEMPO_MAXIMO_SEGUNDOS = 30.0
 MAX_ALTERNATIVAS = 2
 #: Por defecto el comité no razona: fue el modo más estable y barato en la demo.
 RAZONAMIENTO = False
+#: Temperatura 0 en los tres agentes, incluido el auditor: menos variación entre corridas.
+TEMPERATURA = 0.0
 
 #: Intentos por agente: el primero y un reintento si la salida no es JSON válido.
 MAX_INTENTOS_AGENTE = 2
@@ -217,13 +222,14 @@ class EscenarioComite(BaseModel):
 
 @dataclass(frozen=True, slots=True)
 class LimitesComite:
-    """Límites de la deliberación: llamadas, tokens por agente y reloj total."""
+    """Límites de la deliberación: llamadas, tokens, reloj y temperatura."""
 
     max_llamadas: int = MAX_LLAMADAS
     max_tokens_agente: int = MAX_TOKENS_AGENTE
     tiempo_maximo_segundos: float = TIEMPO_MAXIMO_SEGUNDOS
     max_alternativas: int = MAX_ALTERNATIVAS
     razonamiento: bool = RAZONAMIENTO
+    temperatura: float = TEMPERATURA
 
 
 @dataclass(slots=True)
@@ -290,6 +296,7 @@ def cargar_limites(ruta: Path | None = None) -> LimitesComite:
         tiempo_maximo_segundos=float(seccion.get("tiempo_maximo_segundos", TIEMPO_MAXIMO_SEGUNDOS)),
         max_alternativas=int(seccion.get("max_alternativas", MAX_ALTERNATIVAS)),
         razonamiento=bool(seccion.get("razonamiento", RAZONAMIENTO)),
+        temperatura=float(seccion.get("temperatura", TEMPERATURA)),
     )
 
 
@@ -345,7 +352,7 @@ def deliberar(
     )
     if modelo is None:
         modelo = crear_modelo(
-            temperatura=0.0,
+            temperatura=ajustes.temperatura,
             max_tokens=ajustes.max_tokens_agente,
             timeout=ajustes.tiempo_maximo_segundos,
             razonamiento=ajustes.razonamiento,
@@ -368,7 +375,10 @@ def deliberar(
 
     hallazgos = auditar(list(posturas.values()), resultado, escenarios)
     if posturas["auditor"].postura == "objeta" or hallazgos:
-        hallazgos = _corregir(
+        # La objeción original se conserva en `posturas` para la pantalla; el
+        # texto de la persona solo la muestra si la corrección no la resuelve.
+        originales = _sin_repetir([*_hallazgos_del_auditor(posturas["auditor"]), *hallazgos])
+        pendientes = _corregir(
             modelo,
             contexto,
             posturas,
@@ -377,14 +387,15 @@ def deliberar(
             ajustes,
             presupuesto,
             registro,
-            hallazgos,
+            originales,
         )
-        observaciones = _hallazgos_del_auditor(posturas["auditor"])
-        if hallazgos:
+        if pendientes:
             return _respuesta_sin_comite(
-                posturas, resultado, _sin_repetir([*observaciones, *hallazgos])
+                posturas, resultado, _sin_repetir([*originales, *pendientes])
             )
-        hallazgos = _sin_repetir([*observaciones, *hallazgos])
+        # La validación determinística pasa: la línea del auditor para la
+        # persona es «conforme», sin repetir una objeción ya corregida.
+        hallazgos = []
 
     alternativas = _elegir_alternativas(posturas["comercial"], escenarios, ajustes.max_alternativas)
     return _sintetizar(posturas, resultado, alternativas, hallazgos, escenarios)
@@ -499,7 +510,8 @@ def auditar(
     Revisa cifras, promesas de aprobación, alternativas fuera de los escenarios
     (solo en la postura del comercial), complacencia frente a la postura de
     riesgo, datos personales y, cuando se pasa la recomendación final, el aviso
-    orientativo.
+    orientativo que la síntesis agrega de forma determinística. Ese aviso no se
+    exige a las posturas de riesgo ni de comercial.
 
     Args:
         posturas: opiniones de los tres agentes.
@@ -1330,16 +1342,16 @@ def _linea_auditor(postura: PosturaAgente, hallazgos: Sequence[str]) -> str:
 
     Returns:
         `Auditor: revisó las cifras y está conforme`, el hallazgo principal si
-        objeta, o la línea completa si se abstuvo.
+        sigue objetando, o la línea completa si se abstuvo.
     """
     if postura.postura == "conforme":
         return AUDITOR_CONFORME
     if postura.postura == "objeta":
-        principal = (
-            hallazgos[0]
-            if hallazgos
-            else (postura.argumentos[0] if postura.argumentos else "objetó la deliberación")
-        )
+        if not hallazgos:
+            # Objetó antes de la corrección, pero la validación determinística
+            # pasó: el texto de la persona no puede contradecir la recomendación.
+            return AUDITOR_CONFORME
+        principal = hallazgos[0]
         return f"Auditor: {principal}"
     return _linea_postura(postura)
 

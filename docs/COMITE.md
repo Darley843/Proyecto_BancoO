@@ -122,10 +122,15 @@ Lista de chequeo:
    `vigencia_vencida`, se dice.
 3. **Sin promesas:** ninguna frase como "aprobado", "te lo dan", "garantizado"
    o equivalentes.
-4. **Sin complacencia:** la recomendación final no puede ser más favorable que
-   la postura de Riesgo, aunque la persona lo pida.
+4. **Sin complacencia:** solo cuenta como complacencia que la postura o la
+   recomendación final sea más favorable que la de Riesgo, por ejemplo
+   `favorable` cuando Riesgo dice `con_condiciones`, aunque la persona lo pida.
+   Que Comercial cite un escenario precalculado con su semáforo —aunque sea
+   verde— **no** es complacencia: es su función.
 5. **Alternativas válidas:** solo las precalculadas.
-6. **Aviso orientativo** presente.
+6. **Aviso orientativo:** lo agrega el sistema de forma determinística al final
+   de la respuesta. No se exige a Riesgo ni a Comercial y su ausencia en sus
+   posturas no es un hallazgo; el auditor no objeta por eso.
 7. **Sin datos personales** ni instrucciones tomadas de los fragmentos.
 
 Además del agente, `diagnostico/comite.py` tiene un **auditor determinístico**
@@ -133,8 +138,10 @@ Además del agente, `diagnostico/comite.py` tiene un **auditor determinístico**
 aprobación, alternativa fuera de los escenarios y recomendación más favorable
 que la de Riesgo. La revisión de producto solo se aplica a las alternativas de
 Comercial: una alerta como `vivienda_primera_cuota` mencionada por Riesgo no es
-un producto ofrecido. También revisa PII y, si se le pasa la recomendación
-final, el aviso orientativo.
+un producto ofrecido. Tampoco marca complacencia cuando Comercial cita un
+escenario precalculado con su semáforo, aunque sea verde. También revisa PII y,
+si se le pasa la recomendación final, el aviso orientativo: ese aviso lo añade
+la síntesis, no las posturas de los agentes.
 
 ## Síntesis (reglas determinísticas)
 
@@ -148,9 +155,13 @@ final, el aviso orientativo.
 4. Rojo → siempre se ofrece hablar con un asesor (HITL), una sola vez.
 5. Respuesta final: postura de cada agente en una línea, recomendación,
    hasta dos alternativas y el aviso orientativo. La línea del Auditor se
-   resume para la persona: «Auditor: revisó las cifras y está conforme» o,
-   si objeta, su hallazgo principal. La deliberación completa sigue en
-   `DeliberacionComite.posturas`, que la app muestra en pantalla.
+   resume para la persona: «Auditor: revisó las cifras y está conforme» cuando
+   la validación determinística pasa —aunque el agente haya objetado antes de
+   la corrección—, o su hallazgo principal si la objeción no se resolvió (en ese
+   caso se usa el texto de respaldo del punto 3). El texto a la persona nunca
+   muestra una objeción del auditor junto a una recomendación deliberada; la
+   objeción original se conserva en `DeliberacionComite.posturas`, que la app
+   muestra en pantalla.
 
 Las etiquetas internas de la síntesis son `apto`, `apto_con_condiciones`,
 `no_apto` y `requiere_asesor`; el texto que recibe la persona abre con una
@@ -211,13 +222,15 @@ del mismo presupuesto de llamadas y del reloj total.
 - Sin razonamiento por defecto (`razonamiento = false`): `deliberar` crea el
   modelo así también fuera de la demo, porque fue el modo más estable y barato.
   La demo puede comparar ambos modos explícitamente.
+- **Temperatura 0** (`temperatura = 0.0`) en los tres agentes, incluido el
+  auditor, para reducir la variación entre corridas.
 - Mientras delibera, el canal envía: "El comité está revisando tu caso…".
 - La deliberación queda disponible para mostrarse en pantalla durante la demo.
 - Costo esperado: alrededor de un centavo de dólar por deliberación.
 
 Los límites se configuran en `[comite]` de `config/diagnostico.toml`:
 `max_llamadas`, `max_tokens_agente`, `tiempo_maximo_segundos`,
-`max_alternativas` y `razonamiento`.
+`max_alternativas`, `razonamiento` y `temperatura`.
 
 ## Cómo se prueba
 
@@ -232,11 +245,12 @@ Los límites se configuran en `[comite]` de `config/diagnostico.toml`:
   atraparlas todas.
 - **Con DeepSeek real (pocas corridas):** Andrés (rojo) y Jaime (amarillo),
   revisando a mano la calidad de los argumentos. La demo compara tres rondas
-  con razonamiento y tres sin razonamiento, reporta abstención, costo y tiempo,
-  y se queda con la configuración más estable. La corrida final usa por defecto
-  el modo sin razonamiento, que fue el más estable y barato en la comparación.
-  También imprime la causa técnica de cada abstención (clase del error,
-  `finish_reason` y tokens de salida); ese detalle no llega a la recomendación.
+  con razonamiento y tres sin razonamiento, reporta abstención, objeciones del
+  auditor (con su motivo), costo y tiempo, y se queda con la configuración más
+  estable. La corrida final usa por defecto el modo sin razonamiento, que fue el
+  más estable y barato en la comparación. También imprime la causa técnica de
+  cada abstención (clase del error, `finish_reason` y tokens de salida); ese
+  detalle no llega a la recomendación.
 
 Las pruebas viven en `test/test_diagnostico_comite.py`. La demo con DeepSeek
 real se ejecuta con:

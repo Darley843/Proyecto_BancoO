@@ -127,6 +127,35 @@ class Balance:
         return conteo
 
     @property
+    def objeciones(self) -> int:
+        """Veces que el agente auditor objetó antes de la corrección."""
+        return sum(
+            1
+            for corrida in self.corridas
+            if corrida.deliberacion is not None
+            for postura in corrida.deliberacion.posturas
+            if postura.agente == "auditor" and postura.postura == "objeta"
+        )
+
+    def motivos_objecion(self) -> list[str]:
+        """Explica cada objeción del auditor con su ronda y su persona.
+
+        Returns:
+            Una línea por objeción, con los argumentos que dejó el agente; la
+            lista queda vacía si el auditor no objetó.
+        """
+        lineas: list[str] = []
+        for corrida in self.corridas:
+            if corrida.deliberacion is None:
+                continue
+            for postura in corrida.deliberacion.posturas:
+                if postura.agente != "auditor" or postura.postura != "objeta":
+                    continue
+                motivo = " | ".join(postura.argumentos) or "sin argumentos"
+                lineas.append(f"ronda {corrida.ronda} {corrida.persona}: {motivo}")
+        return lineas
+
+    @property
     def costo_usd(self) -> float:
         """Costo de todas las llamadas, incluidas las que fallaron."""
         return sum(_resumen(corrida.registro).costo_usd_total for corrida in self.corridas)
@@ -305,7 +334,7 @@ def _imprimir_comparacion(balances: Sequence[Balance]) -> None:
     Args:
         balances: resultados de cada configuración comparada.
     """
-    print("\n=== Comparación de configuraciones ===")
+    print("\n=== Resumen por configuración ===")
     print(
         f"{'configuración':<20} {'posturas':>9} {'absten.':>8} {'tasa':>7} "
         f"{'costo USD':>12} {'tiempo s':>9} {'promedio s':>11}"
@@ -323,6 +352,9 @@ def _imprimir_comparacion(balances: Sequence[Balance]) -> None:
             f"riesgo={por_rol['riesgo']}, comercial={por_rol['comercial']}, "
             f"auditor={por_rol['auditor']}"
         )
+        print(f"  objeciones del auditor: {balance.objeciones}")
+        for linea in balance.motivos_objecion():
+            print(f"    - {linea}")
         _imprimir_abstenciones(balance)
 
 
@@ -475,6 +507,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             tiempo_maximo_segundos=limites.tiempo_maximo_segundos,
             max_alternativas=limites.max_alternativas,
             razonamiento=limites.razonamiento,
+            temperatura=limites.temperatura,
         )
     personas = _personas()
     casos = {ident: _diagnostico(ident) for ident in PERSONAS}
@@ -496,7 +529,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     balances: list[Balance] = []
     for configuracion in configuraciones:
         modelo = crear_modelo(
-            temperatura=0.0,
+            temperatura=limites.temperatura,
             max_tokens=limites.max_tokens_agente,
             timeout=limites.tiempo_maximo_segundos,
             razonamiento=configuracion.razonamiento,
@@ -507,13 +540,12 @@ def main(argv: Sequence[str] | None = None) -> int:
                 balance.corridas.append(_correr(ident, casos[ident], modelo, limites, ronda=ronda))
         balances.append(balance)
 
-    if len(balances) > 1:
-        _imprimir_comparacion(balances)
+    _imprimir_comparacion(balances)
     elegida = _elegir(balances)
     print(f"\nConfiguración elegida: {elegida.configuracion.nombre}")
 
     modelo = crear_modelo(
-        temperatura=0.0,
+        temperatura=limites.temperatura,
         max_tokens=limites.max_tokens_agente,
         timeout=limites.tiempo_maximo_segundos,
         razonamiento=elegida.configuracion.razonamiento,

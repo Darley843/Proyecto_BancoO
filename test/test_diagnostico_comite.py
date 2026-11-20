@@ -836,9 +836,78 @@ def test_correccion_unica_y_sin_segunda_ronda(raiz_tasas: Path) -> None:
     assert deliberacion.recomendacion.startswith(
         "El comité de crédito considera viable la solicitud, con condiciones."
     )
-    assert deliberacion.hallazgos_auditor
-    assert any("promesa" in hallazgo.casefold() for hallazgo in deliberacion.hallazgos_auditor)
-    assert "Auditor: Hay una promesa de aprobación." in deliberacion.recomendacion
+    # La corrección deja la validación determinística en limpio: la persona ve
+    # que el auditor está conforme y nunca la objeción ya corregida.
+    assert "Auditor: revisó las cifras y está conforme" in deliberacion.recomendacion
+    assert "Hay una promesa de aprobación." not in deliberacion.recomendacion
+    assert deliberacion.hallazgos_auditor == []
+    # La objeción original se conserva en `posturas` para la pantalla.
+    auditor = next(postura for postura in deliberacion.posturas if postura.agente == "auditor")
+    assert auditor.postura == "objeta"
+    assert auditor.argumentos == ["Hay una promesa de aprobación."]
+
+
+def test_comercial_con_escenario_verde_no_es_complacencia(raiz_tasas: Path) -> None:
+    """Citar compra de cartera en verde no es complacencia si ambas posturas coinciden.
+
+    Regresión de la demo real con Jaime: el auditor objetó porque Comercial citó
+    un escenario precalculado con semáforo verde. Esa cita es su función; la
+    complacencia solo existe si la postura es más favorable que la de Riesgo. Si
+    la corrección pasa la validación determinística, el texto a la persona no
+    muestra la objeción.
+    """
+    entrada, resultado = _diagnostico("pensionado_amarillo", raiz_tasas)
+    escenarios = construir_escenarios(entrada, resultado, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
+    compra = next(escenario for escenario in escenarios if escenario.codigo == "compra_de_cartera")
+    assert compra.semaforo == "verde"
+
+    riesgo = _postura(
+        "riesgo",
+        "con_condiciones",
+        ["La cuota deja un margen ajustado y la razón está en amarillo."],
+        ["margen_despues_cuota", "razon_endeudamiento"],
+    )
+    comercial = _postura(
+        "comercial",
+        "con_condiciones",
+        [
+            "[compra_de_cartera] Trasladar las cuotas actuales deja el semáforo "
+            "en verde; la recomendación sigue con condiciones."
+        ],
+        ["escenarios[compra_de_cartera]"],
+    )
+    objecion = _postura(
+        "auditor",
+        "objeta",
+        ["La postura del comercial es más favorable que la de riesgo."],
+    )
+
+    assert (
+        auditar(
+            [PosturaAgente.model_validate(postura) for postura in (riesgo, comercial, objecion)],
+            resultado,
+            escenarios,
+        )
+        == []
+    )
+
+    modelo = ModeloComite(
+        {
+            "riesgo": [riesgo],
+            "comercial": [comercial, comercial],
+            "auditor": [objecion],
+        }
+    )
+    deliberacion = deliberar(entrada, resultado, modelo=modelo, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
+
+    assert deliberacion is not None
+    assert modelo.llamadas.count("comercial") == 2
+    assert "Auditor: revisó las cifras y está conforme" in deliberacion.recomendacion
+    assert "más favorable" not in deliberacion.recomendacion
+    assert "objeta" not in deliberacion.recomendacion
+    assert deliberacion.hallazgos_auditor == []
+    auditor = next(postura for postura in deliberacion.posturas if postura.agente == "auditor")
+    assert auditor.postura == "objeta"
 
 
 def test_prompts_del_comite_cargan_sin_datos_personales() -> None:
@@ -848,6 +917,17 @@ def test_prompts_del_comite_cargan_sin_datos_personales() -> None:
         assert prompt.sistema
         assert "invent" in prompt.sistema.casefold()
         assert detectar_pii(prompt.sistema) is None
+
+
+def test_prompt_del_auditor_no_confunde_semaforo_verde_con_complacencia() -> None:
+    """El auditor no exige el aviso a los agentes ni llama complacencia a un escenario verde."""
+    prompt = cargar_prompt("comite_auditor")
+    texto = f"{prompt.sistema}\n{prompt.recordatorio}".casefold()
+
+    assert "aunque sea verde" in texto
+    assert "**no** es complacencia" in texto
+    assert "determin" in texto
+    assert "no se exige" in texto
 
 
 def test_el_comite_no_recibe_nombre_ni_numero(raiz_tasas: Path) -> None:
@@ -1084,6 +1164,7 @@ def test_limites_del_comite_cubren_el_razonamiento() -> None:
     assert limites.max_tokens_agente == 3_000
     assert limites.max_llamadas == 4
     assert limites.tiempo_maximo_segundos == 30.0
+    assert limites.temperatura == 0.0
 
 
 def test_deliberar_crea_el_modelo_sin_razonamiento(
@@ -1115,6 +1196,7 @@ def test_deliberar_crea_el_modelo_sin_razonamiento(
     assert deliberacion is not None
     assert limites.razonamiento is False
     assert capturado["razonamiento"] is False
+    assert capturado["temperatura"] == 0.0
     assert capturado["max_tokens"] == limites.max_tokens_agente
     assert capturado["timeout"] == limites.tiempo_maximo_segundos
 
