@@ -30,6 +30,23 @@ vivienda_primera_cuota = 0.40
 monto_minimo = 500000
 monto_maximo = 2000000000
 
+# Límites del comité de crédito (docs/COMITE.md). La deliberación hace una sola
+# ronda de tres agentes y, si el auditor objeta, una única corrección: nunca
+# más de cuatro llamadas al modelo, reintentos incluidos. `max_tokens_agente`
+# es el tope de cada respuesta —el razonamiento de DeepSeek consume ese tope y
+# con 1.200 el JSON quedaba cortado— y `tiempo_maximo_segundos` el reloj total
+# de la deliberación. `razonamiento = false` desactiva el modo de pensamiento
+# del modelo: fue el modo más estable y barato en la demo, y `deliberar` lo usa
+# por defecto también fuera de la demo. `temperatura = 0` se aplica a los tres
+# agentes, incluido el auditor, para reducir la variación entre corridas.
+[comite]
+max_llamadas = 4
+max_tokens_agente = 3000
+tiempo_maximo_segundos = 30
+max_alternativas = 2
+razonamiento = false
+temperatura = 0.0
+
 [productos]
 libre_inversion = "Libre inversión"
 compra_cartera = "Compra de cartera"

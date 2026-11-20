@@ -64,6 +64,7 @@ from banco_occidente_corpus.asistente.validacion import (
     es_sin_datos,
     mensaje_pii,
     normalizar_cifra,
+    normalizar_cifra_numerica,
     sanear_pregunta,
 )
 from banco_occidente_corpus.utils import stable_tokens
@@ -259,6 +260,18 @@ def test_crear_modelo_usa_deepseek_flash(monkeypatch: pytest.MonkeyPatch) -> Non
     assert modelo.model_name == "deepseek-flash"
     assert modelo.temperature == 0.0
     assert modelo.max_tokens == 512
+
+
+def test_crear_modelo_puede_desactivar_el_razonamiento(monkeypatch: pytest.MonkeyPatch) -> None:
+    """El comité compara el modo normal con `reasoning_effort="none"`."""
+    monkeypatch.setenv("DEEPSEEK_API_KEY", "clave-falsa")
+
+    con_razonamiento = crear_modelo(max_tokens=3_000)
+    sin_razonamiento = crear_modelo(max_tokens=3_000, razonamiento=False)
+
+    assert con_razonamiento.reasoning_effort is None
+    assert sin_razonamiento.reasoning_effort == "none"
+    assert sin_razonamiento.max_tokens == 3_000
 
 
 # ---------------------------------------------------------------- prompts
@@ -690,8 +703,19 @@ def test_cifras_inventadas_normaliza_el_contexto() -> None:
     assert cifras_inventadas("La línea es 018000514652", CONTEXTO) == set()
     assert cifras_inventadas("La línea es 018000 514652", CONTEXTO) == set()
     assert cifras_inventadas("La tasa es 4,5%", CONTEXTO) == set()
-    assert cifras_inventadas("La tasa es 99 %", CONTEXTO) == {"99"}
+    assert cifras_inventadas("La tasa es 99 %", CONTEXTO) == {"0.99"}
     assert "15000" in cifras_duras(CONTEXTO)
+
+
+def test_cifras_equiparan_decimal_y_porcentaje() -> None:
+    """Un decimal y su porcentaje equivalente son la misma cifra canonica."""
+    assert normalizar_cifra_numerica("0.30") == "0.3"
+    assert normalizar_cifra_numerica("30 %") == "0.3"
+    assert normalizar_cifra_numerica("0.8572") == "0.8572"
+    assert normalizar_cifra_numerica("85,72 %") == "0.8572"
+    assert cifras_duras("0.30") == cifras_duras("30 %")
+    assert "030" not in cifras_duras("0.30")
+    assert normalizar_cifra_numerica("$1.393.023") == "1393023"
 
 
 # ---------------------------------------------------------------- FAQ

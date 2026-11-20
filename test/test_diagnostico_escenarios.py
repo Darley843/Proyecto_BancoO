@@ -396,6 +396,8 @@ def test_por_defecto_usa_el_motor_del_diagnostico(
 def test_formatos_en_pesos() -> None:
     """Pesos con punto de miles; un rango con extremos iguales es una cifra."""
     assert formatear_pesos(Decimal("1250000.4")) == "$1.250.000"
+    assert formatear_pesos(Decimal("-1643023")) == "-$1.643.023"
+    assert formatear_pesos(Decimal("-524")) == "-$524"
     assert (
         formatear_rango(RangoDecimal(desde=Decimal(410_000), hasta=Decimal(455_000)))
         == "$410.000–$455.000"

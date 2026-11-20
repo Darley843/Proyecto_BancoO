@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 if TYPE_CHECKING:
     from langchain_core.language_models import BaseChatModel
@@ -46,10 +46,13 @@ class ParametrosTarea:
 
 
 #: Parametros fijos por tarea: Q&A y FAQ a temperatura 0, resumen a 0.2.
+#: El comite pide 3.000 tokens porque el razonamiento consume el tope y el JSON
+#: de la postura quedaba cortado con 1.200.
 PARAMETROS_POR_TAREA: dict[str, ParametrosTarea] = {
     "qa": ParametrosTarea(temperatura=0.0, max_tokens=2_000),
     "faq": ParametrosTarea(temperatura=0.0, max_tokens=8_000),
     "resumen": ParametrosTarea(temperatura=0.2, max_tokens=4_000),
+    "comite": ParametrosTarea(temperatura=0.0, max_tokens=3_000),
 }
 
 
@@ -81,21 +84,34 @@ def crear_modelo(
     max_tokens: int | None = None,
     timeout: float = TIMEOUT_POR_DEFECTO,
     max_retries: int = REINTENTOS_POR_DEFECTO,
+    razonamiento: bool = True,
 ) -> BaseChatModel:
     """Crea un ``ChatDeepSeek`` configurado para el asistente.
 
     La importacion es perezosa para que ``--help`` funcione sin clave ni red.
+
+    Args:
+        modelo: nombre del modelo en la API.
+        temperatura: temperatura de muestreo.
+        max_tokens: tope de tokens de salida, razonamiento incluido.
+        timeout: tiempo maximo de cada peticion, en segundos.
+        max_retries: reintentos del cliente HTTP de LangChain.
+        razonamiento: si es ``False`` desactiva el modo de pensamiento con
+            ``reasoning_effort="none"``; el comite lo compara en su demo.
     """
     from langchain_deepseek import ChatDeepSeek
 
-    return ChatDeepSeek(
-        model=modelo,
-        api_key=api_key_desde_entorno(),
-        temperature=temperatura,
-        max_tokens=max_tokens,
-        timeout=timeout,
-        max_retries=max_retries,
-    )
+    opciones: dict[str, Any] = {
+        "model": modelo,
+        "api_key": api_key_desde_entorno(),
+        "temperature": temperatura,
+        "max_tokens": max_tokens,
+        "timeout": timeout,
+        "max_retries": max_retries,
+    }
+    if not razonamiento:
+        opciones["reasoning_effort"] = "none"
+    return ChatDeepSeek(**opciones)
 
 
 def crear_modelo_para(
@@ -104,6 +120,7 @@ def crear_modelo_para(
     modelo: str = MODELO_POR_DEFECTO,
     timeout: float = TIMEOUT_POR_DEFECTO,
     max_retries: int = REINTENTOS_POR_DEFECTO,
+    razonamiento: bool = True,
 ) -> BaseChatModel:
     """Crea el modelo con la temperatura y el tope que fija la tarea."""
     parametros = parametros_de(tarea)
@@ -113,4 +130,5 @@ def crear_modelo_para(
         max_tokens=parametros.max_tokens,
         timeout=timeout,
         max_retries=max_retries,
+        razonamiento=razonamiento,
     )
