@@ -45,7 +45,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 from ..asistente.metricas import extraer_metricas
 from ..asistente.modelo import crear_modelo
 from ..asistente.prompts import cargar_prompt
-from ..asistente.validacion import cifras_duras, detectar_pii, normalizar_cifra
+from ..asistente.validacion import cifras_duras, detectar_pii, normalizar_cifra_numerica
 from ..canal.contratos import EntradaDiagnostico, RangoDecimal, ResultadoDiagnostico
 from ..config import PROJECT_ROOT
 from ..tablero.tasas import NOMBRES_PRODUCTO
@@ -108,6 +108,9 @@ _FECHA_ISO = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
 
 #: Números estructurales que no son cifras del caso (conteos y porcentajes).
 _CIFRAS_ESTRUCTURALES = frozenset({"0", "1", "2", "3", "10", "20", "30", "40", "100"})
+
+#: Porcentajes de la prueba de estrés de ingreso (independiente y dependiente).
+PORCENTAJES_ESTRES: tuple[int, ...] = (10, 20)
 
 #: Frase con la que la recomendación ofrece hablar con un asesor.
 _OFERTA_ASESOR = "habla con un asesor"
@@ -1184,13 +1187,41 @@ def _cifras_permitidas(
     for fecha in _FECHA_ISO.findall("\n".join(textos)):
         permitidas.update({str(int(parte)) for parte in fecha})
     for valor in _decimales(resultado.model_dump(mode="json")):
-        for cifra in (valor, valor * 100):
-            permitidas.add(normalizar_cifra(_formatear_decimal(cifra)))
+        _agregar_equivalente(permitidas, valor)
     for escenario in escenarios:
         for valor in _decimales(escenario.model_dump(mode="json")):
-            for cifra in (valor, valor * 100):
-                permitidas.add(normalizar_cifra(_formatear_decimal(cifra)))
+            _agregar_equivalente(permitidas, valor)
+    for valor in _umbrales_de_politica():
+        _agregar_equivalente(permitidas, valor)
+    for porcentaje in PORCENTAJES_ESTRES:
+        _agregar_equivalente(permitidas, Decimal(porcentaje) / Decimal(100))
     return {cifra for cifra in permitidas if cifra}
+
+
+def _agregar_equivalente(destino: set[str], valor: Decimal) -> None:
+    """Añade una cifra y su forma porcentual al conjunto de permitidas.
+
+    Args:
+        destino: conjunto de cifras que se amplía en el sitio.
+        valor: número que el caso autoriza citar.
+    """
+    texto = _formatear_decimal(valor)
+    destino.add(normalizar_cifra_numerica(texto))
+    destino.add(normalizar_cifra_numerica(f"{texto} %"))
+
+
+def _umbrales_de_politica() -> tuple[Decimal, ...]:
+    """Lee de `config/diagnostico.toml` los umbrales que el comité puede citar.
+
+    Returns:
+        Los límites verde, amarillo y de vivienda de la política del proyecto.
+    """
+    ajustes = motor.cargar_config()
+    return (
+        ajustes.verde_hasta,
+        ajustes.amarillo_hasta,
+        ajustes.umbral_vivienda_primera_cuota,
+    )
 
 
 def _decimales(valor: Any) -> Iterator[Decimal]:

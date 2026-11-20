@@ -640,6 +640,85 @@ def test_error_400_deepseek_devuelve_respuesta_deterministica(raiz_tasas: Path) 
     assert all(postura.postura == "abstencion" for postura in deliberacion.posturas)
 
 
+def test_demo_andres_no_cae_al_texto_de_respaldo(raiz_tasas: Path) -> None:
+    """Regresión de la demo real: los umbrales 0.30 y 0.40 no son cifras inventadas.
+
+    Las posturas reproducen el caso y los formatos que citó Riesgo en la demo
+    con Andrés. Riesgo cita los umbrales en forma decimal y porcentual, la tasa
+    máxima y su vigencia; el auditor queda conforme. Antes del arreglo, el
+    auditor determinístico reportaba «030» y «040» y la recomendación caía al
+    texto del diagnóstico.
+    """
+    entrada, resultado = _diagnostico("independiente_rojo", raiz_tasas)
+    assert resultado.semaforo == "rojo"
+    escenarios = construir_escenarios(entrada, resultado, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
+    posturas = [
+        _postura(
+            "riesgo",
+            "desfavorable",
+            [
+                "La razón de endeudamiento es 0.8572, equivalente a 85,72 %, y "
+                "supera el umbral amarillo de 0.40 (40 %).",
+                "El umbral verde es 0.30 (30 %) y la cuota máxima de $1.393.023 "
+                "supera la capacidad de $250.000.",
+                "La tasa máxima es 28,17 % E.A., vigente del 1 al 30 de noviembre de 2026.",
+            ],
+            ["razon_endeudamiento", "margen_despues_cuota", "tasa_ea.hasta"],
+        ),
+        _postura(
+            "comercial",
+            "desfavorable",
+            [
+                "[plazo_mas_largo] Ampliar el plazo a 48 meses deja la cuota en "
+                "$1.043.628–$1.162.006 y el semáforo sigue en rojo.",
+                "[compra_de_cartera] Trasladar las cuotas actuales deja el margen "
+                "negativo y el semáforo sigue en rojo.",
+            ],
+            ["escenarios[plazo_mas_largo]", "escenarios[compra_de_cartera]"],
+        ),
+        _postura(
+            "auditor",
+            "conforme",
+            [
+                "Revisé las cifras: 0.8572 y 85,72 % coinciden con la razón de "
+                "endeudamiento; 0.30 (30 %) y 0.40 (40 %) son política del proyecto.",
+                "La tasa máxima de 28,17 % E.A. y la vigencia del 1 al 30 de "
+                "noviembre de 2026 están citadas.",
+            ],
+            ["diagnostico", "umbrales"],
+        ),
+    ]
+
+    hallazgos = auditar(
+        [PosturaAgente.model_validate(postura) for postura in posturas],
+        resultado,
+        escenarios,
+    )
+    assert hallazgos == []
+
+    modelo = ModeloComite(
+        {
+            "riesgo": [posturas[0]],
+            "comercial": [posturas[1]],
+            "auditor": [posturas[2]],
+        }
+    )
+    deliberacion = deliberar(
+        entrada,
+        resultado,
+        modelo=modelo,
+        hoy=FECHA_CONSULTA,
+        raiz=raiz_tasas,
+    )
+
+    assert deliberacion is not None
+    assert sorted(modelo.llamadas) == ["auditor", "comercial", "riesgo"]
+    assert deliberacion.hallazgos_auditor == []
+    assert deliberacion.recomendacion.startswith("no_apto:")
+    assert "El comité no logró" not in deliberacion.recomendacion
+    assert deliberacion.ofrece_asesor is True
+
+
 def test_correccion_unica_y_sin_segunda_ronda(raiz_tasas: Path) -> None:
     """Una objeción del auditor se corrige una vez y no se repite la ronda."""
     entrada, resultado = _diagnostico("pensionado_amarillo", raiz_tasas)

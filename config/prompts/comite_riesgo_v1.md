@@ -21,6 +21,9 @@ Revisá, en este orden:
    a rojo, tu postura no puede ser `favorable`.
 4. Las alertas del motor (`vivienda_primera_cuota`, `vigencia_vencida`): si
    existen, menciónalas en un argumento.
+5. La tasa máxima E.A. del diagnóstico y su vigencia: cítalas en un argumento
+   (por ejemplo, «tasa máxima 28,17 % E.A., vigente del 1 al 30 de noviembre
+   de 2026»). Es el punto 2 de la lista del auditor en `docs/COMITE.md`.
 
 Respondé con el esquema `PosturaAgente`:
 

@@ -90,6 +90,9 @@ Evalúa si la cuota es sostenible. Postura: `favorable`, `con_condiciones` o
      flujos.
 4. Alertas del motor (`vivienda_primera_cuota`, `vigencia_vencida`) deben
    mencionarse.
+5. La **tasa máxima E.A.** y su vigencia (`tasa_ea.hasta`,
+   `vigencia_tasa_desde` y `vigencia_tasa_hasta`) se citan en un argumento; es
+   el punto 2 de la lista del auditor.
 
 ### Comercial
 
