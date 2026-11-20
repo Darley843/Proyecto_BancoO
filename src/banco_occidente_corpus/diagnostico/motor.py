@@ -104,6 +104,9 @@ class ConfigDiagnostico:
     bloques: Mapping[str, BloqueRango] = field(default_factory=dict)
     monto_minimo: Decimal = MONTO_MINIMO
     monto_maximo: Decimal = MONTO_MAXIMO
+    preguntas: Mapping[str, str] = field(default_factory=dict)
+    textos: Mapping[str, str] = field(default_factory=dict)
+    orden: tuple[str, ...] = ()
 
 
 def cargar_config(ruta: Path | None = None) -> ConfigDiagnostico:
@@ -130,11 +133,16 @@ def cargar_config(ruta: Path | None = None) -> ConfigDiagnostico:
     claves: dict[str, str] = {}
     aplica_a: dict[str, tuple[str, ...]] = {}
     bloques: dict[str, BloqueRango] = {}
+    preguntas: dict[str, str] = {}
+    textos: dict[str, str] = {}
+    orden: list[str] = []
     for rango in datos.get("rango", []):
         clave = str(rango["clave"])
         productos = tuple(str(producto) for producto in rango.get("aplica_a", []))
         minimo: Decimal | None = None
         maximo: Decimal | None = None
+        orden.append(clave)
+        preguntas[clave] = str(rango.get("pregunta", ""))
         for opcion in rango.get("opcion", []):
             ident = str(opcion["id"])
             valor = Decimal(str(opcion["valor"]))
@@ -143,6 +151,7 @@ def cargar_config(ruta: Path | None = None) -> ConfigDiagnostico:
             valores[ident] = valor
             claves[ident] = clave
             aplica_a[ident] = productos
+            textos[ident] = str(opcion.get("texto", ident))
             minimo = inferior if minimo is None else min(minimo, inferior)
             maximo = superior if maximo is None else max(maximo, superior)
         if minimo is not None and maximo is not None:
@@ -162,6 +171,9 @@ def cargar_config(ruta: Path | None = None) -> ConfigDiagnostico:
         bloques=bloques,
         monto_minimo=Decimal(str(limites.get("monto_minimo", MONTO_MINIMO))),
         monto_maximo=Decimal(str(limites.get("monto_maximo", MONTO_MAXIMO))),
+        preguntas=preguntas,
+        textos=textos,
+        orden=tuple(orden),
     )
 
 

@@ -10,11 +10,11 @@ Dos implementaciones detrás del ``Protocol`` :class:`Enviador`:
   el destino esté entre las huellas autorizadas.
 
 Los textos largos se parten por párrafos en bloques de 4.096 caracteres; los
-botones van en un mensaje interactivo y el título se recorta a 20. La tarjeta
-de Pana se sube como media y se envía como imagen después del texto: si la
-imagen falla, el texto ya salió y la respuesta no se corta. El token, el número
-y los bytes de la imagen nunca se registran en los logs. Las pruebas viven en
-``test/test_canal_envio.py``.
+botones van en un mensaje interactivo (título recortado a 20) y las listas en
+otro, con hasta diez filas. La tarjeta de Pana se sube como media y se envía
+como imagen después del texto: si la imagen falla, el texto ya salió y la
+respuesta no se corta. El token, el número y los bytes de la imagen nunca se
+registran en los logs. Las pruebas viven en ``test/test_canal_envio.py``.
 """
 
 from __future__ import annotations
@@ -32,10 +32,16 @@ from uuid import uuid4
 import httpx
 
 from .almacen import conectar, inicializar_almacen
-from .contratos import BotonCanal, RespuestaCanal
+from .contratos import BotonCanal, OpcionCanal, RespuestaCanal
 
 #: Largo máximo de un mensaje de WhatsApp.
 LARGO_MAXIMO: int = 4096
+
+#: Etiqueta del botón que abre la lista interactiva (Meta corta en 20).
+TITULO_LISTA: str = "Elige una opción"
+
+#: Título de la única sección de la lista (Meta corta en 24).
+TITULO_SECCION: str = "Opciones"
 
 #: Intentos totales contra Meta (el primero más un reintento).
 INTENTOS: int = 2
@@ -184,7 +190,8 @@ class EnviadorMeta:
             for indice, parte in enumerate(partes):
                 ultima = indice == len(partes) - 1
                 botones = respuesta.botones if ultima and respuesta.tipo == "botones" else []
-                salida = self._enviar_parte(cliente, parte, botones)
+                opciones = respuesta.opciones if ultima and respuesta.tipo == "lista" else []
+                salida = self._enviar_parte(cliente, parte, botones, opciones)
             if respuesta.tipo == "imagen" and respuesta.imagen is not None:
                 try:
                     media_id = self._subir_imagen(cliente, respuesta.imagen)
@@ -196,14 +203,34 @@ class EnviadorMeta:
             if propio:
                 cliente.close()
 
-    def _cuerpo(self, texto: str, botones: list[BotonCanal]) -> dict[str, Any]:
-        """Arma el JSON de un mensaje de texto o interactivo."""
+    def _cuerpo(
+        self,
+        texto: str,
+        botones: list[BotonCanal],
+        opciones: list[OpcionCanal],
+    ) -> dict[str, Any]:
+        """Arma el JSON de un mensaje de texto, de botones o de lista."""
         cuerpo: dict[str, Any] = {
             "messaging_product": "whatsapp",
             "recipient_type": "individual",
             "to": self.destino,
         }
-        if botones:
+        if opciones:
+            cuerpo["type"] = "interactive"
+            cuerpo["interactive"] = {
+                "type": "list",
+                "body": {"text": texto},
+                "action": {
+                    "button": TITULO_LISTA,
+                    "sections": [
+                        {
+                            "title": TITULO_SECCION,
+                            "rows": [_fila(opcion) for opcion in opciones],
+                        }
+                    ],
+                },
+            }
+        elif botones:
             cuerpo["type"] = "interactive"
             cuerpo["interactive"] = {
                 "type": "button",
@@ -278,10 +305,16 @@ class EnviadorMeta:
 
         raise ErrorEnvio("Meta no respondió")
 
-    def _enviar_parte(self, cliente: httpx.Client, texto: str, botones: list[BotonCanal]) -> str:
+    def _enviar_parte(
+        self,
+        cliente: httpx.Client,
+        texto: str,
+        botones: list[BotonCanal],
+        opciones: list[OpcionCanal],
+    ) -> str:
         """Envía una parte con reintentos acotados y sin filtrar secretos."""
         url = f"{URL_META}/{self.version_api}/{self.phone_number_id}/messages"
-        respuesta = self._publicar(cliente, url, json=self._cuerpo(texto, botones))
+        respuesta = self._publicar(cliente, url, json=self._cuerpo(texto, botones, opciones))
         return _id_salida(respuesta)
 
     def _subir_imagen(self, cliente: httpx.Client, png: bytes) -> str:
@@ -332,6 +365,21 @@ class EnviadorMeta:
             "image": {"id": media_id},
         }
         return _id_salida(self._publicar(cliente, url, json=cuerpo))
+
+
+def _fila(opcion: OpcionCanal) -> dict[str, str]:
+    """Convierte una opción en la fila que espera la lista de Meta.
+
+    Args:
+        opcion: fila del contrato del canal.
+
+    Returns:
+        El JSON de la fila, con los topes de Meta aplicados (24 y 72).
+    """
+    fila = {"id": opcion.id, "title": opcion.titulo[:24]}
+    if opcion.descripcion:
+        fila["description"] = opcion.descripcion[:72]
+    return fila
 
 
 def _id_salida(respuesta: httpx.Response) -> str:

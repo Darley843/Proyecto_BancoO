@@ -54,6 +54,21 @@ class BotonCanal(BaseModel):
     titulo: str = Field(min_length=1, max_length=20)
 
 
+class OpcionCanal(BaseModel):
+    """Una fila de la lista interactiva de WhatsApp.
+
+    WhatsApp corta el título en 24 caracteres y la descripción en 72; el
+    identificador es el que vuelve en ``MensajeEntrante.id_boton`` cuando la
+    persona elige la fila.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    id: str = Field(min_length=1, max_length=256)
+    titulo: str = Field(min_length=1, max_length=24)
+    descripcion: str | None = Field(default=None, max_length=72)
+
+
 class MensajeEntrante(BaseModel):
     """Mensaje normalizado que llega desde el webhook."""
 
@@ -70,8 +85,10 @@ class MensajeEntrante(BaseModel):
 class RespuestaCanal(BaseModel):
     """Respuesta que el canal envía al usuario.
 
-    Una respuesta de tipo ``imagen`` lleva además el PNG de Pana en memoria:
-    el texto viaja primero y la imagen después. El PNG se excluye de la
+    Una respuesta de tipo ``botones`` lleva hasta tres botones y una de tipo
+    ``lista`` entre una y diez filas: las dos son excluyentes entre sí y con la
+    imagen. Una respuesta de tipo ``imagen`` lleva además el PNG de Pana en
+    memoria: el texto viaja primero y la imagen después. El PNG se excluye de la
     representación para que sus bytes no terminen en un log.
     """
 
@@ -80,33 +97,43 @@ class RespuestaCanal(BaseModel):
     usuario_id: str
     id_mensaje_origen: str
     texto: str = Field(min_length=1, max_length=4096)
-    tipo: Literal["texto", "botones", "error", "imagen"] = "texto"
+    tipo: Literal["texto", "botones", "lista", "error", "imagen"] = "texto"
     botones: list[BotonCanal] = Field(default_factory=list, max_length=3)
+    opciones: list[OpcionCanal] = Field(default_factory=list, max_length=10)
     metadatos: dict[str, str] = Field(default_factory=dict)
     imagen: bytes | None = Field(default=None, repr=False)
 
     @model_validator(mode="after")
-    def _imagen_coherente(self) -> Self:
-        """Exige el PNG con el tipo imagen y lo prohíbe en los demás tipos.
+    def _interactivo_coherente(self) -> Self:
+        """Exige cada interactivo con su tipo y lo prohíbe en los demás.
 
-        La imagen acompaña al texto y no reemplaza a los botones, así que una
-        respuesta de imagen no los admite. El peso se controla antes de salir
-        a la red.
+        La imagen acompaña al texto y no reemplaza a los botones ni a la lista,
+        así que una respuesta de imagen no admite interactivos. El peso se
+        controla antes de salir a la red.
 
         Returns:
             La respuesta validada.
 
         Raises:
-            ValueError: si falta el PNG, si sobra, si lleva botones o si pesa
-                1 MB o más.
+            ValueError: si falta el PNG, si sobra, si mezcla interactivos o si
+                pesa 1 MB o más.
         """
         if self.tipo == "imagen":
             if self.imagen is None:
                 raise ValueError("la respuesta de tipo imagen necesita el PNG")
-            if self.botones:
-                raise ValueError("la respuesta de tipo imagen no lleva botones")
+            if self.botones or self.opciones:
+                raise ValueError("la respuesta de tipo imagen no lleva interactivos")
         elif self.imagen is not None:
             raise ValueError("solo la respuesta de tipo imagen lleva PNG")
+
+        if self.tipo == "lista":
+            if not self.opciones:
+                raise ValueError("la respuesta de tipo lista necesita opciones")
+            if self.botones:
+                raise ValueError("la respuesta de tipo lista no lleva botones")
+        elif self.opciones:
+            raise ValueError("solo la respuesta de tipo lista lleva opciones")
+
         if self.imagen is not None and len(self.imagen) >= PESO_MAXIMO_IMAGEN:
             raise ValueError("la imagen del canal pesa 1 MB o más")
         return self

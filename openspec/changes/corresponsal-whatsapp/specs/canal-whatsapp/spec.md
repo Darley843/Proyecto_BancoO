@@ -156,7 +156,7 @@ El canal SHALL enviar respuestas por la API de Meta con `timeout` explícito cua
 
 ### Requirement: Contratos compartidos del canal
 
-El canal SHALL validar los mensajes y las respuestas con los modelos Pydantic `MensajeEntrante`, `RespuestaCanal` y `PerfilUsuario`. `MensajeEntrante` MUST rechazar payloads sin id, remitente o texto; `RespuestaCanal` MUST distinguir texto, botones, error e imagen; `PerfilUsuario` MUST limitar el rol a `cliente` o `asesor`.
+El canal SHALL validar los mensajes y las respuestas con los modelos Pydantic `MensajeEntrante`, `RespuestaCanal` y `PerfilUsuario`. `MensajeEntrante` MUST rechazar payloads sin id, remitente o texto; `RespuestaCanal` MUST distinguir texto, botones, lista, error e imagen, y MUST NOT mezclar botones, filas de lista e imagen en el mismo mensaje; `PerfilUsuario` MUST limitar el rol a `cliente` o `asesor`.
 
 #### Scenario: Payload válido
 - **WHEN** llega un texto con id, remitente y cuerpo
@@ -166,9 +166,37 @@ El canal SHALL validar los mensajes y las respuestas con los modelos Pydantic `M
 - **WHEN** falta el id o el remitente
 - **THEN** el mensaje se descarta con un error registrado y sin respuesta al usuario
 
+#### Scenario: Lista interactiva
+- **WHEN** una respuesta lleva más de tres opciones
+- **THEN** viaja como lista con hasta diez filas y sin botones
+
 #### Scenario: Rol inválido
 - **WHEN** un perfil declara un rol distinto de cliente o asesor
 - **THEN** la validación falla y no se guarda el perfil
+
+### Requirement: Entrevista del diagnóstico en el canal
+
+Con consentimiento, el canal SHALL atender la entrevista del diagnóstico antes del grafo: una pregunta por turno, con botones hasta tres opciones y lista cuando hay más. La sesión MUST guardar solo los ids canónicos por `usuario_id`, MUST borrarse al terminar o al cancelar, y el resultado MUST enviar el texto del motor y la tarjeta de Pana como imagen. «Asesor» MUST dejar un caso en la tabla `casos` sin nombre ni número.
+
+#### Scenario: Invitación
+- **WHEN** un usuario con consentimiento pide un diagnóstico y no tiene entrevista en curso
+- **THEN** recibe la invitación con «Empezar» y «Ahora no» sin llamar al modelo
+
+#### Scenario: Un paso por turno
+- **WHEN** el usuario elige una de las opciones de la pregunta pendiente
+- **THEN** el canal confirma lo anotado y envía el paso siguiente, sin repetir preguntas
+
+#### Scenario: Respuesta fuera de la lista
+- **WHEN** el usuario escribe algo que no es una de las opciones
+- **THEN** la entrevista no avanza y se repite la pregunta con el aviso
+
+#### Scenario: Resultado con tarjeta
+- **WHEN** se responde el último paso
+- **THEN** el canal calcula con el motor, envía el texto del resultado y después la tarjeta PNG
+
+#### Scenario: Cancelar o pedir asesor
+- **WHEN** el usuario escribe «cancelar» o «asesor», o toca su botón
+- **THEN** la sesión se borra y responde el texto fijo; «asesor» además deja el caso sin datos personales
 
 ### Requirement: Servidor local con túnel externo
 
