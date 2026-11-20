@@ -109,6 +109,12 @@ _FECHA_ISO = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
 #: Números estructurales que no son cifras del caso (conteos y porcentajes).
 _CIFRAS_ESTRUCTURALES = frozenset({"0", "1", "2", "3", "10", "20", "30", "40", "100"})
 
+#: Frase con la que la recomendación ofrece hablar con un asesor.
+_OFERTA_ASESOR = "habla con un asesor"
+
+#: Motivo genérico de una abstención por fallo; nunca expone el error crudo.
+MOTIVO_FALLO = "El agente no pudo responder con los datos del caso."
+
 
 class PosturaAgente(BaseModel):
     """Opinión estructurada de un rol del comité.
@@ -124,6 +130,20 @@ class PosturaAgente(BaseModel):
     postura: str = Field(min_length=1)
     argumentos: list[str] = Field(default_factory=list, max_length=3)
     evidencia: list[str] = Field(default_factory=list)
+
+
+#: DeepSeek Flash en modo pensamiento rechaza `tool_choice` con un 400; el
+#: esquema viaja en el prompt y la respuesta se valida con Pydantic.
+METODO_ESTRUCTURADO = "json_mode"
+
+_ESQUEMA_JSON = json.dumps(PosturaAgente.model_json_schema(), ensure_ascii=False, indent=2)
+
+#: Instrucción de `json_mode`: sin ella el proveedor no conoce la forma esperada.
+INSTRUCCION_JSON = (
+    "Responde solo con un objeto JSON válido, sin texto adicional, sin comentarios "
+    "y sin cercas de código. Debe cumplir exactamente este esquema JSON Schema:\n"
+    f"{_ESQUEMA_JSON}"
+)
 
 
 class DeliberacionComite(BaseModel):
@@ -290,6 +310,8 @@ def deliberar(
     posturas["auditor"] = _revisar(modelo, contexto, posturas, presupuesto, registro)
 
     hallazgos = auditar(list(posturas.values()), resultado, escenarios)
+    if _sin_posturas(posturas):
+        return _respuesta_sin_comite(posturas, resultado, hallazgos)
     if posturas["auditor"].postura == "objeta" or hallazgos:
         hallazgos = _corregir(
             modelo,
@@ -438,7 +460,7 @@ def auditar(
     productos = _productos_permitidos(resultado, escenarios)
 
     for postura in posturas:
-        if postura.agente == "auditor":
+        if postura.agente == "auditor" or postura.postura == "abstencion":
             continue
         texto = _texto_de(postura)
         for cifra in sorted(cifras_duras(texto)):
@@ -460,6 +482,7 @@ def auditar(
     if (
         riesgo is not None
         and comercial is not None
+        and "abstencion" not in {riesgo.postura, comercial.postura}
         and riesgo.postura in ORDEN_POSTURA
         and comercial.postura in ORDEN_POSTURA
         and _orden(comercial.postura) > _orden(riesgo.postura)
@@ -670,8 +693,8 @@ def _ronda_inicial(
             rol = futuros[futuro]
             try:
                 posturas[rol] = futuro.result()
-            except Exception as exc:  # noqa: BLE001 - el rol queda en abstención
-                posturas[rol] = _abstencion(rol, f"Fallo del agente: {exc}")
+            except Exception:  # noqa: BLE001 - el rol queda en abstención
+                posturas[rol] = _abstencion(rol, MOTIVO_FALLO)
     except TimeoutError:
         pass
     finally:
@@ -780,26 +803,30 @@ def _consultar(
     sistema = prompt.sistema
     if prompt.recordatorio:
         sistema = f"{sistema}\n\n{prompt.recordatorio}"
-    humano = _mensaje_humano(contexto, hallazgos, revision)
+    humano = f"{_mensaje_humano(contexto, hallazgos, revision)}\n\n{INSTRUCCION_JSON}"
     mensajes = [SystemMessage(content=sistema), HumanMessage(content=humano)]
 
     inicio = time.monotonic()
     metricas: Mapping[str, Any] | None = None
     try:
-        runnable = modelo.with_structured_output(PosturaAgente, include_raw=True)
+        runnable = modelo.with_structured_output(
+            PosturaAgente,
+            method=METODO_ESTRUCTURADO,
+            include_raw=True,
+        )
         salida = runnable.invoke(mensajes)
-    except Exception as exc:  # noqa: BLE001 - el rol queda en abstención
+    except Exception:  # noqa: BLE001 - el rol queda en abstención
         segundos = time.monotonic() - inicio
         if registro is not None:
-            registro.anotar(rol, metricas, segundos, str(exc))
-        return _abstencion(rol, f"Fallo del agente {rol}: {exc}")
+            registro.anotar(rol, metricas, segundos, MOTIVO_FALLO)
+        return _abstencion(rol, MOTIVO_FALLO)
 
     segundos = time.monotonic() - inicio
     postura, metricas, error = _leer_salida(salida)
     if registro is not None:
-        registro.anotar(rol, metricas, segundos, error)
+        registro.anotar(rol, metricas, segundos, MOTIVO_FALLO if error else None)
     if postura is None:
-        return _abstencion(rol, error or f"El agente {rol} no devolvió una postura válida.")
+        return _abstencion(rol, MOTIVO_FALLO)
     return _normalizar(postura, rol)
 
 
@@ -894,6 +921,29 @@ def _abstencion(rol: str, motivo: str) -> PosturaAgente:
         argumentos=[motivo[:300]],
         evidencia=[],
     )
+
+
+def _sin_posturas(posturas: Mapping[str, PosturaAgente]) -> bool:
+    """Indica si riesgo y comercial quedaron sin una postura válida.
+
+    Args:
+        posturas: posturas de los tres roles.
+
+    Returns:
+        `True` si ambos roles iniciales se abstuvieron; la deliberación no
+        puede sostener una recomendación propia.
+    """
+    return all(posturas[rol].postura == "abstencion" for rol in ROLES_INICIALES)
+
+
+def _agregar_oferta_asesor(lineas: list[str]) -> None:
+    """Añade la oferta de asesor solo si la recomendación aún no la trae.
+
+    Args:
+        lineas: líneas de la recomendación; se modifican en el sitio.
+    """
+    if not any(_OFERTA_ASESOR in linea.casefold() for linea in lineas):
+        lineas.append("Puedes hablar con un asesor para revisar tu caso.")
 
 
 def _normalizar(postura: PosturaAgente, rol: str) -> PosturaAgente:
@@ -1034,7 +1084,7 @@ def _sintetizar(
             f"Estrés de ingreso: margen de {formatear_pesos(estres.margen_despues_cuota)}."
         )
     if ofrece:
-        lineas.append("Puedes hablar con un asesor para revisar tu caso.")
+        _agregar_oferta_asesor(lineas)
     lineas.append(resultado.aviso)
 
     return DeliberacionComite(
@@ -1104,7 +1154,7 @@ def _respuesta_sin_comite(
         *resultado.recomendaciones,
     ]
     if resultado.semaforo == "rojo":
-        lineas.append("Puedes hablar con un asesor para revisar tu caso.")
+        _agregar_oferta_asesor(lineas)
     lineas.append(resultado.aviso)
     return DeliberacionComite(
         posturas=[posturas[rol] for rol in ROLES],

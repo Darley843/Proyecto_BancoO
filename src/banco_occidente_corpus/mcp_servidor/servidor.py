@@ -475,8 +475,8 @@ SIN_CUOTA_FIJA: frozenset[str] = frozenset({"ahorro", "cdt", "tarjeta_credito", 
 
 #: Aviso orientativo obligatorio de toda simulación de cuota.
 AVISO_SIMULACION: str = (
-    "Cálculo orientativo con la tasa publicada por el Banco de Occidente para "
-    "{vigencia}. No incluye tu historial crediticio, que un banco evalúa "
+    "Cálculo orientativo con la tasa publicada por el Banco de Occidente, "
+    "vigente {vigencia}. No incluye tu historial crediticio, que un banco evalúa "
     "obligatoriamente (Circular Básica Financiera, Circular Externa 004 de 2026 "
     "de la Superfinanciera, párrafo 1.1.2.27 c). No es una aprobación ni una "
     "oferta de crédito; la tasa final depende del monto, el plazo y tu perfil. "

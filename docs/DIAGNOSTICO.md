@@ -224,12 +224,12 @@ ejecuta con `diagnostico.motor.calcular`.
 ## Texto de aviso (obligatorio)
 
 > Este resultado es orientativo y se basa en rangos aproximados y en las tasas
-> publicadas por el Banco de Occidente para [vigencia]. No incluye tu historial
-> crediticio, que un banco evalúa obligatoriamente (Circular Básica Financiera,
-> Circular Externa 004 de 2026 de la Superfinanciera, párrafo 1.1.2.27 c). No es
-> una aprobación ni una oferta de crédito; la tasa final depende del monto, el
-> plazo y tu perfil. Proyecto académico de la UAO, no es un canal oficial del
-> banco.
+> publicadas por el Banco de Occidente, vigentes [vigencia]. No incluye tu
+> historial crediticio, que un banco evalúa obligatoriamente (Circular Básica
+> Financiera, Circular Externa 004 de 2026 de la Superfinanciera, párrafo
+> 1.1.2.27 c). No es una aprobación ni una oferta de crédito; la tasa final
+> depende del monto, el plazo y tu perfil. Proyecto académico de la UAO, no es
+> un canal oficial del banco.
 
 ## Referencias normativas
 

@@ -138,14 +138,16 @@ aviso orientativo.
    síntesis comercial.
 3. Si el Auditor **objeta**, se corrige una vez con sus hallazgos; si vuelve a
    objetar, se responde con el texto determinístico del diagnóstico (sin
-   comité).
-4. Rojo → siempre se ofrece hablar con un asesor (HITL).
+   comité). Si Riesgo y Comercial se abstienen, también se responde con ese
+   texto: el auditor determinístico no revisa los mensajes de error.
+4. Rojo → siempre se ofrece hablar con un asesor (HITL), una sola vez.
 5. Respuesta final: postura de cada agente en una línea, recomendación,
    hasta dos alternativas y el aviso orientativo.
 
 La recomendación usa una de estas etiquetas: `apto`, `apto_con_condiciones`,
 `no_apto` o `requiere_asesor`. Una abstención o un rol que no responde produce
-`requiere_asesor`; nunca se inventa una decisión.
+`requiere_asesor`; si Riesgo y Comercial se abstienen a la vez, se usa el texto
+del diagnóstico. Nunca se inventa una decisión.
 
 ## Por qué el resultado es orientativo
 
@@ -156,7 +158,7 @@ datos. Por eso el resultado es orientativo y nunca una aprobación. El aviso lo
 dice explícitamente:
 
 > Este resultado es orientativo: se basa en rangos aproximados y en las tasas
-> publicadas por el Banco de Occidente para [vigencia], y no incluye tu
+> publicadas por el Banco de Occidente, vigentes [vigencia], y no incluye tu
 > historial crediticio, que un banco evalúa obligatoriamente. No es una
 > aprobación ni una oferta de crédito. Proyecto académico de la UAO, no es un
 > canal oficial del banco.
@@ -180,7 +182,9 @@ class DeliberacionComite(BaseModel):
 ```
 
 Los modelos viven en `src/banco_occidente_corpus/diagnostico/comite.py` y se
-piden con `with_structured_output(PosturaAgente)`.
+piden con `with_structured_output(PosturaAgente, method="json_mode")`: el
+esquema viaja en el prompt y la respuesta se valida con Pydantic. No se fuerza
+`tool_choice`, porque el modo de razonamiento de DeepSeek lo rechaza con un 400.
 
 ## Límites y experiencia
 

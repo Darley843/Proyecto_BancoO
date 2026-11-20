@@ -1179,12 +1179,12 @@ def _porcentaje(valor: Decimal) -> str:
 def _aviso(tasa: TasaProducto | None) -> str:
     """Arma el aviso orientativo obligatorio citando la vigencia de la tasa."""
     if tasa is None:
-        vigencia = "la vigencia publicada"
+        referencia = "en la vigencia publicada"
     else:
-        vigencia = vigencia_legible(tasa.vigencia_desde, tasa.vigencia_hasta)
+        referencia = f"vigentes {vigencia_legible(tasa.vigencia_desde, tasa.vigencia_hasta)}"
     return (
         "Este resultado es orientativo y se basa en rangos aproximados y en las "
-        f"tasas publicadas por el Banco de Occidente para {vigencia}. No incluye "
+        f"tasas publicadas por el Banco de Occidente, {referencia}. No incluye "
         "tu historial crediticio, que un banco evalúa obligatoriamente (Circular "
         "Básica Financiera, Circular Externa 004 de 2026 de la Superfinanciera, "
         "párrafo 1.1.2.27 c). No es una aprobación ni una oferta de crédito; la "

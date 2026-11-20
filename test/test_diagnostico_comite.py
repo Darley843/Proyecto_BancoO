@@ -194,6 +194,18 @@ def _postura(
     }
 
 
+def _error_400() -> RuntimeError:
+    """Reproduce el 400 de DeepSeek contra ``tool_choice`` en modo pensamiento.
+
+    Returns:
+        Una excepción con el texto y el ``request_id`` que devuelve el proveedor.
+    """
+    return RuntimeError(
+        "Error code: 400 - Thinking mode does not support this tool_choice "
+        "(request_id=20261119-987654321)"
+    )
+
+
 def _rol(sistema: str) -> str:
     """Deduce el rol del comité a partir del prompt del sistema.
 
@@ -227,17 +239,19 @@ class ModeloComite:
         self.llamadas: list[str] = []
         self.mensajes: list[str] = []
         self.mensajes_por_rol: dict[str, list[str]] = {}
+        self.metodos: list[str] = []
 
-    def with_structured_output(self, schema: Any, **_kwargs: Any) -> RunnableLambda:
+    def with_structured_output(self, schema: Any, **kwargs: Any) -> RunnableLambda:
         """Devuelve un runnable que valida el siguiente payload del rol.
 
         Args:
             schema: esquema Pydantic de salida.
-            **_kwargs: argumentos de LangChain, ignorados.
+            **kwargs: argumentos de LangChain, incluido el método de salida.
 
         Returns:
             El runnable que responde como el agente.
         """
+        self.metodos.append(str(kwargs.get("method", "")))
 
         def invocar(mensajes: Sequence[BaseMessage]) -> dict[str, Any]:
             """Selecciona la respuesta del rol y la valida contra el esquema."""
@@ -596,6 +610,34 @@ def test_auditor_bajo_ataque_frena_la_respuesta(raiz_tasas: Path) -> None:
     assert deliberacion.alternativas == []
     assert deliberacion.hallazgos_auditor
     assert deliberacion.ofrece_asesor is True
+
+
+def test_error_400_deepseek_devuelve_respuesta_deterministica(raiz_tasas: Path) -> None:
+    """Si los tres agentes fallan con el 400, responde el diagnóstico sin ruido."""
+    entrada, resultado = _diagnostico("independiente_rojo", raiz_tasas)
+    assert resultado.semaforo == "rojo"
+    modelo = ModeloComite(
+        {
+            "riesgo": [_error_400()],
+            "comercial": [_error_400()],
+            "auditor": [_error_400()],
+        }
+    )
+
+    deliberacion = deliberar(entrada, resultado, modelo=modelo)
+
+    assert deliberacion is not None
+    assert set(modelo.metodos) == {"json_mode"}
+    assert len(modelo.llamadas) == 3
+    assert deliberacion.recomendacion.startswith("El comité no logró")
+    assert deliberacion.alternativas == []
+    assert deliberacion.hallazgos_auditor == []
+    assert not any("Cifra no presente" in hallazgo for hallazgo in deliberacion.hallazgos_auditor)
+    assert "request_id" not in deliberacion.recomendacion
+    assert "tool_choice" not in deliberacion.recomendacion
+    assert "987654321" not in deliberacion.recomendacion
+    assert deliberacion.recomendacion.count("Habla con un asesor") == 1
+    assert all(postura.postura == "abstencion" for postura in deliberacion.posturas)
 
 
 def test_correccion_unica_y_sin_segunda_ronda(raiz_tasas: Path) -> None:
