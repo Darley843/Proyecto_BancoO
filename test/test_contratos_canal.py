@@ -16,6 +16,7 @@ import pytest
 from pydantic import ValidationError
 
 from banco_occidente_corpus.canal.contratos import (
+    PESO_MAXIMO_IMAGEN,
     BotonCanal,
     CasoAsesor,
     EntradaDiagnostico,
@@ -156,6 +157,54 @@ def test_respuesta_sin_texto_falla() -> None:
             id_mensaje_origen="wamid.SIM123",
             texto="",
         )
+
+
+def _respuesta_imagen(**cambios: Any) -> RespuestaCanal:
+    """Construye una respuesta con tarjeta y los cambios pedidos."""
+    datos: dict[str, Any] = {
+        "usuario_id": "u" * 32,
+        "id_mensaje_origen": "wamid.SIM123",
+        "texto": "Tu diagnóstico",
+        "tipo": "imagen",
+        "imagen": b"\x89PNG\r\n\x1a\n",
+    }
+    datos.update(cambios)
+    return RespuestaCanal(**datos)
+
+
+def test_respuesta_de_imagen_conserva_el_texto_y_oculta_los_bytes() -> None:
+    """La tarjeta acompaña al texto y sus bytes no aparecen en la represión."""
+    png = b"PNGDATOS-SECRETOS"
+
+    respuesta = _respuesta_imagen(imagen=png)
+
+    assert respuesta.texto == "Tu diagnóstico"
+    assert respuesta.imagen == png
+    assert "PNGDATOS" not in repr(respuesta)
+
+
+def test_respuesta_de_imagen_sin_png_falla() -> None:
+    """El tipo imagen exige el PNG para poder enviarlo."""
+    with pytest.raises(ValidationError):
+        _respuesta_imagen(imagen=None)
+
+
+def test_png_con_tipo_distinto_de_imagen_falla() -> None:
+    """Un PNG suelto en una respuesta de texto no se envía por accidente."""
+    with pytest.raises(ValidationError):
+        _respuesta_imagen(tipo="texto")
+
+
+def test_respuesta_de_imagen_no_admite_botones() -> None:
+    """La tarjeta acompaña al texto; no reemplaza a los botones."""
+    with pytest.raises(ValidationError):
+        _respuesta_imagen(botones=[BotonCanal(id="asesor", titulo="Asesor")])
+
+
+def test_imagen_de_un_megabyte_o_mas_falla() -> None:
+    """El contrato corta el PNG que llega al límite antes de salir a la red."""
+    with pytest.raises(ValidationError):
+        _respuesta_imagen(imagen=b"x" * PESO_MAXIMO_IMAGEN)
 
 
 def test_perfil_por_defecto_es_cliente_sin_consentimiento() -> None:

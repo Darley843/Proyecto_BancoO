@@ -96,7 +96,7 @@
 - [ ] 8.10 Preparar el guion de sustentación en `docs/SUSTENTACION.md` con el recorrido consentimiento → pregunta → diagnóstico → HITL → «¿Y si…?» → comité → Roba la Bóveda → Arqueo; verificar que cada paso tiene el comando o la pantalla que lo demuestra.
 - [ ] 8.11 Crear el paquete `pana` con el dibujo del personaje (foto de perfil y tres caras), las tarjetas PNG del diagnóstico y del «¿Y si…?» y su texto equivalente, con Pillow fijo y DejaVu Sans versionada; verificar con `test/test_pana_tarjetas.py` que la imagen pesa menos de 1 MB, se genera en memoria, rechaza teléfonos y documentos y que el texto lleva los mismos datos.
 - [ ] 8.12a Convertir el `ResultadoDiagnostico` del motor (#136) y la `ComparacionEscenario` del «¿Y si…?» en datos de tarjeta, con `pana/desde_diagnostico.py` (`tarjeta_y_texto`, `escenario_y_texto`): crédito con cuota → diagnóstico, ahorro → ahorro, libranza de independiente o capacidad negativa → «no aplica»; la tarjeta usa la tasa mensual máxima (la del semáforo) y un nombre corto de la fuente; verificar con `test/test_pana_desde_diagnostico.py` contra el motor real y una tabla Gold temporal.
-- [ ] 8.12 (PR aparte, después de 8.11) Enviar la tarjeta por el canal como mensaje de tipo imagen después del texto, cuando `RespuestaCanal` tenga el tipo imagen; verificar con el enviador falso que el texto sale primero y que una falla de la imagen no corta la respuesta.
+- [x] 8.12 (PR aparte, después de 8.11) Enviar la tarjeta por el canal como mensaje de tipo imagen después del texto, cuando `RespuestaCanal` tenga el tipo imagen; verificar con el enviador falso que el texto sale primero y que una falla de la imagen no corta la respuesta.
 
 ## 9. Integración y cierre — equipo (21–23 nov)
 
