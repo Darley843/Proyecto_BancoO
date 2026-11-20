@@ -92,6 +92,8 @@ MAX_LLAMADAS = 4
 MAX_TOKENS_AGENTE = 3_000
 TIEMPO_MAXIMO_SEGUNDOS = 30.0
 MAX_ALTERNATIVAS = 2
+#: Por defecto el comité no razona: fue el modo más estable y barato en la demo.
+RAZONAMIENTO = False
 
 #: Intentos por agente: el primero y un reintento si la salida no es JSON válido.
 MAX_INTENTOS_AGENTE = 2
@@ -127,6 +129,9 @@ PORCENTAJES_ESTRES: tuple[int, ...] = (10, 20)
 
 #: Frase con la que la recomendación ofrece hablar con un asesor.
 _OFERTA_ASESOR = "habla con un asesor"
+
+#: Línea corta del auditor cuando no objeta; el detalle va en `posturas`.
+AUDITOR_CONFORME = "Auditor: revisó las cifras y está conforme"
 
 #: Motivo genérico de una abstención por fallo; nunca expone el error crudo.
 MOTIVO_FALLO = "El agente no pudo responder con los datos del caso."
@@ -218,6 +223,7 @@ class LimitesComite:
     max_tokens_agente: int = MAX_TOKENS_AGENTE
     tiempo_maximo_segundos: float = TIEMPO_MAXIMO_SEGUNDOS
     max_alternativas: int = MAX_ALTERNATIVAS
+    razonamiento: bool = RAZONAMIENTO
 
 
 @dataclass(slots=True)
@@ -283,6 +289,7 @@ def cargar_limites(ruta: Path | None = None) -> LimitesComite:
         max_tokens_agente=int(seccion.get("max_tokens_agente", MAX_TOKENS_AGENTE)),
         tiempo_maximo_segundos=float(seccion.get("tiempo_maximo_segundos", TIEMPO_MAXIMO_SEGUNDOS)),
         max_alternativas=int(seccion.get("max_alternativas", MAX_ALTERNATIVAS)),
+        razonamiento=bool(seccion.get("razonamiento", RAZONAMIENTO)),
     )
 
 
@@ -305,7 +312,8 @@ def deliberar(
     Args:
         entrada: insumos del diagnóstico, ya validados.
         resultado: resultado del motor; su semáforo no se modifica.
-        modelo: modelo de chat; por defecto se crea el DeepSeek del comité.
+        modelo: modelo de chat; por defecto se crea el DeepSeek del comité con
+            el modo de razonamiento que fija `[comite]` en el TOML.
         calcular: motor determinista para los escenarios; por defecto
             `diagnostico.motor.calcular`.
         hoy: fecha con la que se comprueba la vigencia de la tasa.
@@ -340,6 +348,7 @@ def deliberar(
             temperatura=0.0,
             max_tokens=ajustes.max_tokens_agente,
             timeout=ajustes.tiempo_maximo_segundos,
+            razonamiento=ajustes.razonamiento,
         )
 
     presupuesto = _Presupuesto(ajustes.max_llamadas, ajustes.tiempo_maximo_segundos)
@@ -1248,12 +1257,11 @@ def _sintetizar(
 
     lineas = [
         f"{APERTURA_RECOMENDACION[etiqueta]} Es una opinión del comité de crédito "
-        "y no una aprobación; la decisión final corresponde a un asesor humano "
-        "del banco.",
+        "y no una aprobación; la decisión final corresponde a un asesor.",
         f"Semáforo del motor: {resultado.semaforo} (no cambia).",
         _linea_postura(riesgo),
         _linea_postura(comercial),
-        _linea_postura(auditor),
+        _linea_auditor(auditor, hallazgos),
     ]
     if alternativas:
         lineas.append("Alternativas: " + " | ".join(alternativas))
@@ -1308,6 +1316,32 @@ def _linea_postura(postura: PosturaAgente) -> str:
     """
     detalle = f" — {postura.argumentos[0]}" if postura.argumentos else ""
     return f"{postura.agente.capitalize()}: {postura.postura}{detalle}"
+
+
+def _linea_auditor(postura: PosturaAgente, hallazgos: Sequence[str]) -> str:
+    """Resume la auditoría en una línea corta para la persona.
+
+    El detalle completo de la revisión no se pierde: sigue en
+    `DeliberacionComite.posturas`, que la app muestra en pantalla.
+
+    Args:
+        postura: postura del auditor.
+        hallazgos: hallazgos que quedan después de la corrección.
+
+    Returns:
+        `Auditor: revisó las cifras y está conforme`, el hallazgo principal si
+        objeta, o la línea completa si se abstuvo.
+    """
+    if postura.postura == "conforme":
+        return AUDITOR_CONFORME
+    if postura.postura == "objeta":
+        principal = (
+            hallazgos[0]
+            if hallazgos
+            else (postura.argumentos[0] if postura.argumentos else "objetó la deliberación")
+        )
+        return f"Auditor: {principal}"
+    return _linea_postura(postura)
 
 
 def _respuesta_sin_comite(

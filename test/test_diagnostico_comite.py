@@ -430,6 +430,31 @@ def test_amarillo_convoca_tres_posturas_y_una_ronda(raiz_tasas: Path) -> None:
         "Ampliar el plazo a 48 meses" in alternativa for alternativa in deliberacion.alternativas
     )
     assert any("20 % menos" in alternativa for alternativa in deliberacion.alternativas)
+    assert "la decisión final corresponde a un asesor." in deliberacion.recomendacion
+    assert "asesor humano del banco" not in deliberacion.recomendacion
+
+
+def test_la_linea_del_auditor_se_resume_para_la_persona(raiz_tasas: Path) -> None:
+    """La recomendación dice que el auditor está conforme; el detalle queda en posturas."""
+    entrada, resultado = _diagnostico("pensionado_amarillo", raiz_tasas)
+    argumento = "Revisé la cuota, la tasa y los escenarios: todo coincide."
+    modelo = ModeloComite(
+        {
+            "riesgo": [_postura("riesgo", "con_condiciones", ["La cuota deja poco margen."])],
+            "comercial": [
+                _postura("comercial", "con_condiciones", ["[plazo_mas_largo] Revisa el plazo."])
+            ],
+            "auditor": [_postura("auditor", "conforme", [argumento])],
+        }
+    )
+
+    deliberacion = deliberar(entrada, resultado, modelo=modelo)
+
+    assert deliberacion is not None
+    assert "Auditor: revisó las cifras y está conforme" in deliberacion.recomendacion
+    assert argumento not in deliberacion.recomendacion
+    auditor = next(postura for postura in deliberacion.posturas if postura.agente == "auditor")
+    assert auditor.argumentos == [argumento]
 
 
 def test_auditor_revisa_las_posturas_de_riesgo_y_comercial(raiz_tasas: Path) -> None:
@@ -813,6 +838,7 @@ def test_correccion_unica_y_sin_segunda_ronda(raiz_tasas: Path) -> None:
     )
     assert deliberacion.hallazgos_auditor
     assert any("promesa" in hallazgo.casefold() for hallazgo in deliberacion.hallazgos_auditor)
+    assert "Auditor: Hay una promesa de aprobación." in deliberacion.recomendacion
 
 
 def test_prompts_del_comite_cargan_sin_datos_personales() -> None:
@@ -1058,6 +1084,39 @@ def test_limites_del_comite_cubren_el_razonamiento() -> None:
     assert limites.max_tokens_agente == 3_000
     assert limites.max_llamadas == 4
     assert limites.tiempo_maximo_segundos == 30.0
+
+
+def test_deliberar_crea_el_modelo_sin_razonamiento(
+    raiz_tasas: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Fuera de la demo, `deliberar` lee `razonamiento = false` del TOML."""
+    entrada, resultado = _diagnostico("pensionado_amarillo", raiz_tasas)
+    modelo = ModeloComite(
+        {
+            "riesgo": [_postura("riesgo", "con_condiciones", ["La cuota deja poco margen."])],
+            "comercial": [
+                _postura("comercial", "con_condiciones", ["[plazo_mas_largo] Revisa el plazo."])
+            ],
+            "auditor": [_postura("auditor", "conforme", ["Sin hallazgos."])],
+        }
+    )
+    capturado: dict[str, Any] = {}
+
+    def crear_modelo_de_prueba(**kwargs: Any) -> ModeloComite:
+        """Registra los argumentos con los que `deliberar` crea el modelo."""
+        capturado.update(kwargs)
+        return modelo
+
+    monkeypatch.setattr(comite_mod, "crear_modelo", crear_modelo_de_prueba)
+
+    deliberacion = deliberar(entrada, resultado, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
+
+    limites = cargar_limites()
+    assert deliberacion is not None
+    assert limites.razonamiento is False
+    assert capturado["razonamiento"] is False
+    assert capturado["max_tokens"] == limites.max_tokens_agente
+    assert capturado["timeout"] == limites.tiempo_maximo_segundos
 
 
 def test_metricas_de_longitud_salen_de_la_excepcion() -> None:

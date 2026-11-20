@@ -147,7 +147,10 @@ final, el aviso orientativo.
    texto y **no se convoca al auditor**: no hay posturas que revisar.
 4. Rojo → siempre se ofrece hablar con un asesor (HITL), una sola vez.
 5. Respuesta final: postura de cada agente en una línea, recomendación,
-   hasta dos alternativas y el aviso orientativo.
+   hasta dos alternativas y el aviso orientativo. La línea del Auditor se
+   resume para la persona: «Auditor: revisó las cifras y está conforme» o,
+   si objeta, su hallazgo principal. La deliberación completa sigue en
+   `DeliberacionComite.posturas`, que la app muestra en pantalla.
 
 Las etiquetas internas de la síntesis son `apto`, `apto_con_condiciones`,
 `no_apto` y `requiere_asesor`; el texto que recibe la persona abre con una
@@ -169,6 +172,9 @@ dice explícitamente:
 > historial crediticio, que un banco evalúa obligatoriamente. No es una
 > aprobación ni una oferta de crédito. Proyecto académico de la UAO, no es un
 > canal oficial del banco.
+
+Por eso la recomendación aclara que «la decisión final corresponde a un asesor»:
+el comité no aprueba y el proyecto no habla en nombre del banco.
 
 ## Salida estructurada
 
@@ -202,13 +208,16 @@ del mismo presupuesto de llamadas y del reloj total.
   crece.
 - Tope de 3.000 tokens por agente —el razonamiento consume ese tope— y tiempo
   máximo de la deliberación (30 s).
+- Sin razonamiento por defecto (`razonamiento = false`): `deliberar` crea el
+  modelo así también fuera de la demo, porque fue el modo más estable y barato.
+  La demo puede comparar ambos modos explícitamente.
 - Mientras delibera, el canal envía: "El comité está revisando tu caso…".
 - La deliberación queda disponible para mostrarse en pantalla durante la demo.
 - Costo esperado: alrededor de un centavo de dólar por deliberación.
 
 Los límites se configuran en `[comite]` de `config/diagnostico.toml`:
-`max_llamadas`, `max_tokens_agente`, `tiempo_maximo_segundos` y
-`max_alternativas`.
+`max_llamadas`, `max_tokens_agente`, `tiempo_maximo_segundos`,
+`max_alternativas` y `razonamiento`.
 
 ## Cómo se prueba
 

@@ -474,6 +474,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             max_tokens_agente=opciones.tope_tokens,
             tiempo_maximo_segundos=limites.tiempo_maximo_segundos,
             max_alternativas=limites.max_alternativas,
+            razonamiento=limites.razonamiento,
         )
     personas = _personas()
     casos = {ident: _diagnostico(ident) for ident in PERSONAS}

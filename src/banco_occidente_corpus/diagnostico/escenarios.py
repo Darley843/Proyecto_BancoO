@@ -326,13 +326,14 @@ def formatear_pesos(valor: Decimal) -> str:
     """Formatea pesos colombianos sin decimales y con punto de miles.
 
     Args:
-        valor: monto en pesos.
+        valor: monto en pesos; puede ser negativo.
 
     Returns:
-        Texto como `$1.250.000`.
+        Texto como `$1.250.000` o `-$1.250.000`, con el signo antes del peso.
     """
     entero = int(valor.quantize(Decimal(1)))
-    return "$" + f"{entero:,}".replace(",", ".")
+    signo = "-" if entero < 0 else ""
+    return f"{signo}$" + f"{abs(entero):,}".replace(",", ".")
 
 
 def formatear_rango(rango: RangoDecimal) -> str:
