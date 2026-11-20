@@ -40,6 +40,10 @@ AlertaDiagnostico = Literal[
 #: Color del semáforo; ``None`` significa que el producto no tiene semáforo.
 SemaforoDiagnostico = Literal["verde", "amarillo", "rojo"]
 
+#: Peso máximo del PNG de Pana que viaja por el canal (bytes). WhatsApp acepta
+#: hasta 5 MB, pero la tarjeta se genera por debajo de 1 MB.
+PESO_MAXIMO_IMAGEN: int = 1_000_000
+
 
 class BotonCanal(BaseModel):
     """Un botón de respuesta rápida de WhatsApp."""
@@ -64,16 +68,48 @@ class MensajeEntrante(BaseModel):
 
 
 class RespuestaCanal(BaseModel):
-    """Respuesta que el canal envía al usuario."""
+    """Respuesta que el canal envía al usuario.
+
+    Una respuesta de tipo ``imagen`` lleva además el PNG de Pana en memoria:
+    el texto viaja primero y la imagen después. El PNG se excluye de la
+    representación para que sus bytes no terminen en un log.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     usuario_id: str
     id_mensaje_origen: str
     texto: str = Field(min_length=1, max_length=4096)
-    tipo: Literal["texto", "botones", "error"] = "texto"
+    tipo: Literal["texto", "botones", "error", "imagen"] = "texto"
     botones: list[BotonCanal] = Field(default_factory=list, max_length=3)
     metadatos: dict[str, str] = Field(default_factory=dict)
+    imagen: bytes | None = Field(default=None, repr=False)
+
+    @model_validator(mode="after")
+    def _imagen_coherente(self) -> Self:
+        """Exige el PNG con el tipo imagen y lo prohíbe en los demás tipos.
+
+        La imagen acompaña al texto y no reemplaza a los botones, así que una
+        respuesta de imagen no los admite. El peso se controla antes de salir
+        a la red.
+
+        Returns:
+            La respuesta validada.
+
+        Raises:
+            ValueError: si falta el PNG, si sobra, si lleva botones o si pesa
+                1 MB o más.
+        """
+        if self.tipo == "imagen":
+            if self.imagen is None:
+                raise ValueError("la respuesta de tipo imagen necesita el PNG")
+            if self.botones:
+                raise ValueError("la respuesta de tipo imagen no lleva botones")
+        elif self.imagen is not None:
+            raise ValueError("solo la respuesta de tipo imagen lleva PNG")
+        if self.imagen is not None and len(self.imagen) >= PESO_MAXIMO_IMAGEN:
+            raise ValueError("la imagen del canal pesa 1 MB o más")
+        return self
 
 
 class PerfilUsuario(BaseModel):

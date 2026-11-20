@@ -363,9 +363,11 @@ class RespuestaCanal(BaseModel):
     usuario_id: str
     id_mensaje_origen: str
     texto: str = Field(min_length=1, max_length=4096)
-    tipo: Literal["texto", "botones", "error"] = "texto"
+    tipo: Literal["texto", "botones", "error", "imagen"] = "texto"
     botones: list[BotonCanal] = Field(default_factory=list, max_length=3)
     metadatos: dict[str, str] = Field(default_factory=dict)
+    # Solo con tipo "imagen": el PNG de Pana, en memoria y fuera de los logs.
+    imagen: bytes | None = Field(default=None, repr=False)
 
 
 class PerfilUsuario(BaseModel):
