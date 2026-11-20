@@ -244,6 +244,7 @@ def crear_grafo(
     constructor.add_node("mixto", cast(Any, _nodo_mixto(dependencias)))
     constructor.add_node("cortesia", cast(Any, _nodo_cortesia(dependencias)))
     constructor.add_node("rechazo", cast(Any, _nodo_rechazo(dependencias)))
+    constructor.add_node("diagnostico", cast(Any, _nodo_diagnostico(dependencias)))
     constructor.add_node("redactar", cast(Any, _nodo_redactar(dependencias)))
 
     constructor.add_edge(START, "reformular")
@@ -255,6 +256,7 @@ def crear_grafo(
             "X": "rechazo",
             "T": "tablero",
             "B": "boveda",
+            "D": "diagnostico",
             "mixto": "mixto",
             "cortesia": "cortesia",
             "perfil": "perfil",
@@ -270,6 +272,7 @@ def crear_grafo(
             "mixto": "mixto",
             "cortesia": "cortesia",
             "rechazo": "rechazo",
+            "diagnostico": "diagnostico",
         },
     )
     constructor.add_conditional_edges(
@@ -289,6 +292,7 @@ def crear_grafo(
     )
     constructor.add_edge("cortesia", END)
     constructor.add_edge("rechazo", END)
+    constructor.add_edge("diagnostico", END)
     constructor.add_edge("redactar", END)
 
     return constructor.compile(checkpointer=checkpointer, store=store)
@@ -737,6 +741,33 @@ def _nodo_rechazo(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal],
     return rechazo
 
 
+#: Invitación de la ruta D. Es fija y no usa modelo: el cálculo del diagnóstico
+#: es determinístico y lo hace el motor; el canal arranca la entrevista guiada.
+TEXTO_DIAGNOSTICO: str = (
+    "Puedo hacerte un diagnóstico financiero orientativo: con rangos de tus "
+    "ingresos, gastos y cuotas actuales calculo tu capacidad de pago, la cuota "
+    "estimada y un semáforo. No es una aprobación de crédito. Escribe "
+    "«quiero hacer el diagnóstico» para empezar."
+)
+
+
+def _nodo_diagnostico(
+    dependencias: DependenciasGrafo,
+) -> Callable[[EstadoSucursal], dict[str, Any]]:
+    """Crea el nodo de la ruta D: invita a la entrevista, sin búsqueda ni modelo."""
+
+    def diagnostico(estado: EstadoSucursal) -> dict[str, Any]:
+        return {
+            "respuesta": TEXTO_DIAGNOSTICO,
+            "fuentes": [],
+            "uso": {"uso_modelo": False, "costo_usd": 0.0},
+            "avisos": ["diagnostico"],
+            "messages": [AIMessage(content=TEXTO_DIAGNOSTICO)],
+        }
+
+    return diagnostico
+
+
 def _nodo_redactar(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal], dict[str, Any]]:
     """Crea el nodo que redacta con plantilla o con el RAG validado."""
 
@@ -801,7 +832,7 @@ def _ruta_digiturno(estado: EstadoSucursal) -> str:
     if motivo.startswith("mixta"):
         return "mixto"
     letra = str(turno.get("letra", "B"))
-    return letra if letra in {"B", "T", "X"} else "B"
+    return letra if letra in {"B", "T", "X", "D"} else "B"
 
 
 def _ruta_despues_de_perfil(estado: EstadoSucursal) -> str:
@@ -815,7 +846,7 @@ def _ruta_despues_de_perfil(estado: EstadoSucursal) -> str:
     if motivo.startswith("mixta"):
         return "mixto"
     letra = str(turno.get("letra", "B"))
-    return {"X": "rechazo", "T": "tablero", "B": "boveda"}.get(letra, "boveda")
+    return {"X": "rechazo", "T": "tablero", "B": "boveda", "D": "diagnostico"}.get(letra, "boveda")
 
 
 def _ruta_boveda(estado: EstadoSucursal) -> str:

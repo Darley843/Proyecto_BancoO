@@ -942,7 +942,7 @@ function crearTurno(turno) {
  * @returns {HTMLElement} El ticket creado.
  */
 function crearTicket(datos) {
-  const letra = ["B", "T", "X"].includes(datos?.turno) ? datos.turno : "X";
+  const letra = ["B", "T", "X", "D"].includes(datos?.turno) ? datos.turno : "X";
   const etiqueta = etiquetaTurno(datos);
   const ticket = document.createElement("span");
   ticket.className = `ventanilla__ticket ventanilla__ticket--${letra.toLowerCase()}`;
@@ -961,7 +961,7 @@ function crearTicket(datos) {
  * @returns {string} Letra y número, o solo la letra.
  */
 function etiquetaTurno(datos) {
-  const letra = ["B", "T", "X"].includes(datos?.turno) ? datos.turno : "X";
+  const letra = ["B", "T", "X", "D"].includes(datos?.turno) ? datos.turno : "X";
   const numero = datos?.turno_numero;
   if (
     numero === null ||

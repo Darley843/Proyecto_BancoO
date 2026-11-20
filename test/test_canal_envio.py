@@ -6,6 +6,7 @@ las cabeceras y el cuerpo, y se simulan 429, 5xx y 4xx sin abrir un socket.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import logging
 import sqlite3
@@ -35,11 +36,18 @@ TOKEN = "token-de-prueba"
 AHORA = datetime(2026, 11, 17, 12, 0, tzinfo=UTC)
 """Instante fijo de las pruebas."""
 
-TipoRespuesta = Literal["texto", "botones", "error"]
+TipoRespuesta = Literal["texto", "botones", "error", "imagen"]
+
+PNG = b"\x89PNG\r\n\x1a\n" + b"tarjeta-de-pana"
+"""Bytes ficticios de una tarjeta; el enviador no decodifica el PNG."""
 
 
 def _respuesta(
-    texto: str = "hola", *, tipo: TipoRespuesta = "texto", botones: list[BotonCanal] | None = None
+    texto: str = "hola",
+    *,
+    tipo: TipoRespuesta = "texto",
+    botones: list[BotonCanal] | None = None,
+    imagen: bytes | None = None,
 ) -> RespuestaCanal:
     """Construye una respuesta válida del canal."""
     return RespuestaCanal(
@@ -48,6 +56,7 @@ def _respuesta(
         texto=texto,
         tipo=tipo,
         botones=botones or [],
+        imagen=imagen,
     )
 
 
@@ -266,3 +275,96 @@ def test_el_cliente_http_se_crea_con_timeout(monkeypatch: pytest.MonkeyPatch) ->
     enviador.enviar(_respuesta())
 
     assert capturado["timeout"] == 10.0
+
+
+def test_enviador_falso_registra_texto_y_despues_imagen(tmp_path: Path) -> None:
+    """El falso deja constancia del orden: primero el texto, luego la tarjeta."""
+    enviador = EnviadorFalso(tmp_path / "whatsapp.sqlite")
+
+    enviador.enviar(_respuesta("Tu diagnóstico", tipo="imagen", imagen=PNG))
+
+    assert [tipo for tipo, _ in enviador.registro] == ["texto", "imagen"]
+    assert enviador.registro[0][1] == "Tu diagnóstico"
+    assert enviador.registro[1][1] == hashlib.sha256(PNG).hexdigest()
+
+
+def test_enviador_meta_sube_la_imagen_y_la_envia_despues_del_texto() -> None:
+    """La tarjeta viaja como media y después como mensaje de imagen."""
+    llamadas: list[httpx.Request] = []
+
+    def manejador(peticion: httpx.Request) -> httpx.Response:
+        if peticion.url.path.endswith("/media"):
+            return httpx.Response(200, json={"id": "media-1"})
+        return httpx.Response(200, json={"messages": [{"id": "wamid.OUT"}]})
+
+    cliente = _cliente(manejador, llamadas)
+
+    salida = _meta(cliente).enviar(_respuesta("Tu diagnóstico", tipo="imagen", imagen=PNG))
+
+    assert salida == "wamid.OUT"
+    assert [peticion.url.path for peticion in llamadas] == [
+        "/v23.0/100000000000001/messages",
+        "/v23.0/100000000000001/media",
+        "/v23.0/100000000000001/messages",
+    ]
+    primera = json.loads(llamadas[0].content)
+    assert primera["type"] == "text"
+
+    subida = llamadas[1]
+    assert subida.headers["authorization"] == f"Bearer {TOKEN}"
+    assert subida.headers["user-agent"] == "UA/prueba"
+    assert subida.headers["from"] == "correo@uao.edu.co"
+    assert subida.headers["content-type"].startswith("multipart/form-data; boundary=")
+    assert b'name="file"; filename="pana.png"' in subida.content
+    assert b"Content-Type: image/png" in subida.content
+    assert b'name="messaging_product"' in subida.content
+
+    imagen = json.loads(llamadas[2].content)
+    assert imagen["type"] == "image"
+    assert imagen["image"] == {"id": "media-1"}
+    cliente.close()
+
+
+@pytest.mark.parametrize("falla", ["subida", "envio"])
+def test_falla_de_la_imagen_no_corta_la_respuesta(falla: str) -> None:
+    """Si la tarjeta no sale, el envío termina bien con el id del texto."""
+    llamadas: list[httpx.Request] = []
+    mensajes = {"n": 0}
+
+    def manejador(peticion: httpx.Request) -> httpx.Response:
+        if peticion.url.path.endswith("/media"):
+            if falla == "subida":
+                return httpx.Response(500, json={"error": "x"})
+            return httpx.Response(200, json={"id": "media-1"})
+        mensajes["n"] += 1
+        if falla == "envio" and mensajes["n"] == 2:
+            return httpx.Response(400, json={"error": "x"})
+        return httpx.Response(200, json={"messages": [{"id": "wamid.TEXTO"}]})
+
+    salida = _meta(_cliente(manejador, llamadas)).enviar(
+        _respuesta("Tu diagnóstico", tipo="imagen", imagen=PNG)
+    )
+
+    assert salida == "wamid.TEXTO"
+    assert len(llamadas) == 3
+
+
+def test_falla_de_la_imagen_no_filtra_el_token_ni_el_destino(
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """El aviso de la tarjeta fallida no expone credenciales ni el número."""
+    llamadas: list[httpx.Request] = []
+
+    def manejador(peticion: httpx.Request) -> httpx.Response:
+        if peticion.url.path.endswith("/media"):
+            return httpx.Response(400, json={"error": "x"})
+        return httpx.Response(200, json={"messages": [{"id": "wamid.TEXTO"}]})
+
+    with caplog.at_level(logging.WARNING):
+        _meta(_cliente(manejador, llamadas)).enviar(
+            _respuesta("Tu diagnóstico", tipo="imagen", imagen=PNG)
+        )
+
+    assert "no se pudo enviar la tarjeta" in caplog.text
+    assert TOKEN not in caplog.text
+    assert "57000000001" not in caplog.text

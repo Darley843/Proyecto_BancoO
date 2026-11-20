@@ -88,6 +88,21 @@ def test_el_readme_enlaza_la_operacion_del_canal() -> None:
     assert ".env.example" in readme
 
 
+def test_el_readme_explica_tunel_y_meta() -> None:
+    """El README no se queda en el resumen: explica túnel y configuración de Meta."""
+    readme = (RAIZ / "README.md").read_text(encoding="utf-8")
+
+    for pieza in (
+        "cloudflared",
+        "Whatsapp Business Account",
+        "subscribed_apps",
+        "WHATSAPP_MODO",
+        "/webhooks/whatsapp",
+        "messages",
+    ):
+        assert pieza in readme, pieza
+
+
 def test_los_comandos_del_modulo_usan_uv() -> None:
     """Ningún comando del paquete se invoca con el Python del sistema."""
     for archivo in ("README.md", "docs/OPERACION_WHATSAPP.md"):

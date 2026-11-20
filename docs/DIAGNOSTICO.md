@@ -99,6 +99,11 @@ puede ser mayor que la respuesta del paso 5.
 | Vehículo | `monto.DE_30M_A_60M`, `monto.DE_60M_A_100M`, `monto.MAS_100M` | 45M, 80M, 120M |
 | Vivienda | `monto.DE_100M_A_200M`, `monto.DE_200M_A_350M`, `monto.MAS_350M` | 150M, 275M, 400M |
 
+El **valor de cálculo** de cada rango es representativo y no un límite del
+producto. Los escenarios «¿Y si…?» y el MCP aceptan montos de **$500.000 a
+$2.000 millones** (`[limites]` de `config/diagnostico.toml`), y el plazo sigue
+los rangos de cada objetivo.
+
 ### plazo (meses)
 
 | Objetivo | Ids |
@@ -108,11 +113,15 @@ puede ser mayor que la respuesta del paso 5.
 
 ## Cálculo
 
-Con los valores de cálculo de cada rango:
+Con los valores de cálculo de cada rango, con precisión decimal de 28 dígitos:
 
-- Tasa mensual: `i = (1 + EA) ^ (1/12) − 1`
-- Cuota (amortización francesa): `cuota = monto × i / (1 − (1 + i) ^ (−n))`
-- Capacidad de pago: `capacidad = ingresos − gastos − cuotas`
+- Tasa mensual: `i = (1 + EA) ^ (1/12) − 1`, sin redondear.
+- Cuota (amortización francesa): `cuota = monto × i / (1 − (1 + i) ^ (−n))`;
+  con `i = 0`, `cuota = monto / n`. Solo la cuota final se redondea al peso.
+- **Capacidad de pago**: `capacidad = ingresos − gastos − cuotas actuales`,
+  antes de la cuota nueva. En compra de cartera las cuotas trasladadas
+  desaparecen: `capacidad = ingresos − gastos − (cuotas − cuota_trasladar)`.
+- **Margen después de la cuota**: `margen = capacidad − cuota_nueva`.
 - Razón de endeudamiento: `RE = (cuotas + cuota_nueva) / ingresos`
   (en compra de cartera: `(cuotas − cuota_trasladar + cuota_nueva) / ingresos`)
 - Cuota mostrada: rango entre la cuota con la tasa mínima y con la tasa máxima.
@@ -122,27 +131,82 @@ Con los valores de cálculo de cada rango:
 
 | Color | Regla |
 |---|---|
-| Rojo | `cuota_nueva > capacidad`, o `RE > 40 %` |
-| Amarillo | `30 % < RE ≤ 40 %` |
-| Verde | `RE ≤ 30 %` y `cuota_nueva ≤ capacidad` |
+| Rojo | `margen < 0`, o `RE > 40 %` |
+| Amarillo | `margen ≥ 0` y `30 % < RE ≤ 40 %` |
+| Verde | `margen ≥ 0` y `RE ≤ 30 %` |
 
-Umbrales configurables en `config/diagnostico.toml` (por defecto 0,30 y 0,40).
+Umbrales configurables en `config/diagnostico.toml`: `verde_hasta` 0,30,
+`amarillo_hasta` 0,40 y `vivienda_primera_cuota` 0,40.
 
 Reglas adicionales:
 
-- **Vivienda:** además, la primera cuota no debe superar el 30 % de los
-  ingresos; si lo supera, el resultado es rojo. (Verificar la norma vigente
-  antes de la sustentación.)
-- **Libranza:** solo para `empleado` o `pensionado`. Si es `independiente`, se
-  explica que la libranza requiere convenio con el empleador o pagador y se
-  ofrece simular libre inversión.
-- **Compra de cartera:** además del semáforo, se informa el ahorro mensual
-  estimado `cuota_trasladar − cuota_nueva`; si es negativo, se dice que el
-  traslado no reduce la cuota con ese plazo.
+- **Vivienda:** además, la primera cuota no debe superar el **40 % de los
+  ingresos familiares**; si lo supera, el resultado es rojo con la alerta
+  `vivienda_primera_cuota`. Es el límite del Decreto 583 de 2025, que modificó
+  el Decreto 1077 de 2015 (antes era del 30 % para No VIS). La entrevista usa el
+  ingreso declarado como referencia de los ingresos familiares.
+- **Libranza:** la Ley 1527 de 2012, modificada por la Ley 1902 de 2018, cubre
+  a empleados, pensionados y contratistas por prestación de servicios; lo que se
+  exige es una **entidad pagadora con convenio**. La entrevista todavía no
+  pregunta por esa entidad, así que el motor solo simula libranza para
+  `empleado` o `pensionado`. Si es `independiente`, explica la regla y ofrece
+  simular libre inversión.
+- **Compra de cartera:** la capacidad comparable descuenta las cuotas que se
+  trasladan y el margen se calcula con la cuota nueva. Además se informa el
+  ahorro mensual estimado `cuota_trasladar − cuota_nueva`; si es negativo, se
+  dice que el traslado no reduce la cuota con ese plazo.
 - **Ahorro:** no hay semáforo de crédito. Se informa la capacidad de ahorro
-  mensual (`capacidad`) y las tasas vigentes de ahorro y CDT del Tablero.
-- **Capacidad negativa** (gastos + cuotas > ingresos): rojo sin simular
-  crédito, con recomendación de ordenar gastos y deudas primero.
+  mensual (`capacidad`) y las tasas vigentes de ahorro y CDT del Tablero. La
+  tasa de ahorro se presenta con el **tramo de saldo más bajo** (por ejemplo,
+  «De 0 a $5.000.000») como referencia para quien empieza, y la envolvente del
+  producto queda en `rango_completo` como dato adicional. El CDT no se resume en
+  un solo porcentaje: `tasa_ea` es el rango por plazo del **monto mínimo** (por
+  ejemplo, «De $500 mil a $99 millones»), `tramos` detalla cada plazo y
+  `rango_completo` conserva la envolvente. El motivo explica que la tasa depende
+  del plazo y del monto.
+- **Capacidad negativa** (gastos + cuotas actuales > ingresos): rojo sin
+  simular crédito, con recomendación de ordenar gastos y deudas primero. Con
+  capacidad **cero** la recomendación del ahorro es revisar los gastos fijos, no
+  automatizar un ahorro que no cabe en el presupuesto.
+- **Vigencia:** si la vigencia de la tasa consultada no incluye la fecha de hoy
+  (por ejemplo, la de ahorro del 4 al 9 de noviembre de 2026), el resultado
+  agrega la alerta `vigencia_vencida` y un motivo que cita la vigencia publicada
+  y la fecha de la consulta. La tasa se informa igual, con la advertencia. Si
+  ninguna tabla cubre hoy, la consulta usa la más reciente en lugar de detener
+  el diagnóstico: la app sigue respondiendo después del 30 de noviembre y el
+  aviso viaja en el Tablero (`TasaVigente.vigencia_vencida`), en el motor y en
+  el MCP. `TasaNoDisponible` queda solo para un producto sin ninguna tasa
+  publicada.
+
+## Representación en `ResultadoDiagnostico`
+
+Los campos de crédito son opcionales porque no todos los productos simulan una
+cuota. El motor lo representa así:
+
+| Caso | `semaforo` | `cuota_mensual` y tasa | Alerta |
+|---|---|---|---|
+| Crédito simulado | `verde`, `amarillo` o `rojo` | Con valor, en rango | Ninguna |
+| Ahorro (`objetivo.ahorro`) | `None` | `None`; `capacidad_pago` es la capacidad de ahorro y `tasas_captacion` lista ahorro y CDT | Ninguna |
+| Libranza de independiente | `None` | `None` | `libranza_no_aplica` |
+| Capacidad negativa | `rojo` (regla del guion) | `None`: no se simula | `capacidad_negativa` |
+| Vivienda sobre el 40 % de los ingresos familiares (Decreto 583 de 2025) | `rojo` | Con valor | `vivienda_primera_cuota` |
+| Tasa cuya vigencia no cubre hoy | El del producto | Con el valor publicado | `vigencia_vencida` |
+
+`TasaCaptacion` guarda `producto`, `tasa_ea` (la referencia), `referencia` (el
+tramo de saldo o la banda de monto), `rango_completo`, `tramos` (plazos del CDT
+con su tasa), la vigencia y la fuente.
+
+`monto_credito` y `plazo_meses` son obligatorios en los productos de crédito y
+el contrato los prohíbe en ahorro: el validador rechaza un ahorro con monto o
+plazo. `vinculacion` es obligatoria. `cuota_trasladar` es opcional y el motor
+solo la exige en compra de cartera. `ahorro_mensual_estimado` se llena solo en
+compra de cartera (`cuota_trasladar − cuota_nueva`) y `rango_usado` conserva el
+id canónico de cada bloque de la entrevista.
+
+Los ids de la entrevista se convierten en la entrada con
+`diagnostico.motor.entrada_desde_respuestas`, que toma los valores de cálculo
+de `config/diagnostico.toml`; el canal nunca conoce las cifras. El cálculo se
+ejecuta con `diagnostico.motor.calcular`.
 
 ## Recomendaciones por color
 
@@ -153,13 +217,35 @@ Reglas adicionales:
 - **Rojo:** con estos datos la cuota compromete demasiado el ingreso. Sugerir
   monto menor o plazo mayor, compra de cartera si hay deudas caras, y ofrecer
   hablar con un asesor (HITL).
+- **Ahorro sin capacidad (cero o negativa):** sugerir revisar los gastos fijos
+  y renegociar las cuotas que más pesan; no proponer automatizar el ahorro
+  hasta que haya margen.
 
 ## Texto de aviso (obligatorio)
 
 > Este resultado es orientativo y se basa en rangos aproximados y en las tasas
-> publicadas por el Banco de Occidente para [vigencia]. No es una aprobación ni
-> una oferta de crédito; la tasa final depende del monto, el plazo y tu perfil.
-> Proyecto académico de la UAO, no es un canal oficial del banco.
+> publicadas por el Banco de Occidente, vigentes [vigencia]. No incluye tu
+> historial crediticio, que un banco evalúa obligatoriamente (Circular Básica
+> Financiera, Circular Externa 004 de 2026 de la Superfinanciera, párrafo
+> 1.1.2.27 c). No es una aprobación ni una oferta de crédito; la tasa final
+> depende del monto, el plazo y tu perfil. Proyecto académico de la UAO, no es
+> un canal oficial del banco.
+
+## Referencias normativas
+
+- **Decreto 583 de 2025**, que modificó el Decreto 1077 de 2015: la primera
+  cuota de un crédito de vivienda no puede superar el **40 % de los ingresos
+  familiares**. Antes el límite era del 30 % para vivienda No VIS.
+- **Ley 1527 de 2012**, modificada por la **Ley 1902 de 2018**: la libranza
+  cubre a empleados, pensionados y contratistas por prestación de servicios
+  siempre que exista una **entidad pagadora con convenio**.
+- **Circular Básica Financiera (CBF)**, Circular Externa 004 de 2026 de la
+  Superintendencia Financiera de Colombia, párrafos **1.1.2.20**, **1.1.2.26**
+  y **1.1.2.27**: evaluación de la capacidad de pago y del historial
+  crediticio. Esta referencia reemplaza a la anterior «Circular Básica Contable
+  y Financiera». El diagnóstico no consulta el historial: por eso el aviso lo
+  declara fuera del alcance y el resultado nunca sustituye la evaluación del
+  banco.
 
 ## Personas sintéticas sugeridas para pruebas
 

@@ -13,9 +13,10 @@ fuera 48 meses?» o «¿y si pido 8 millones?». Este módulo:
 4. compara cuota, semáforo y razón de endeudamiento (`ComparacionEscenario`)
    y arma el mensaje para WhatsApp.
 
-El cálculo no vive aquí: se inyecta la función del motor determinista
-(`diagnostico.motor`), así este módulo no duplica fórmulas y se prueba con un
-grafo simulado mientras el grafo real de diagnóstico se termina.
+El cálculo no vive aquí: por defecto se usa el motor determinista
+(`diagnostico.motor.calcular`) y las pruebas pueden inyectar un doble sin
+duplicar fórmulas. El ahorro no tiene cuota ni semáforo de crédito: un cambio
+de monto o de plazo se rechaza con un mensaje claro y no crea la rama.
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ from langchain_core.runnables import RunnableConfig
 from pydantic import BaseModel, ConfigDict, ValidationError
 
 from ..canal.contratos import EntradaDiagnostico, RangoDecimal, ResultadoDiagnostico
+from . import motor
 
 CampoEscenario = Literal[
     "monto_credito",
@@ -50,8 +52,6 @@ MAXIMO_ESCENARIOS = 10
 PLAZO_GENERAL = (6, 72)
 #: Plazo en meses para vivienda.
 PLAZO_VIVIENDA = (60, 240)
-#: Monto del crédito en pesos.
-MONTO = (Decimal(500_000), Decimal(2_000_000_000))
 #: Ingreso, gastos y cuotas mensuales en pesos (0 solo para gastos y cuotas).
 VALOR_MENSUAL_MAXIMO = Decimal(1_000_000_000)
 
@@ -175,6 +175,11 @@ def aplicar_cambio(entrada: EntradaDiagnostico, cambio: CambioEscenario) -> Entr
             mensaje que dice el rango permitido.
     """
     valor = cambio.valor
+    if entrada.producto == "ahorro" and cambio.campo in {"monto_credito", "plazo_meses"}:
+        raise EscenarioFueraDeRango(
+            "El ahorro no se simula con monto ni plazo de crédito: no tiene cuota. "
+            "Puedes cambiar tu ingreso, tus gastos o tus cuotas actuales."
+        )
     if cambio.campo == "plazo_meses":
         minimo, maximo = PLAZO_VIVIENDA if entrada.producto == "vivienda" else PLAZO_GENERAL
         if valor != valor.to_integral_value() or not minimo <= valor <= maximo:
@@ -184,9 +189,11 @@ def aplicar_cambio(entrada: EntradaDiagnostico, cambio: CambioEscenario) -> Entr
             )
         nuevo: Any = int(valor)
     elif cambio.campo == "monto_credito":
-        if not MONTO[0] <= valor <= MONTO[1]:
+        ajustes = motor.cargar_config()
+        if not ajustes.monto_minimo <= valor <= ajustes.monto_maximo:
             raise EscenarioFueraDeRango(
-                f"El monto debe estar entre {formatear_pesos(MONTO[0])} y {formatear_pesos(MONTO[1])}."
+                f"El monto debe estar entre {formatear_pesos(ajustes.monto_minimo)} "
+                f"y {formatear_pesos(ajustes.monto_maximo)}."
             )
         nuevo = valor
     else:
@@ -208,7 +215,7 @@ def bifurcar_escenario(
     usuario_id: str,
     thread_original: str,
     cambio: CambioEscenario,
-    calcular: Callable[[EntradaDiagnostico], ResultadoDiagnostico],
+    calcular: Callable[[EntradaDiagnostico], ResultadoDiagnostico] | None = None,
 ) -> ComparacionEscenario:
     """Crea la rama «¿Y si…?» de un diagnóstico terminado y la compara.
 
@@ -220,15 +227,15 @@ def bifurcar_escenario(
         usuario_id: huella HMAC de la persona (nunca el número).
         thread_original: `thread_id` del diagnóstico terminado.
         cambio: insumo y valor nuevos.
-        calcular: motor determinista que convierte la entrada en resultado.
+        calcular: motor determinista; por defecto `diagnostico.motor.calcular`.
 
     Returns:
         La comparación entre el original y el escenario.
 
     Raises:
         DiagnosticoNoTerminado: si el hilo no existe o no está terminado.
-        EscenarioFueraDeRango: si el cambio está fuera de los límites o se
-            alcanzó el máximo de escenarios.
+        EscenarioFueraDeRango: si el cambio está fuera de los límites, si el
+            producto no simula crédito o si se alcanzó el máximo de escenarios.
     """
     valores = dict(grafo.get_state(_config(thread_original)).values or {})
     if valores.get("etapa") != ETAPA_TERMINADA or not valores.get("resultado"):
@@ -236,11 +243,17 @@ def bifurcar_escenario(
             "Primero terminemos tu diagnóstico; después podemos probar escenarios."
         )
     original = ResultadoDiagnostico.model_validate(valores["resultado"])
+    if original.semaforo is None or original.cuota_mensual is None:
+        raise EscenarioFueraDeRango(
+            "Este diagnóstico no tiene una cuota de crédito simulada: no hay "
+            "escenario que comparar. Un asesor puede revisar tu caso."
+        )
     entrada = aplicar_cambio(original.entrada, cambio)
 
     numero = _siguiente_numero(grafo, usuario_id)
     thread_escenario = f"diag:{usuario_id}:esc:{numero}"
-    resultado = calcular(entrada).model_copy(update={"escenario_de": thread_original})
+    motor_calculo = calcular if calcular is not None else motor.calcular
+    resultado = motor_calculo(entrada).model_copy(update={"escenario_de": thread_original})
 
     estado_rama = {
         clave: valor for clave, valor in valores.items() if clave not in {"messages", "caso"}
@@ -313,13 +326,14 @@ def formatear_pesos(valor: Decimal) -> str:
     """Formatea pesos colombianos sin decimales y con punto de miles.
 
     Args:
-        valor: monto en pesos.
+        valor: monto en pesos; puede ser negativo.
 
     Returns:
-        Texto como `$1.250.000`.
+        Texto como `$1.250.000` o `-$1.250.000`, con el signo antes del peso.
     """
     entero = int(valor.quantize(Decimal(1)))
-    return "$" + f"{entero:,}".replace(",", ".")
+    signo = "-" if entero < 0 else ""
+    return f"{signo}$" + f"{abs(entero):,}".replace(",", ".")
 
 
 def formatear_rango(rango: RangoDecimal) -> str:
@@ -343,7 +357,20 @@ def _foto(resultado: ResultadoDiagnostico) -> FotoResultado:
 
     Returns:
         La foto con cuota, semáforo, razón y capacidad.
+
+    Raises:
+        EscenarioFueraDeRango: si el resultado no simula una cuota de crédito y
+            por tanto no hay nada que comparar.
     """
+    if (
+        resultado.cuota_mensual is None
+        or resultado.semaforo is None
+        or resultado.razon_endeudamiento is None
+    ):
+        raise EscenarioFueraDeRango(
+            "Este diagnóstico no tiene una cuota de crédito simulada: no hay "
+            "escenario que comparar."
+        )
     return FotoResultado(
         cuota_mensual=resultado.cuota_mensual,
         semaforo=resultado.semaforo,

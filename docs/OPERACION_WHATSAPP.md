@@ -2,7 +2,7 @@
 
 Guía completa para conectar la Sucursal 1965 con WhatsApp Cloud API: crear la app
 de Meta, obtener credenciales, levantar el webhook, exponerlo con un túnel y
-probar la recepción de mensajes reales.
+probar la recepción y la respuesta a mensajes reales.
 
 Todo lo que se pega en Meta y todo lo que se ejecuta en PowerShell está marcado.
 Los secretos van **solo** en la sesión: el proyecto no lee `.env`.
@@ -19,10 +19,15 @@ Sucursal: WhatsApp es un transporte, no otra inteligencia.
 | Identidad E.164 y huella HMAC | `canal/identidad.py` | completo |
 | Consentimiento Ley 1581 | `canal/consentimiento.py` | completo |
 | Envío falso y real | `canal/envio.py` | completo |
-| Deduplicación, cola y despachador | tareas 2.3 y 2.9 | en curso |
+| Deduplicación, cola y despachador | `canal/cola.py`, `canal/despachador.py` | completo |
 
-Mientras la cola y el despachador no estén en `main`, el webhook valida la firma
-y responde `200 EVENT_RECEIVED`, pero todavía no responde al usuario.
+Con la cola y el despachador, un mensaje autorizado recibe respuesta del grafo.
+En modo `falso` el envío se registra en `envios` pero no sale a WhatsApp; para
+que el usuario lo reciba hay que usar `WHATSAPP_MODO=real`.
+
+El **19 de noviembre de 2026** el circuito completo quedó verificado con un
+mensaje real: 14 turnos respondidos, 3 consentimientos aceptados y 4 envíos
+registrados en `data/asistente/whatsapp.sqlite`.
 
 ## Puesta en marcha desde cero
 
@@ -147,6 +152,21 @@ uv run python -m banco_occidente_corpus.canal.identidad --huella "+57 300 123 45
 
 El comando lee `WHATSAPP_ID_SALT`, imprime solo la huella y no muestra la sal.
 
+Pega la huella en `config/whatsapp.toml`, reemplazando uno de los marcadores:
+
+```toml
+[autorizados]
+huellas = [
+  "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "0000000000000000000000000000000000000000000000000000000000000002",
+  # ...
+]
+```
+
+Sin ese paso el número queda como no autorizado y el envío real se bloquea con
+`ErrorEnvio: destino no autorizado`. La configuración se lee al arrancar: hay que
+reiniciar la app después de editar el TOML.
+
 ### 7. Publicar la app (navegador) — obligatorio para mensajes reales
 
 En **modo Desarrollo**, Meta solo entrega los eventos del botón «Probar». Los
@@ -240,22 +260,66 @@ Ambos deben devolver `12345`. Después, desde un número autorizado, escribe
 POST /webhooks/whatsapp HTTP/1.1" 200 OK
 ```
 
-Ese `POST 200` es la prueba de que Meta entrega, el túnel funciona y la firma es
-válida. La respuesta al usuario llega con las tareas 2.3 y 2.9.
+El `POST 200` es la prueba de que Meta entrega, el túnel funciona y la firma es
+válida. La respuesta del grafo sale por el enviador: en modo `falso` queda en la
+base; en modo `real` llega al WhatsApp del usuario.
+
+#### 11.1 La conversación completa
+
+Con `WHATSAPP_MODO=real` y la huella del número en `config/whatsapp.toml`:
+
+1. `hola` → aviso de la Ley 1581 con **Acepto** y **Ahora no**.
+2. **Acepto** → confirmación; el consentimiento queda guardado.
+3. Una pregunta del alcance (por ejemplo, «¿cuál es la cuota de manejo de la
+   tarjeta débito?») → respuesta del grafo, con sus fuentes.
+
+Si aparece `ErrorEnvio: destino no autorizado`, falta la huella del paso 6 o la
+sal cambió desde que se generó.
+
+## Diagnóstico de la respuesta
+
+El texto del mensaje no se guarda ni se registra en logs: solo el estado y la
+huella del número. Para saber qué pasó con un turno:
+
+```powershell
+@'
+import sqlite3
+
+with sqlite3.connect("data/asistente/whatsapp.sqlite") as c:
+    print("mensajes:", c.execute("SELECT estado, COUNT(*) FROM mensajes GROUP BY estado").fetchall())
+    print("consentimientos:", c.execute("SELECT COUNT(*) FROM consentimientos").fetchone()[0])
+    print("envios:", c.execute("SELECT COUNT(*) FROM envios").fetchone()[0])
+'@ | uv run python -
+```
+
+Estados posibles:
+
+| Estado | Significado |
+|---|---|
+| `recibido` | registrado y encolado |
+| `procesando` | el trabajador lo tomó |
+| `respondido` | la respuesta se entregó al enviador |
+| `ignorado` | número fuera de las huellas o duplicado |
+| `error` | falló el grafo, el envío o la firma no se pudo validar |
+
+Si hay `error`, mira la ventana de la app: el `logger.exception` del despachador
+muestra la causa sin el número ni el texto. Los errores más comunes son
+`destino no autorizado` (falta la huella) y fallos de credenciales de Meta.
 
 ## Estado verificado
 
-Configuración comprobada el **17 de noviembre de 2026**:
+Configuración comprobada el **19 de noviembre de 2026**:
 
 | Dato | Valor |
 |---|---|
-| App | `Prueba1` · App ID `000000000000000` · publicada |
+| App | `Prueba1`, publicada (App Mode: Live) |
 | Portafolio | `Sucursal 1965 UAO` |
-| WABA ID | `000000000000000`, suscrita a `Prueba1` |
-| Número de prueba | `+1 (555) 555-0100` |
-| Phone Number ID | `000000000000001` |
+| WABA | suscrita a `Prueba1` con `subscribed_apps` |
+| Número de prueba | número de Meta del Paso 1 |
+| Phone Number ID | el del Paso 1 |
 | Webhook | verificado con `hub.challenge` |
 | Entrega real | `POST /webhooks/whatsapp 200 OK` |
+| Respuesta real | 14 turnos respondidos, 3 consentimientos y 4 envíos |
 | Túnel | cloudflared rápido (URL variable) |
 
 Los identificadores y el número de la tabla son de ejemplo: los reales se leen
@@ -297,6 +361,9 @@ $env:WHATSAPP_MODO = "real"
 | `POST` devuelve 401 | App Secret distinto o cuerpo reserializado |
 | `POST` devuelve 503 | Falta `WHATSAPP_APP_SECRET` |
 | Dos checks grises y nada en el webhook | Falta suscribir la cuenta a la app (paso 8) |
+| `ErrorEnvio: destino no autorizado` | Falta la huella del número en `config/whatsapp.toml` o cambió la sal |
+| Estado `respondido` pero no llega a WhatsApp | Estás en modo `falso`: el envío quedó en `envios` y no salió |
+| `hola` no recibe el aviso | La app no arrancó con `WHATSAPP_ID_SALT` o con la huella correcta |
 
 ## Seguridad y datos personales
 

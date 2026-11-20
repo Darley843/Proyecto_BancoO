@@ -164,15 +164,19 @@ El motor vive en `diagnostico/motor.py` y no importa LangGraph ni el modelo. Usa
 
 Fórmulas, aplicadas a los dos extremos del rango de tasa E.A. que publica el PDF:
 
-- `tasa_mensual(valor_ea) = (1 + valor_ea) ** (1/12) - 1`.
+- `tasa_mensual(valor_ea) = (1 + valor_ea) ** (1/12) - 1`, sin redondear.
 - `cuota = monto * i / (1 - (1 + i) ** -n)`; si `i = 0`, `cuota = monto / n`.
+  Solo la cuota final se redondea al peso.
 - `total_intereses = cuota * n - monto` y `total_pagado = cuota * n`.
 - `razon_endeudamiento = (cuotas_deudas + cuota_nueva) / ingreso_mensual`.
-- `capacidad_pago = ingreso_mensual - gastos_mensuales - cuotas_deudas - cuota_nueva`.
+- `capacidad_pago = ingreso_mensual - gastos_mensuales - cuotas_deudas`
+  (antes de la cuota nueva). En compra de cartera las cuotas trasladadas
+  desaparecen: `capacidad_pago = ingreso - gastos - (cuotas - cuota_trasladar)`.
+- `margen_despues_cuota = capacidad_pago - cuota_nueva`.
 
-La cuota se informa como rango: se calcula con la tasa E.A. `desde` y con la `hasta`. El semáforo, la razón de endeudamiento y la capacidad de pago usan la tasa `hasta` (la máxima del rango) y la cuota máxima; es el criterio conservador y el resultado lo declara en `base_semaforo="tasa_maxima"`. Si el usuario escribe una tasa exacta, el rango colapsa a ese valor. Redondeo: dinero a dos decimales, tasas a seis, razón y capacidad a cuatro. La versión de la fórmula es `v1` y se guarda en el resultado.
+La cuota se informa como rango: se calcula con la tasa E.A. `desde` y con la `hasta`. El semáforo, la razón de endeudamiento y el margen usan la tasa `hasta` (la máxima del rango) y la cuota máxima; es el criterio conservador y el resultado lo declara en `base_semaforo="tasa_maxima"`. Si el usuario escribe una tasa exacta, el rango colapsa a ese valor. Redondeo: la tasa mensual conserva la precisión completa del contexto de 28 dígitos, la cuota final y los montos se redondean al peso, y la razón a cuatro decimales. La versión de la fórmula es `v1` y se guarda en el resultado.
 
-Umbrales por defecto en `config/diagnostico.toml`: verde si la razón es menor o igual a `0.30` y la capacidad es positiva; amarillo si la razón es menor o igual a `0.40` y la capacidad no es negativa; rojo en el resto. Son configurables y el resultado guarda los umbrales usados.
+Umbrales por defecto en `config/diagnostico.toml`: verde si la razón es menor o igual a `0.30` y el margen no es negativo; amarillo si la razón es menor o igual a `0.40` y el margen no es negativo; rojo si el margen es negativo o la razón supera `0.40`. En vivienda, además, la primera cuota no puede superar `vivienda_primera_cuota = 0.40` de los ingresos familiares (Decreto 583 de 2025). Son configurables y el resultado guarda los umbrales usados.
 
 **Fuente y captura.** La fuente es el PDF vigente `https://www.bancodeoccidente.com.co/documents/d/guest/tasas-personas-bdo`, enlazado desde `/tarifas`. El flujo es: capturar `/tarifas` en Bronze con el pipeline web; ejecutar `corpus docs discover`; respaldar el inventario completo en `data/raw/documents_urls.original.jsonl` y dejar en `data/raw/documents_urls.jsonl` solo las URLs que contengan `tasas-personas-bdo` y `tarifas-persona-bdo`; ejecutar `corpus docs fetch --priority-max 3 --max-mb 50 --delay 1.5`. No se usa filtro por tipo (`--tipo`): `tasas-personas-bdo` queda clasificado como `otro` y el filtro lo excluiría. La descarga guarda `data/raw/documents/<sha>.pdf` y su registro en `documents_capture.jsonl`. No se ejecuta `corpus docs extract` ni `make gold`: el PDF no se convierte en una página Gold más. Si `/tarifas` no está en Bronze, se captura primero con el pipeline web y después se descubre.
 
@@ -182,7 +186,7 @@ Umbrales por defecto en `config/diagnostico.toml`: verde si la razón es menor o
 
 **Spreads sobre índice.** Un `spread_ipc` o `spread_ibr` no es una tasa: queda fuera de `validar_usura`, de `validar_coherencia_tasas` y de toda consulta que devuelva la tasa del producto (`tasa_vigente`, `tasas_producto` y el MCP), que parten de `tasas_fijas`. Se presenta siempre como «IPC + X puntos» o «IBR + X puntos» y nunca como un porcentaje E.A.
 
-**Consulta.** `tablero/tasas.py` expone `tasa_vigente(producto, fecha=None)` y `tasas_producto(producto)`. La primera lee las tablas Gold, elige la vigencia que contiene la fecha (por defecto, la más reciente) y devuelve `TasaVigente` con el rango E.A./M.V., la vigencia, la URL, el `sha256` y la fecha de extracción. La segunda devuelve las filas por segmento. La consulta es determinista, no usa el modelo ni la red y no lee el valor de presentación del CSV. Si no hay fila para el producto, devuelve `tasa_no_disponible` y el diagnóstico se detiene; no se usa una tasa de la Bóveda ni una cifra en código.
+**Consulta.** `tablero/tasas.py` expone `tasa_vigente(producto, fecha=None)` y `tasas_producto(producto)`. La primera lee las tablas Gold, elige la vigencia que contiene la fecha (por defecto, la más reciente) y Devuelve `TasaVigente` con el rango E.A./M.V., la vigencia, la URL, el `sha256` y la fecha de extracción; si ninguna tabla cubre la fecha consultada, usa la más reciente y marca `vigencia_vencida` en lugar de detenerse. La segunda devuelve las filas por segmento. La consulta es determinista, no usa el modelo ni la red y no lee el valor de presentación del CSV. Si el producto no tiene ninguna fila, devuelve `tasa_no_disponible` y el diagnóstico se detiene; no se usa una tasa de la Bóveda ni una cifra en código.
 
 **Tablero visible.** `Origen` de `tablero/tipos.py` se amplía a `Literal["tarifario", "tabla_web", "tasa"]`. `construir_filas` añade una fila por producto y segmento con `origen="tasa"`, `moneda="%"`, `valor="18,50–24,90"`, `vigente_desde` y `fuente`; el CSV conserva sus diez columnas y la tabla Gold sigue siendo la fuente del cálculo. `make tablero` no hace red y dos ejecuciones producen el mismo CSV.
 
@@ -224,11 +228,11 @@ Alternativa descartada: copiar el checkpoint con `checkpointer.put`. Acopla el c
 
 ### 12. Comité de crédito de una ronda y síntesis determinista
 
-El comité se convoca solo para rojo o amarillo. Hace tres llamadas en paralelo, una por rol, con `with_structured_output(OpinionComite)` y prompts separados en `config/prompts/comite_riesgo_v1.md`, `comite_comercial_v1.md` y `comite_auditor_v1.md`.
+El comité se convoca solo para rojo o amarillo. Riesgo y comercial hacen dos llamadas en paralelo con `with_structured_output(PosturaAgente)`; el auditor corre después, ya con las dos posturas, y revisa cifras, promesas y complacencia. Los prompts separados viven en `config/prompts/comite_riesgo_v1.md`, `comite_comercial_v1.md` y `comite_auditor_v1.md`.
 
-`OpinionComite` incluye `rol`, `veredicto` (`favorable`, `con_condiciones`, `desfavorable`, `abstencion`), `confianza` (0–1), `evidencias` (lista de `{campo, valor, fuente}`), `condiciones`, `riesgos` y `aviso`. La síntesis es determinista: un `desfavorable` de riesgo produce `no_apto`; una abstención o un fallo produce `requiere_asesor`; condiciones comerciales producen `apto_con_condiciones`; si no, `apto`. No hay una cuarta llamada ni una segunda ronda.
+`PosturaAgente` incluye `agente`, `postura`, `argumentos` (máximo tres) y `evidencia`; `DeliberacionComite` agrega la recomendación, hasta dos alternativas, los hallazgos y la oferta de asesor. La síntesis es determinista: un `desfavorable` de riesgo produce `no_apto`; una abstención o un fallo produce `requiere_asesor`; condiciones comerciales producen `apto_con_condiciones`; si no, `apto`. Si el auditor objeta hay una única corrección (cuarta llamada); si vuelve a objetar, se responde con el texto del diagnóstico. No hay segunda ronda.
 
-Si un rol falla o devuelve un esquema inválido, se registra la abstención y se entrega el resultado con las otras dos. El comité no escribe en la Bóveda ni modifica el diagnóstico. El uso de tokens de las tres llamadas se suma al turno.
+Si un rol falla o devuelve un esquema inválido, se registra la abstención y se entrega el resultado con las otras dos. El comité no escribe en la Bóveda ni modifica el diagnóstico. El uso de tokens de las llamadas se suma al turno.
 
 Alternativa descartada: un debate de varias rondas. El taller pide una ronda y el costo se dispara; además, un desacuerdo no se resuelve necesariamente con más llamadas.
 
@@ -239,7 +243,7 @@ Se añade la dependencia `mcp` con `uv add mcp` y se implementa `mcp_servidor/se
 Herramientas:
 
 - `consultar_tasa(consulta: str, limite: int = 5)`: usa `tasas_producto` y `tasa_vigente` del Tablero y devuelve el rango E.A./M.V., la vigencia, la URL, el `sha256` y la fecha de extracción. No llama al modelo ni a la red.
-- `simular_cuota(monto: float, plazo_meses: int, tasa_ea: float)`: importa `diagnostico.motor.simular` para que la fórmula sea la misma. Valida monto y plazo positivos.
+- `simular_cuota(producto: str, monto: float, plazo_meses: int)`: calcula la cuota con las mismas primitivas de `diagnostico.calculo` que usa el motor (`tasa_mensual`, `cuota_francesa`) y la tasa que publica el Tablero para el producto. Devuelve la cuota en rango, las dos tasas E.A. y M.V., la vigencia, la fuente y las alertas. Solo acepta productos de crédito con cuota fija: el ahorro, el CDT, la tarjeta de crédito y el crédito rotativo responden un error explicable. Valida monto y plazo con los límites de `config/diagnostico.toml` para ese producto.
 - `buscar_en_boveda(consulta: str, k: int = 5)`: usa el recuperador híbrido sobre el índice local. Si Ollama no responde, intenta el resultado BM25 disponible y, si tampoco, devuelve un error estructurado. Los fragmentos se devuelven como datos, con su URL y su puntaje.
 
 El servidor no declara herramientas de escritura, no acepta rutas del sistema y limita `k` a 20, la consulta a 500 caracteres y el tiempo a 15 s. No llama a DeepSeek ni al sitio del banco.
@@ -359,9 +363,11 @@ class RespuestaCanal(BaseModel):
     usuario_id: str
     id_mensaje_origen: str
     texto: str = Field(min_length=1, max_length=4096)
-    tipo: Literal["texto", "botones", "error"] = "texto"
+    tipo: Literal["texto", "botones", "error", "imagen"] = "texto"
     botones: list[BotonCanal] = Field(default_factory=list, max_length=3)
     metadatos: dict[str, str] = Field(default_factory=dict)
+    # Solo con tipo "imagen": el PNG de Pana, en memoria y fuera de los logs.
+    imagen: bytes | None = Field(default=None, repr=False)
 
 
 class PerfilUsuario(BaseModel):
@@ -383,18 +389,54 @@ class RangoDecimal(BaseModel):
     hasta: Decimal
 
 
+ProductoDiagnostico = Literal[
+    "libre_inversion",
+    "compra_cartera",
+    "vehiculo_nuevo",
+    "vehiculo_usado",
+    "vivienda",
+    "libranza",
+    "ahorro",
+]
+
+
 class EntradaDiagnostico(BaseModel):
     """Insumos normalizados de un diagnóstico."""
 
     model_config = ConfigDict(extra="forbid")
-    producto: str
-    ingreso_mensual: Decimal
-    gastos_mensuales: Decimal
-    cuotas_deudas: Decimal
-    monto_credito: Decimal
-    plazo_meses: int = Field(ge=6, le=120)
-    tasa_ea: Decimal | None = None
+    producto: ProductoDiagnostico
+    vinculacion: Literal["empleado", "independiente", "pensionado"]
+    ingreso_mensual: Decimal = Field(ge=0)
+    gastos_mensuales: Decimal = Field(ge=0)
+    cuotas_deudas: Decimal = Field(ge=0)
+    cuota_trasladar: Decimal | None = Field(default=None, ge=0)
+    monto_credito: Decimal | None = Field(default=None, ge=0)
+    plazo_meses: int | None = Field(default=None, ge=6, le=240)
     rango_usado: dict[str, str] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _insumos_por_producto(self) -> Self:
+        """Exige monto y plazo en crédito y los prohíbe en ahorro."""
+        if self.producto == "ahorro":
+            if self.monto_credito is not None or self.plazo_meses is not None:
+                raise ValueError("el ahorro no se simula con monto ni plazo de crédito")
+            return self
+        if self.monto_credito is None or self.plazo_meses is None:
+            raise ValueError(
+                "monto_credito y plazo_meses son obligatorios para productos de crédito"
+            )
+        return self
+
+
+class TasaCaptacion(BaseModel):
+    """Tasa de ahorro o CDT vigente que acompaña a un resultado de ahorro."""
+
+    model_config = ConfigDict(extra="forbid")
+    producto: Literal["ahorro", "cdt"]
+    tasa_ea: RangoDecimal
+    vigencia_desde: date
+    vigencia_hasta: date
+    fuente: str
 
 
 class ResultadoDiagnostico(BaseModel):
@@ -403,21 +445,30 @@ class ResultadoDiagnostico(BaseModel):
     model_config = ConfigDict(extra="forbid")
     version_formula: str = "v1"
     entrada: EntradaDiagnostico
-    tasa_ea: RangoDecimal
-    tasa_mensual: RangoDecimal
-    cuota_mensual: RangoDecimal
-    total_intereses: RangoDecimal
-    total_pagado: RangoDecimal
     base_semaforo: Literal["tasa_maxima"] = "tasa_maxima"
-    razon_endeudamiento: Decimal
+    tasa_ea: RangoDecimal | None = None
+    tasa_mensual: RangoDecimal | None = None
+    cuota_mensual: RangoDecimal | None = None
+    total_intereses: RangoDecimal | None = None
+    total_pagado: RangoDecimal | None = None
+    razon_endeudamiento: Decimal | None = None
     capacidad_pago: Decimal
-    semaforo: Literal["verde", "amarillo", "rojo"]
+    margen_despues_cuota: Decimal | None = None
+    ahorro_mensual_estimado: Decimal | None = None
+    semaforo: Literal["verde", "amarillo", "rojo"] | None = None
+    alertas: list[
+        Literal[
+            "vivienda_primera_cuota", "libranza_no_aplica", "capacidad_negativa", "vigencia_vencida"
+        ]
+    ] = Field(default_factory=list)
+    motivos: list[str] = Field(default_factory=list)
     recomendaciones: list[str]
-    fuente_tasa: str
-    vigencia_tasa_desde: date
-    vigencia_tasa_hasta: date
-    sha256_pdf: str
-    umbrales: dict[str, Decimal]
+    fuente_tasa: str | None = None
+    vigencia_tasa_desde: date | None = None
+    vigencia_tasa_hasta: date | None = None
+    sha256_pdf: str | None = None
+    umbrales: dict[str, Decimal] = Field(default_factory=dict)
+    tasas_captacion: list[TasaCaptacion] = Field(default_factory=list)
     aviso: str
     escenario_de: str | None = None
 
@@ -437,6 +488,18 @@ class CasoAsesor(BaseModel):
 ```
 
 `remitente` existe solo en memoria: el almacén guarda el `usuario_id` y borra el número antes de persistir. `ResultadoDiagnostico` no contiene nombre ni número.
+
+**Productos y campos opcionales del diagnóstico.** `EntradaDiagnostico.producto` solo admite los siete objetivos de `docs/DIAGNOSTICO.md`; la tarjeta de crédito y el crédito rotativo quedan fuera porque no tienen cuota fija que simular. `vinculacion` es obligatoria porque decide si la libranza aplica. `cuota_trasladar` es opcional y solo la usa la compra de cartera, donde el motor la exige al calcular. `monto_credito` y `plazo_meses` son opcionales en el contrato, pero el validador exige los dos en los productos de crédito y los prohíbe en `ahorro`: el ahorro no simula una cuota.
+
+`ResultadoDiagnostico` hace opcionales los campos de crédito porque no todos los resultados simulan uno. La representación es explícita:
+
+- **Crédito simulado:** `semaforo`, `tasa_ea`, `cuota_mensual`, `razon_endeudamiento`, `margen_despues_cuota` y los totales llevan valor; `fuente_tasa`, `vigencia_tasa_*` y `sha256_pdf` citan la tasa del Tablero.
+- **Ahorro:** `semaforo` es `None`, igual que `cuota_mensual`, `tasa_ea`, `tasa_mensual`, `razon_endeudamiento`, `margen_despues_cuota` y los totales. `capacidad_pago` guarda la capacidad de ahorro mensual y `tasas_captacion` lista las tasas de ahorro y CDT; `fuente_tasa` y `vigencia_tasa_*` describen la primera de esas tasas.
+- **Libranza que no aplica** (vinculación independiente): `semaforo` es `None`, no hay cuota y la alerta es `libranza_no_aplica`. El motivo explica que la Ley 1527 de 2012, modificada por la Ley 1902 de 2018, también cubre a los contratistas por prestación de servicios y que lo exigido es una entidad pagadora con convenio; la entrevista todavía no pregunta por esa entidad.
+- **Capacidad negativa:** el semáforo es `rojo` (la regla del guion) aunque no haya cuota, y la alerta es `capacidad_negativa`.
+- **Vivienda con primera cuota sobre el 40 % de los ingresos familiares:** el semáforo es `rojo` y la alerta es `vivienda_primera_cuota`. Es el límite del Decreto 583 de 2025, que modificó el Decreto 1077 de 2015 (antes 30 % para No VIS).
+
+`alertas` es un conjunto cerrado y `motivos` guarda la explicación en español para el canal. `ahorro_mensual_estimado` solo se llena en compra de cartera (`cuota_trasladar - cuota_nueva`). `rango_usado` conserva el id canónico de cada bloque de la entrevista para que el resultado se pueda reproducir.
 
 ### Contrato del Tablero para tasas
 
@@ -596,6 +659,11 @@ Variables de entorno, nunca en el repositorio: `WHATSAPP_VERIFY_TOKEN`, `WHATSAP
 [umbrales]
 verde_hasta = 0.30
 amarillo_hasta = 0.40
+vivienda_primera_cuota = 0.40
+
+[limites]
+monto_minimo = 500000
+monto_maximo = 2000000000
 
 [productos]
 libre_inversion = "Libre inversión"
@@ -630,11 +698,11 @@ El `0.0` no es una tasa: significa «sin certificar» y bloquea la publicación 
 
 ```text
 consultar_tasa(consulta: str, limite: int = 5) -> {tasas: [{producto, segmento, tasa_ea_desde, tasa_ea_hasta, tasa_mv_desde, tasa_mv_hasta, vigencia_desde, vigencia_hasta, fuente, sha256_pdf, fecha_extraccion}], total: int}
-simular_cuota(monto: float, plazo_meses: int, tasa_ea: float) -> {cuota, total_intereses, total_pagado, version}
+simular_cuota(producto: str, monto: float, plazo_meses: int) -> {producto, tasa_ea: {desde, hasta}, tasa_mensual: {desde, hasta}, cuota_mensual: {desde, hasta}, total_intereses: {desde, hasta}, total_pagado: {desde, hasta}, version_formula, fuente, vigencia_desde, vigencia_hasta, sha256_pdf, alertas}
 buscar_en_boveda(consulta: str, k: int = 5) -> {fragmentos: [...], total: int}
 ```
 
-Cada respuesta incluye `fuente`, `vigencia_desde`, `vigencia_hasta` y `sha256_pdf` cuando existe. Los errores son `{codigo, mensaje}` y nunca incluyen la consulta completa si contiene PII.
+Cada respuesta incluye `fuente`, `vigencia_desde`, `vigencia_hasta` y `sha256_pdf` cuando existe. `simular_cuota` y `consultar_tasa` agregan `vigencia_vencida` a las alertas cuando la tabla publicada ya no cubre la fecha de hoy, en lugar de fallar. Los errores son `{codigo, mensaje}` y nunca incluyen la consulta completa si contiene PII.
 
 ### Contrato del comité
 

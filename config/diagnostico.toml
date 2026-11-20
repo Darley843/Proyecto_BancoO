@@ -1,9 +1,12 @@
 # Diagnóstico financiero: umbrales del semáforo, catálogo de productos y
 # rangos de la entrevista.
 #
-# Los umbrales son la razón de endeudamiento (cuotas actuales más cuota nueva
-# sobre el ingreso mensual). Se ajustan sin tocar código; los valores de
-# partida son 0,30 y 0,40.
+# Los umbrales `verde_hasta` y `amarillo_hasta` son la razón de endeudamiento
+# (cuotas actuales más cuota nueva sobre el ingreso mensual). Se ajustan sin
+# tocar código; los valores de partida son 0,30 y 0,40.
+# `vivienda_primera_cuota` es el límite legal de la primera cuota sobre los
+# ingresos familiares (Decreto 583 de 2025, que modificó el Decreto 1077 de
+# 2015): 0,40 desde 2025; antes era 0,30 para No VIS.
 #
 # Los rangos, sus ids y sus valores de cálculo salen del guion de la entrevista
 # (docs/DIAGNOSTICO.md, cambio OpenSpec `corresponsal-whatsapp`). Los ids son el
@@ -18,6 +21,31 @@
 [umbrales]
 verde_hasta = 0.30
 amarillo_hasta = 0.40
+vivienda_primera_cuota = 0.40
+
+# Frontera del monto del crédito, en pesos, para el diagnóstico, los escenarios
+# «¿Y si…?» y el MCP. No son los valores de cálculo de los rangos de la
+# entrevista: esos son representativos y no limitan el producto.
+[limites]
+monto_minimo = 500000
+monto_maximo = 2000000000
+
+# Límites del comité de crédito (docs/COMITE.md). La deliberación hace una sola
+# ronda de tres agentes y, si el auditor objeta, una única corrección: nunca
+# más de cuatro llamadas al modelo, reintentos incluidos. `max_tokens_agente`
+# es el tope de cada respuesta —el razonamiento de DeepSeek consume ese tope y
+# con 1.200 el JSON quedaba cortado— y `tiempo_maximo_segundos` el reloj total
+# de la deliberación. `razonamiento = false` desactiva el modo de pensamiento
+# del modelo: fue el modo más estable y barato en la demo, y `deliberar` lo usa
+# por defecto también fuera de la demo. `temperatura = 0` se aplica a los tres
+# agentes, incluido el auditor, para reducir la variación entre corridas.
+[comite]
+max_llamadas = 4
+max_tokens_agente = 3000
+tiempo_maximo_segundos = 30
+max_alternativas = 2
+razonamiento = false
+temperatura = 0.0
 
 [productos]
 libre_inversion = "Libre inversión"

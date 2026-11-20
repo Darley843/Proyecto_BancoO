@@ -74,7 +74,7 @@ def test_costo_de_uso_con_cache_y_salida() -> None:
 
 def test_costo_sin_uso_es_cero() -> None:
     """Sin métricas no hay costo ni tokens."""
-    assert costo_de_uso(None, tarifas_para(datetime.now(UTC))) == (0.0, 0)
+    assert costo_de_uso(None, tarifas_para(datetime(2026, 11, 16, 10, tzinfo=UTC))) == (0.0, 0)
 
 
 def test_gasto_diario_acumula_y_separa_dias(tmp_path: Path) -> None:

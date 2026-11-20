@@ -24,6 +24,7 @@ from banco_occidente_corpus.canal.contratos import (
     RangoDecimal,
     ResultadoDiagnostico,
 )
+from banco_occidente_corpus.diagnostico import escenarios
 from banco_occidente_corpus.diagnostico.escenarios import (
     MAXIMO_ESCENARIOS,
     CambioEscenario,
@@ -54,9 +55,10 @@ class EstadoPrueba(TypedDict, total=False):
 
 def calcular(entrada: EntradaDiagnostico) -> ResultadoDiagnostico:
     """Motor de prueba: cuota francesa con tasa fija y semáforo 0,30/0,40."""
-    n = entrada.plazo_meses
+    n = entrada.plazo_meses or 0
+    monto = entrada.monto_credito or Decimal(0)
     factor = (1 + TASA_MENSUAL) ** n
-    cuota = (entrada.monto_credito * TASA_MENSUAL * factor / (factor - 1)).quantize(Decimal(1))
+    cuota = (monto * TASA_MENSUAL * factor / (factor - 1)).quantize(Decimal(1))
     razon = ((entrada.cuotas_deudas + cuota) / entrada.ingreso_mensual).quantize(Decimal("0.0001"))
     semaforo = (
         "verde" if razon <= Decimal("0.30") else "amarillo" if razon <= Decimal("0.40") else "rojo"
@@ -72,7 +74,7 @@ def calcular(entrada: EntradaDiagnostico) -> ResultadoDiagnostico:
         tasa_ea=fijo(Decimal("0.2682")),
         tasa_mensual=fijo(TASA_MENSUAL),
         cuota_mensual=fijo(cuota),
-        total_intereses=fijo(total - entrada.monto_credito),
+        total_intereses=fijo(total - monto),
         total_pagado=fijo(total),
         razon_endeudamiento=razon,
         capacidad_pago=entrada.ingreso_mensual
@@ -115,6 +117,7 @@ def entrada_base(**cambios: Any) -> EntradaDiagnostico:
     """Libre inversión de 10 millones a 24 meses con ingreso de 2,5 millones."""
     datos: dict[str, Any] = {
         "producto": "libre_inversion",
+        "vinculacion": "empleado",
         "ingreso_mensual": Decimal(2_500_000),
         "gastos_mensuales": Decimal(1_200_000),
         "cuotas_deudas": Decimal(500_000),
@@ -262,6 +265,20 @@ def test_vivienda_admite_plazos_largos() -> None:
         aplicar_cambio(entrada_base(), cambio)
 
 
+def test_el_monto_comparte_la_frontera_del_mcp() -> None:
+    """«¿Y si…?» y el MCP aceptan montos de $500.000 a $2.000 millones."""
+    original = entrada_base()
+    nuevo = aplicar_cambio(
+        original, CambioEscenario(campo="monto_credito", valor=Decimal(80_000_000))
+    )
+
+    assert nuevo.monto_credito == Decimal(80_000_000)
+    with pytest.raises(EscenarioFueraDeRango, match=r"\$500\.000"):
+        aplicar_cambio(
+            original, CambioEscenario(campo="monto_credito", valor=Decimal(3_000_000_000))
+        )
+
+
 def test_aplicar_cambio_no_modifica_la_entrada_original() -> None:
     """La entrada original sigue igual después de aplicar el cambio."""
     original = entrada_base()
@@ -306,9 +323,81 @@ def test_textos_que_no_son_escenarios(texto: str) -> None:
     assert interpretar_pedido(texto) is None
 
 
+def test_ahorro_rechaza_cambio_de_monto_o_plazo() -> None:
+    """El ahorro no tiene cuota: el cambio se rechaza con un mensaje claro."""
+    ahorro = EntradaDiagnostico(
+        producto="ahorro",
+        vinculacion="empleado",
+        ingreso_mensual=Decimal(1_500_000),
+        gastos_mensuales=Decimal(1_000_000),
+        cuotas_deudas=Decimal(0),
+    )
+    for campo, valor in (
+        ("monto_credito", Decimal(1_000_000)),
+        ("plazo_meses", Decimal(12)),
+    ):
+        with pytest.raises(EscenarioFueraDeRango, match="no se simula con monto ni plazo"):
+            aplicar_cambio(ahorro, CambioEscenario(campo=campo, valor=valor))
+
+
+def test_ahorro_no_compara_escenarios() -> None:
+    """Un diagnóstico de ahorro no tiene cuota ni semáforo que comparar."""
+    grafo = construir_grafo()
+    ahorro = EntradaDiagnostico(
+        producto="ahorro",
+        vinculacion="empleado",
+        ingreso_mensual=Decimal(1_500_000),
+        gastos_mensuales=Decimal(1_000_000),
+        cuotas_deudas=Decimal(0),
+    )
+    resultado = ResultadoDiagnostico(
+        entrada=ahorro,
+        capacidad_pago=Decimal(500_000),
+        recomendaciones=[],
+        aviso="Orientativo.",
+    )
+    grafo.update_state(
+        {"configurable": {"thread_id": HILO}},
+        {"etapa": "terminado", "resultado": resultado.model_dump(mode="json")},
+    )
+
+    with pytest.raises(EscenarioFueraDeRango, match="no tiene una cuota"):
+        bifurcar_escenario(
+            grafo,
+            USUARIO,
+            HILO,
+            CambioEscenario(campo="ingreso_mensual", valor=Decimal(2_000_000)),
+        )
+
+
+def test_por_defecto_usa_el_motor_del_diagnostico(
+    grafo_terminado: Any, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sin función inyectada, la bifurcación usa `diagnostico.motor.calcular`."""
+    llamadas: list[EntradaDiagnostico] = []
+
+    def doble(entrada: EntradaDiagnostico) -> ResultadoDiagnostico:
+        """Motor de prueba que registra la entrada recibida."""
+        llamadas.append(entrada)
+        return calcular(entrada)
+
+    monkeypatch.setattr(escenarios.motor, "calcular", doble)
+    comparacion = bifurcar_escenario(
+        grafo_terminado,
+        USUARIO,
+        HILO,
+        CambioEscenario(campo="plazo_meses", valor=Decimal(48)),
+    )
+
+    assert [entrada.plazo_meses for entrada in llamadas] == [48]
+    assert comparacion.thread_escenario.endswith(":esc:1")
+
+
 def test_formatos_en_pesos() -> None:
     """Pesos con punto de miles; un rango con extremos iguales es una cifra."""
     assert formatear_pesos(Decimal("1250000.4")) == "$1.250.000"
+    assert formatear_pesos(Decimal("-1643023")) == "-$1.643.023"
+    assert formatear_pesos(Decimal("-524")) == "-$524"
     assert (
         formatear_rango(RangoDecimal(desde=Decimal(410_000), hasta=Decimal(455_000)))
         == "$410.000–$455.000"
