@@ -255,10 +255,16 @@ def test_el_aviso_usa_el_plazo_configurado(tmp_path: Path) -> None:
     assert respuesta.texto == texto_aviso(15)
 
 
-def test_si_por_texto_acepta() -> None:
-    """El aviso termina en una pregunta; «sí» es una respuesta inequívoca."""
-    assert interpretar(_mensaje("Sí")) == "acepto"
-    assert interpretar(_mensaje("si")) == "acepto"
+def test_un_si_suelto_no_autoriza(tmp_path: Path) -> None:
+    """«Sí» a secas puede responder a otra cosa: no registra la autorización."""
+    maquina = _maquina(tmp_path)
+
+    respuesta = maquina.decidir(_mensaje("Sí"), USUARIO)
+
+    assert maquina.estado(USUARIO) == ESTADO_SIN_CONSENTIMIENTO
+    assert respuesta is not None and respuesta.tipo == "botones"
+    assert interpretar(_mensaje("si")) == "silencio"
+    assert interpretar(_mensaje("acepto")) == "acepto"
     assert interpretar(_mensaje("no")) == "rechazo"
 
 

@@ -78,7 +78,12 @@ ID_ACEPTO = "consent:acepto"
 ID_RECHAZO = "consent:rechazo"
 
 #: Palabras que cuentan como aceptación o rechazo por texto libre.
-TEXTOS_ACEPTO = frozenset({"acepto", "si acepto", "autorizo", "si autorizo", "si"})
+#:
+#: Solo cuentan las que nombran el acto de autorizar. Un «sí» suelto puede estar
+#: respondiendo a cualquier otra pregunta y no sirve como autorización previa,
+#: expresa e informada (Ley 1581 de 2012, art. 9); los botones del aviso siguen
+#: siendo la vía principal.
+TEXTOS_ACEPTO = frozenset({"acepto", "si acepto", "autorizo", "si autorizo"})
 TEXTOS_RECHAZO = frozenset({"no acepto", "ahora no", "no autorizo", "no"})
 TEXTOS_REVOCACION = frozenset({"olvida mis datos", "borra mis datos", "elimina mis datos"})
 

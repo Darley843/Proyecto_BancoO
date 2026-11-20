@@ -14,6 +14,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from banco_occidente_corpus.canal.configuracion import cargar_configuracion_canal
 from banco_occidente_corpus.config import load_config
 from banco_occidente_corpus.sucursal.ajustes import ConfiguracionSucursal
 from banco_occidente_corpus.sucursal.transmision import TransmisionTurno
@@ -184,3 +185,31 @@ def test_el_apagado_suelta_las_transmisiones(modulo_app: ModuleType, tmp_path: P
 
     assert list(transmision.eventos_sse()) == []
     suelta.set()
+
+
+def test_crear_app_purga_los_casos_vencidos_del_canal(
+    modulo_app: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Al arrancar se cumple el plazo de conservación que promete el aviso."""
+    monkeypatch.setenv("WHATSAPP_ID_SALT", "sal-de-prueba")
+    creadas: list[dict[str, object]] = []
+    purgas: list[str] = []
+
+    class MaquinaFalsa:
+        """Reemplazo de la máquina de consentimiento para observar el arranque."""
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            creadas.append(dict(kwargs))
+
+        def purgar_casos_vencidos(self, momento: object | None = None) -> int:
+            """Anota la purga del arranque."""
+            purgas.append("arranque")
+            return 0
+
+    monkeypatch.setattr(modulo_app, "MaquinaConsentimiento", MaquinaFalsa)
+
+    modulo_app.crear_app(tmp_path)
+
+    esperado = cargar_configuracion_canal().retencion_dias
+    assert purgas == ["arranque"]
+    assert creadas and creadas[0]["retencion_dias"] == esperado
