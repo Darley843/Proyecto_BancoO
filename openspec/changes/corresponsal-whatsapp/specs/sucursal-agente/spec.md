@@ -56,7 +56,7 @@ El grafo SHALL aislar la memoria por canal y por usuario: cada usuario del canal
 
 ### Requirement: Ruta D de diagnóstico en el Digiturno
 
-El Digiturno SHALL asignar la letra `D` cuando la pregunta pide un diagnóstico financiero o pregunta por la capacidad de pago o de endeudamiento, con reglas deterministas configurables en `[digiturno]` de `config/sucursal.toml`, después de la PII y de fuera de alcance y antes de la cortesía, sin llamar al modelo. El clasificador de dudas MAY devolver `D`. El grafo MUST resolver `D` en el nodo `diagnostico` con una invitación fija al diagnóstico guiado, sin recuperador, sin Tablero, sin modelo y sin fuentes; el diagnóstico guiado MUST NOT ejecutarse dentro del grafo de preguntas. La API y la Ventanilla MUST aceptar `D` como letra válida con ruta `diagnostico`.
+El Digiturno SHALL asignar la letra `D` cuando la pregunta pide un diagnóstico financiero o pregunta por la capacidad de pago o de endeudamiento, con reglas deterministas configurables en `[digiturno]` de `config/sucursal.toml`, después de la PII y de fuera de alcance y antes de la cortesía, sin llamar al modelo. El clasificador de dudas MAY devolver `D`.
 
 #### Scenario: Intención de diagnóstico
 - **WHEN** llega «¿me alcanza para un crédito de 20 millones?»
@@ -69,6 +69,14 @@ El Digiturno SHALL asignar la letra `D` cuando la pregunta pide un diagnóstico 
 #### Scenario: Tasa sigue en el Tablero
 - **WHEN** llega «¿cuál es la tasa de un crédito de libre inversión?»
 - **THEN** el turno es `T` y no `D`
+
+### Requirement: Nodo diagnostico sin modelo
+
+El grafo MUST resolver `D` en el nodo `diagnostico` con una invitación fija al diagnóstico guiado, sin recuperador, sin Tablero, sin modelo y sin fuentes; el diagnóstico guiado MUST NOT ejecutarse dentro del grafo de preguntas. La API y la Ventanilla MUST aceptar `D` como letra válida con ruta `diagnostico`.
+
+#### Scenario: Nodo diagnostico sin recuperación
+- **WHEN** el turno es `D`
+- **THEN** el grafo responde con la invitación fija, sin recuperador, sin Tablero, sin modelo y sin fuentes, y la API y la Ventanilla aceptan `D` con ruta `diagnostico`
 
 ### Requirement: Duda sin respuesta del modelo
 
