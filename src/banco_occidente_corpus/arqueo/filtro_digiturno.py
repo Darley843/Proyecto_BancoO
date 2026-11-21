@@ -20,6 +20,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import re
 import sys
 from collections import Counter
 from collections.abc import Mapping, Sequence
@@ -45,6 +46,7 @@ from .filtro_dominio import (
     IntervaloWilson,
     cargar_casos,
     evaluar_filtro,
+    intervalo,
     reporte_markdown,
 )
 
@@ -70,6 +72,14 @@ RUTA_CONJUNTO: Path = PROJECT_ROOT / "data" / "evaluacion" / "filtro_dominio.jso
 DECIMALES_DOMINIO: int = 6
 #: Motivo del Digiturno cuando ninguna regla decide y el texto es una duda.
 MOTIVO_DUDA = "defecto"
+#: Último informe publicado de la corrida con modelo (lo escribe `medir_varias`).
+RUTA_INFORME_MODELO: Path = (
+    PROJECT_ROOT / "data" / "evaluacion" / "filtro_dominio_informe_despues.md"
+)
+#: Fila de corrida de ese informe: ``| 1 | 0/50 | 3/50 | 14/14 | 2 |``.
+FILA_CORRIDA = re.compile(
+    r"^\|\s*(\d+)\s*\|\s*(\d+)/(\d+)\s*\|\s*(\d+)/(\d+)\s*\|\s*(\d+)/(\d+)\s*\|\s*(\d+)\s*\|$"
+)
 #: Más ids que estos no se listan en la tabla del Markdown, solo en el JSON.
 MAXIMO_IDS_TABLA: int = 10
 
@@ -300,93 +310,157 @@ def medir_varias(
     return "".join(partes)
 
 
-def _intervalo_dominio(intervalo: IntervaloWilson | None, ids: Sequence[str]) -> dict[str, Any]:
-    """Convierte un intervalo y sus casos con error en el bloque del JSON.
+def _intervalo_json(valor: IntervaloWilson | None) -> dict[str, Any] | None:
+    """Convierte un intervalo de Wilson en el bloque del JSON, o ``None`` sin casos."""
+    if valor is None:
+        return None
+    return {
+        "exitos": valor.exitos,
+        "n": valor.n,
+        "proporcion": round(valor.proporcion, DECIMALES_DOMINIO),
+        "inferior": round(valor.inferior, DECIMALES_DOMINIO),
+        "superior": round(valor.superior, DECIMALES_DOMINIO),
+        "confianza": valor.confianza,
+    }
+
+
+def _ruta_visible(ruta: Path) -> str:
+    """Ruta relativa al proyecto, o solo el nombre si está fuera de él."""
+    try:
+        return ruta.resolve().relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        return ruta.name
+
+
+def leer_corridas_modelo(ruta: Path = RUTA_INFORME_MODELO) -> list[dict[str, int]]:
+    """Lee la tabla de corridas del informe con modelo que escribe `medir_varias`.
+
+    El Arqueo no llama a DeepSeek: resume la última corrida publicada.
 
     Args:
-        intervalo: proporción con su intervalo de Wilson, o ``None`` sin casos.
-        ids: ids de los casos con error; nunca el texto.
+        ruta: informe Markdown de ``--con-modelo --repeticiones N``.
 
     Returns:
-        Conteo, proporción e intervalo redondeados, más los ids.
+        Una fila por corrida con fuga, rechazo indebido, acierto en frontera,
+        sus totales y las dudas sin respuesta; vacía si el informe no existe.
     """
-    if intervalo is None:
-        return {
-            "exitos": 0,
-            "n": 0,
-            "proporcion": None,
-            "inferior": None,
-            "superior": None,
-            "confianza": None,
-            "ids": [],
-        }
-    return {
-        "exitos": intervalo.exitos,
-        "n": intervalo.n,
-        "proporcion": round(intervalo.proporcion, DECIMALES_DOMINIO),
-        "inferior": round(intervalo.inferior, DECIMALES_DOMINIO),
-        "superior": round(intervalo.superior, DECIMALES_DOMINIO),
-        "confianza": intervalo.confianza,
-        "ids": list(ids),
-    }
+    if not ruta.exists():
+        return []
+    corridas: list[dict[str, int]] = []
+    for linea in ruta.read_text(encoding="utf-8").splitlines():
+        coincidencia = FILA_CORRIDA.match(linea.strip())
+        if coincidencia is None:
+            continue
+        numero, fuga, n_fuera, rechazo, n_dentro, frontera, n_frontera, dudas = (
+            int(valor) for valor in coincidencia.groups()
+        )
+        corridas.append(
+            {
+                "corrida": numero,
+                "fuga": fuga,
+                "n_fuera": n_fuera,
+                "rechazo_indebido": rechazo,
+                "n_dentro": n_dentro,
+                "acierto_frontera": frontera,
+                "n_frontera": n_frontera,
+                "dudas_sin_respuesta": dudas,
+            }
+        )
+    return corridas
 
 
 def seccion_dominio(
     ruta: Path = RUTA_CONJUNTO,
     *,
     configuracion: ConfiguracionDigiturno | None = None,
+    informe_modelo: Path = RUTA_INFORME_MODELO,
 ) -> dict[str, Any]:
-    """Arma la sección ``dominio`` de ``arqueo.json`` con el Digiturno solo con reglas.
+    """Arma la sección ``dominio`` de ``arqueo.json``.
 
-    Usa el modo sin modelo para que el Arqueo siga costando US$ 0 y sea
-    determinista: las dudas caen en ``B``. Por eso la fuga medida es una cota
-    superior de la de la app (allí el modelo puede rechazar una duda) y el
-    rechazo indebido, una cota inferior. Solo se guardan ids, nunca el texto de
-    los casos.
+    Pone lado a lado dos lecturas del mismo conjunto:
+
+    - **Reglas solas**, medidas en cada Arqueo (US$ 0 y determinista): cuántos
+      casos deciden las reglas (cobertura) y cuántos errores cometen entre los
+      que deciden. Un caso que ninguna regla decide es una duda: en la app la
+      resuelve el modelo, así que no se cuenta como fuga de las reglas.
+    - **Sistema real con modelo**, leído del último informe publicado con
+      ``--con-modelo``, sin volver a llamar a DeepSeek.
+
+    Solo se guardan ids, nunca el texto de los casos.
 
     Args:
         ruta: conjunto JSONL del filtro de dominio.
         configuracion: palabras y patrones del Digiturno; por defecto los del TOML.
+        informe_modelo: informe Markdown de la corrida con modelo.
 
     Returns:
-        ``{"modo", "conjunto", "casos", "fuga", "rechazo_indebido",
-        "acierto_frontera", "dudas", "decidio"}``.
+        ``{"conjunto", "casos", "reglas", "modelo"}``; ``modelo`` es ``None`` si
+        no hay informe publicado.
     """
     casos = cargar_casos(ruta)
     turnos: dict[str, Turno] = {}
-    resultado = evaluar_filtro(
-        casos, clasificador_digiturno(configuracion=configuracion, turnos=turnos)
-    )
-    conteo = Counter(caso.categoria.value for caso in casos)
-    decidio = Counter(origen_turno(turnos[caso.texto]) for caso in casos if caso.texto in turnos)
-    dudas = Counter(
-        caso.categoria.value
-        for caso in casos
-        if caso.texto in turnos and turnos[caso.texto].motivo.split(":")[0] == MOTIVO_DUDA
-    )
-    try:
-        conjunto = ruta.resolve().relative_to(PROJECT_ROOT).as_posix()
-    except ValueError:
-        conjunto = ruta.name
+    decidir = clasificador_digiturno(configuracion=configuracion, turnos=turnos)
+    grupos: dict[str, dict[str, Any]] = {
+        categoria.value: {"n": 0, "deciden": 0, "ids": []} for categoria in Categoria
+    }
+    for caso in casos:
+        obtenida = decidir(caso.texto)
+        grupo = grupos[caso.categoria.value]
+        grupo["n"] += 1
+        if turnos[caso.texto].motivo.split(":")[0] == MOTIVO_DUDA:
+            continue
+        grupo["deciden"] += 1
+        if obtenida is not caso.esperado:
+            grupo["ids"].append(caso.id)
+
+    decidio = Counter(origen_turno(turnos[caso.texto]) for caso in casos)
+    total = sum(grupo["n"] for grupo in grupos.values())
+    deciden = sum(grupo["deciden"] for grupo in grupos.values())
+    corridas = leer_corridas_modelo(informe_modelo)
     return {
-        "modo": "solo_reglas",
-        "conjunto": conjunto,
-        "casos": {categoria.value: conteo.get(categoria.value, 0) for categoria in Categoria},
-        "fuga": _intervalo_dominio(resultado.fuga, resultado.ids_fuga),
-        "rechazo_indebido": _intervalo_dominio(
-            resultado.rechazo_indebido, resultado.ids_rechazo_indebido
+        "conjunto": _ruta_visible(ruta),
+        "casos": {clave: grupo["n"] for clave, grupo in grupos.items()},
+        "reglas": {
+            "modo": "solo_reglas",
+            "cobertura": _intervalo_json(intervalo(deciden, total)),
+            "grupos": {
+                clave: {
+                    "n": grupo["n"],
+                    "deciden": grupo["deciden"],
+                    "cobertura": _intervalo_json(intervalo(grupo["deciden"], grupo["n"])),
+                    "errores": _intervalo_json(intervalo(len(grupo["ids"]), grupo["deciden"])),
+                    "ids": list(grupo["ids"]),
+                }
+                for clave, grupo in grupos.items()
+            },
+            "decidio": dict(sorted(decidio.items())),
+        },
+        "modelo": (
+            {"fuente": _ruta_visible(informe_modelo), "corridas": corridas} if corridas else None
         ),
-        "acierto_frontera": _intervalo_dominio(
-            resultado.acierto_frontera, resultado.ids_frontera_fallidos
-        ),
-        "dudas": {categoria.value: dudas.get(categoria.value, 0) for categoria in Categoria},
-        "decidio": dict(sorted(decidio.items())),
     }
 
 
 def _porcentaje(valor: float) -> str:
     """Escribe una proporción como porcentaje con coma decimal, p. ej. ``4,0 %``."""
     return f"{valor * 100:.1f}".replace(".", ",") + " %"
+
+
+def _celda_intervalo(datos: Mapping[str, Any] | None) -> str:
+    """``exitos/n (p % [inf %; sup %])`` o una raya si no hay casos."""
+    if not datos:
+        return "—"
+    return (
+        f"{datos['exitos']}/{datos['n']} ({_porcentaje(datos['proporcion'])} "
+        f"[{_porcentaje(datos['inferior'])}; {_porcentaje(datos['superior'])}])"
+    )
+
+
+def _celda_ids(ids: Sequence[str]) -> str:
+    """Lista los ids con error, o remite al JSON si son demasiados."""
+    if len(ids) > MAXIMO_IDS_TABLA:
+        return f"{len(ids)} casos; la lista está en `arqueo.json`"
+    return ", ".join(ids) or "—"
 
 
 def markdown_dominio(seccion: Mapping[str, Any] | None) -> list[str]:
@@ -404,53 +478,76 @@ def markdown_dominio(seccion: Mapping[str, Any] | None) -> list[str]:
     if not seccion:
         return [*lineas, "No se midió el filtro de dominio en esta corrida.", ""]
     casos: Mapping[str, int] = seccion.get("casos") or {}
+    reglas: Mapping[str, Any] = seccion.get("reglas") or {}
+    grupos: Mapping[str, Any] = reglas.get("grupos") or {}
+    cobertura: Mapping[str, Any] = reglas.get("cobertura") or {}
     lineas += [
         f"Conjunto `{seccion.get('conjunto', RUTA_CONJUNTO.name)}`: "
         f"{casos.get('dentro', 0)} dentro, {casos.get('fuera', 0)} fuera y "
-        f"{casos.get('frontera', 0)} de frontera. El Digiturno se mide solo con reglas, "
-        "sin modelo (US$ 0 y determinista): un mensaje que ninguna regla decide es una "
-        "duda y aquí se acepta en `B`. En la app esas dudas las resuelve el modelo, así "
-        "que esta tabla mide lo que las reglas atajan solas: la fuga es una cota superior "
-        "de la de la app y el rechazo indebido, una cota inferior. La corrida con el modelo "
-        "se publica aparte en `data/evaluacion/filtro_dominio_informe_modelo.md`.",
+        f"{casos.get('frontera', 0)} de frontera. Se muestran lado a lado las reglas solas, "
+        "que el Arqueo mide en cada corrida, y el sistema real con el modelo, tomado del "
+        "último informe publicado.",
         "",
-        "| Métrica | Casos | Proporción [IC Wilson 95 %] | Casos con error |",
-        "|---|---:|---|---|",
+        "### Reglas solas (US$ 0, determinista)",
+        "",
+        f"Las reglas deciden {cobertura.get('exitos', 0)} de {cobertura.get('n', 0)} casos "
+        f"({_celda_intervalo(cobertura)}). El resto son dudas: en la app las resuelve el "
+        "modelo, así que no cuentan como error de las reglas.",
+        "",
+        "| Grupo | Casos | Deciden las reglas | Error entre los que deciden | Casos con error |",
+        "|---|---:|---|---|---|",
     ]
     for clave, nombre in (
-        ("fuga", "Fuga (fuera de tema aceptadas)"),
-        ("rechazo_indebido", "Rechazo indebido (legítimas rechazadas)"),
-        ("acierto_frontera", "Acierto en frontera"),
+        ("fuera", "Fuera de tema (fuga)"),
+        ("dentro", "Dentro del dominio (rechazo indebido)"),
+        ("frontera", "Frontera (decisión distinta)"),
     ):
-        datos: Mapping[str, Any] = seccion.get(clave) or {}
-        if not datos.get("n"):
-            lineas.append(f"| {nombre} | 0 | — | — |")
-            continue
-        proporcion = (
-            f"{_porcentaje(datos['proporcion'])} "
-            f"[{_porcentaje(datos['inferior'])}; {_porcentaje(datos['superior'])}]"
+        datos: Mapping[str, Any] = grupos.get(clave) or {}
+        lineas.append(
+            f"| {nombre} | {datos.get('n', 0)} | {_celda_intervalo(datos.get('cobertura'))} "
+            f"| {_celda_intervalo(datos.get('errores'))} | {_celda_ids(datos.get('ids') or [])} |"
         )
-        ids: list[str] = list(datos.get("ids") or [])
-        if len(ids) > MAXIMO_IDS_TABLA:
-            detalle = f"{len(ids)} casos; la lista está en `arqueo.json`"
-        else:
-            detalle = ", ".join(ids) or "—"
-        lineas.append(f"| {nombre} | {datos['exitos']}/{datos['n']} | {proporcion} | {detalle} |")
-    dudas: Mapping[str, int] = seccion.get("dudas") or {}
-    if dudas:
-        lineas += [
-            "",
-            "**Dudas** (ninguna regla decide; en la app las resuelve el modelo): "
-            f"fuera {dudas.get('fuera', 0)} de {casos.get('fuera', 0)}, "
-            f"dentro {dudas.get('dentro', 0)} de {casos.get('dentro', 0)} y "
-            f"frontera {dudas.get('frontera', 0)} de {casos.get('frontera', 0)}.",
-        ]
-    decidio: Mapping[str, int] = seccion.get("decidio") or {}
+    decidio: Mapping[str, int] = reglas.get("decidio") or {}
     if decidio:
         resumen = ", ".join(f"{origen} {n}" for origen, n in decidio.items())
         lineas += ["", f"**Quién decidió** (todos los casos): {resumen}."]
+
+    lineas += ["", "### Sistema real: reglas + modelo (DeepSeek)", ""]
+    modelo: Mapping[str, Any] | None = seccion.get("modelo")
+    if not modelo:
+        lineas += [
+            f"Todavía no hay una corrida con modelo publicada en `{RUTA_INFORME_MODELO.name}`.",
+            "",
+        ]
+    else:
+        corridas: Sequence[Mapping[str, int]] = modelo["corridas"]
+        lineas += [
+            f"{len(corridas)} corridas publicadas en `{modelo['fuente']}`. El Arqueo no las "
+            "recalcula porque gastan tokens; se actualizan con "
+            "`uv run python -m banco_occidente_corpus.arqueo.filtro_digiturno --con-modelo "
+            f"--repeticiones 3 --salida {modelo['fuente']}`.",
+            "",
+            "| Corrida | Fuga | Rechazo indebido | Acierto en frontera | Dudas sin respuesta |",
+            "|---:|---|---|---|---:|",
+        ]
+        lineas += [
+            f"| {c['corrida']} | {c['fuga']}/{c['n_fuera']} | "
+            f"{c['rechazo_indebido']}/{c['n_dentro']} | "
+            f"{c['acierto_frontera']}/{c['n_frontera']} | {c['dudas_sin_respuesta']} |"
+            for c in corridas
+        ]
+        primera = corridas[0]
+        lineas.append(
+            "| **Rango** | "
+            + _rango([c["fuga"] for c in corridas], primera["n_fuera"])
+            + " | "
+            + _rango([c["rechazo_indebido"] for c in corridas], primera["n_dentro"])
+            + " | "
+            + _rango([c["acierto_frontera"] for c in corridas], primera["n_frontera"])
+            + " | |"
+        )
+        lineas.append("")
     lineas += [
-        "",
         "Solo se publican los ids de los casos con error; el texto está en el conjunto.",
         "",
     ]
