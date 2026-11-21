@@ -12,7 +12,8 @@ Reglas del guion:
 - ``cuota_trasladar`` solo se pregunta en compra de cartera; monto y plazo se
   omiten en ahorro.
 - El estado guarda solo el paso actual y los ids elegidos, nunca el texto libre
-  ni datos personales. Vence a los ``ttl_minutos`` sin actividad.
+  ni datos personales. Vence a los ``ttl_minutos`` sin actividad y la app lo
+  purga al arrancar.
 - ``nuevo`` reinicia la entrevista; ``cancelar`` la deja; ``asesor`` la deja y
   ofrece revisión humana. Cualquier otro texto repite la pregunta con sus
   opciones, sin inventar un valor.
@@ -26,6 +27,8 @@ imagen después. Si el comité falla, se responde con el diagnóstico sin comit�
 persona escribe después «¿y si lo pago en 60 meses?», `escenario` recalcula con
 el motor y responde con la tarjeta de antes y después; el original no cambia.
 Sin un resultado vigente, el mensaje sigue su camino normal hacia el grafo.
+La app purga al arrancar las entrevistas y los resultados vencidos, para que el
+plazo del aviso no dependa de que la persona vuelva a escribir.
 
 Las pruebas viven en ``test/test_canal_entrevista.py``.
 """
@@ -636,6 +639,35 @@ class EntrevistaCanal:
             conexion.execute(
                 "DELETE FROM resultados_diagnostico WHERE usuario_id = ?", (usuario_id,)
             )
+
+    def purgar_vencidos(self, momento: datetime | None = None) -> int:
+        """Borra las entrevistas y los resultados que ya vencieron.
+
+        La app la llama al arrancar, sobre la misma instancia que usa el
+        despachador. Sin esta purga, una entrevista abandonada o un resultado
+        que nadie vuelve a consultar quedarían en la base más allá de los plazos
+        que promete el aviso: ``ttl_minutos`` sin actividad para la entrevista y
+        24 horas para el resultado.
+
+        Args:
+            momento: instante de referencia; por defecto ahora en UTC.
+
+        Returns:
+            Cuántas filas se borraron entre las dos tablas.
+        """
+        ahora = momento or datetime.now(UTC)
+        limite_entrevistas = (ahora - timedelta(minutes=self.ttl_minutos)).isoformat()
+        limite_resultados = (ahora - VIGENCIA_RESULTADO).isoformat()
+        with conectar(self.ruta) as conexion:
+            entrevistas = conexion.execute(
+                "DELETE FROM entrevistas WHERE actualizado_en < ?",
+                (limite_entrevistas,),
+            ).rowcount
+            resultados = conexion.execute(
+                "DELETE FROM resultados_diagnostico WHERE guardado_en < ?",
+                (limite_resultados,),
+            ).rowcount
+        return entrevistas + resultados
 
     def _guardar_resultado(self, usuario_id: str, resultado: ResultadoDiagnostico) -> None:
         """Guarda el resultado para un «¿Y si…?» posterior; no lleva el número.

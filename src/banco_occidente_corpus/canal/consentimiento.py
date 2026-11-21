@@ -5,11 +5,17 @@ La primera interacción de un número autorizado recibe el aviso y dos botones:
 perfil; el estado queda en ``consentimientos`` y la versión del aviso se guarda
 para poder auditar qué texto se aceptó.
 
-«Olvida mis datos» revoca la autorización y borra los casos del usuario. La
-fila del consentimiento **no se borra**: queda con ``revocado_en`` como prueba
-de la autorización (Decreto 1377 de 2013, art. 8); solo guarda la huella, la
-versión del aviso y las fechas. El perfil del store lo borra la tarea 2.6 y el
-id de deduplicación se conserva porque no contiene datos personales.
+«Olvida mis datos» revoca la autorización y borra los datos del diagnóstico:
+los casos, el avance de la entrevista y el último resultado guardado para el
+«¿Y si…?». La fila del consentimiento **no se borra**: queda con
+``revocado_en`` como prueba de la autorización (Decreto 1377 de 2013, art. 8);
+solo guarda la huella, la versión del aviso y las fechas. El perfil del store lo
+borra la tarea 2.6 y el id de deduplicación se conserva porque no contiene datos
+personales.
+
+El plazo máximo del aviso (``retencion_dias``, 30 por defecto) sigue siendo
+cierto: la entrevista se purga a los ``entrevista_ttl_minutos`` sin actividad y
+el último resultado a las 24 horas, ambos por debajo de ese máximo.
 
 El aviso cumple el deber de informar (Ley 1581 de 2012, art. 12): responsable,
 datos que se tratan, finalidad, a quién se comparten (el asesor del equipo y el
@@ -176,11 +182,13 @@ class MaquinaConsentimiento:
             )
 
     def revocar(self, usuario_id: str, momento: datetime | None = None) -> None:
-        """Revoca la autorización y borra los casos; el perfil lo borra la tarea 2.6.
+        """Revoca la autorización y borra los datos del diagnóstico.
 
-        La fila del consentimiento se conserva con ``revocado_en`` como prueba
-        de la autorización (Decreto 1377 de 2013, art. 8). No contiene datos
-        personales: solo la huella, la versión del aviso y las fechas.
+        Borra los casos, el avance de la entrevista y el último resultado del
+        «¿Y si…?». La fila del consentimiento se conserva con ``revocado_en``
+        como prueba de la autorización (Decreto 1377 de 2013, art. 8). No
+        contiene datos personales: solo la huella, la versión del aviso y las
+        fechas.
 
         Args:
             usuario_id: huella del número.
@@ -194,6 +202,10 @@ class MaquinaConsentimiento:
                 (instante, usuario_id),
             )
             conexion.execute("DELETE FROM casos WHERE usuario_id = ?", (usuario_id,))
+            conexion.execute("DELETE FROM entrevistas WHERE usuario_id = ?", (usuario_id,))
+            conexion.execute(
+                "DELETE FROM resultados_diagnostico WHERE usuario_id = ?", (usuario_id,)
+            )
 
     def purgar_casos_vencidos(self, momento: datetime | None = None) -> int:
         """Borra los casos más viejos que el plazo de conservación del aviso.

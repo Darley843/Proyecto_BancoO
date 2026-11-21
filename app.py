@@ -114,8 +114,13 @@ def crear_app(
             version=canal.version_aviso,
             retencion_dias=canal.retencion_dias,
         )
-        # El aviso promete un plazo de conservación: se cumple al arrancar.
+        entrevista = EntrevistaCanal(
+            ruta_canal,
+            ttl_minutos=canal.entrevista_ttl_minutos,
+        )
+        # El aviso promete plazos de conservación: se cumplen al arrancar.
         maquina.purgar_casos_vencidos()
+        entrevista.purgar_vencidos()
 
         def fabrica_enviador(usuario_id: str, destino: str) -> Enviador:
             """Devuelve el enviador falso o el cliente real de Meta."""
@@ -171,10 +176,7 @@ def crear_app(
             cola=cola,
             crear_enviador=fabrica_enviador,
             responder=responder,
-            entrevista=EntrevistaCanal(
-                ruta_canal,
-                ttl_minutos=canal.entrevista_ttl_minutos,
-            ),
+            entrevista=entrevista,
         )
 
     @asynccontextmanager

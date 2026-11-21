@@ -647,6 +647,43 @@ def test_el_resultado_vence_a_las_24_horas(tmp_path: Path, raiz_tasas: Path) -> 
         assert conexion.execute("SELECT COUNT(*) FROM resultados_diagnostico").fetchone()[0] == 0
 
 
+def test_purgar_borra_solo_la_entrevista_y_el_resultado_vencidos(tmp_path: Path) -> None:
+    """La purga del arranque borra lo vencido y conserva lo que sigue vigente."""
+    ruta = tmp_path / "whatsapp.sqlite"
+    entrevista = EntrevistaCanal(ruta, ttl_minutos=30)
+    with sqlite3.connect(str(ruta)) as conexion:
+        for usuario, minutos in (("viejo", 31), ("reciente", 5)):
+            conexion.execute(
+                "INSERT INTO entrevistas (usuario_id, paso, respuestas_json, actualizado_en) "
+                "VALUES (?, ?, ?, ?)",
+                (
+                    usuario,
+                    "objetivo",
+                    "{}",
+                    (FECHA_CONSULTA - timedelta(minutes=minutos)).isoformat(),
+                ),
+            )
+        for usuario, horas in (("viejo", 25), ("reciente", 23)):
+            conexion.execute(
+                "INSERT INTO resultados_diagnostico (usuario_id, resultado_json, guardado_en) "
+                "VALUES (?, ?, ?)",
+                (usuario, "{}", (FECHA_CONSULTA - timedelta(hours=horas)).isoformat()),
+            )
+
+    borrados = entrevista.purgar_vencidos(FECHA_CONSULTA)
+
+    assert borrados == 2
+    with sqlite3.connect(str(ruta)) as conexion:
+        quedan_entrevistas = [
+            fila[0] for fila in conexion.execute("SELECT usuario_id FROM entrevistas")
+        ]
+        quedan_resultados = [
+            fila[0] for fila in conexion.execute("SELECT usuario_id FROM resultados_diagnostico")
+        ]
+    assert quedan_entrevistas == ["reciente"]
+    assert quedan_resultados == ["reciente"]
+
+
 def test_el_ahorro_no_tiene_y_si(tmp_path: Path, raiz_tasas: Path) -> None:
     """Un plan de ahorro no simula cuota: se explica en texto."""
     entrevista = EntrevistaCanal(tmp_path / "whatsapp.sqlite", hoy=FECHA_CONSULTA, raiz=raiz_tasas)
