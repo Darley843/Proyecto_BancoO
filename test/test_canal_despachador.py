@@ -194,3 +194,40 @@ def test_error_del_grafo_envia_texto_de_respaldo(
 
     assert banco.enviadas[-1].texto == TEXTO_ERROR
     assert contar_mensajes(banco.ruta) == {"error": 1}
+
+
+def test_dos_usuarios_no_comparten_hilo_ni_perfil(tmp_path: Path) -> None:
+    """Cada número entra con su propio hilo y su propia huella de perfil."""
+    ruta = tmp_path / "whatsapp.sqlite"
+    numeros = ("57000000001", "57000000002")
+    usuarios = tuple(calcular_usuario_id(numero, SAL) for numero in numeros)
+    llamadas: list[tuple[str, str, str]] = []
+    enviadas: list[RespuestaCanal] = []
+
+    def responder(pregunta: str, thread_id: str, perfil: str) -> str:
+        """Doble del grafo que guarda el hilo y la huella de cada turno."""
+        llamadas.append((pregunta, thread_id, perfil))
+        return "respuesta del grafo"
+
+    despachador = Despachador(
+        config=ConfiguracionCanal(huellas=usuarios),
+        sal=SAL,
+        ruta_almacen=ruta,
+        maquina=MaquinaConsentimiento(ruta),
+        cola=ColaMensajes(),
+        crear_enviador=lambda _usuario, _destino: EnviadorEspia(enviadas),
+        responder=responder,
+    )
+    for indice, (usuario_id, numero) in enumerate(zip(usuarios, numeros, strict=True)):
+        despachador.maquina.aceptar(usuario_id, AHORA)
+        mensaje = _mensaje("¿cuál es la cuota de manejo?", id_mensaje=f"wamid.USUARIO{indice}")
+        mensaje = mensaje.model_copy(update={"remitente": numero})
+        despachador.recibir(mensaje)
+        despachador.procesar(mensaje)
+
+    assert llamadas == [
+        ("¿cuál es la cuota de manejo?", f"wa:{usuarios[0]}", huella_perfil(usuarios[0])),
+        ("¿cuál es la cuota de manejo?", f"wa:{usuarios[1]}", huella_perfil(usuarios[1])),
+    ]
+    assert llamadas[0][1] != llamadas[1][1]
+    assert llamadas[0][2] != llamadas[1][2]

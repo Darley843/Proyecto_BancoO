@@ -21,6 +21,7 @@ import os
 import threading
 from collections.abc import AsyncIterator, Callable
 from contextlib import asynccontextmanager
+from functools import partial
 from pathlib import Path
 
 import uvicorn
@@ -54,7 +55,12 @@ from banco_occidente_corpus.sucursal.api import (
 )
 from banco_occidente_corpus.sucursal.costo import CacheRespuestas, GastoDiario
 from banco_occidente_corpus.sucursal.grafo import responder_turno
-from banco_occidente_corpus.sucursal.preguntar import PiezasGrafo, construir_piezas
+from banco_occidente_corpus.sucursal.perfil import borrar_perfil_en
+from banco_occidente_corpus.sucursal.preguntar import (
+    RUTA_PERFIL,
+    PiezasGrafo,
+    construir_piezas,
+)
 from banco_occidente_corpus.sucursal.transmision import cerrar_transmisiones
 
 HOST = "127.0.0.1"
@@ -115,6 +121,7 @@ def crear_app(
             ruta_canal,
             version=canal.version_aviso,
             retencion_dias=canal.retencion_dias,
+            borrar_perfil=partial(borrar_perfil_en, configuracion.paths.root / RUTA_PERFIL),
         )
         entrevista = EntrevistaCanal(
             ruta_canal,
