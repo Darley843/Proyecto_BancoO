@@ -43,7 +43,7 @@ import os
 import sqlite3
 import tempfile
 import unicodedata
-from collections.abc import Callable, Iterator, Sequence
+from collections.abc import Callable, Generator, Sequence
 from contextlib import contextmanager
 from dataclasses import dataclass, field
 from datetime import datetime
@@ -184,7 +184,7 @@ def grafo_ruta_d(pregunta: str, _thread_id: str, _perfil: str) -> RespuestaGrafo
 
 
 @contextmanager
-def _secreto_simulado() -> Iterator[None]:
+def _secreto_simulado() -> Generator[None]:
     """Fija el App Secret ficticio solo durante el recorrido y lo restaura."""
     anterior = os.environ.get("WHATSAPP_APP_SECRET")
     os.environ["WHATSAPP_APP_SECRET"] = SECRETO_SIMULADO
