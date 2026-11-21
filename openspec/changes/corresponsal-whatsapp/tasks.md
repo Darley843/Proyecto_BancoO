@@ -28,7 +28,7 @@
 - [x] 2.5 Implementar la autorización contra las cinco huellas de `config/whatsapp.toml`; verificar con payloads simulados que un número autorizado sigue el flujo y uno desconocido recibe el aviso de prueba sin crear perfil ni consentimiento.
   > Nota (21 nov): resuelta en el #144.
 - [x] 2.6 Implementar el perfil en el `SqliteStore` bajo `("whatsapp", usuario_id)`, el `thread_id` `wa:<usuario_id>` y la inyección de `perfil=huella_perfil(usuario_id)` al grafo actual; verificar con dos usuarios simultáneos que no comparten historial, perfil ni caché.
-  > Nota (21 nov): resuelta en el #144, con una diferencia: el perfil se guarda en el namespace `("perfil", hash)` del `SqliteStore` y se inyecta al grafo con `huella_perfil(usuario_id)`; el `thread_id` sí es `wa:<usuario_id>`.
+  > Nota (21 nov): `thread_id` `wa:<usuario_id>` e inyección de `huella_perfil` ya estaban en `canal/despachador.py` y `sucursal/grafo.py::responder_turno`. El perfil **no** vive bajo `("whatsapp", usuario_id)`: se queda en `("perfil", sha256(usuario_id))` (`sucursal/perfil.py`), que aísla igual sin usar la huella HMAC como clave del store; se corrige la tarea, no el código. La revocación «olvida mis datos» ahora borra el perfil con `borrar_perfil_en` inyectado en `MaquinaConsentimiento`, y el aislamiento entre dos números se comprueba en `test/test_canal_despachador.py::test_dos_usuarios_no_comparten_hilo_ni_perfil` y `test/test_canal_perfil.py::test_revocar_borra_el_perfil`.
 - [x] 2.7 Implementar la máquina de consentimiento con el aviso de la Ley 1581, el botón «Acepto», la versión y la revocación «olvida mis datos»; verificar con `test/test_canal_consentimiento.py` los casos primer contacto, aceptación, rechazo, silencio y revocación con borrado.
   > Nota (21 nov): resuelta en el #139; la máquina nació en el #123 y el #139 conservó la prueba de la autorización y ajustó el aviso a la Ley 1581.
 - [x] 2.8 Implementar `EnviadorFalso` y `EnviadorMeta` detrás del Protocol `Enviador`, con `timeout`, User-Agent, `From`, reintentos solo 429/5xx y límites de 4096 caracteres y tres botones; verificar con `test/test_canal_envio.py` el envío falso, el rechazo de destino no autorizado, el texto largo partido y la ausencia del token en logs.
@@ -66,16 +66,16 @@
 
 ## 4. HITL y casos de asesor — Darley (18–19 nov)
 
-- [ ] 4.1 Integrar el nodo `hitl` del grafo de diagnóstico con `interrupt({"tipo": "asesor", "caso": ...})` para rojo o solicitud expresa; verificar con `test/test_diagnostico_hitl.py` que el turno se suspende sin respuesta final y que el estado queda identificable.
-  > Estado (21 nov): pendiente. No hay nodo `hitl`, ni `interrupt()`, ni `test/test_diagnostico_hitl.py`; el diagnóstico actual termina en el resultado.
-- [ ] 4.2 Implementar la reanudación con `Command(resume={"accion": ...})` para «Contactar» y «Descartar»; verificar que contactar crea un `CasoAsesor`, descartar lo cierra y una segunda reanudación devuelve error sin duplicar.
-  > Estado (21 nov): pendiente; depende de 4.1, no hay reanudación con `Command(resume=...)`.
-- [ ] 4.3 Implementar la creación, listado y cierre de `CasoAsesor` sin número, nombre ni texto libre; verificar con una inspección de la tabla `casos` y con una prueba que el caso solo contiene `usuario_id`, motivo, semáforo, resultado y estado.
-  > Estado (21 nov): pendiente. El contrato `CasoAsesor` y la tabla `casos` existen, pero no hay creación, listado ni cierre conectados al flujo.
-- [ ] 4.4 Conectar la reanudación al despachador cuando el mensaje llega como botón o texto «contactar»/«descartar»; verificar con `test/test_canal_hitl.py` que el botón reanuda el hilo correcto y que un hilo ajeno no se ve afectado.
-  > Estado (21 nov): pendiente; depende de 4.1 y 4.2.
-- [ ] 4.5 Documentar en `docs/DIAGNOSTICO.md` el flujo HITL, los botones y el estado del caso; verificar que el texto coincide con los identificadores de botón usados en el código.
-  > Estado (21 nov): pendiente; no hay flujo HITL que documentar.
+- [x] 4.1 Integrar el nodo `hitl` del grafo de diagnóstico con `interrupt({"tipo": "asesor", "caso": ...})` para rojo o solicitud expresa; verificar con `test/test_diagnostico_hitl.py` que el turno se suspende sin respuesta final y que el estado queda identificable.
+  > Nota (21 nov): `canal/hitl.py` compila el grafo mínimo del HITL (`ofrecer` → `decidir`) con `SqliteSaver` en el mismo `whatsapp.sqlite`; el rojo suspende y deja `__interrupt__` y `next` en `ofrecer`. La solicitud expresa pasa por el mismo nodo y se reanuda en el acto con `contactar`, para no volver a preguntar lo que la persona ya decidió. El estado del checkpoint solo guarda motivo y semáforo, sin el resultado.
+- [x] 4.2 Implementar la reanudación con `Command(resume={"accion": ...})` para «Contactar» y «Descartar»; verificar que contactar crea un `CasoAsesor`, descartar lo cierra y una segunda reanudación devuelve error sin duplicar.
+  > Nota (21 nov): contactar abre el caso con `abrir_caso`, que reutiliza el vivo por `usuario_id` y motivo; descartar no crea fila. La segunda pulsación responde el aviso de «no hay caso pendiente» y no escribe nada (`test/test_canal_hitl.py::test_una_segunda_pulsacion_no_duplica`). El hilo se borra al reanudar.
+- [x] 4.3 Implementar la creación, listado y cierre de `CasoAsesor` sin número, nombre ni texto libre; verificar con una inspección de la tabla `casos` y con una prueba que el caso solo contiene `usuario_id`, motivo, semáforo, resultado y estado.
+  > Nota (21 nov): `canal/almacen.py` añade `registrar_caso`, `abrir_caso`, `cerrar_caso`, `listar_casos` y `obtener_caso` sobre el estado canónico `pendiente|contactado|descartado|cerrado`; `CasoAsesor.semaforo` admite `pendiente`. Pruebas en `test/test_canal_casos.py`; el caso real del HITL se comprueba en `test/test_canal_hitl.py`.
+- [x] 4.4 Conectar la reanudación al despachador cuando el mensaje llega como botón o texto «contactar»/«descartar»; verificar con `test/test_canal_hitl.py` que el botón reanuda el hilo correcto y que un hilo ajeno no se ve afectado.
+  > Nota (21 nov): el despachador entrega el turno a `EntrevistaCanal.reanudar` antes de la entrevista y del grafo; el botón encuentra su hilo por `usuario_id`. `test/test_canal_hitl.py` recorre dos números a la vez y comprueba que el caso es solo del que pulsa; el simulador (`make simular`) también pulsa «Contactar» para cerrar el rojo.
+- [x] 4.5 Documentar en `docs/DIAGNOSTICO.md` el flujo HITL, los botones y el estado del caso; verificar que el texto coincide con los identificadores de botón usados en el código.
+  > Nota (21 nov): `docs/DIAGNOSTICO.md` § «HITL con el asesor» usa los ids reales `diagnostico.contactar` y `diagnostico.descartar` de `canal/entrevista.py`, y describe la suspensión, la reanudación, el caso y la segunda pulsación. `docs/OPERACION_WHATSAPP.md` actualiza el flujo del mensaje.
 
 ## 5. MCP de solo lectura — Nayla (19–20 nov)
 

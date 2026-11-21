@@ -201,9 +201,11 @@ Alternativa descartada: pedir al modelo que redacte el diagnóstico. Duplicaría
 
 ### 11. HITL y escenarios «¿Y si…?»
 
-El `CasoAsesor` se crea solo con `usuario_id`, motivo, semáforo, resultado estructurado, fecha y estado. No incluye nombre, número ni texto de la conversación.
+El `CasoAsesor` se crea solo con `usuario_id`, motivo, semáforo, resultado estructurado, fecha y estado. No incluye nombre, número ni texto de la conversación. El semáforo admite `pendiente` para la solicitud directa de asesor, que todavía no tiene diagnóstico calculado.
 
-«Contactar» y «Descartar» quedan para las tareas 4.1–4.5. El caso se guarda en `casos` con `usuario_id`, motivo, semáforo, `resultado_json`, fecha y estado; no incluye nombre, número ni texto de la conversación.
+«Contactar» reanuda con `Command(resume={"accion": "contactar"})` el hilo que quedó suspendido con `interrupt()`; abre el caso en `casos` y responde que un asesor lo revisará. «Descartar» reanuda con `{"accion": "descartar"}`, no crea caso y agradece. Una segunda pulsación devuelve el aviso de «no hay caso pendiente» y no duplica. El HITL vive en `canal/hitl.py` como un grafo mínimo de dos nodos (`ofrecer`, `decidir`) con su `SqliteSaver` en el mismo `whatsapp.sqlite`; la entrevista sigue siendo la máquina de estados de `canal/entrevista.py`, porque el estado de la entrevista es pequeño y efímero.
+
+El `interrupt` se dispara solo en rojo: primero se muestra el resumen con los botones y la tarjeta llega al reanudar. Si la persona pide un asesor a mitad de la entrevista, el caso se abre sin volver a preguntar y la entrevista se deja.
 
 Para «¿Y si…?», el servicio parte del `ResultadoDiagnostico` guardado y de su `EntradaDiagnostico`, aplica el cambio y vuelve a calcular con el motor; no necesita un `StateGraph` ni un checkpointer. El original no se toca. El detalle queda para 8.2.
 
@@ -463,7 +465,7 @@ class CasoAsesor(BaseModel):
     id_caso: str
     usuario_id: str
     motivo: str
-    semaforo: Literal["verde", "amarillo", "rojo"]
+    semaforo: Literal["verde", "amarillo", "rojo", "pendiente"]
     resultado: ResultadoDiagnostico | None = None
     creado_en: datetime
     estado: Literal["pendiente", "contactado", "descartado", "cerrado"] = "pendiente"

@@ -367,7 +367,8 @@ uv run python -m banco_occidente_corpus.simulador --solo pensionado_amarillo
 4. Sin consentimiento, se envía el aviso de la Ley 1581 con «Acepto» y «Ahora
    no»; sin aceptación no se invoca el grafo.
 5. Con consentimiento, el despachador decide si el turno va al grafo de
-   preguntas, al diagnóstico o a un asesor.
+   preguntas, al diagnóstico o a un asesor. Si hay un caso del HITL suspendido,
+   los botones «Contactar» y «Descartar» lo reanudan antes que nada.
 
 ## Problemas frecuentes
 
