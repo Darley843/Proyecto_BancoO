@@ -143,6 +143,8 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | `.../canal/entrada.py` | Extrae y normaliza texto, botones y listas del payload de Meta |
 | `.../canal/cola.py` | Cola de un trabajador para procesar fuera del webhook |
 | `.../canal/despachador.py` | Identidad, autorización, consentimiento y respuesta del canal |
+| `.../canal/entrevista.py` | Entrevista del diagnóstico por WhatsApp: pasos, comandos y tarjeta |
+| `.../canal/hitl.py` | HITL del asesor: `interrupt()`, botones Contactar/Descartar y caso |
 | `.../sucursal/grafo.py` | StateGraph con memoria, rutas y redacción |
 | `.../sucursal/ajustes.py` | Tope de gasto, TTL y modo demo |
 | `.../sucursal/costo.py` | Tarifas valle/pico, gasto diario y caché |
