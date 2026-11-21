@@ -37,6 +37,21 @@ esta lista se escribe en el repositorio, en capturas ni en el chat del grupo.
 - [ ] Índice de la Bóveda presente: `data/boveda/indice.json` existe. Si falta,
       `make indice` (usa Ollama y tarda). Sin índice, la Ventanilla y Roba la
       Bóveda responden 503.
+- [ ] El índice está en **Qdrant**, no solo en Chroma: `data/boveda/indice.json`
+      dice `"almacen": "qdrant"` y la colección pesa varios MB.
+  ```powershell
+  Get-Content data\boveda\indice.json
+  (Get-Item data\boveda\qdrant\collection\boveda\storage.sqlite).Length
+  ```
+  Si falta la línea `almacen` o la colección pesa unos 12 KB, la búsqueda
+  vectorial no devuelve nada y la Ventanilla responde solo con BM25, sin aviso.
+  Pasa con los índices creados antes del cambio a Qdrant. Se arregla en
+  segundos, con la app cerrada y sin Ollama ni DeepSeek:
+  ```powershell
+  uv run python -m banco_occidente_corpus.boveda migrar-qdrant
+  ```
+  Comprobación: en `make arqueo`, la configuración 1/0 da hit@5 0,75 y no lo
+  mismo que la 0/1 (0,53).
 - [ ] Tasas del Tablero: si el banco publicó una tabla nueva, regenerarla
       (Nayla). Si no, la demo muestra la alerta `vigencia_vencida`, y es lo
       honesto.
