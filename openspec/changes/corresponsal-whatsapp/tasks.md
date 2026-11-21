@@ -96,7 +96,8 @@
 
 ## 8. Escenarios «¿Y si…?», latencia y operación — Yoldy (17–21 nov)
 
-- [ ] 8.1 Ejecutar el experimento de llamada por WhatsApp el martes 17 y registrar en `docs/EXPERIMENTO_LLAMADA.md` la prueba, el resultado y la decisión (adoptado, aplazado o descartado); verificar que el documento tiene fecha, número de prueba autorizado y justificación.
+- [x] 8.1 Ejecutar el experimento de llamada por WhatsApp el martes 17 y registrar en `docs/EXPERIMENTO_LLAMADA.md` la prueba, el resultado y la decisión (adoptado, aplazado o descartado); verificar que el documento tiene fecha, número de prueba autorizado y justificación.
+  > Nota (Yoldy, 20 nov): la prueba en vivo no se ejecutó; `docs/EXPERIMENTO_LLAMADA.md` registra el protocolo, las fuentes y la decisión **aplazado**, con su justificación.
 - [ ] 8.2 Implementar la bifurcación del diagnóstico con un `thread_id` nuevo y `update_state` desde el estado terminado; verificar con `test/test_diagnostico_escenarios.py` que cambia el plazo, compara cuota y semáforo y no altera el hilo original.
 - [ ] 8.3 Implementar el rechazo de escenarios con monto o plazo fuera de rango; verificar con pruebas que no se crea la rama y que el mensaje explica el límite.
 - [ ] 8.4 Implementar el context manager `medir(flujo, cache)` y la tabla `latencias`; verificar con pruebas que escribe `webhook`, `diagnostico`, `hitl` y `mcp`, y que separa `cache=1`.
