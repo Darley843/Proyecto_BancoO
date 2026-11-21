@@ -113,8 +113,8 @@
   > Nota (21 nov): resuelta en el #118, con una diferencia: el corpus vive en `data/evaluacion/filtro_dominio.jsonl` (50 dentro, 50 fuera y 14 de frontera) en vez de `config/evaluacion/casos_dominio.toml`; cada línea trae id, texto, esperado, categoría y subcategoría.
 - [x] 7.4 Implementar `arqueo/dominio.py` con la matriz de confusión, la tasa de fuga, la tasa de rechazo indebido y el intervalo de Wilson; verificar con `test/test_arqueo_dominio.py` casos conocidos de fuga, rechazo indebido, muestra pequeña y etiqueta faltante.
   > Nota (21 nov): resuelta en el #118, con una diferencia: el módulo es `arqueo/filtro_dominio.py` y las pruebas `test/test_filtro_dominio.py`; calcula fuga, rechazo indebido, acierto de frontera e intervalos de Wilson con las etiquetas del JSONL.
-- [ ] 7.5 Integrar las secciones `dominio` en `data/evaluacion/arqueo.json` y `docs/ARQUEO.md`; verificar que las cifras coinciden, que la ejecución es determinista y que no se incluye el texto completo de los casos.
-  > Estado (21 nov): en revisión en el #158 (Anny).
+- [x] 7.5 Integrar las secciones `dominio` en `data/evaluacion/arqueo.json` y `docs/ARQUEO.md`; verificar que las cifras coinciden, que la ejecución es determinista y que no se incluye el texto completo de los casos.
+  > Nota (21 nov): resuelta en el #158 (Anny): la sección «Filtro de dominio» muestra las reglas solas con su cobertura y el sistema real con modelo, lado a lado.
 - [x] 7.6 Implementar el clasificador de Roba la Bóveda (`inyeccion`, `extraccion_prompt`, `dato_personal`, `fuera_dominio`, `legitimo`) y las reglas de éxito; verificar con `test/test_roba_clasificador.py` un intento de cada categoría, uno resistido y uno legítimo.
 - [x] 7.7 Implementar el marcador en `data/asistente/roba.sqlite`, el límite de 20 intentos por sesión y la exportación sin PII; verificar con pruebas el punto ganado, la defensa resistida, el reinicio y la exportación reproducible.
 - [x] 7.8 Implementar los endpoints `POST /api/roba/intento`, `GET /api/roba`, `POST /api/roba/reiniciar` y `GET /api/roba/exportar`; verificar con `TestClient` que usan el corpus sintético y que no envían nada por WhatsApp.
@@ -152,8 +152,8 @@
 
 - [ ] 9.1 Ejecutar `make fmt`, `make check` y `make demo`; verificar que lint, tipos, pruebas y pipeline offline pasan al 100 % sin `DEEPSEEK_API_KEY` y con Ollama apagado.
   > Estado (21 nov): pendiente; es la verificación de cierre y debe correr después de los PR abiertos.
-- [ ] 9.2 Ejecutar `make tablero` y `make arqueo`; verificar que el CSV conserva las diez columnas, que aparecen las tasas 2026 con su vigencia, que la cuota se muestra en rango, que el reporte incluye dominio y latencia y que no hay llamadas a DeepSeek.
-  > Estado (21 nov): pendiente; depende de 7.5 (dominio en el Arqueo). Antes de regenerar el Arqueo hay que comprobar que la configuración 1/0 no dé lo mismo que la 0/1 (problema del índice con prefijos).
+- [x] 9.2 Ejecutar `make tablero` y `make arqueo`; verificar que el CSV conserva las diez columnas, que aparecen las tasas 2026 con su vigencia, que la cuota se muestra en rango, que el reporte incluye dominio y latencia y que no hay llamadas a DeepSeek.
+  > Nota (21 nov): `make tablero` reproducible (632 filas, 10 columnas, 12/12 preguntas verificadas, `tablero.csv` sin cambios) y `make arqueo` regenerado en el computador de la demo con el índice en Qdrant: 1/0 hit@5 0,75 (27/36) y 0/1 0,53 (19/36), más la sección del filtro de dominio del #158.
 - [ ] 9.3 Ejecutar el recorrido sintético completo por el webhook con las seis personas y `EnviadorFalso`: consentimiento, pregunta, diagnóstico, HITL, «¿Y si…?», comité y Roba la Bóveda; verificar que cada respuesta sale una sola vez y que no se envía nada por WhatsApp real.
   > Estado (21 nov): pendiente; depende de 4.1 a 4.5 (HITL). El recorrido base con el enviador falso ya existe en `make simular` (#157).
 - [ ] 9.4 Arrancar `make app` y recorrer las ocho vistas; verificar `/api/operacion`, `/api/roba`, `/api/estado`, `/api/preguntar` y el webhook local contra el contrato.

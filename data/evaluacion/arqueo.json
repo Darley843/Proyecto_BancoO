@@ -694,6 +694,133 @@
       }
     ]
   },
+  "dominio": {
+    "casos": {
+      "dentro": 50,
+      "frontera": 14,
+      "fuera": 50
+    },
+    "conjunto": "data/evaluacion/filtro_dominio.jsonl",
+    "modelo": {
+      "corridas": [
+        {
+          "acierto_frontera": 14,
+          "corrida": 1,
+          "dudas_sin_respuesta": 2,
+          "fuga": 0,
+          "n_dentro": 50,
+          "n_frontera": 14,
+          "n_fuera": 50,
+          "rechazo_indebido": 3
+        },
+        {
+          "acierto_frontera": 14,
+          "corrida": 2,
+          "dudas_sin_respuesta": 0,
+          "fuga": 0,
+          "n_dentro": 50,
+          "n_frontera": 14,
+          "n_fuera": 50,
+          "rechazo_indebido": 1
+        },
+        {
+          "acierto_frontera": 14,
+          "corrida": 3,
+          "dudas_sin_respuesta": 1,
+          "fuga": 0,
+          "n_dentro": 50,
+          "n_frontera": 14,
+          "n_fuera": 50,
+          "rechazo_indebido": 2
+        }
+      ],
+      "fuente": "data/evaluacion/filtro_dominio_informe_despues.md"
+    },
+    "reglas": {
+      "cobertura": {
+        "confianza": 0.95,
+        "exitos": 26,
+        "inferior": 0.160661,
+        "n": 114,
+        "proporcion": 0.22807,
+        "superior": 0.313208
+      },
+      "decidio": {
+        "regla cortesia": 2,
+        "regla diagnostico": 7,
+        "regla fuera_alcance": 7,
+        "regla identidad": 1,
+        "regla tarifas": 9,
+        "sin regla (duda)": 88
+      },
+      "grupos": {
+        "dentro": {
+          "cobertura": {
+            "confianza": 0.95,
+            "exitos": 17,
+            "inferior": 0.224369,
+            "n": 50,
+            "proporcion": 0.34,
+            "superior": 0.478462
+          },
+          "deciden": 17,
+          "errores": {
+            "confianza": 0.95,
+            "exitos": 0,
+            "inferior": 0.0,
+            "n": 17,
+            "proporcion": 0.0,
+            "superior": 0.184318
+          },
+          "ids": [],
+          "n": 50
+        },
+        "frontera": {
+          "cobertura": {
+            "confianza": 0.95,
+            "exitos": 4,
+            "inferior": 0.117214,
+            "n": 14,
+            "proporcion": 0.285714,
+            "superior": 0.546491
+          },
+          "deciden": 4,
+          "errores": {
+            "confianza": 0.95,
+            "exitos": 0,
+            "inferior": 0.0,
+            "n": 4,
+            "proporcion": 0.0,
+            "superior": 0.489891
+          },
+          "ids": [],
+          "n": 14
+        },
+        "fuera": {
+          "cobertura": {
+            "confianza": 0.95,
+            "exitos": 5,
+            "inferior": 0.043476,
+            "n": 50,
+            "proporcion": 0.1,
+            "superior": 0.213602
+          },
+          "deciden": 5,
+          "errores": {
+            "confianza": 0.95,
+            "exitos": 0,
+            "inferior": 0.0,
+            "n": 5,
+            "proporcion": 0.0,
+            "superior": 0.434482
+          },
+          "ids": [],
+          "n": 50
+        }
+      },
+      "modo": "solo_reglas"
+    }
+  },
   "evaluacion": {
     "v1": {
       "aciertos": 16,
@@ -709,6 +836,11 @@
       "revisadas": 20,
       "total": 20
     }
+  },
+  "latencia": {
+    "con_cache": {},
+    "minimo_corridas": 30,
+    "sin_cache": {}
   },
   "mcnemar": {
     "alfa": 0.05,

@@ -4,7 +4,7 @@ Reporte reproducible de recuperacion, evaluacion y costo de la fase 2. Se genera
 
 ## Ficha de corrida
 
-- Commit: `c4800af`.
+- Commit: `ff2f067`.
 - Alcance del indice: `base`.
 - Indice con prefijos: `data/boveda/indice.json` con modelo `nomic-embed-text-v2-moe`, prefijos si, 869 fragmentos y dimension 768.
 - Indice sin prefijos: `data/boveda/experimentos/sin_prefijos/indice.json` con 869 fragmentos y dimension 768.
@@ -212,6 +212,39 @@ Diferencias por normalizacion de URL y por deduplicacion de texto se reportan co
 - El barrido tiene en la practica dos estados. `EnsembleRetriever` fusiona por rangos reciprocos (peso / (posicion + 60)): con esa constante el orden depende sobre todo de que peso supera 0.5, no de su valor exacto. Dentro de cada lado (peso vectorial menor o mayor que 0.5) el hit@5 casi no cambia; lo que cambia es el orden dentro del top 5, que se ve en el MRR.
 - Los seguimientos se buscan uniendo `previa` y `pregunta`, como `medir_recuperacion.py`. En produccion la Sucursal reformula con el nodo `reformular` del grafo, asi que su cifra real puede ser distinta.
 - Las preguntas de ruta T responden desde el Tablero: su hit@5 no mide la Boveda y se reporta con y sin ellas.
+
+## Latencia
+
+Todavía no hay corridas medidas en `data/asistente/latencias.sqlite`. Se llenan al usar la app (`make app`) con el canal y la Ventanilla.
+
+## Filtro de dominio
+
+Conjunto `data/evaluacion/filtro_dominio.jsonl`: 50 dentro, 50 fuera y 14 de frontera. Se muestran lado a lado las reglas solas, que el Arqueo mide en cada corrida, y el sistema real con el modelo, tomado del último informe publicado.
+
+### Reglas solas (US$ 0, determinista)
+
+Las reglas deciden 26 de 114 casos (22,8 % [16,1 %; 31,3 %]). El resto son dudas: en la app las resuelve el modelo, así que no cuentan como error de las reglas.
+
+| Grupo | Casos | Deciden las reglas | Error entre los que deciden | Casos con error |
+|---|---:|---|---|---|
+| Fuera de tema (fuga) | 50 | 5/50 (10,0 % [4,3 %; 21,4 %]) | 0/5 (0,0 % [0,0 %; 43,4 %]) | — |
+| Dentro del dominio (rechazo indebido) | 50 | 17/50 (34,0 % [22,4 %; 47,8 %]) | 0/17 (0,0 % [0,0 %; 18,4 %]) | — |
+| Frontera (decisión distinta) | 14 | 4/14 (28,6 % [11,7 %; 54,6 %]) | 0/4 (0,0 % [0,0 %; 49,0 %]) | — |
+
+**Quién decidió** (todos los casos): regla cortesia 2, regla diagnostico 7, regla fuera_alcance 7, regla identidad 1, regla tarifas 9, sin regla (duda) 88.
+
+### Sistema real: reglas + modelo (DeepSeek)
+
+3 corridas publicadas en `data/evaluacion/filtro_dominio_informe_despues.md`. El Arqueo no las recalcula porque gastan tokens; se actualizan con `uv run python -m banco_occidente_corpus.arqueo.filtro_digiturno --con-modelo --repeticiones 3 --salida data/evaluacion/filtro_dominio_informe_despues.md`.
+
+| Corrida | Fuga | Rechazo indebido | Acierto en frontera | Dudas sin respuesta |
+|---:|---|---|---|---:|
+| 1 | 0/50 | 3/50 | 14/14 | 2 |
+| 2 | 0/50 | 1/50 | 14/14 | 0 |
+| 3 | 0/50 | 2/50 | 14/14 | 1 |
+| **Rango** | 0/50 (0,0 %) | 1 a 3 de 50 (2,0 a 6,0 %) | 14/14 (100,0 %) | |
+
+Solo se publican los ids de los casos con error; el texto está en el conjunto.
 
 ## Comando
 
