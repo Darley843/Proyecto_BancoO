@@ -5,6 +5,8 @@ y el comité funcionen en vivo, y qué hacer si algo falla. Complementa
 `docs/OPERACION_WHATSAPP.md`, que tiene la puesta en marcha paso a paso, y
 `docs/SEGURIDAD.md` §5.1 (trazas solo para la demo).
 
+La demo corre en el **computador de Nayla**; los comandos asumen esa máquina.
+
 Regla general: **los secretos solo viven en la sesión de PowerShell**. Nada de
 esta lista se escribe en el repositorio, en capturas ni en el chat del grupo.
 
@@ -44,6 +46,8 @@ esta lista se escribe en el repositorio, en capturas ni en el chat del grupo.
 - [ ] Token permanente de Meta vigente (60 días desde que se generó).
 - [ ] App publicada (*Live*) y cuenta de WhatsApp suscrita a la app
       (`docs/OPERACION_WHATSAPP.md`, pasos 7 y 8).
+- [ ] Nayla agregada como desarrolladora o administradora de la app de Meta,
+      para que pueda actualizar el webhook ella misma si el túnel se cae.
 - [ ] Los **cinco números autorizados** en Meta, incluido el del profesor,
       cada uno con el código confirmado.
 - [ ] Sus huellas en `[autorizados]` de `config/whatsapp.toml`, generadas con
@@ -51,21 +55,26 @@ esta lista se escribe en el repositorio, en capturas ni en el chat del grupo.
   ```powershell
   uv run python -m banco_occidente_corpus.canal.identidad --huella "+57 300 123 4567"
   ```
-- [ ] Si el texto del aviso cambió desde el último ensayo, subir `version_aviso`
-      en `config/whatsapp.toml`: así los números de prueba vuelven a aceptar el
-      aviso vigente (Decreto 1377 de 2013, art. 8).
+  Las huellas reales se editan **solo en el computador de la demo**: nunca se
+  hace `git add` ni commit de `config/whatsapp.toml` con ellas (el repositorio
+  es público).
+- [ ] `version_aviso` en `config/whatsapp.toml` corresponde al texto vigente
+      del aviso (`2026-11-20`, con la mención de DeepSeek). Si el aviso vuelve a
+      cambiar, se sube otra vez: así los números de prueba aceptan el texto
+      nuevo (Decreto 1377 de 2013, art. 8).
 
 ### DeepSeek
 
 - [ ] Saldo suficiente en `platform.deepseek.com`. Un comité cuesta alrededor
       de un centavo de dólar y el tope diario de la app es US$ 0,20
       (`SUCURSAL_TOPE_USD` lo cambia solo para esa sesión).
-- [ ] La clave ya está en las variables de usuario de Windows. Se comprueba sin
-      mostrarla:
+- [ ] La clave de DeepSeek de la app va en `..\whatsapp-env.ps1`, junto con las
+      variables del canal y fuera del repositorio, para que la ventana de la app
+      la cargue con el mismo comando. Se comprueba sin mostrarla:
   ```powershell
   [bool]$env:DEEPSEEK_API_KEY
   ```
-  Nunca se escribe a mano en la terminal ni en el chat.
+  Nunca se escribe en el chat, en una captura ni en el repositorio.
 
 ### Ensayo general
 
@@ -92,8 +101,11 @@ make app
 **Ventana 2: el túnel.**
 
 ```powershell
-& "$HOME\cloudflared.exe" tunnel --url http://127.0.0.1:8000
+cloudflared tunnel --url http://127.0.0.1:8000
 ```
+
+Si `cloudflared` no está instalado: `winget install --id Cloudflare.cloudflared`
+y abrir una ventana nueva.
 
 - [ ] Copiar la URL `https://….trycloudflare.com`. Es **variable**: cada vez
       que el túnel se reinicia cambia.
@@ -112,6 +124,11 @@ curl.exe "https://<url-del-tunel>/webhooks/whatsapp?hub.mode=subscribe&hub.verif
 - [ ] Las dos devuelven `12345`.
 - [ ] Un `hola` desde un número autorizado produce `POST /webhooks/whatsapp 200`
       en la ventana 1.
+- [ ] **Calentamiento de la latencia:** enviar al menos **30 mensajes** por el
+      canal antes de mostrar la vista Operación. Con menos de 30 corridas por
+      flujo, p50 y p95 se marcan como muestra insuficiente (`MINIMO_CORRIDAS`
+      en `sucursal/operacion.py`). Es correcto mostrarlo así, pero con 30 la
+      cifra ya es concluyente.
 
 ## 3. Prueba de humo, en el orden de la demo
 
@@ -122,19 +139,19 @@ curl.exe "https://<url-del-tunel>/webhooks/whatsapp?hub.mode=subscribe&hub.verif
 | 3 | «¿Cuál es la cuota de manejo de la tarjeta débito?» | Respuesta del Tablero (`T`) con su fuente |
 | 4 | «¿En qué año se fundó el Banco de Occidente?» | Respuesta de la Bóveda (`B`) con cita |
 | 5 | «¿Qué clima hace hoy en Cali?» | Rechazo (`X`) con la respuesta estándar |
-| 6 | «¿Me alcanza para un crédito?» | Invitación al diagnóstico (`D`), sin modelo |
+| 6 | «¿Me alcanza para un crédito?» | Arranca la entrevista del diagnóstico por WhatsApp |
 | 7 | Entrevista con la persona `empleada_verde` | Verde y tarjeta de Pana |
-| 8 | Entrevista con `pensionado_amarillo` | Mensaje «El comité está revisando tu caso…» y luego la recomendación del comité |
-| 9 | Entrevista con `independiente_rojo` | Comité, prueba de estrés y oferta de asesor (HITL) |
+| 8 | Entrevista con `pensionado_amarillo` | La recomendación del comité llega completa en una sola respuesta (unos 4 s) |
+| 9 | Entrevista con `independiente_rojo` | Comité y prueba de estrés; mientras no entre el HITL, la oferta de asesor es solo texto |
 | 10 | «¿Y si lo pago en 60 meses?» (si entró) | Tarjeta de antes y después |
 | 11 | «Olvida mis datos» | Confirmación de revocación; el siguiente `hola` vuelve a pedir el aviso |
 | 12 | Web → Ventanilla: «¿me alcanza para un crédito?» | Ticket **D** verde |
 | 13 | Web → Roba la Bóveda: las tres ideas | Defensa resistida; **Exportar resumen** descarga el JSON sin datos personales |
-| 14 | Web → Operación | Mensajes, consentimientos, casos y Roba con datos reales; latencia si ya hay mediciones |
+| 14 | Web → Operación | Mensajes, consentimientos, casos y Roba con datos reales; p50 y p95 del canal después del calentamiento |
 | 15 | Comité en pantalla: `uv run python scripts/demo_comite.py` | Posturas de Riesgo, Comercial y Auditor; costo y tiempo |
 
-Los pasos 7 a 11 necesitan la entrevista por WhatsApp (#149) en `main`, y la
-oferta de asesor del paso 9, el HITL. Las respuestas de las entrevistas salen
+Los pasos 6 a 11 necesitan la entrevista por WhatsApp (#149) en `main`. En la
+web, la Ventanilla sigue mostrando el ticket `D` (paso 12). Las respuestas de las entrevistas salen
 de `data/evaluacion/personas_sinteticas.json`.
 Se usan **solo datos inventados**: nadie escribe sus ingresos reales.
 
@@ -147,7 +164,7 @@ robustez del modelo frente a la inyección se muestra con el caso 5
 
 | Si falla… | Qué hacer |
 |---|---|
-| El túnel se cae | Reiniciar `cloudflared`, copiar la URL nueva, actualizar el callback en Meta y verificar (unos 2 minutos) |
+| El túnel se cae | Reiniciar `cloudflared`, copiar la URL nueva, actualizar el callback en Meta (Nayla o Darley) y verificar (unos 2 minutos) |
 | Meta no entrega los mensajes | Mostrar el flujo con la app web y el simulador: `uv run python -m pytest test/test_simulador_webhook_real.py -q` firma las conversaciones de las personas contra el webhook real; también el video del ensayo |
 | `ErrorEnvio: destino no autorizado` | Falta la huella del número o cambió la sal: regenerarla, pegarla en `config/whatsapp.toml` y reiniciar la app |
 | DeepSeek falla o se alcanza el tope | Ventanilla en modo demo (`$env:SUCURSAL_DEMO = "1"` y reiniciar la app); el comité se muestra con la corrida grabada del ensayo |
@@ -165,13 +182,19 @@ robustez del modelo frente a la inyección se muestra con el caso 5
       log: **rotarlos**.
 - [ ] Cada número de prueba escribe «olvida mis datos» si no se volverá a usar.
 - [ ] Nada de `data/asistente/` se sube al repositorio.
+- [ ] `git status` limpio: **no hacer commit de `config/whatsapp.toml` con
+      huellas reales**. Para dejarlo como estaba:
+  ```powershell
+  git restore config/whatsapp.toml
+  ```
 
 ## 6. Responsables (propuesta; se confirma en el grupo)
 
 | Tarea | Responsable |
 |---|---|
 | Esta lista y la prueba de humo | Anny |
-| Meta, túnel, callback y huellas de los números | Darley |
+| Computador de la demo, túnel y callback | Nayla |
+| App de Meta, huellas de los números y respaldo del callback | Darley |
 | Tasas del Tablero y comité | Nayla |
-| Tablero de operación y latencia | Yoldy |
-| Video o capturas de respaldo | Por asignar |
+| Tablero de operación, latencia y calentamiento | Yoldy |
+| Video, capturas de respaldo y guion de la sustentación | Yoldy |
