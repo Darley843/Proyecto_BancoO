@@ -21,8 +21,8 @@ const MINIMO_CORRIDAS = 30;
 
 /** Nombre visible de cada flujo medido. */
 const FLUJOS = {
-  webhook: "Webhook (recibir y responder)",
-  diagnostico: "Diagnóstico financiero",
+  webhook: "Canal WhatsApp (procesar y responder, sin la espera en cola)",
+  diagnostico: "Diagnóstico con comité (motor, comité y tarjeta)",
   hitl: "Asesor (HITL)",
   mcp: "Servidor MCP",
   ventanilla: "Ventanilla web (preguntar)",

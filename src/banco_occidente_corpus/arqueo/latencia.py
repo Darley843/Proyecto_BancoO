@@ -249,6 +249,12 @@ def markdown_latencia(seccion: Mapping[str, Any] | None) -> list[str]:
         f"Percentil nearest-rank en milisegundos. Con menos de {minimo} corridas el "
         "flujo se marca como no concluyente y no se informa su percentil.",
         "",
+        "- `webhook`: procesamiento del canal, desde que el trabajador toma el mensaje "
+        "hasta enviar la respuesta. No incluye la espera en la cola ni la red de Meta.",
+        "- `diagnostico`: motor, comité y tarjeta al terminar la entrevista, sin los "
+        "pasos de la entrevista.",
+        "- `ventanilla`: `POST /api/preguntar` y su versión en vivo.",
+        "",
     ]
     for titulo, tabla in (("Sin caché", sin_cache), ("Con caché", con_cache)):
         if not tabla:

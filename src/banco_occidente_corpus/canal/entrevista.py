@@ -30,6 +30,10 @@ Sin un resultado vigente, el mensaje sigue su camino normal hacia el grafo.
 La app purga al arrancar las entrevistas y los resultados vencidos, para que el
 plazo del aviso no dependa de que la persona vuelva a escribir.
 
+Latencia: con ``ruta_latencias``, `completar` mide como flujo ``diagnostico`` el
+cálculo del motor, el comité y la tarjeta, aparte de los pasos de la entrevista
+(tarea 8.4). Una consulta sin tasa publicada no se cuenta.
+
 Las pruebas viven en ``test/test_canal_entrevista.py``.
 """
 
@@ -46,6 +50,7 @@ from pathlib import Path
 
 from langchain_core.language_models import BaseChatModel
 
+from ..arqueo.latencia import medir
 from ..config import PROJECT_ROOT
 from ..diagnostico import comite, motor
 from ..diagnostico.escenarios import (
@@ -336,7 +341,8 @@ class EntrevistaCanal:
     El avance vive en la tabla ``entrevistas`` del almacén del canal y vence a
     los ``ttl_minutos``. El modelo del comité y la fecha de la tasa se pueden
     inyectar para las pruebas; en producción se usan el modelo del comité y la
-    fecha de hoy.
+    fecha de hoy. Con ``ruta_latencias`` cada diagnóstico completo se mide como
+    flujo ``diagnostico``; sin ella no se escribe nada.
     """
 
     ruta: Path
@@ -344,6 +350,7 @@ class EntrevistaCanal:
     modelo: BaseChatModel | None = None
     hoy: datetime | None = None
     raiz: Path | None = None
+    ruta_latencias: Path | None = None
     reloj: Callable[[], datetime] = field(default_factory=lambda: lambda: datetime.now(UTC))
     _config: motor.ConfigDiagnostico | None = field(default=None, init=False, repr=False)
     _bloques: dict[str, BloqueEntrevista] | None = field(default=None, init=False, repr=False)
@@ -517,6 +524,27 @@ class EntrevistaCanal:
         Convoca al comité solo en amarillo o rojo con cuota. Si el comité falla,
         responde con el diagnóstico sin comité. En rojo ofrece hablar con un
         asesor.
+
+        Args:
+            usuario_id: huella del número.
+            id_mensaje: id del mensaje que originó la respuesta.
+            respuestas: ids canónicos elegidos en la entrevista.
+
+        Returns:
+            La respuesta con el texto y, si se pudo generar, el PNG de Pana.
+        """
+        with medir("diagnostico", ruta=self.ruta_latencias) as corrida:
+            respuesta = self._diagnosticar(usuario_id, id_mensaje, respuestas)
+            corrida.guardar = respuesta.texto != TEXTO_SIN_TASA
+        return respuesta
+
+    def _diagnosticar(
+        self,
+        usuario_id: str,
+        id_mensaje: str,
+        respuestas: Mapping[str, str],
+    ) -> RespuestaCanal:
+        """Corre motor, comité y tarjeta; es el tramo que mide `completar`.
 
         Args:
             usuario_id: huella del número.
