@@ -986,3 +986,19 @@ def test_cortesia_no_consume_tope(monkeypatch: pytest.MonkeyPatch, tmp_path: Pat
     assert respuesta.status_code == 200
     assert respuesta.json()["ruta"] == "cortesia"
     assert respuesta.json()["costo_usd"] == 0.0
+
+
+def test_la_ventanilla_registra_su_latencia_con_la_cache_aparte(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Cada pregunta deja una corrida «ventanilla»; la de caché va con cache=1."""
+    modelo = ModeloGuion([RESPUESTA_BOVEDA])
+    escenario = preparar(monkeypatch, tmp_path, modelo=modelo, fragmentos=[fragmento()])
+
+    preguntar(escenario.cliente, PREGUNTA_BOVEDA, "hilo-latencia")
+    preguntar(escenario.cliente, PREGUNTA_BOVEDA, "hilo-latencia")
+    preguntar(escenario.cliente, "", "hilo-latencia")
+
+    with sqlite3.connect(tmp_path / "data/asistente/latencias.sqlite") as conexion:
+        filas = conexion.execute("SELECT flujo, cache FROM latencias ORDER BY rowid").fetchall()
+    assert filas == [("ventanilla", 0), ("ventanilla", 1)]

@@ -25,6 +25,7 @@ const FLUJOS = {
   diagnostico: "Diagnóstico financiero",
   hitl: "Asesor (HITL)",
   mcp: "Servidor MCP",
+  ventanilla: "Ventanilla web (preguntar)",
 };
 
 /** Nombre visible del modo de envío del canal. */
