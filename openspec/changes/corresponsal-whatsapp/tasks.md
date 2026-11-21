@@ -154,8 +154,8 @@
   > Estado (21 nov): pendiente; es la verificación de cierre y debe correr después de los PR abiertos.
 - [ ] 9.2 Ejecutar `make tablero` y `make arqueo`; verificar que el CSV conserva las diez columnas, que aparecen las tasas 2026 con su vigencia, que la cuota se muestra en rango, que el reporte incluye dominio y latencia y que no hay llamadas a DeepSeek.
   > Estado (21 nov): pendiente; depende de 7.5 (dominio en el Arqueo). Antes de regenerar el Arqueo hay que comprobar que la configuración 1/0 no dé lo mismo que la 0/1 (problema del índice con prefijos).
-- [ ] 9.3 Ejecutar el recorrido sintético completo por el webhook con las cinco personas y `EnviadorFalso`: consentimiento, pregunta, diagnóstico, HITL, «¿Y si…?», comité y Roba la Bóveda; verificar que cada respuesta sale una sola vez y que no se envía nada por WhatsApp real.
-  > Estado (21 nov): pendiente; depende de 4.1–4.5 (HITL) y de 7.2 (comando con `EnviadorFalso`).
+- [ ] 9.3 Ejecutar el recorrido sintético completo por el webhook con las seis personas y `EnviadorFalso`: consentimiento, pregunta, diagnóstico, HITL, «¿Y si…?», comité y Roba la Bóveda; verificar que cada respuesta sale una sola vez y que no se envía nada por WhatsApp real.
+  > Estado (21 nov): pendiente; depende de 4.1 a 4.5 (HITL). El recorrido base con el enviador falso ya existe en `make simular` (#157).
 - [ ] 9.4 Arrancar `make app` y recorrer las ocho vistas; verificar `/api/operacion`, `/api/roba`, `/api/estado`, `/api/preguntar` y el webhook local contra el contrato.
   > Estado (21 nov): pendiente; es la verificación manual de cierre.
 - [ ] 9.5 Revisar `git status` y el diff final: sin `data/asistente/*.sqlite`, sin `data/boveda/`, sin `.env`, sin claves, sin cambios en `data/raw/` salvo el PDF de tasas capturado, sin cambios en el resto de `data/gold/` y con `data/gold/tasas/` y `data/estructurados/tablero.csv` regenerados.
