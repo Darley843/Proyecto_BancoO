@@ -22,7 +22,7 @@ import argparse
 import io
 import sys
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
 
@@ -39,8 +39,10 @@ from ..sucursal.digiturno import (
 from ..sucursal.tipos import Turno
 from .filtro_dominio import (
     CasoDominio,
+    Categoria,
     Clasificador,
     Decision,
+    IntervaloWilson,
     cargar_casos,
     evaluar_filtro,
     reporte_markdown,
@@ -64,6 +66,12 @@ MOTIVOS_REGLAS: frozenset[str] = frozenset(
 )
 #: Conjunto versionado del filtro de dominio.
 RUTA_CONJUNTO: Path = PROJECT_ROOT / "data" / "evaluacion" / "filtro_dominio.jsonl"
+#: Decimales de las proporciones del filtro en ``arqueo.json``.
+DECIMALES_DOMINIO: int = 6
+#: Motivo del Digiturno cuando ninguna regla decide y el texto es una duda.
+MOTIVO_DUDA = "defecto"
+#: Más ids que estos no se listan en la tabla del Markdown, solo en el JSON.
+MAXIMO_IDS_TABLA: int = 10
 
 
 def decision_de_turno(turno: Turno) -> Decision:
@@ -290,6 +298,163 @@ def medir_varias(
     else:
         partes.append("\nNingún caso tuvo error en ninguna corrida.\n")
     return "".join(partes)
+
+
+def _intervalo_dominio(intervalo: IntervaloWilson | None, ids: Sequence[str]) -> dict[str, Any]:
+    """Convierte un intervalo y sus casos con error en el bloque del JSON.
+
+    Args:
+        intervalo: proporción con su intervalo de Wilson, o ``None`` sin casos.
+        ids: ids de los casos con error; nunca el texto.
+
+    Returns:
+        Conteo, proporción e intervalo redondeados, más los ids.
+    """
+    if intervalo is None:
+        return {
+            "exitos": 0,
+            "n": 0,
+            "proporcion": None,
+            "inferior": None,
+            "superior": None,
+            "confianza": None,
+            "ids": [],
+        }
+    return {
+        "exitos": intervalo.exitos,
+        "n": intervalo.n,
+        "proporcion": round(intervalo.proporcion, DECIMALES_DOMINIO),
+        "inferior": round(intervalo.inferior, DECIMALES_DOMINIO),
+        "superior": round(intervalo.superior, DECIMALES_DOMINIO),
+        "confianza": intervalo.confianza,
+        "ids": list(ids),
+    }
+
+
+def seccion_dominio(
+    ruta: Path = RUTA_CONJUNTO,
+    *,
+    configuracion: ConfiguracionDigiturno | None = None,
+) -> dict[str, Any]:
+    """Arma la sección ``dominio`` de ``arqueo.json`` con el Digiturno solo con reglas.
+
+    Usa el modo sin modelo para que el Arqueo siga costando US$ 0 y sea
+    determinista: las dudas caen en ``B``. Por eso la fuga medida es una cota
+    superior de la de la app (allí el modelo puede rechazar una duda) y el
+    rechazo indebido, una cota inferior. Solo se guardan ids, nunca el texto de
+    los casos.
+
+    Args:
+        ruta: conjunto JSONL del filtro de dominio.
+        configuracion: palabras y patrones del Digiturno; por defecto los del TOML.
+
+    Returns:
+        ``{"modo", "conjunto", "casos", "fuga", "rechazo_indebido",
+        "acierto_frontera", "dudas", "decidio"}``.
+    """
+    casos = cargar_casos(ruta)
+    turnos: dict[str, Turno] = {}
+    resultado = evaluar_filtro(
+        casos, clasificador_digiturno(configuracion=configuracion, turnos=turnos)
+    )
+    conteo = Counter(caso.categoria.value for caso in casos)
+    decidio = Counter(origen_turno(turnos[caso.texto]) for caso in casos if caso.texto in turnos)
+    dudas = Counter(
+        caso.categoria.value
+        for caso in casos
+        if caso.texto in turnos and turnos[caso.texto].motivo.split(":")[0] == MOTIVO_DUDA
+    )
+    try:
+        conjunto = ruta.resolve().relative_to(PROJECT_ROOT).as_posix()
+    except ValueError:
+        conjunto = ruta.name
+    return {
+        "modo": "solo_reglas",
+        "conjunto": conjunto,
+        "casos": {categoria.value: conteo.get(categoria.value, 0) for categoria in Categoria},
+        "fuga": _intervalo_dominio(resultado.fuga, resultado.ids_fuga),
+        "rechazo_indebido": _intervalo_dominio(
+            resultado.rechazo_indebido, resultado.ids_rechazo_indebido
+        ),
+        "acierto_frontera": _intervalo_dominio(
+            resultado.acierto_frontera, resultado.ids_frontera_fallidos
+        ),
+        "dudas": {categoria.value: dudas.get(categoria.value, 0) for categoria in Categoria},
+        "decidio": dict(sorted(decidio.items())),
+    }
+
+
+def _porcentaje(valor: float) -> str:
+    """Escribe una proporción como porcentaje con coma decimal, p. ej. ``4,0 %``."""
+    return f"{valor * 100:.1f}".replace(".", ",") + " %"
+
+
+def markdown_dominio(seccion: Mapping[str, Any] | None) -> list[str]:
+    """Escribe la sección «Filtro de dominio» de ``docs/ARQUEO.md``.
+
+    Se arma desde el mismo bloque del JSON, así que las cifras coinciden.
+
+    Args:
+        seccion: el bloque ``dominio`` de ``arqueo.json``.
+
+    Returns:
+        Las líneas de la sección, listas para unir con saltos de línea.
+    """
+    lineas = ["## Filtro de dominio", ""]
+    if not seccion:
+        return [*lineas, "No se midió el filtro de dominio en esta corrida.", ""]
+    casos: Mapping[str, int] = seccion.get("casos") or {}
+    lineas += [
+        f"Conjunto `{seccion.get('conjunto', RUTA_CONJUNTO.name)}`: "
+        f"{casos.get('dentro', 0)} dentro, {casos.get('fuera', 0)} fuera y "
+        f"{casos.get('frontera', 0)} de frontera. El Digiturno se mide solo con reglas, "
+        "sin modelo (US$ 0 y determinista): un mensaje que ninguna regla decide es una "
+        "duda y aquí se acepta en `B`. En la app esas dudas las resuelve el modelo, así "
+        "que esta tabla mide lo que las reglas atajan solas: la fuga es una cota superior "
+        "de la de la app y el rechazo indebido, una cota inferior. La corrida con el modelo "
+        "se publica aparte en `data/evaluacion/filtro_dominio_informe_modelo.md`.",
+        "",
+        "| Métrica | Casos | Proporción [IC Wilson 95 %] | Casos con error |",
+        "|---|---:|---|---|",
+    ]
+    for clave, nombre in (
+        ("fuga", "Fuga (fuera de tema aceptadas)"),
+        ("rechazo_indebido", "Rechazo indebido (legítimas rechazadas)"),
+        ("acierto_frontera", "Acierto en frontera"),
+    ):
+        datos: Mapping[str, Any] = seccion.get(clave) or {}
+        if not datos.get("n"):
+            lineas.append(f"| {nombre} | 0 | — | — |")
+            continue
+        proporcion = (
+            f"{_porcentaje(datos['proporcion'])} "
+            f"[{_porcentaje(datos['inferior'])}; {_porcentaje(datos['superior'])}]"
+        )
+        ids: list[str] = list(datos.get("ids") or [])
+        if len(ids) > MAXIMO_IDS_TABLA:
+            detalle = f"{len(ids)} casos; la lista está en `arqueo.json`"
+        else:
+            detalle = ", ".join(ids) or "—"
+        lineas.append(f"| {nombre} | {datos['exitos']}/{datos['n']} | {proporcion} | {detalle} |")
+    dudas: Mapping[str, int] = seccion.get("dudas") or {}
+    if dudas:
+        lineas += [
+            "",
+            "**Dudas** (ninguna regla decide; en la app las resuelve el modelo): "
+            f"fuera {dudas.get('fuera', 0)} de {casos.get('fuera', 0)}, "
+            f"dentro {dudas.get('dentro', 0)} de {casos.get('dentro', 0)} y "
+            f"frontera {dudas.get('frontera', 0)} de {casos.get('frontera', 0)}.",
+        ]
+    decidio: Mapping[str, int] = seccion.get("decidio") or {}
+    if decidio:
+        resumen = ", ".join(f"{origen} {n}" for origen, n in decidio.items())
+        lineas += ["", f"**Quién decidió** (todos los casos): {resumen}."]
+    lineas += [
+        "",
+        "Solo se publican los ids de los casos con error; el texto está en el conjunto.",
+        "",
+    ]
+    return lineas
 
 
 def main(argv: Sequence[str] | None = None) -> int:

@@ -78,6 +78,7 @@ from .experimentos import (
     medir_configuracion,
     vectorial_directo,
 )
+from .filtro_digiturno import markdown_dominio, seccion_dominio
 from .latencia import markdown_latencia, ruta_por_defecto, seccion_latencia
 from .metricas import (
     ALFA,
@@ -413,6 +414,7 @@ def ejecutar_arqueo(
         avisos=avisos,
         sensibilidad=sensibilidad,
         latencia=seccion_latencia(ruta_por_defecto(config.paths.root)),
+        dominio=seccion_dominio(),
     )
     texto = render_markdown(arqueo, ficha)
 
@@ -437,6 +439,7 @@ def construir_arqueo(
     avisos: Sequence[str] = (),
     sensibilidad: Sensibilidad | None = None,
     latencia: Mapping[str, Any] | None = None,
+    dominio: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Arma el diccionario determinista de ``arqueo.json``.
 
@@ -454,6 +457,8 @@ def construir_arqueo(
             no incluye el bloque ``sensibilidad``.
         latencia: seccion de `latencia.seccion_latencia`; si falta, el bloque
             ``latencia`` no se incluye.
+        dominio: seccion de `filtro_digiturno.seccion_dominio`; si falta, el
+            bloque ``dominio`` no se incluye.
 
     Returns:
         El diccionario listo para serializar.
@@ -648,6 +653,7 @@ def construir_arqueo(
         },
         "avisos": lista_avisos,
         **({"latencia": dict(latencia)} if latencia is not None else {}),
+        **({"dominio": dict(dominio)} if dominio is not None else {}),
     }
 
 
@@ -1216,6 +1222,7 @@ def render_markdown(arqueo: Mapping[str, Any], ficha: FichaCorrida) -> str:
         "Boveda y se reporta con y sin ellas.",
         "",
         *(markdown_latencia(arqueo["latencia"]) if "latencia" in arqueo else []),
+        *(markdown_dominio(arqueo["dominio"]) if "dominio" in arqueo else []),
         "## Comando",
         "",
         "```bash",
