@@ -1,12 +1,14 @@
 """Almacén SQLite del canal de WhatsApp.
 
-Cuatro tablas: ``mensajes`` para la deduplicación por id, ``consentimientos``
-para la Ley 1581, ``envios`` para que un reintento no duplique la respuesta y
-``casos`` para los asesores humanos.
+Cinco tablas: ``mensajes`` para la deduplicación por id, ``consentimientos``
+para la Ley 1581, ``envios`` para que un reintento no duplique la respuesta,
+``casos`` para los asesores humanos y ``entrevistas`` para el paso actual y los
+ids elegidos en la entrevista del diagnóstico.
 
 El esquema no tiene columnas para el número, el nombre ni el texto del mensaje:
-el perfil vive fuera del repositorio y el número solo existe en memoria. La base
-tampoco se versiona: se crea al usarla y se regenera borrándola.
+el perfil vive fuera del repositorio y el número solo existe en memoria. La
+entrevista guarda únicamente ids canónicos y el nombre del paso, nunca el texto
+libre. La base tampoco se versiona: se crea al usarla y se regenera borrándola.
 """
 
 from __future__ import annotations
@@ -18,7 +20,7 @@ from pathlib import Path
 #: Ruta por defecto de la base del canal.
 RUTA_ALMACEN: Path = Path("data/asistente/whatsapp.sqlite")
 
-#: Esquema de las cuatro tablas del canal.
+#: Esquema de las cinco tablas del canal.
 ESQUEMA: str = """
 CREATE TABLE IF NOT EXISTS mensajes (
     id_mensaje TEXT PRIMARY KEY,
@@ -52,6 +54,19 @@ CREATE TABLE IF NOT EXISTS casos (
     estado TEXT NOT NULL,
     creado_en TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS entrevistas (
+    usuario_id TEXT PRIMARY KEY,
+    paso TEXT NOT NULL,
+    respuestas_json TEXT NOT NULL,
+    actualizado_en TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS resultados_diagnostico (
+    usuario_id TEXT PRIMARY KEY,
+    resultado_json TEXT NOT NULL,
+    guardado_en TEXT NOT NULL
+);
 """
 
 
@@ -69,7 +84,7 @@ def conectar(ruta: Path = RUTA_ALMACEN) -> sqlite3.Connection:
 
 
 def inicializar_almacen(ruta: Path = RUTA_ALMACEN) -> None:
-    """Crea las cuatro tablas del canal si no existen.
+    """Crea las tablas del canal si no existen.
 
     Es idempotente: llamarla dos veces deja el mismo esquema y conserva los
     datos ya escritos.

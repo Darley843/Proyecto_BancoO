@@ -285,6 +285,51 @@ def bifurcar_escenario(
     )
 
 
+def comparar_resultado(
+    original: ResultadoDiagnostico,
+    cambio: CambioEscenario,
+    *,
+    origen: str,
+    calcular: Callable[[EntradaDiagnostico], ResultadoDiagnostico] | None = None,
+) -> tuple[ResultadoDiagnostico, ComparacionEscenario]:
+    """Compara un «¿Y si…?» contra un resultado ya calculado, sin el grafo.
+
+    Es la versión que usa el canal de WhatsApp: el resultado original sale del
+    almacén del canal y no de un hilo de LangGraph. Aplica los mismos límites
+    que `bifurcar_escenario` y no modifica el original.
+
+    Args:
+        original: diagnóstico terminado, con cuota y semáforo.
+        cambio: insumo y valor nuevos.
+        origen: identificador del diagnóstico original (por ejemplo,
+            ``wa:<huella>``); el escenario se nombra ``<origen>:esc``.
+        calcular: motor determinista; por defecto `diagnostico.motor.calcular`.
+
+    Returns:
+        El resultado del escenario y la comparación con el original.
+
+    Raises:
+        EscenarioFueraDeRango: si el original no simula una cuota o el cambio
+            está fuera de los límites.
+    """
+    foto_original = _foto(original)
+    entrada = aplicar_cambio(original.entrada, cambio)
+    motor_calculo = calcular if calcular is not None else motor.calcular
+    resultado = motor_calculo(entrada).model_copy(update={"escenario_de": origen})
+    foto_escenario = _foto(resultado)
+    tendencia = _tendencia(foto_original, foto_escenario)
+    comparacion = ComparacionEscenario(
+        thread_original=origen,
+        thread_escenario=f"{origen}:esc",
+        cambio=cambio,
+        original=foto_original,
+        escenario=foto_escenario,
+        tendencia=tendencia,
+        mensaje=redactar_comparacion(cambio, foto_original, foto_escenario, tendencia),
+    )
+    return resultado, comparacion
+
+
 def redactar_comparacion(
     cambio: CambioEscenario,
     original: FotoResultado,

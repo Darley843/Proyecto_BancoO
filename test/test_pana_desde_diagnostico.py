@@ -44,6 +44,7 @@ from banco_occidente_corpus.pana.tarjetas import (
     DatosDiagnostico,
     DatosNoAplica,
     pesos,
+    porcentaje,
 )
 from banco_occidente_corpus.tablero.tasas import FilaTasa, escribir_tabla
 
@@ -197,6 +198,8 @@ def test_credito_verde_da_tarjeta_de_diagnostico(raiz: Path) -> None:
     assert datos.plazo_meses == 48
     assert datos.cuota_min == resultado.cuota_mensual.desde
     assert datos.cuota_max == resultado.cuota_mensual.hasta
+    assert resultado.tasa_ea is not None
+    assert datos.tasa_ea_pct == (resultado.tasa_ea.hasta * 100).quantize(Decimal("0.01"))
     assert datos.tasa_mensual_pct == (resultado.tasa_mensual.hasta * 100).quantize(Decimal("0.01"))
     assert datos.tasa_vigencia == "nov. 2026"
     assert datos.tasa_fuente == "Tasas publicadas por el Banco de Occidente"
@@ -216,6 +219,17 @@ def test_la_fuente_se_dice_para_la_persona_y_el_texto_cita_el_pdf(raiz: Path) ->
     assert "Tasas publicadas por el Banco de Occidente, nov. 2026" in texto
     assert FUENTE in texto
     assert "Tablero" not in texto
+
+
+def test_el_texto_muestra_primero_la_tasa_efectiva_anual(raiz: Path) -> None:
+    """El texto cita la E.A. y luego la M.V., el estándar del proyecto."""
+    resultado = _credito(raiz)
+    _, texto = tarjeta_y_texto(resultado)
+
+    assert resultado.tasa_ea is not None and resultado.tasa_mensual is not None
+    ea = (resultado.tasa_ea.hasta * 100).quantize(Decimal("0.01"))
+    mv = (resultado.tasa_mensual.hasta * 100).quantize(Decimal("0.01"))
+    assert f"Tasa de referencia: {porcentaje(ea)} E.A. ({porcentaje(mv)} M.V.)" in texto
 
 
 def test_el_ahorro_tambien_cita_el_pdf(raiz: Path) -> None:

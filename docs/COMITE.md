@@ -154,14 +154,16 @@ la síntesis, no las posturas de los agentes.
    texto y **no se convoca al auditor**: no hay posturas que revisar.
 4. Rojo → siempre se ofrece hablar con un asesor (HITL), una sola vez.
 5. Respuesta final: postura de cada agente en una línea, recomendación,
-   hasta dos alternativas y el aviso orientativo. La línea del Auditor se
-   resume para la persona: «Auditor: revisó las cifras y está conforme» cuando
-   la validación determinística pasa —aunque el agente haya objetado antes de
-   la corrección—, o su hallazgo principal si la objeción no se resolvió (en ese
-   caso se usa el texto de respaldo del punto 3). El texto a la persona nunca
-   muestra una objeción del auditor junto a una recomendación deliberada; la
-   objeción original se conserva en `DeliberacionComite.posturas`, que la app
-   muestra en pantalla.
+   hasta dos alternativas y el aviso orientativo. Las posturas se escriben en
+   lenguaje natural («con condiciones», «se abstuvo») y el texto no lleva
+   códigos internos: ni etiquetas de síntesis ni corchetes de escenario. La
+   línea del Auditor se resume para la persona: «Auditor: revisó las cifras y
+   está conforme» cuando la validación determinística pasa —aunque el agente
+   haya objetado antes de la corrección—, o su hallazgo principal si la
+   objeción no se resolvió (en ese caso se usa el texto de respaldo del punto
+   3). El texto a la persona nunca muestra una objeción del auditor junto a una
+   recomendación deliberada; la objeción original se conserva en
+   `DeliberacionComite.posturas`, que la app muestra en pantalla.
 
 Las etiquetas internas de la síntesis son `apto`, `apto_con_condiciones`,
 `no_apto` y `requiere_asesor`; el texto que recibe la persona abre con una

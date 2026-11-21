@@ -11,6 +11,8 @@ pais_por_defecto = "57"
 version_aviso = "2026-11-20"
 limite_intentos_roba = 20
 retencion_dias = 30
+# Minutos que sobrevive una entrevista sin respuesta antes de descartarse.
+entrevista_ttl_minutos = 30
 
 [autorizados]
 # Huellas HMAC-SHA256 de los cinco números de prueba, en hexadecimal.

@@ -37,6 +37,7 @@ EJEMPLO_DIAGNOSTICO = DatosDiagnostico(
     cuota_min=Decimal(150_000),
     cuota_max=Decimal(170_000),
     razon="El pago se lleva entre 30 % y 40 % de lo que te queda libre cada mes.",
+    tasa_ea_pct=Decimal("25.37"),
     tasa_mensual_pct=Decimal("1.9"),
     tasa_vigencia="nov. 2026",
     tasa_fuente=FUENTE_TASAS,

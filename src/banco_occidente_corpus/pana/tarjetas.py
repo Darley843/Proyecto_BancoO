@@ -147,6 +147,8 @@ class DatosDiagnostico(BaseModel):
         cuota_min: límite inferior de lo que se paga al mes.
         cuota_max: límite superior de lo que se paga al mes.
         razon: frase corta que explica el color.
+        tasa_ea_pct: tasa efectiva anual de referencia, en porcentaje; es la
+            primera cifra del texto, por ser el estándar del proyecto.
         tasa_mensual_pct: tasa de referencia mensual, en porcentaje.
         tasa_vigencia: corte de la tasa («nov. 2026»).
         tasa_fuente: de dónde sale la tasa, dicho para la persona
@@ -166,6 +168,7 @@ class DatosDiagnostico(BaseModel):
     cuota_min: Decimal = Field(gt=0)
     cuota_max: Decimal = Field(gt=0)
     razon: str = Field(min_length=1, max_length=110)
+    tasa_ea_pct: Decimal | None = Field(default=None, gt=0, lt=100)
     tasa_mensual_pct: Decimal = Field(gt=0, lt=10)
     tasa_vigencia: str = Field(min_length=1, max_length=30)
     tasa_fuente: str = Field(min_length=1, max_length=60)
@@ -469,6 +472,20 @@ def monto_corto(valor: Decimal) -> str:
 # --- texto equivalente ----------------------------------------------------
 
 
+def _tasa_de_referencia(datos: DatosDiagnostico) -> str:
+    """Escribe la tasa con la efectiva anual primero y la mensual entre paréntesis.
+
+    Args:
+        datos: datos del diagnóstico.
+
+    Returns:
+        ``28,17 % E.A. (2,09 % M.V.)`` o, si no hay E.A., ``2,09 % mensual``.
+    """
+    if datos.tasa_ea_pct is None:
+        return f"{porcentaje(datos.tasa_mensual_pct)} mensual"
+    return f"{porcentaje(datos.tasa_ea_pct)} E.A. ({porcentaje(datos.tasa_mensual_pct)} M.V.)"
+
+
 def texto_diagnostico(datos: DatosDiagnostico) -> str:
     """Escribe el texto que acompaña a la tarjeta del diagnóstico.
 
@@ -486,7 +503,7 @@ def texto_diagnostico(datos: DatosDiagnostico) -> str:
         f"{datos.producto} · {monto_corto(datos.monto)} a {datos.plazo_meses} meses\n"
         f"{datos.razon}\n\n"
         f"Lo que pagarías al mes: *{rango_pesos(datos.cuota_min, datos.cuota_max)}*\n"
-        f"Tasa de referencia: {porcentaje(datos.tasa_mensual_pct)} mensual\n"
+        f"Tasa de referencia: {_tasa_de_referencia(datos)}\n"
         + (
             f"Ahorro mensual estimado: *{pesos(datos.ahorro_mensual)}*\n"
             if datos.ahorro_mensual is not None

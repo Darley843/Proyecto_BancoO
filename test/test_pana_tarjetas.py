@@ -127,7 +127,7 @@ def test_texto_del_diagnostico_lleva_los_mismos_datos() -> None:
     for pieza in (
         TITULO_SEMAFORO["amarillo"],
         "$150.000 – $170.000",
-        "1,9 % mensual",
+        "25,37 % E.A. (1,9 % M.V.)",
         "Tasas publicadas por el Banco de Occidente",
         "nov. 2026",
         "Portátil",
@@ -135,6 +135,13 @@ def test_texto_del_diagnostico_lleva_los_mismos_datos() -> None:
         AVISO,
     ):
         assert pieza in texto, pieza
+
+
+def test_texto_sin_tasa_efectiva_conserva_la_mensual() -> None:
+    """Sin E.A. en los datos, el texto mantiene la tasa mensual como antes."""
+    texto = texto_diagnostico(_diagnostico(tasa_ea_pct=None))
+
+    assert "1,9 % mensual" in texto
 
 
 def test_texto_del_escenario_lleva_los_dos_lados() -> None:

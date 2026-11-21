@@ -90,6 +90,17 @@ ORDEN_POSTURA: dict[str, int] = {
     "favorable": 2,
 }
 
+#: Cómo se escribe cada postura en la recomendación que recibe la persona. La
+#: deliberación interna sigue usando los valores del contrato (`posturas`).
+POSTURA_LEGIBLE: dict[str, str] = {
+    "favorable": "favorable",
+    "con_condiciones": "con condiciones",
+    "desfavorable": "desfavorable",
+    "abstencion": "se abstuvo",
+    "conforme": "conforme",
+    "objeta": "objeta",
+}
+
 #: Valores por defecto si el TOML no trae la sección `[comite]`.
 MAX_LLAMADAS = 4
 MAX_TOKENS_AGENTE = 3_000
@@ -1291,7 +1302,7 @@ def _sintetizar(
 
     return DeliberacionComite(
         posturas=[riesgo, comercial, auditor],
-        recomendacion="\n".join(lineas),
+        recomendacion="\n".join(texto_para_la_persona(linea) for linea in lineas),
         alternativas=list(alternativas)[:MAX_ALTERNATIVAS],
         hallazgos_auditor=list(hallazgos),
         ofrece_asesor=ofrece,
@@ -1317,17 +1328,40 @@ def _etiqueta(riesgo: PosturaAgente, comercial: PosturaAgente) -> str:
     return "apto"
 
 
+def texto_para_la_persona(texto: str) -> str:
+    """Escribe una línea de la recomendación sin códigos internos.
+
+    Las posturas y los códigos de escenario son el vocabulario interno de la
+    deliberación; la persona recibe el mismo contenido en lenguaje natural. Los
+    corchetes de código se eliminan y cualquier identificador snake_case que
+    quede en un argumento del modelo se escribe con espacios.
+
+    Args:
+        texto: línea o párrafo de la recomendación.
+
+    Returns:
+        El texto sin códigos entre corchetes, sin guiones bajos y con los
+        espacios repetidos colapsados.
+    """
+    sin_codigos = _CODIGO.sub("", texto)
+    sin_guiones = _IDENTIFICADOR.sub(
+        lambda coincidencia: coincidencia.group(0).replace("_", " "), sin_codigos
+    )
+    return re.sub(r"[ \t]{2,}", " ", sin_guiones).strip()
+
+
 def _linea_postura(postura: PosturaAgente) -> str:
-    """Escribe la postura de un agente en una línea.
+    """Escribe la postura de un agente en una línea, en lenguaje natural.
 
     Args:
         postura: opinión del agente.
 
     Returns:
-        Texto con el rol, la postura y su primer argumento.
+        Texto con el rol, la postura legible y su primer argumento.
     """
+    legible = POSTURA_LEGIBLE.get(postura.postura, postura.postura.replace("_", " "))
     detalle = f" — {postura.argumentos[0]}" if postura.argumentos else ""
-    return f"{postura.agente.capitalize()}: {postura.postura}{detalle}"
+    return f"{postura.agente.capitalize()}: {legible}{detalle}"
 
 
 def _linea_auditor(postura: PosturaAgente, hallazgos: Sequence[str]) -> str:
@@ -1387,7 +1421,7 @@ def _respuesta_sin_comite(
     lineas.append(resultado.aviso)
     return DeliberacionComite(
         posturas=[posturas[rol] for rol in ROLES],
-        recomendacion="\n".join(lineas),
+        recomendacion="\n".join(texto_para_la_persona(linea) for linea in lineas),
         alternativas=[],
         hallazgos_auditor=list(hallazgos),
         ofrece_asesor=resultado.semaforo == "rojo",

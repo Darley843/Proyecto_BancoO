@@ -187,29 +187,42 @@ def test_el_apagado_suelta_las_transmisiones(modulo_app: ModuleType, tmp_path: P
     suelta.set()
 
 
-def test_crear_app_purga_los_casos_vencidos_del_canal(
+def test_crear_app_purga_los_datos_vencidos_del_canal(
     modulo_app: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """Al arrancar se cumple el plazo de conservación que promete el aviso."""
+    """Al arrancar se cumplen los plazos de casos, entrevista y resultado."""
     monkeypatch.setenv("WHATSAPP_ID_SALT", "sal-de-prueba")
-    creadas: list[dict[str, object]] = []
+    creadas: dict[str, list[dict[str, object]]] = {"maquina": [], "entrevista": []}
     purgas: list[str] = []
 
     class MaquinaFalsa:
         """Reemplazo de la máquina de consentimiento para observar el arranque."""
 
         def __init__(self, *args: object, **kwargs: object) -> None:
-            creadas.append(dict(kwargs))
+            creadas["maquina"].append(dict(kwargs))
 
         def purgar_casos_vencidos(self, momento: object | None = None) -> int:
-            """Anota la purga del arranque."""
-            purgas.append("arranque")
+            """Anota la purga de los casos."""
+            purgas.append("casos")
+            return 0
+
+    class EntrevistaFalsa:
+        """Reemplazo de la entrevista para observar la purga del arranque."""
+
+        def __init__(self, *args: object, **kwargs: object) -> None:
+            creadas["entrevista"].append(dict(kwargs))
+
+        def purgar_vencidos(self, momento: object | None = None) -> int:
+            """Anota la purga de entrevistas y resultados."""
+            purgas.append("entrevista")
             return 0
 
     monkeypatch.setattr(modulo_app, "MaquinaConsentimiento", MaquinaFalsa)
+    monkeypatch.setattr(modulo_app, "EntrevistaCanal", EntrevistaFalsa)
 
     modulo_app.crear_app(tmp_path)
 
-    esperado = cargar_configuracion_canal().retencion_dias
-    assert purgas == ["arranque"]
-    assert creadas and creadas[0]["retencion_dias"] == esperado
+    canal = cargar_configuracion_canal()
+    assert purgas == ["casos", "entrevista"]
+    assert creadas["maquina"][0]["retencion_dias"] == canal.retencion_dias
+    assert creadas["entrevista"][0]["ttl_minutos"] == canal.entrevista_ttl_minutos

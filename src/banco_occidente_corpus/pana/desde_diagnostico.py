@@ -237,6 +237,7 @@ def datos_diagnostico(resultado: ResultadoDiagnostico) -> DatosDiagnostico:
     ):
         raise SinTarjeta("el resultado no tiene una cuota de crédito simulada")
     ahorro = resultado.ahorro_mensual_estimado
+    tasa_ea = _pct(resultado.tasa_ea.hasta) if resultado.tasa_ea is not None else None
     return DatosDiagnostico(
         producto=nombre_producto(entrada.producto),
         monto=entrada.monto_credito,
@@ -245,6 +246,7 @@ def datos_diagnostico(resultado: ResultadoDiagnostico) -> DatosDiagnostico:
         cuota_min=resultado.cuota_mensual.desde,
         cuota_max=resultado.cuota_mensual.hasta,
         razon=_razon_credito(resultado),
+        tasa_ea_pct=tasa_ea,
         tasa_mensual_pct=_pct(resultado.tasa_mensual.hasta),
         tasa_vigencia=vigencia_corta(
             resultado.vigencia_tasa_hasta, vencida="vigencia_vencida" in resultado.alertas

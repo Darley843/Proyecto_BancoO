@@ -32,7 +32,8 @@ from banco_occidente_corpus.canal.almacen import marcar_procesando_como_error
 from banco_occidente_corpus.canal.cola import ColaMensajes
 from banco_occidente_corpus.canal.configuracion import cargar_configuracion_canal
 from banco_occidente_corpus.canal.consentimiento import MaquinaConsentimiento
-from banco_occidente_corpus.canal.despachador import Despachador
+from banco_occidente_corpus.canal.despachador import Despachador, RespuestaGrafo
+from banco_occidente_corpus.canal.entrevista import EntrevistaCanal
 from banco_occidente_corpus.canal.envio import (
     Enviador,
     EnviadorFalso,
@@ -113,8 +114,13 @@ def crear_app(
             version=canal.version_aviso,
             retencion_dias=canal.retencion_dias,
         )
-        # El aviso promete un plazo de conservación: se cumple al arrancar.
+        entrevista = EntrevistaCanal(
+            ruta_canal,
+            ttl_minutos=canal.entrevista_ttl_minutos,
+        )
+        # El aviso promete plazos de conservación: se cumplen al arrancar.
         maquina.purgar_casos_vencidos()
+        entrevista.purgar_vencidos()
 
         def fabrica_enviador(usuario_id: str, destino: str) -> Enviador:
             """Devuelve el enviador falso o el cliente real de Meta."""
@@ -147,8 +153,8 @@ def crear_app(
                     piezas_canal.append(construir_piezas(configuracion, parametros))
                 return piezas_canal[0]
 
-        def responder(pregunta: str, thread_id: str, perfil: str) -> str:
-            """Entrega una pregunta al grafo y devuelve su respuesta."""
+        def responder(pregunta: str, thread_id: str, perfil: str) -> RespuestaGrafo:
+            """Entrega una pregunta al grafo y devuelve su respuesta y su ruta."""
             actuales = obtener_piezas()
             estado = responder_turno(
                 actuales.grafo,
@@ -157,7 +163,10 @@ def crear_app(
                 thread_id,
                 perfil,
             )
-            return str(estado.get("respuesta") or "")
+            return RespuestaGrafo(
+                texto=str(estado.get("respuesta") or ""),
+                avisos=tuple(str(aviso) for aviso in estado.get("avisos") or ()),
+            )
 
         despachador = Despachador(
             config=canal,
@@ -167,6 +176,7 @@ def crear_app(
             cola=cola,
             crear_enviador=fabrica_enviador,
             responder=responder,
+            entrevista=entrevista,
         )
 
     @asynccontextmanager

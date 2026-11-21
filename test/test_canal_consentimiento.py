@@ -13,12 +13,14 @@ from banco_occidente_corpus.canal.consentimiento import (
     ID_ACEPTO,
     ID_RECHAZO,
     LARGO_MAXIMO_AVISO,
+    RETENCION_POR_DEFECTO,
     MaquinaConsentimiento,
     es_revocacion,
     interpretar,
     texto_aviso,
 )
 from banco_occidente_corpus.canal.contratos import MensajeEntrante
+from banco_occidente_corpus.canal.entrevista import TTL_POR_DEFECTO, VIGENCIA_RESULTADO
 
 AHORA = datetime(2026, 11, 17, 12, 0, tzinfo=UTC)
 """Instante fijo de las pruebas."""
@@ -130,10 +132,10 @@ def test_con_consentimiento_el_turno_sigue_al_grafo(tmp_path: Path) -> None:
     assert maquina.decidir(_mensaje("¿cuál es la cuota de manejo?"), USUARIO) is None
 
 
-def test_revocacion_borra_casos_y_conserva_la_prueba_del_consentimiento(
+def test_revocacion_borra_los_datos_del_diagnostico_y_conserva_la_prueba(
     tmp_path: Path,
 ) -> None:
-    """«Olvida mis datos» borra los casos y deja el consentimiento revocado como prueba."""
+    """«Olvida mis datos» borra casos, entrevista y resultado; el consentimiento queda."""
     ruta = tmp_path / "whatsapp.sqlite"
     maquina = _maquina(tmp_path)
     maquina.aceptar(USUARIO, AHORA)
@@ -142,6 +144,21 @@ def test_revocacion_borra_casos_y_conserva_la_prueba_del_consentimiento(
             "INSERT INTO casos (id_caso, usuario_id, motivo, semaforo, resultado_json, "
             "estado, creado_en) VALUES (?, ?, ?, ?, ?, ?, ?)",
             ("caso-1", USUARIO, "solicitud_directa", "amarillo", "{}", "pendiente", "2026-11-17"),
+        )
+        conexion.execute(
+            "INSERT INTO entrevistas (usuario_id, paso, respuestas_json, actualizado_en) "
+            "VALUES (?, ?, ?, ?)",
+            (
+                USUARIO,
+                "objetivo",
+                '{"objetivo": "objetivo.ahorro"}',
+                "2026-11-17T11:59:00+00:00",
+            ),
+        )
+        conexion.execute(
+            "INSERT INTO resultados_diagnostico (usuario_id, resultado_json, guardado_en) "
+            "VALUES (?, ?, ?)",
+            (USUARIO, "{}", "2026-11-17T11:00:00+00:00"),
         )
         conexion.execute(
             "INSERT INTO mensajes (id_mensaje, usuario_id, estado, recibido_en) "
@@ -156,6 +173,8 @@ def test_revocacion_borra_casos_y_conserva_la_prueba_del_consentimiento(
     assert maquina.estado(USUARIO) == ESTADO_SIN_CONSENTIMIENTO
     assert _contar(ruta, "consentimientos") == 1
     assert _contar(ruta, "casos") == 0
+    assert _contar(ruta, "entrevistas") == 0
+    assert _contar(ruta, "resultados_diagnostico") == 0
     assert _contar(ruta, "mensajes") == 1
     with sqlite3.connect(str(ruta)) as conexion:
         version, aceptado_en, revocado_en = conexion.execute(
@@ -241,6 +260,15 @@ def test_el_aviso_cumple_el_deber_de_informar() -> None:
         "¿Autorizas",
     ):
         assert fragmento in AVISO, fragmento
+
+
+def test_los_plazos_de_la_entrevista_y_del_resultado_caben_en_el_aviso() -> None:
+    """El máximo de 30 días sigue siendo cierto: la entrevista vence a los
+    30 minutos y el resultado a las 24 horas, y la purga los borra antes."""
+    maximo = timedelta(days=RETENCION_POR_DEFECTO)
+
+    assert maximo > timedelta(minutes=TTL_POR_DEFECTO)
+    assert maximo > VIGENCIA_RESULTADO
 
 
 def test_el_aviso_cabe_en_un_mensaje_interactivo() -> None:
