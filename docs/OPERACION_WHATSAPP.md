@@ -340,6 +340,25 @@ Los secretos (App Secret, tokens, sal) no se documentan aquí.
 $env:WHATSAPP_MODO = "real"
 ```
 
+### Recorrido simulado (sin Meta)
+
+`make simular` recorre el canal con las personas sintéticas de
+`data/evaluacion/personas_sinteticas.json` sin tocar Meta ni abrir puertos:
+firma cada mensaje, lo entrega al webhook real dentro del proceso y registra las
+respuestas con `EnviadorFalso`. A cada persona le envía el saludo, **Acepto**, su
+entrevista, «¿Y si lo pago en 60 meses?», «olvida mis datos» y un reintento del
+primer mensaje, y verifica una respuesta por turno, el semáforo esperado, la
+tarjeta, la revocación y que el número no quede en la base. Usa un App Secret y
+una sal ficticios y una base temporal, así que no necesita las variables del
+canal ni toca `data/asistente/`. Sin `DEEPSEEK_API_KEY`, amarillo y rojo salen
+sin comité. `--solo <id>` simula una sola persona; el comando termina con
+código 0 si todas pasan.
+
+```powershell
+make simular
+uv run python -m banco_occidente_corpus.simulador --solo pensionado_amarillo
+```
+
 ## Flujo de un mensaje
 
 1. Meta hace `POST /webhooks/whatsapp` con el cuerpo crudo firmado.

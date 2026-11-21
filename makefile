@@ -159,6 +159,10 @@ all: ## Pipeline completo: discover -> fetch -> extract -> gold -> stats
 demo: ## Prueba el pipeline con una pagina local (sin red)
 	$(UV) run python scripts/demo_offline.py
 
+.PHONY: simular
+simular: ## Recorre el canal de WhatsApp con las personas sinteticas y el enviador falso (sin red)
+	$(UV) run python -m banco_occidente_corpus.simulador
+
 .PHONY: deliver
 deliver: gold stats pack ## Genera Gold, el indice y el ZIP del entregable
 	@echo Paquete listo en dist/

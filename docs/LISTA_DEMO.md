@@ -173,7 +173,7 @@ robustez del modelo frente a la inyección se muestra con el caso 5
 | Si falla… | Qué hacer |
 |---|---|
 | El túnel se cae | Reiniciar `cloudflared`, copiar la URL nueva, actualizar el callback en Meta (Nayla o Darley) y verificar (unos 2 minutos) |
-| Meta no entrega los mensajes | Mostrar el flujo con la app web y el simulador: `uv run python -m pytest test/test_simulador_webhook_real.py -q` firma las conversaciones de las personas contra el webhook real; también el video del ensayo |
+| Meta no entrega los mensajes | Mostrar el flujo con la app web y el simulador: `make simular` firma las conversaciones de las personas, las entrega al webhook real con el enviador falso y muestra por persona el semáforo, el comité y el «¿Y si…?»; también el video del ensayo |
 | `ErrorEnvio: destino no autorizado` | Falta la huella del número o cambió la sal: regenerarla, pegarla en `config/whatsapp.toml` y reiniciar la app |
 | DeepSeek falla o se alcanza el tope | Ventanilla en modo demo (`$env:SUCURSAL_DEMO = "1"` y reiniciar la app); el comité se muestra con la corrida grabada del ensayo |
 | Ollama o el índice no responden | La Ventanilla y Roba responden 503: arrancar Ollama, revisar `data/boveda/indice.json` y, si no se recupera, usar capturas o video |
