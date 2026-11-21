@@ -119,6 +119,7 @@ def crear_app(
         entrevista = EntrevistaCanal(
             ruta_canal,
             ttl_minutos=canal.entrevista_ttl_minutos,
+            ruta_latencias=ruta_latencias,
         )
         # El aviso promete plazos de conservación: se cumplen al arrancar.
         maquina.purgar_casos_vencidos()

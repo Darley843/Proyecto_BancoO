@@ -750,3 +750,49 @@ def test_y_si_por_whatsapp_de_punta_a_punta(tmp_path: Path, raiz_tasas: Path) ->
     assert [tipo for tipo, _ in enviador.registro[enviados:]] == ["texto", "imagen"]
     assert "72" in enviador.registro[enviados][1]
     assert _sin_numero_en_la_base(ruta, persona.numero)
+
+
+def _flujos_medidos(ruta: Path) -> list[tuple[str, int]]:
+    """Lee las corridas guardadas en la base de latencias."""
+    if not ruta.exists():
+        return []
+    with sqlite3.connect(str(ruta)) as conexion:
+        return conexion.execute("SELECT flujo, cache FROM latencias").fetchall()
+
+
+def test_completar_mide_el_diagnostico_con_comite_aparte(tmp_path: Path, raiz_tasas: Path) -> None:
+    """El diagnóstico completo se guarda como flujo ``diagnostico`` y una sola vez."""
+    latencias = tmp_path / "latencias.sqlite"
+    entrevista = EntrevistaCanal(
+        tmp_path / "whatsapp.sqlite",
+        hoy=FECHA_CONSULTA,
+        raiz=raiz_tasas,
+        ruta_latencias=latencias,
+    )
+
+    entrevista.completar("u" * 64, "wamid.1", RESPUESTAS_CREDITO)
+
+    assert _flujos_medidos(latencias) == [("diagnostico", 0)]
+
+
+def test_completar_sin_ruta_de_latencias_no_escribe(tmp_path: Path, raiz_tasas: Path) -> None:
+    """Sin ``ruta_latencias`` se diagnostica igual y no se crea ninguna base."""
+    entrevista = EntrevistaCanal(tmp_path / "whatsapp.sqlite", hoy=FECHA_CONSULTA, raiz=raiz_tasas)
+
+    entrevista.completar("u" * 64, "wamid.1", RESPUESTAS_CREDITO)
+
+    assert not (tmp_path / "latencias.sqlite").exists()
+
+
+def test_sin_tasa_publicada_no_cuenta_como_diagnostico(tmp_path: Path) -> None:
+    """Una consulta que no llega al motor no ensucia la latencia del diagnóstico."""
+    latencias = tmp_path / "latencias.sqlite"
+    entrevista = EntrevistaCanal(
+        tmp_path / "whatsapp.sqlite", raiz=tmp_path, ruta_latencias=latencias
+    )
+    respuestas = dict(RESPUESTAS_CREDITO)
+
+    respuesta = entrevista.completar("u" * 64, "wamid.1", respuestas)
+
+    assert respuesta.texto == TEXTO_SIN_TASA
+    assert _flujos_medidos(latencias) == []
