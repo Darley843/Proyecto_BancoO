@@ -150,16 +150,16 @@
 
 ## 9. Integración y cierre — equipo (21–23 nov)
 
-- [ ] 9.1 Ejecutar `make fmt`, `make check` y `make demo`; verificar que lint, tipos, pruebas y pipeline offline pasan al 100 % sin `DEEPSEEK_API_KEY` y con Ollama apagado.
-  > Estado (21 nov): pendiente; es la verificación de cierre y debe correr después de los PR abiertos.
+- [x] 9.1 Ejecutar `make fmt`, `make check` y `make demo`; verificar que lint, tipos, pruebas y pipeline offline pasan al 100 % sin `DEEPSEEK_API_KEY` y con Ollama apagado.
+  > Nota (21 nov): en el computador de la demo, make fmt sin cambios (780 archivos), make check en verde (ruff, ty y 1947 pruebas) y make demo con el pipeline sin red de Bronze a Silver y Gold.
 - [x] 9.2 Ejecutar `make tablero` y `make arqueo`; verificar que el CSV conserva las diez columnas, que aparecen las tasas 2026 con su vigencia, que la cuota se muestra en rango, que el reporte incluye dominio y latencia y que no hay llamadas a DeepSeek.
   > Nota (21 nov): `make tablero` reproducible (632 filas, 10 columnas, 12/12 preguntas verificadas, `tablero.csv` sin cambios) y `make arqueo` regenerado en el computador de la demo con el índice en Qdrant: 1/0 hit@5 0,75 (27/36) y 0/1 0,53 (19/36), más la sección del filtro de dominio del #158.
 - [ ] 9.3 Ejecutar el recorrido sintético completo por el webhook con las seis personas y `EnviadorFalso`: consentimiento, pregunta, diagnóstico, HITL, «¿Y si…?», comité y Roba la Bóveda; verificar que cada respuesta sale una sola vez y que no se envía nada por WhatsApp real.
   > Estado (21 nov): pendiente; depende de 4.1 a 4.5 (HITL). El recorrido base con el enviador falso ya existe en `make simular` (#157).
-- [ ] 9.4 Arrancar `make app` y recorrer las ocho vistas; verificar `/api/operacion`, `/api/roba`, `/api/estado`, `/api/preguntar` y el webhook local contra el contrato.
-  > Estado (21 nov): pendiente; es la verificación manual de cierre.
-- [ ] 9.5 Revisar `git status` y el diff final: sin `data/asistente/*.sqlite`, sin `data/boveda/`, sin `.env`, sin claves, sin cambios en `data/raw/` salvo el PDF de tasas capturado, sin cambios en el resto de `data/gold/` y con `data/gold/tasas/` y `data/estructurados/tablero.csv` regenerados.
-  > Estado (21 nov): pendiente; se hace al cerrar el cambio.
+- [x] 9.4 Arrancar `make app` y recorrer las ocho vistas; verificar `/api/operacion`, `/api/roba`, `/api/estado`, `/api/preguntar` y el webhook local contra el contrato.
+  > Nota (21 nov): make app en el computador de la demo; /health, /api/estado, /api/operacion y /api/roba?sesion=… responden 200 (sin el parámetro sesion, /api/roba responde 422 por diseño). Las ocho vistas cargan con datos; la Ventanilla responde y Roba la Bóveda acepta intentos y actualiza el marcador.
+- [x] 9.5 Revisar `git status` y el diff final: sin `data/asistente/*.sqlite`, sin `data/boveda/`, sin `.env`, sin claves, sin cambios en `data/raw/` salvo el PDF de tasas capturado, sin cambios en el resto de `data/gold/` y con `data/gold/tasas/` y `data/estructurados/tablero.csv` regenerados.
+  > Nota (21 nov): git ls-files no incluye bases SQLite, .env, data/boveda/, data/asistente/ ni archivos de secretos; config/whatsapp.toml conserva las huellas de ejemplo. Las únicas coincidencias del patrón de claves están en el contenido base64 incrustado de docs/arquitectura.html y docs/datos.html (verificado por número de línea): son falsos positivos.
 - [ ] 9.6 Actualizar `CONSTITUTION.md`, `AGENTS.md`, `docs/ESTANDAR.md`, `docs/DIAGNOSTICO.md`, `README.md` y la skill `boveda-rag` con el canal, el diagnóstico, el MCP, Roba la Bóveda, la tabla Gold de tasas 2026 y las nuevas pruebas; verificar que las rutas y comandos documentados existen.
   > Estado (21 nov): pendiente como revisión final, aunque cada PR ya actualizó la documentación de su alcance.
 - [ ] 9.7 Confirmar el congelamiento del sábado 21 con `make check` y `make arqueo` en verde, y cerrar el 23 con la revisión de la sustentación y el `git status` limpio.
