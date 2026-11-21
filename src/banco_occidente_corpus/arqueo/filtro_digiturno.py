@@ -446,14 +446,19 @@ def _porcentaje(valor: float) -> str:
     return f"{valor * 100:.1f}".replace(".", ",") + " %"
 
 
+def _proporcion(datos: Mapping[str, Any]) -> str:
+    """``p % [inf %; sup %]`` de un intervalo del JSON."""
+    return (
+        f"{_porcentaje(datos['proporcion'])} "
+        f"[{_porcentaje(datos['inferior'])}; {_porcentaje(datos['superior'])}]"
+    )
+
+
 def _celda_intervalo(datos: Mapping[str, Any] | None) -> str:
     """``exitos/n (p % [inf %; sup %])`` o una raya si no hay casos."""
     if not datos:
         return "—"
-    return (
-        f"{datos['exitos']}/{datos['n']} ({_porcentaje(datos['proporcion'])} "
-        f"[{_porcentaje(datos['inferior'])}; {_porcentaje(datos['superior'])}])"
-    )
+    return f"{datos['exitos']}/{datos['n']} ({_proporcion(datos)})"
 
 
 def _celda_ids(ids: Sequence[str]) -> str:
@@ -490,8 +495,9 @@ def markdown_dominio(seccion: Mapping[str, Any] | None) -> list[str]:
         "",
         "### Reglas solas (US$ 0, determinista)",
         "",
-        f"Las reglas deciden {cobertura.get('exitos', 0)} de {cobertura.get('n', 0)} casos "
-        f"({_celda_intervalo(cobertura)}). El resto son dudas: en la app las resuelve el "
+        f"Las reglas deciden {cobertura.get('exitos', 0)} de {cobertura.get('n', 0)} casos"
+        + (f" ({_proporcion(cobertura)})" if cobertura else "")
+        + ". El resto son dudas: en la app las resuelve el "
         "modelo, así que no cuentan como error de las reglas.",
         "",
         "| Grupo | Casos | Deciden las reglas | Error entre los que deciden | Casos con error |",
