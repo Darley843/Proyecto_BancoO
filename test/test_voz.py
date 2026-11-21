@@ -8,8 +8,10 @@ memoria, la presentación fija de Pana y los endpoints de la web.
 from __future__ import annotations
 
 import io
+from collections.abc import Callable
 from pathlib import Path
 
+import httpx
 import numpy as np
 import pytest
 import soundfile
@@ -18,6 +20,12 @@ from fastapi.testclient import TestClient
 
 from banco_occidente_corpus.voz import __main__ as muestras
 from banco_occidente_corpus.voz.api import crear_router_voz
+from banco_occidente_corpus.voz.descarga import (
+    TIMEOUT_SEGUNDOS,
+    ErrorDescarga,
+    descargar_modelos,
+    urls_del_modelo,
+)
 from banco_occidente_corpus.voz.presentacion import (
     TEXTO_PRESENTACION,
     es_pedido_de_presentacion,
@@ -422,17 +430,89 @@ def test_muestras_escribe_un_ogg_por_personaje(
     assert sorted(p.stem for p in (tmp_path / "muestras").glob("*.ogg")) == sorted(PERSONAJES)
 
 
-def test_descargar_no_repite_modelos_presentes(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
-) -> None:
-    """Si todos los modelos ya están, no se llama a Piper."""
-    config = ConfiguracionVoz(carpeta=tmp_path)
+def _cliente_falso(pedidos: list[httpx.Request], estado: int = 200) -> Callable[..., httpx.Client]:
+    """Fábrica de clientes httpx que responden sin red y anotan cada pedido."""
+
+    def responder(pedido: httpx.Request) -> httpx.Response:
+        """Devuelve bytes fijos (o el estado pedido) y guarda el pedido."""
+        pedidos.append(pedido)
+        return httpx.Response(estado, content=b"modelo-falso")
+
+    def crear(**opciones: object) -> httpx.Client:
+        """Crea el cliente con el transporte falso y las opciones recibidas."""
+        return httpx.Client(transport=httpx.MockTransport(responder), **opciones)  # type: ignore[arg-type]
+
+    return crear
+
+
+def test_urls_del_modelo() -> None:
+    """La URL sigue la estructura del repositorio de voces de Piper."""
+    onnx, config = urls_del_modelo("es_MX-ald-medium")
+    assert onnx.endswith("/es/es_MX/ald/medium/es_MX-ald-medium.onnx")
+    assert config == onnx + ".json"
+    assert onnx.startswith("https://huggingface.co/rhasspy/piper-voices/resolve/")
+    with pytest.raises(ValueError, match="inválido"):
+        urls_del_modelo("../../otra-cosa")
+
+
+def test_descarga_con_user_agent_from_y_timeout(tmp_path: Path) -> None:
+    """Cada pedido lleva User-Agent, From y timeout; el archivo queda completo."""
+    pedidos: list[httpx.Request] = []
+    bajados = descargar_modelos(
+        ["es_MX-ald-medium"],
+        tmp_path,
+        user_agent="UA-de-prueba",
+        remitente="equipo@ejemplo.edu",
+        crear_cliente=_cliente_falso(pedidos),
+    )
+    assert bajados == ["es_MX-ald-medium"]
+    assert len(pedidos) == 2
+    for pedido in pedidos:
+        assert pedido.headers["User-Agent"] == "UA-de-prueba"
+        assert pedido.headers["From"] == "equipo@ejemplo.edu"
+        assert pedido.extensions["timeout"]["read"] == TIMEOUT_SEGUNDOS
+    assert (tmp_path / "es_MX-ald-medium.onnx").read_bytes() == b"modelo-falso"
+    assert not list(tmp_path.glob("*.parcial"))
+
+
+def test_descarga_no_repite_modelos_presentes(tmp_path: Path) -> None:
+    """Si el .onnx y su .json ya están, no hay pedidos."""
     (tmp_path / "es_MX-ald-medium.onnx").write_bytes(b"x")
-    monkeypatch.setattr(muestras, "cargar_configuracion_voz", lambda: config)
+    (tmp_path / "es_MX-ald-medium.onnx.json").write_bytes(b"{}")
+    pedidos: list[httpx.Request] = []
+    bajados = descargar_modelos(
+        ["es_MX-ald-medium"],
+        tmp_path,
+        user_agent="UA",
+        remitente="equipo@ejemplo.edu",
+        crear_cliente=_cliente_falso(pedidos),
+    )
+    assert bajados == []
+    assert pedidos == []
 
-    def prohibido(*_: object, **__: object) -> None:
-        """La descarga no debe ejecutarse."""
-        raise AssertionError("no debía descargar")
 
-    monkeypatch.setattr(muestras.subprocess, "run", prohibido)
-    assert muestras.main(["descargar"]) == 0
+def test_descarga_fallida_no_deja_archivos(tmp_path: Path) -> None:
+    """Un 404 lanza ErrorDescarga y no deja ni el modelo ni el .parcial."""
+    with pytest.raises(ErrorDescarga, match="404"):
+        descargar_modelos(
+            ["es_MX-ald-medium"],
+            tmp_path,
+            user_agent="UA",
+            remitente="equipo@ejemplo.edu",
+            crear_cliente=_cliente_falso([], estado=404),
+        )
+    assert list(tmp_path.iterdir()) == []
+
+
+def test_descarga_sin_from_se_niega(tmp_path: Path) -> None:
+    """Sin site.contact no se hace ninguna petición."""
+    pedidos: list[httpx.Request] = []
+    with pytest.raises(ValueError, match="From"):
+        descargar_modelos(
+            ["es_MX-ald-medium"],
+            tmp_path,
+            user_agent="UA",
+            remitente=" ",
+            crear_cliente=_cliente_falso(pedidos),
+        )
+    assert pedidos == []

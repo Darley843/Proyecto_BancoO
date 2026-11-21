@@ -5,15 +5,16 @@ personaje, para escucharlas y comprobar que se distinguen antes de la demo. No
 envía nada a ningún servicio. Equivale a ``make voces-prueba``.
 
 ``python -m banco_occidente_corpus.voz descargar`` (``make voz-modelo``) baja
-una sola vez los modelos que nombra ``config/voz.toml``, sin repetirlos.
+una sola vez los modelos que nombra ``config/voz.toml``, sin repetirlos, con
+el User-Agent y el header ``From`` del proyecto (ver ``voz/descarga.py``).
 """
 
 from __future__ import annotations
 
-import subprocess
 import sys
 
-from ..config import PROJECT_ROOT
+from ..config import PROJECT_ROOT, load_config
+from .descarga import ErrorDescarga, descargar_modelos
 from .presentacion import TEXTO_PRESENTACION
 from .sintesis import PERSONAJES, VozNoDisponible, cargar_configuracion_voz, crear_voz
 
@@ -32,21 +33,29 @@ MUESTRAS: dict[str, str] = {
 
 
 def descargar() -> int:
-    """Descarga con Piper los modelos de ``config/voz.toml`` que aún no están.
+    """Descarga los modelos de ``config/voz.toml`` que aún no están.
 
     Returns:
-        El código de salida de la descarga (0 si no faltaba ninguno).
+        0 si quedaron todos; 1 si alguno no se pudo bajar.
     """
     config = cargar_configuracion_voz()
-    faltan = [m for m in config.modelos() if not config.ruta_modelo(m, PROJECT_ROOT).exists()]
-    if not faltan:
-        print("Todas las voces ya están en", config.ruta_modelo("x", PROJECT_ROOT).parent)
-        return 0
+    sitio = load_config().site
     carpeta = config.ruta_modelo("x", PROJECT_ROOT).parent
-    carpeta.mkdir(parents=True, exist_ok=True)
-    print("Descargando:", ", ".join(faltan))
-    orden = [sys.executable, "-m", "piper.download_voices", *faltan, "--data-dir", str(carpeta)]
-    return subprocess.run(orden, check=False).returncode  # noqa: S603
+    try:
+        bajados = descargar_modelos(
+            config.modelos(),
+            carpeta,
+            user_agent=sitio.user_agent,
+            remitente=sitio.contact,
+        )
+    except (ErrorDescarga, ValueError) as error:
+        print(f"No se pudo descargar: {error}")
+        return 1
+    if bajados:
+        print("Descargadas:", ", ".join(bajados))
+    else:
+        print("Todas las voces ya estaban en", carpeta.relative_to(PROJECT_ROOT))
+    return 0
 
 
 def main(argumentos: list[str] | None = None) -> int:

@@ -8,7 +8,7 @@ subtítulos siguen visibles.
 ## Una vez por computador
 
 ```powershell
-make voz-modelo     # descarga los modelos que nombra config/voz.toml (~300 MB)
+make voz-modelo     # descarga los modelos que nombra config/voz.toml (~300 MB, con timeout, User-Agent y From)
 make voces-prueba   # escribe data/modelos/voz/muestras/<personaje>.ogg
 ```
 
@@ -69,3 +69,11 @@ La voz del navegador también es el respaldo cuando Piper falla.
 
 Las pruebas viven en `test/test_voz.py` (con un sintetizador falso: no necesitan
 los modelos).
+
+## Licencia
+
+`piper-tts` es GPL-3.0. El código del proyecto sigue con licencia MIT; quien
+distribuya el proyecto junto con `piper-tts` debe cumplir la GPL-3.0. La
+decisión está en la tabla de decisiones de `CONSTITUTION.md`. Cada
+modelo de voz trae su propia licencia en su `MODEL_CARD` del repositorio de
+voces de Piper.

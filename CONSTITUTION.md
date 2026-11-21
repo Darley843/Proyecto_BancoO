@@ -134,6 +134,17 @@ descarga masiva de PDF, transcripción de vídeo.
 > `robots.txt`/1,5 s; el token vive solo en `WHATSAPP_ACCESS_TOKEN` y el
 > proyecto no lee `.env`.
 
+> **Voces de la escena (Piper):** `make voz-modelo` baja los modelos de voz del
+> repositorio público `huggingface.co/rhasspy/piper-voices` desde
+> `voz/descarga.py`, con `httpx`, `timeout` explícito de 30 s por lectura, el
+> User-Agent de `config/site.toml` y el header `From`. No es scraping del sitio
+> del banco, así que no pasa por `net.py` ni le aplican `robots.txt`/1,5 s. Los
+> modelos quedan en `data/modelos/` y no se versionan. La síntesis es local: el
+> texto nunca sale del computador. **Licencia:** `piper-tts` es GPL-3.0. El
+> código del proyecto sigue con licencia MIT; quien distribuya el proyecto junto
+> con `piper-tts` debe cumplir la GPL-3.0 (decisión registrada en la tabla de
+> decisiones).
+
 > **App del asistente:** `app/web/` es una app estática (HTML, CSS y
 > JavaScript) que consume la API de `sucursal/api.py` y delega toda la lógica en
 > `asistente/` y `sucursal/`; no contiene reglas de negocio ni accede a la red por
@@ -713,6 +724,7 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 | 2026-11-16 | El cliente de Meta vive en `canal/envio.py` y es la única excepción de red fuera de `net.py`: `timeout` explícito, User-Agent y `From`, sin `robots.txt` ni 1,5 s; nunca `verify=False` | La API de Meta no es scraping: no hay `robots.txt` que consultar ni ritmo de cortesía que respetar, pero el `timeout` y la identificación sí son obligatorios. Se documenta en `AGENTS.md` para que GGA no lo marque como violación y en `docs/SEGURIDAD.md` §3.9 con su modelo de amenazas |
 | 2026-11-17 | Digiturno: cuarta letra `D` (diagnóstico) con reglas deterministas en `[digiturno]` antes de la cortesía; el nodo `diagnostico` responde una invitación fija al diagnóstico guiado, sin recuperador, Tablero ni modelo, y la API, la Ventanilla y el Arqueo aceptan la letra (PR #134) | Revisa la decisión del 2026-11-13 de no añadir letras: la intención de diagnóstico no es una búsqueda en la Bóveda ni en el Tablero ni un rechazo, y por motivo quedaba contada como `B` o caía en `X` cuando el modelo la juzgaba fuera de alcance (rechazo indebido en el filtro de dominio). El diagnóstico guiado sigue fuera del grafo, como dice `openspec/changes/corresponsal-whatsapp/design.md`: el nodo solo invita y el canal conduce la entrevista |
 | 2026-11-17 | Digiturno: una duda que el modelo no responde se reintenta una vez y, si sigue sin respuesta, va a `X` (`rechazo:modelo_sin_respuesta`); `tasa` e `intereses` proponen `T`; una pregunta válida con una instrucción incrustada para cambiar o revelar las reglas va a `X` completa (PR #134) | Reemplaza el respaldo a `B` del 2026-11-04: aceptar por defecto era un fallo abierto (fail-open) que dejaba pasar fuera de dominio cuando DeepSeek no respondía. Medido con `arqueo/filtro_digiturno.py` sobre los 114 casos de `data/evaluacion/filtro_dominio.jsonl` (3 corridas con DeepSeek): fuga 0 de 50 antes y después, rechazo indebido de 5 a 1–3 de 50 y frontera de 10 a 14 de 14 (`filtro_dominio_informe_antes.md` y `_despues.md`). El costo del cierre es que una caída del modelo rechaza una pregunta válida, que el cliente puede repetir |
+| 2026-11-21 | Voces de la escena con Piper (`piper-tts`, GPL-3.0) local; la descarga de modelos en `voz/descarga.py` es la segunda excepción de red fuera de `net.py`, con las mismas reglas que la de Meta | Voz sin internet ni costo y distinta por personaje; la descarga cumple `timeout`, User-Agent y `From`; el código sigue MIT y quien distribuya el conjunto con `piper-tts` cumple la GPL-3.0 |
 
 ## 12. Configuración local (no trackear)
 
