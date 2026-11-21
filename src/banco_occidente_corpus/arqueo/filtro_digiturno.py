@@ -72,6 +72,8 @@ RUTA_CONJUNTO: Path = PROJECT_ROOT / "data" / "evaluacion" / "filtro_dominio.jso
 DECIMALES_DOMINIO: int = 6
 #: Motivo del Digiturno cuando ninguna regla decide y el texto es una duda.
 MOTIVO_DUDA = "defecto"
+#: Cómo se muestran las dudas en «Quién decidió»: no son una regla.
+ETIQUETA_DUDA = "sin regla (duda)"
 #: Último informe publicado de la corrida con modelo (lo escribe `medir_varias`).
 RUTA_INFORME_MODELO: Path = (
     PROJECT_ROOT / "data" / "evaluacion" / "filtro_dominio_informe_despues.md"
@@ -332,6 +334,12 @@ def _ruta_visible(ruta: Path) -> str:
         return ruta.name
 
 
+def _origen_legible(turno: Turno) -> str:
+    """Como `origen_turno`, pero las dudas se nombran como tales y no como regla."""
+    origen = origen_turno(turno)
+    return ETIQUETA_DUDA if origen == f"regla {MOTIVO_DUDA}" else origen
+
+
 def leer_corridas_modelo(ruta: Path = RUTA_INFORME_MODELO) -> list[dict[str, int]]:
     """Lee la tabla de corridas del informe con modelo que escribe `medir_varias`.
 
@@ -413,7 +421,7 @@ def seccion_dominio(
         if obtenida is not caso.esperado:
             grupo["ids"].append(caso.id)
 
-    decidio = Counter(origen_turno(turnos[caso.texto]) for caso in casos)
+    decidio = Counter(_origen_legible(turnos[caso.texto]) for caso in casos)
     total = sum(grupo["n"] for grupo in grupos.values())
     deciden = sum(grupo["deciden"] for grupo in grupos.values())
     corridas = leer_corridas_modelo(informe_modelo)

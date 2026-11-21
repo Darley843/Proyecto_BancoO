@@ -14,6 +14,7 @@ import re
 from pathlib import Path
 
 from banco_occidente_corpus.arqueo.filtro_digiturno import (
+    ETIQUETA_DUDA,
     MOTIVO_DUDA,
     RUTA_CONJUNTO,
     RUTA_INFORME_MODELO,
@@ -83,7 +84,8 @@ def test_la_cobertura_suma_los_grupos() -> None:
     assert reglas["cobertura"]["n"] == sum(seccion["casos"].values())
     assert reglas["cobertura"]["exitos"] == sum(g["deciden"] for g in reglas["grupos"].values())
     assert sum(reglas["decidio"].values()) == reglas["cobertura"]["n"]
-    dudas = reglas["decidio"].get(f"regla {MOTIVO_DUDA}", 0)
+    dudas = reglas["decidio"].get(ETIQUETA_DUDA, 0)
+    assert f"regla {MOTIVO_DUDA}" not in reglas["decidio"]
     assert reglas["cobertura"]["exitos"] == reglas["cobertura"]["n"] - dudas
 
 
@@ -148,6 +150,7 @@ def test_el_markdown_pone_lado_a_lado_reglas_y_modelo(tmp_path: Path) -> None:
     fuera = seccion["reglas"]["grupos"]["fuera"]
     assert f"| Fuera de tema (fuga) | {fuera['n']} | {fuera['deciden']}/{fuera['n']} " in texto
     assert "| 2 | 1/50 | 1/50 | 13/14 | 0 |" in texto
+    assert f"{ETIQUETA_DUDA} {seccion['reglas']['decidio'][ETIQUETA_DUDA]}" in texto
     assert "| **Rango** | 0 a 1 de 50 (0,0 a 2,0 %) | 1 a 3 de 50 (2,0 a 6,0 %) |" in texto
 
 
