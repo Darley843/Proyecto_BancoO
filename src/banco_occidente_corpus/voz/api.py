@@ -67,7 +67,7 @@ class PedidoVoz(BaseModel):
     personaje: Personaje = "pana"
 
 
-def _estado(nombre: str, voz: VozPersonaje, piper: bool) -> EstadoPersonaje:
+def _estado(voz: VozPersonaje, piper: bool) -> EstadoPersonaje:
     """Arma el estado público de un personaje (sin rutas ni datos internos)."""
     return EstadoPersonaje(
         motor="navegador" if voz.motor == "navegador" else "piper",
@@ -100,7 +100,6 @@ def crear_router_voz(
     configuradas = personajes or (voz.personajes if voz is not None else {})
     estado = {
         nombre: _estado(
-            nombre,
             configuradas.get(nombre, VOZ_POR_DEFECTO),
             voz is not None
             and configuradas.get(nombre, VOZ_POR_DEFECTO).motor == "piper"
