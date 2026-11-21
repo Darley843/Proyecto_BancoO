@@ -59,3 +59,6 @@ desktop.ini
 *.log
 # Roba la Bóveda
 data/asistente/roba_memoria.sqlite
+
+# Voces de la escena (Piper): se descargan con `make voz-modelo`
+data/modelos/

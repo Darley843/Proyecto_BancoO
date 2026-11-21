@@ -143,6 +143,14 @@ contexto: ## Genera data/contexto/contexto_banco.md y su manifest desde Gold
 app: ## Abre la Sucursal 1965 en http://127.0.0.1:8000 (API + app web)
 	$(UV) run python app.py
 
+.PHONY: voz-modelo
+voz-modelo: ## Descarga una vez las voces de la escena (Piper) que nombra config/voz.toml
+	$(UV) run python -m banco_occidente_corpus.voz descargar
+
+.PHONY: voces-prueba
+voces-prueba: ## Genera data/modelos/voz/muestras/<personaje>.ogg para escuchar cada voz
+	$(UV) run python -m banco_occidente_corpus.voz
+
 .PHONY: evaluar
 evaluar: ## v1: 20 preguntas del alcance -> docs/RESULTADOS_20_PREGUNTAS.md; VERSION=v2: 44 preguntas con el grafo -> docs/RESULTADOS_FASE2.md (requiere DEEPSEEK_API_KEY)
 	$(UV) run python -m banco_occidente_corpus.asistente evaluar $(if $(SOLO),--solo $(SOLO),) $(if $(PAUSA),--pausa $(PAUSA),) $(if $(VERSION),--version $(VERSION),) $(if $(REVALIDAR),--revalidar,)

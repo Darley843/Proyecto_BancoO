@@ -1,0 +1,86 @@
+# Voces de la escena «Pana vs. el gota a gota» (y de Pana en la app web).
+# Texto a voz local con Piper: hablar no usa internet. Los modelos se
+# descargan una vez con `make voz-modelo` en `carpeta`, que no se versiona.
+# Si falta un modelo, la web usa la voz del navegador para ese personaje.
+#
+# Por personaje:
+#   motor     "piper" (voz local, suena igual en cualquier computador) o
+#             "navegador" (una voz instalada en Windows o en el navegador,
+#             por ejemplo una con acento colombiano)
+#   modelo    voz de Piper (archivo <modelo>.onnx en `carpeta`)
+#   hablante  número de hablante, solo en voces con varios (sharvard: 0 y 1)
+#   velocidad menos de 1 habla más rápido, más de 1 más lento
+#   tono      menos de 1 más grave, más de 1 más agudo (1 = natural)
+#   navegador           parte del nombre de la voz del navegador ("" = la
+#                       primera en español); se usa con motor "navegador" y
+#                       como respaldo si Piper falla
+#   tono_navegador      0 a 2 (1 = natural)
+#   velocidad_navegador 0.1 a 10 (1 = natural)
+# Escuchar las de Piper: `make voces-prueba` → data/modelos/voz/muestras/*.ogg
+# Escoger y probar las del navegador: `make app` y abrir
+# http://127.0.0.1:8000/voces.html (copia de ahí las líneas para este archivo).
+
+[voz]
+activa = true
+carpeta = "data/modelos/voz"
+largo_maximo = 900
+
+[personajes.pana]
+# Pana: voz de hombre (Ald, México).
+motor = "piper"
+modelo = "es_MX-ald-medium"
+velocidad = 1.0
+tono = 1.0
+navegador = ""
+tono_navegador = 1.15
+velocidad_navegador = 1.0
+
+[personajes.don_gota]
+motor = "piper"
+modelo = "es_ES-davefx-medium"
+velocidad = 1.1
+tono = 0.85
+navegador = ""
+tono_navegador = 0.6
+velocidad_navegador = 0.9
+
+[personajes.joven]
+# El joven es la persona voluntaria: en la escena habla en persona y no usa
+# esta voz. Queda solo por si el modo de respaldo lee su respuesta.
+motor = "piper"
+modelo = "es_ES-sharvard-medium"
+hablante = 1
+velocidad = 0.95
+tono = 1.1
+navegador = ""
+tono_navegador = 1.35
+velocidad_navegador = 1.05
+
+[personajes.agente_joven]
+motor = "piper"
+modelo = "es_ES-sharvard-medium"
+hablante = 0
+velocidad = 0.95
+tono = 1.0
+navegador = ""
+tono_navegador = 1.0
+velocidad_navegador = 1.1
+
+[personajes.agente_banco]
+# Agente del banco: voz de mujer (Daniela, Argentina).
+motor = "piper"
+modelo = "es_AR-daniela-high"
+velocidad = 1.0
+tono = 1.0
+navegador = ""
+tono_navegador = 1.1
+velocidad_navegador = 0.95
+
+[personajes.auditor]
+motor = "piper"
+modelo = "es_MX-claude-high"
+velocidad = 1.05
+tono = 0.95
+navegador = ""
+tono_navegador = 0.75
+velocidad_navegador = 1.0
