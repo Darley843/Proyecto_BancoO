@@ -186,9 +186,9 @@ El webhook SHALL servirse desde la misma app FastAPI que escucha solo en `127.0.
 - **WHEN** se revisa la configuración y los comandos del canal
 - **THEN** no hay un host público ni un flag para abrirlo
 
-### Requirement: Tarjetas de Pana con imagen
+### Requirement: Tarjeta de Pana junto al texto
 
-El canal SHALL poder acompañar el diagnóstico y el «¿Y si…?» con una tarjeta PNG de Pana, el personaje del asistente. La tarjeta MUST acompañar al texto y MUST NOT reemplazarlo: el texto lleva los mismos datos (semáforo, cuota en rango, tasa con vigencia y fuente, y el aviso). La imagen MUST NOT llevar nombre, número ni documento de la persona, MUST generarse en memoria y MUST NOT guardarse en disco después del envío. El aviso MUST decir que Pana es el asistente de un proyecto académico, no del banco. Se usa Pillow con versión fija y una fuente libre versionada en el repositorio con su licencia. Los stickers quedan fuera de este cambio.
+El canal SHALL poder acompañar el diagnóstico y el «¿Y si…?» con una tarjeta PNG de Pana, el personaje del asistente. La tarjeta MUST acompañar al texto y MUST NOT reemplazarlo: el texto lleva los mismos datos (semáforo, cuota en rango, tasa con vigencia y fuente, y el aviso).
 
 #### Scenario: Texto antes que la imagen
 - **WHEN** la respuesta trae tarjeta y el canal está en modo real o falso
@@ -198,9 +198,17 @@ El canal SHALL poder acompañar el diagnóstico y el «¿Y si…?» con una tarj
 - **WHEN** el envío de la tarjeta falla
 - **THEN** la persona ya recibió el texto con los mismos datos
 
+### Requirement: Imagen sin datos personales y aviso académico
+
+La imagen MUST NOT llevar nombre, número ni documento de la persona, MUST generarse en memoria y MUST NOT guardarse en disco después del envío. El aviso MUST decir que Pana es el asistente de un proyecto académico, no del banco.
+
 #### Scenario: Sin datos personales en la imagen
 - **WHEN** se intenta crear una tarjeta con un teléfono o un documento en un texto, o con un campo de nombre
 - **THEN** la validación lo rechaza y no se genera la imagen
+
+### Requirement: Generación reproducible de la tarjeta
+
+La tarjeta MUST generarse con Pillow en versión fija y una fuente libre versionada en el repositorio con su licencia; los stickers quedan fuera de este cambio.
 
 #### Scenario: Igual en Windows y en la CI
 - **WHEN** se genera la misma tarjeta dos veces
