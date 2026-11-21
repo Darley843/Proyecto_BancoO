@@ -8,7 +8,7 @@
 version_api = "v23.0"
 modo = "falso"  # falso | real
 pais_por_defecto = "57"
-version_aviso = "2026-11"
+version_aviso = "2026-11-20"
 limite_intentos_roba = 20
 retencion_dias = 30
 
