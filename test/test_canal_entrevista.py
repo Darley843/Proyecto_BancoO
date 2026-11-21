@@ -30,6 +30,7 @@ from banco_occidente_corpus.canal.contratos import MensajeEntrante
 from banco_occidente_corpus.canal.despachador import Despachador, RespuestaGrafo
 from banco_occidente_corpus.canal.entrada import extraer_mensajes
 from banco_occidente_corpus.canal.entrevista import (
+    PREGUNTA_HITL,
     TEXTO_SIN_TASA,
     VIGENCIA_RESULTADO,
     EntrevistaCanal,
@@ -497,17 +498,29 @@ def test_persona_completa_la_entrevista_y_recibe_su_semaforo(
         _enviar(payload, despachador)
 
     assert llamadas == ["Hola, quiero hacer el diagnóstico"]
+    esperado = persona.esperado.semaforo
+    if esperado is SemaforoEsperado.ROJO:
+        # El rojo suspende en el HITL: resumen con el semáforo y botones, sin
+        # tarjeta todavía. La tarjeta llega cuando la persona decide.
+        assert enviador.registro[-1][0] == "texto"
+        texto_hitl = enviador.registro[-1][1]
+        assert TITULO_ESPERADO[esperado] in texto_hitl
+        assert PREGUNTA_HITL in texto_hitl
+        assert "asesor" in texto_hitl.casefold()
+        assert despachador.entrevista is not None
+        assert despachador.entrevista._hitl.suspendido(usuario_id) is True
+        assert _paso_guardado(despachador, usuario_id) is None
+        assert _sin_numero_en_la_base(ruta, persona.numero)
+        return
+
     assert [tipo for tipo, _ in enviador.registro[-2:]] == ["texto", "imagen"]
     texto_final = enviador.registro[-2][1]
     assert not CODIGO_INTERNO.search(texto_final)
-    esperado = persona.esperado.semaforo
     if esperado is None:
         assert "Cuenta de ahorros" in texto_final or "CDT" in texto_final
     else:
         assert TITULO_ESPERADO[esperado] in texto_final
-    if persona.esperado.semaforo is SemaforoEsperado.ROJO:
-        assert "asesor" in texto_final.casefold()
-    if persona.esperado.semaforo is SemaforoEsperado.AMARILLO:
+    if esperado is SemaforoEsperado.AMARILLO:
         assert "comité" in texto_final.casefold()
         assert "con condiciones" in texto_final
         assert len(modelo.llamadas) == 3
@@ -544,8 +557,8 @@ def test_si_el_comite_falla_se_responde_con_el_diagnostico(
     for payload in conversacion(persona, preambulo=(CONSENTIMIENTO,)):
         _enviar(payload, despachador)
 
-    assert [tipo for tipo, _ in enviador.registro[-2:]] == ["texto", "imagen"]
-    texto_final = enviador.registro[-2][1]
+    assert [tipo for tipo, _ in enviador.registro[-1:]] == ["texto"]
+    texto_final = enviador.registro[-1][1]
     assert TITULO_ESPERADO[SemaforoEsperado.ROJO] in texto_final
     assert "comité" not in texto_final.casefold()
     assert "asesor" in texto_final.casefold()
