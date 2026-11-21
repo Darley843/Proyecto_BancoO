@@ -24,6 +24,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from ollama import ResponseError
 from pydantic import BaseModel, Field
 
+from ..arqueo.latencia import medir, ruta_por_defecto
 from ..boveda.mapa import ServicioMapa
 from ..config import Config
 from ..panel import pipeline_summary
@@ -247,6 +248,7 @@ def crear_router(
         Roba la Bóveda (`/api/roba`).
     """
     router = APIRouter(prefix="/api")
+    ruta_latencias = ruta_por_defecto(config.paths.root)
     fabrica = piezas or _fabrica_piezas(config, ajustes)
     servicio = ServicioPreguntas(
         config, ajustes, gasto, cache=cache, piezas=lambda: con_avance(fabrica())
@@ -375,14 +377,17 @@ def crear_router(
             La respuesta del contrato o `{"error": {"codigo", "mensaje"}}`.
         """
         peticion = datos or PreguntarRequest()
-        try:
-            respuesta = servicio.preguntar(
-                peticion.pregunta,
-                peticion.thread_id,
-                peticion.perfil_id,
-            )
-        except ErrorSucursal as error:
-            return _error(error)
+        with medir("ventanilla", ruta=ruta_latencias) as corrida:
+            try:
+                respuesta = servicio.preguntar(
+                    peticion.pregunta,
+                    peticion.thread_id,
+                    peticion.perfil_id,
+                )
+            except ErrorSucursal as error:
+                corrida.guardar = False
+                return _error(error)
+            corrida.cache = bool(respuesta.get("cache"))
         return PreguntarRespuesta.model_validate(respuesta)
 
     @router.post("/preguntar/stream", response_model=None)
@@ -406,12 +411,18 @@ def crear_router(
         peticion = datos or PreguntarRequest()
 
         def atender() -> dict[str, Any]:
-            """Atiende el turno y valida el cuerpo con el contrato de la API."""
-            respuesta = servicio.preguntar(
-                peticion.pregunta,
-                peticion.thread_id,
-                peticion.perfil_id,
-            )
+            """Atiende el turno, mide su latencia y valida el cuerpo con el contrato."""
+            with medir("ventanilla", ruta=ruta_latencias) as corrida:
+                try:
+                    respuesta = servicio.preguntar(
+                        peticion.pregunta,
+                        peticion.thread_id,
+                        peticion.perfil_id,
+                    )
+                except Exception:
+                    corrida.guardar = False
+                    raise
+                corrida.cache = bool(respuesta.get("cache"))
             return PreguntarRespuesta.model_validate(respuesta).model_dump(mode="json")
 
         transmision = TransmisionTurno(atender).iniciar()

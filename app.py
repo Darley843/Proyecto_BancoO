@@ -27,6 +27,7 @@ import uvicorn
 from fastapi import FastAPI, Response
 from fastapi.staticfiles import StaticFiles
 
+from banco_occidente_corpus.arqueo.latencia import con_latencia, ruta_por_defecto
 from banco_occidente_corpus.boveda.mapa import ServicioMapa
 from banco_occidente_corpus.canal.almacen import marcar_procesando_como_error
 from banco_occidente_corpus.canal.cola import ColaMensajes
@@ -105,6 +106,7 @@ def crear_app(
     canal = cargar_configuracion_canal()
     sal = os.getenv("WHATSAPP_ID_SALT", "").strip()
     ruta_canal = configuracion.paths.root / "data/asistente/whatsapp.sqlite"
+    ruta_latencias = ruta_por_defecto(configuracion.paths.root)
     cola = ColaMensajes()
     despachador: Despachador | None = None
 
@@ -184,7 +186,7 @@ def crear_app(
         """Arranca y detiene el trabajador del canal con la app."""
         if despachador is not None:
             marcar_procesando_como_error(ruta_canal)
-            cola.iniciar(despachador.procesar)
+            cola.iniciar(con_latencia("webhook", despachador.procesar, ruta=ruta_latencias))
         try:
             yield
         finally:

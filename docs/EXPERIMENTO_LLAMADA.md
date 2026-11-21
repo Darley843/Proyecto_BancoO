@@ -7,7 +7,7 @@ OpenSpec `corresponsal-whatsapp`, tarea 8.1 y decisión 17. Responsable: Yoldy.
 | Fecha de la decisión | 2026-11-20 (viernes; la prueba estaba planeada para el martes 17) |
 | Número de negocio | Número de prueba de Meta (*Public Test Number*) del canal |
 | Resultado | La prueba en vivo no se ejecutó: el tiempo se usó en el canal de texto. El análisis previo muestra que el audio en tiempo real no cabe antes del sábado 21. |
-| Decisión | **Aplazado** |
+| Decisión | **Aplazado sin ejecutar la prueba** |
 
 > Este documento no guarda números de teléfono, tokens ni capturas con datos personales (Ley 1581 de 2012).
 
@@ -61,9 +61,11 @@ Tiempo máximo de la prueba: **2 horas**. Si al cumplirse no hay audio, se regis
 | **Aplazado** | El evento de llamada llega (paso 4), pero el audio en tiempo real no cabe en el plazo. Se documenta como trabajo futuro. |
 | **Descartado** | Meta exige medio de pago o verificación, o el número de prueba no ofrece llamadas, o no llega el evento. |
 
+Ninguno de los tres criterios se puede aplicar tal cual, porque la prueba no se ejecutó y nunca llegó el evento de la llamada (paso 4). Por eso el resultado se registra como **aplazado sin ejecutar la prueba**: no se adopta ni se descarta, queda como trabajo futuro con el protocolo de la sección 3 listo para correrlo.
+
 ## 6. Decisión y justificación
 
-**Aplazado** como trabajo futuro. Según las fuentes, el número de prueba puede activar llamadas, pero contestar exige una pila WebRTC en el servidor (ICE, DTLS, SRTP y OPUS) y encadenar voz a texto, el grafo y texto a voz con baja latencia. Con el congelamiento el sábado 21, ese trabajo no cabe sin quitar tiempo al canal de texto, que ya recibe mensajes por el webhook. Las notas de voz quedan como alternativa más barata si el equipo la aprueba.
+**Aplazado sin ejecutar la prueba**, como trabajo futuro. Según las fuentes, el número de prueba puede activar llamadas, pero contestar exige una pila WebRTC en el servidor (ICE, DTLS, SRTP y OPUS) y encadenar voz a texto, el grafo y texto a voz con baja latencia. Con el congelamiento el sábado 21, ese trabajo no cabe sin quitar tiempo al canal de texto, que ya recibe mensajes por el webhook. Las notas de voz quedan como alternativa más barata si el equipo la aprueba.
 
 **Hipótesis antes de probar:** lo más probable es **aplazado o descartado**. Aunque la señalización sea posible, contestar exige montar WebRTC en el servidor y encadenar voz a texto, el grafo y texto a voz con baja latencia, que es más trabajo del que cabe hasta el sábado 21. El resto del cambio (canal de texto, diagnóstico, HITL, comité, Roba la Bóveda) no depende de esta decisión.
 
