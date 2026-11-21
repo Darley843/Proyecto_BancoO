@@ -14,8 +14,8 @@ esta lista se escribe en el repositorio, en capturas ni en el chat del grupo.
 
 ### Código y entorno
 
-- [ ] `main` al día y con los PR de la demo fusionados: #139 (Ley 1581),
-      #149 (entrevista por WhatsApp), el HITL con el asesor y la latencia, si
+- [ ] `main` al día y con los PR de la demo fusionados: #139 (Ley 1581) y
+      #149 (entrevista por WhatsApp). El HITL con el asesor y la latencia, si
       ya entraron.
 - [ ] En la máquina de la demo:
   ```powershell
@@ -128,7 +128,10 @@ curl.exe "https://<url-del-tunel>/webhooks/whatsapp?hub.mode=subscribe&hub.verif
       canal antes de mostrar la vista Operación. Con menos de 30 corridas por
       flujo, p50 y p95 se marcan como muestra insuficiente (`MINIMO_CORRIDAS`
       en `sucursal/operacion.py`). Es correcto mostrarlo así, pero con 30 la
-      cifra ya es concluyente.
+      cifra ya es concluyente. El ensayo general ya produce esos mensajes,
+      porque cada botón de la entrevista cuenta como uno. Como mezclan pasos
+      rápidos con diagnósticos de unos 4 s, p50 y p95 son del canal completo;
+      separarlos por flujo queda para el #150.
 
 ## 3. Prueba de humo, en el orden de la demo
 
@@ -143,17 +146,22 @@ curl.exe "https://<url-del-tunel>/webhooks/whatsapp?hub.mode=subscribe&hub.verif
 | 7 | Entrevista con la persona `empleada_verde` | Verde y tarjeta de Pana |
 | 8 | Entrevista con `pensionado_amarillo` | La recomendación del comité llega completa en una sola respuesta (unos 4 s) |
 | 9 | Entrevista con `independiente_rojo` | Comité y prueba de estrés; mientras no entre el HITL, la oferta de asesor es solo texto |
-| 10 | «¿Y si lo pago en 60 meses?» (si entró) | Tarjeta de antes y después |
+| 10 | «¿Y si lo pago en 60 meses?» | Tarjeta de antes y después |
 | 11 | «Olvida mis datos» | Confirmación de revocación; el siguiente `hola` vuelve a pedir el aviso |
 | 12 | Web → Ventanilla: «¿me alcanza para un crédito?» | Ticket **D** verde |
 | 13 | Web → Roba la Bóveda: las tres ideas | Defensa resistida; **Exportar resumen** descarga el JSON sin datos personales |
 | 14 | Web → Operación | Mensajes, consentimientos, casos y Roba con datos reales; p50 y p95 del canal después del calentamiento |
 | 15 | Comité en pantalla: `uv run python scripts/demo_comite.py` | Posturas de Riesgo, Comercial y Auditor; costo y tiempo |
 
-Los pasos 6 a 11 necesitan la entrevista por WhatsApp (#149) en `main`. En la
-web, la Ventanilla sigue mostrando el ticket `D` (paso 12). Las respuestas de las entrevistas salen
-de `data/evaluacion/personas_sinteticas.json`.
+Los pasos 6 a 11 usan la entrevista por WhatsApp (#149). En la web, la
+Ventanilla sigue mostrando el ticket `D` (paso 12). Las respuestas de las
+entrevistas salen de `data/evaluacion/personas_sinteticas.json`.
 Se usan **solo datos inventados**: nadie escribe sus ingresos reales.
+
+Durante la entrevista se responde con los botones o la lista: un texto libre
+repite la pregunta. «Cancelar» la deja, «nuevo» la reinicia y una entrevista a
+medias vence a los 30 minutos (`entrevista_ttl_minutos`). El «¿Y si…?» del paso
+10 compara contra el último diagnóstico del mismo número, durante 24 horas.
 
 Para la sustentación de Roba la Bóveda: en modo demo mide sobre todo las
 **defensas determinísticas** (puerta de PII, Digiturno y respuestas fijas). La
