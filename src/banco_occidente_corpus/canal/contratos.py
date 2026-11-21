@@ -303,7 +303,7 @@ class CasoAsesor(BaseModel):
     id_caso: str
     usuario_id: str
     motivo: str
-    semaforo: Literal["verde", "amarillo", "rojo"]
+    semaforo: Literal["verde", "amarillo", "rojo", "pendiente"]
     resultado: ResultadoDiagnostico | None = None
     creado_en: datetime
     estado: Literal["pendiente", "contactado", "descartado", "cerrado"] = "pendiente"
