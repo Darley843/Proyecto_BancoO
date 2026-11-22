@@ -30,7 +30,7 @@ from banco_occidente_corpus.canal.entrevista import (
     EntrevistaCanal,
 )
 from banco_occidente_corpus.canal.envio import EnviadorFalso
-from banco_occidente_corpus.canal.hitl import HitlAsesor
+from banco_occidente_corpus.canal.hitl import HitlAsesor, limpiar_hilo
 from banco_occidente_corpus.canal.identidad import calcular_usuario_id
 from banco_occidente_corpus.tablero.tasas import FilaTasa, escribir_tabla
 
@@ -255,3 +255,29 @@ def test_sin_action_valida_la_reanudacion_falla(tmp_path: Path) -> None:
     assert hitl.reanudar("u" * 64, "otra") is None  # type: ignore[arg-type]
     assert hitl.suspendido("u" * 64) is True
     assert listar_casos(ruta) == ()
+
+
+def test_revocar_limpia_el_hilo_suspendido(tmp_path: Path, raiz: Path) -> None:
+    """«Olvida mis datos» no deja el HITL suspendido en la base."""
+    ruta = tmp_path / "whatsapp.sqlite"
+    hitl = HitlAsesor(ruta)
+    usuario = "u" * 64
+    hitl.suspender(usuario, motivo="semaforo_rojo", semaforo="rojo")
+    maquina = MaquinaConsentimiento(ruta)
+    maquina.aceptar(usuario, AHORA)
+
+    respuesta = maquina.decidir(_mensaje("olvida mis datos"), usuario)
+
+    assert respuesta is not None
+    assert hitl.suspendido(usuario) is False
+    assert listar_casos(ruta) == ()
+
+
+def test_limpiar_hilo_sin_tablas_del_saver_no_falla(tmp_path: Path) -> None:
+    """Una base sin checkpoint se deja como está, sin lanzar error."""
+    ruta = tmp_path / "vacia.sqlite"
+    ruta.touch()
+
+    limpiar_hilo(ruta, "u" * 64)
+
+    assert ruta.exists()

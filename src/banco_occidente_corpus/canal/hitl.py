@@ -90,6 +90,29 @@ def config_hilo(usuario_id: str) -> dict[str, Any]:
     return {"configurable": {"thread_id": f"{PREFIJO_HILO}{usuario_id}{SUFIJO_HILO}"}}
 
 
+def limpiar_hilo(ruta: Path, usuario_id: str) -> None:
+    """Borra el checkpoint del HITL de una persona, si existe.
+
+    Se usa al revocar («olvida mis datos») para no dejar el caso suspendido en
+    la base. No compila el grafo: abre el saver y borra el hilo directamente, y
+    no falla si la persona nunca llegó al HITL.
+
+    Args:
+        ruta: base `whatsapp.sqlite` del canal.
+        usuario_id: huella HMAC del número.
+    """
+    if not ruta.exists():
+        return
+    conexion = sqlite3.connect(str(ruta), check_same_thread=False)
+    try:
+        SqliteSaver(conexion).delete_thread(f"{PREFIJO_HILO}{usuario_id}{SUFIJO_HILO}")
+    except sqlite3.OperationalError:
+        # La base todavía no tiene las tablas del checkpointer.
+        return
+    finally:
+        conexion.close()
+
+
 @dataclass
 class HitlAsesor:
     """Suspende el turno y crea o descarta el caso de asesor.
@@ -180,14 +203,12 @@ class HitlAsesor:
         return abrir_caso(self.ruta, usuario_id, motivo, semaforo="pendiente")
 
     def limpiar(self, usuario_id: str) -> None:
-        """Borra el checkpoint de la persona, si el saver lo permite.
+        """Borra el checkpoint del HITL de la persona, si existe.
 
         Args:
             usuario_id: huella HMAC del número.
         """
-        borrar = getattr(self._grafo.checkpointer, "delete_thread", None)
-        if borrar is not None:
-            borrar(config_hilo(usuario_id)["configurable"]["thread_id"])
+        limpiar_hilo(self.ruta, usuario_id)
 
     def _ofrecer(self, estado: EstadoHitl) -> dict[str, Any]:
         """Suspende el turno y devuelve la acción elegida al reanudar."""

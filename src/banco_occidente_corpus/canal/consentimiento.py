@@ -7,10 +7,11 @@ para poder auditar qué texto se aceptó.
 
 «Olvida mis datos» revoca la autorización y borra los datos del diagnóstico:
 los casos, el avance de la entrevista, el último resultado guardado para el
-«¿Y si…?» y el perfil del store. La fila del consentimiento **no se borra**:
-queda con ``revocado_en`` como prueba de la autorización (Decreto 1377 de 2013,
-art. 8); solo guarda la huella, la versión del aviso y las fechas. El id de
-deduplicación se conserva porque no contiene datos personales.
+«¿Y si…?», el hilo suspendido del HITL y el perfil del store. La fila del
+consentimiento **no se borra**: queda con ``revocado_en`` como prueba de la
+autorización (Decreto 1377 de 2013, art. 8); solo guarda la huella, la versión
+del aviso y las fechas. El id de deduplicación se conserva porque no contiene
+datos personales.
 
 El plazo máximo del aviso (``retencion_dias``, 30 por defecto) sigue siendo
 cierto: la entrevista se purga a los ``entrevista_ttl_minutos`` sin actividad y
@@ -34,6 +35,7 @@ from typing import Literal
 
 from .almacen import conectar, inicializar_almacen
 from .contratos import BotonCanal, MensajeEntrante, RespuestaCanal
+from .hitl import limpiar_hilo
 
 #: El usuario todavía no aceptó el aviso.
 ESTADO_SIN_CONSENTIMIENTO = "sin_consentimiento"
@@ -194,10 +196,10 @@ class MaquinaConsentimiento:
         """Revoca la autorización y borra los datos del diagnóstico.
 
         Borra los casos, el avance de la entrevista, el último resultado del
-        «¿Y si…?» y el perfil del store. La fila del consentimiento se conserva
-        con ``revocado_en`` como prueba de la autorización (Decreto 1377 de
-        2013, art. 8). No contiene datos personales: solo la huella, la versión
-        del aviso y las fechas.
+        «¿Y si…?», el hilo suspendido del HITL y el perfil del store. La fila del
+        consentimiento se conserva con ``revocado_en`` como prueba de la
+        autorización (Decreto 1377 de 2013, art. 8). No contiene datos
+        personales: solo la huella, la versión del aviso y las fechas.
 
         Args:
             usuario_id: huella del número.
@@ -215,6 +217,7 @@ class MaquinaConsentimiento:
             conexion.execute(
                 "DELETE FROM resultados_diagnostico WHERE usuario_id = ?", (usuario_id,)
             )
+        limpiar_hilo(self.ruta, usuario_id)
         if self.borrar_perfil is not None:
             self.borrar_perfil(usuario_id)
 

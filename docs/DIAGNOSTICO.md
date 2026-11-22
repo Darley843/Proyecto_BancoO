@@ -59,6 +59,8 @@ grafo mínimo de dos nodos en `canal/hitl.py`, porque `interrupt()` y
 - **Descartar:** no crea caso, cierra el turno y agradece.
 - **Una segunda pulsación:** responde el aviso de «no hay caso pendiente» y no
   duplica la fila.
+- **«Olvida mis datos»:** revoca el consentimiento y borra también el hilo
+  suspendido, así no queda un caso a medias en la base.
 - **Solicitud directa:** «quiero un asesor» a mitad de la entrevista abre el
   caso con semáforo `pendiente` y deja la entrevista.
 
