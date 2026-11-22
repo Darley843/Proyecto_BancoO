@@ -8,7 +8,7 @@ Ver `proposal.md` para la motivación. El estado actual que condiciona el diseñ
 - `diagnostico/motor.py` convierte los ids de la entrevista en una `EntradaDiagnostico` y devuelve un `ResultadoDiagnostico` con cuota, tasa E.A., totales, semáforo, razón de endeudamiento, margen y aviso. `diagnostico/calculo.py` hace la aritmética en `Decimal` y lee la tabla Gold de tasas.
 - `diagnostico/comite.py` ya tiene `PosturaAgente`, `EscenarioComite`, `construir_escenarios` y `auditar`, con las comprobaciones de cifras duras, promesas de aprobación, productos, PII y aviso orientativo.
 - `config/tasas.toml` tiene la usura vigente, su fuente y su resolución; `tablero/tasas.py` la valida.
-- `app/web/` es una SPA con vistas que se cargan por `import()` desde `app.js`; `app.py` registra los routers antes de montar los estáticos y escucha solo en `127.0.0.1`.
+- `app/web/` es una SPA con vistas que se cargan por `import()` desde `app.js`; `app.py` registra los routers antes de montar los estáticos y escucha solo en `127.0.0.1`. La escena **no** entra en esa SPA: el PR #169 de Yoldy (rama `feat/pantalla-escena`) añade la página aparte `app/web/escena.html` con sus módulos en `app/web/escena/`, pensada para proyectar a pantalla completa.
 - `simulador/` recorre el canal de WhatsApp con el enviador falso; `make simular` no se toca.
 - Restricciones duras: solo `uv`; sin `.env`; sin secretos en el repositorio; sin datos personales; sin cambios en Bronze, Silver, Gold, tasas ni Bóveda; pruebas sin red, sin DeepSeek y sin Ollama; toda función pública con anotaciones y docstring en español.
 - Calendario: revisión y congelamiento del contrato el **domingo 22 de noviembre**; construcción del lunes 23 al miércoles 25; ensayo general y congelamiento el **jueves 26 a las 18:00**; demo el **viernes 27**.
@@ -216,6 +216,8 @@ Invariantes:
 5. El auditor **MUST** revisar todos los turnos y su veredicto **MUST** ser la última palabra sobre el cierre.
 6. La escena **MUST NOT** persistir el perfil del voluntario ni grabar audio.
 
+La página `app/web/escena.html` valida del lado del cliente con `app/web/escena/contrato.js`, espejo de `TurnoEscena`: `fuente` con `tipo` y `referencia`, `valor_legible`, `unidad`, los cinco orígenes (`guion_fijo`, `motor`, `llm`, `reglas`, `entrada_voz`), el `escenario` completo y el `veredicto` del auditor en un campo aparte del `semaforo`. Ese espejo **MUST** seguir al contrato de Python; si diverge, la página no pinta el turno.
+
 `CifraEscena.valor` usa la misma convención que el motor: las tasas son fracciones (`0.2834` es 28,34 % E.A.) y los pesos son unidades. `valor_legible` es el texto que se muestra; la plantilla y la tarjeta usan el mismo `valor_legible` para que no diverjan.
 
 Ejemplo de turno de Pana:
@@ -370,7 +372,9 @@ La mesa no incluye el estrés como oferta; el auditor puede citarlo como prueba,
 
 ### 7. Pantalla, voces, avatares y subtítulos
 
-- Nueva vista `#escena` en `app/web/index.html` y `app/web/vistas/escena.js`, con el patrón de `mostrarVista` y `crearTexto`; no se reescribe la SPA.
+- La pantalla es la **página aparte** `app/web/escena.html` (PR #169 de Yoldy), con `app/web/escena/escena.js`, `escena.css`, `rostros.js`, `contrato.js` y `turnos-ejemplo.json`. No es una vista `#escena` de la SPA y **MUST NOT** añadir enlaces ni secciones a `app/web/index.html`; la página se abre directo en `http://127.0.0.1:8000/escena.html`, sin el resto del sitio alrededor, para proyectar.
+- `app/web/escena/contrato.js` es el espejo de cliente de `TurnoEscena`: `fuente` con `tipo` y `referencia`, `valor_legible`, `unidad`, los orígenes `guion_fijo`, `motor`, `llm`, `reglas` y `entrada_voz`, el `escenario` completo y el veredicto del auditor en un campo aparte del `semaforo`. Se alinea con `escena/contratos.py` y con la salida de `make escena-proyectada`.
+- `turnos-ejemplo.json` es solo andamio de maquetación. Cuando exista `make escena-proyectada`, se reemplaza por su salida real (`data/escena/proyectado.json`) y la página deja de depender de datos escritos a mano.
 - Reutiliza `app/web/voz.js`: cada turno llama `decirComo(turno.personaje, turno.texto, {alTerminar, soloSubtitulos})`. El `personaje` del contrato es la misma clave de `config/voz.toml` y de `PERSONAJES`.
 - Avatares vectoriales locales; Pana reutiliza `dibujar_pana` si entra el endpoint de avatar, y si no, un SVG consistente. El que habla se ilumina; los demás se atenúan.
 - Subtítulos grandes, `aria-live`, alto contraste y botones: **Siguiente**, **Solo subtítulos**, **Núcleo**, **Perfil seguro**, **Reiniciar**. Teclado: espacio/Enter avanza, `S` subtítulos, `N` núcleo.
@@ -441,7 +445,7 @@ make check
 make escena-proyectada
 make voces-prueba
 make app
-# abrir http://127.0.0.1:8000/#escena
+# abrir http://127.0.0.1:8000/escena.html
 # modo demo sin modelo:
 $env:SUCURSAL_DEMO = "1"; make app
 ```
@@ -469,7 +473,7 @@ $env:SUCURSAL_DEMO = "1"; make app
 - `test_escena_auditor.py`: `auditar_texto` conserva el comportamiento del comité; reglas nuevas; `conforme`/`con_observaciones`/`objeta`; `objeta` bloquea el cierre verde; alternativas formales.
 - `test_escena_estres.py`: 100 perfiles aleatorios con semilla y los extremos; mutaciones de cifra, fuente, promesa, gota, semáforo y PII; el auditor nunca deja pasar un hallazgo alto.
 - `test_escena_entrada.py`: letras, montos, confirmación, ambigüedad, monto fuera de rango y datos personales.
-- `test_escena_api.py` y `test_app_web.py`: opciones, voluntario con semilla, interpretar, escena, negociación, proyectado, router montado y vista servida; sin red.
+- `test_escena_api.py` y `test_app_web.py`: opciones, voluntario con semilla, interpretar, escena, negociación, proyectado, router montado y `app/web/escena.html` servida con `contrato.js`; sin red.
 - `test_seguridad.py`: `data/escena/` ignorado; sin secretos ni PII en `config/escena.toml`; el servidor sigue en loopback.
 
 ## Risks / Trade-offs
@@ -490,7 +494,7 @@ $env:SUCURSAL_DEMO = "1"; make app
 2. **Lunes 23 a miércoles 25**: implementación por dueño, con `make check` en verde en cada rama.
 3. **Jueves 26, 18:00**: congelamiento; no entran cambios funcionales. Ensayo general con un voluntario distinto al del día de la demo.
 4. **Viernes 27, 08:00**: preflight en el computador de la demo (`uv sync`, `make check`, `make escena-proyectada`, `make voces-prueba`, `make app`, Gold vigente, clave de DeepSeek solo en la sesión, sin secretos).
-5. **Rollback**: si la escena falla, no se toca el resto de la Sucursal; se usa el JSON de `data/escena/` y el modo solo subtítulos. El código de la escena queda aislado en `escena/` y se puede desactivar quitando el router y el enlace de la vista.
+5. **Rollback**: si la escena falla, no se toca el resto de la Sucursal; se usa el JSON de `data/escena/` y el modo solo subtítulos. El código de la escena queda aislado en `escena/` y `app/web/escena.html` se puede desactivar quitando el router y la página, sin tocar la SPA.
 
 ## Open Questions
 

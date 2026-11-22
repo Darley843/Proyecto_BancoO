@@ -14,7 +14,7 @@ Hoy existen las piezas sueltas: el motor del diagnóstico, el comité y su audit
 - Añadir la **negociación** entre el agente del joven y el agente del banco: máximo cuatro turnos sobre escenarios precalculados por el motor, 15 segundos en total y 4 segundos por llamada. El LLM solo elige un código de la mesa y un argumento sin cifras; la aceptación la decide el código y los umbrales del semáforo no se mueven.
 - Añadir el **auditor de la escena** con reglas en código, reutilizando las comprobaciones de `diagnostico/comite.py`: cifras que existan, fuentes presentes, ninguna promesa de aprobación, ninguna recomendación del gota a gota, ningún cambio de semáforo y ningún dato personal. Su veredicto usa `conforme`, `con_observaciones` u `objeta`, sin colores, para no confundirlo con el semáforo del crédito.
 - Añadir la **entrada por voz** del voluntario para las cuatro preguntas con letras A–F (monto, ingresos, gastos y deudas), el monto declarado, la confirmación de Pana, la elección aleatoria de fila y silla y los perfiles seguros preparados.
-- Añadir la **pantalla** `#escena` con avatares, voces, subtítulos grandes, panel de trazabilidad y modo de respaldo con solo subtítulos y clics.
+- Añadir la **pantalla** `app/web/escena.html` como página aparte (PR #169 de Yoldy), con avatares, voces, subtítulos grandes, panel de trazabilidad y modo de respaldo con solo subtítulos y clics. No es una vista `#escena` de la SPA.
 - Añadir `make escena-proyectada`, un objetivo **aparte** de `make simular`, que genera la escena de respaldo sin DeepSeek y sin red. No se modifica `make simular`.
 - Mantener el plan B en vivo: escena completa → núcleo Don Gota/Pana/auditor → solo subtítulos y clics → perfil seguro → capturas como último recurso.
 
@@ -32,12 +32,12 @@ Ninguna. No se modifican requisitos de las capacidades existentes. La extracció
 
 ## Impact
 
-- **Código nuevo**: `src/banco_occidente_corpus/escena/` con contratos Pydantic, cálculo de Don Gota, comparación, mesa de escenarios, negociación, auditor, perfiles, servicio, API y CLI. Vista nueva `app/web/vistas/escena.js` y estilos.
-- **Código tocado**: `app.py` (router de la escena antes de los estáticos), `app/web/index.html` (enlace y sección `#escena`), `asistente/prompts.py` (dos tareas de negociación), `diagnostico/comite.py` (extracción de `auditar_texto`), `makefile` (`escena-proyectada`), `.gitignore` (`data/escena/`).
+- **Código nuevo**: `src/banco_occidente_corpus/escena/` con contratos Pydantic, cálculo de Don Gota, comparación, mesa de escenarios, negociación, auditor, perfiles, servicio, API y CLI. Pantalla aparte `app/web/escena.html` con sus módulos en `app/web/escena/` y sus estilos; la SPA no se toca.
+- **Código tocado**: `app.py` (router de la escena antes de los estáticos), `asistente/prompts.py` (dos tareas de negociación), `diagnostico/comite.py` (extracción de `auditar_texto`), `makefile` (`escena-proyectada`), `.gitignore` (`data/escena/`).
 - **Configuración nueva**: `config/escena.toml` con el banco de frases de Don Gota, la mesa, el auditor, los perfiles seguros y la UI; `config/prompts/negociacion_joven_v1.md` y `negociacion_banco_v1.md`. Sin secretos y sin datos personales.
 - **Datos generados**: `data/escena/proyectado.json` y `data/escena/nucleo.json`, fuera de Git. La escena en vivo no se persiste; los perfiles seguros son ficticios y versionados.
 - **Dependencias**: ninguna nueva. Se reutilizan `langchain`/DeepSeek, `FastAPI`, `Pydantic`, Piper y la voz del navegador. El reconocimiento de voz usa la API del navegador, con aviso de posible servicio externo y respaldo por teclado.
-- **Pruebas**: unitarias del gota, la comparación, la negociación y el parser; integración de la API; auditor con mutaciones; estrés con perfiles al azar y extremos; humo de la vista. Todas sin red, sin DeepSeek y sin Ollama.
+- **Pruebas**: unitarias del gota, la comparación, la negociación y el parser; integración de la API; auditor con mutaciones; estrés con perfiles al azar y extremos; humo de la página `escena.html`. Todas sin red, sin DeepSeek y sin Ollama.
 - **Riesgos controlados**: el voluntario puede no cooperar o el micrófono fallar (perfil seguro y teclado); DeepSeek puede tardar o fallar (política determinista y núcleo); la voz puede fallar (solo subtítulos y clics); la tasa puede faltar o estar vencida (aviso, sin cifras inventadas, el auditor no da `conforme`).
 
 ## Out of Scope
