@@ -2738,3 +2738,18 @@ main:focus {
 }
 
 /* --- fin roba --- */
+
+/* ---------- Probador de voces (/voces.html) ---------- */
+.probador { background: var(--fondo); color: var(--texto); }
+.probador__contenido { max-width: var(--ancho); margin: 0 auto; padding-block: 24px 48px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; gap: 20px; }
+.probador__cabecera p { max-width: 70ch; color: var(--texto-suave); }
+.probador__aviso { color: var(--aviso); }
+.probador__acciones { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; }
+.probador__lista { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; }
+.probador__tarjeta { background: var(--superficie); border: 1px solid var(--borde); border-radius: var(--radio); padding: 16px; display: grid; gap: 10px; min-width: 0; }
+.probador__tarjeta h2 { margin: 0; font-size: 1.1rem; color: var(--azul); }
+.probador__campo { display: grid; gap: 4px; font-size: 0.9rem; }
+.probador__campo select, .probador__campo input:not([type="range"]) { font: inherit; padding: 6px 8px; border: 1px solid var(--borde); border-radius: 6px; background: var(--superficie); color: var(--texto); min-width: 0; }
+.probador button { font: inherit; font-weight: 600; padding: 8px 14px; border-radius: 8px; border: 0; background: var(--azul); color: var(--texto-sobre-azul); cursor: pointer; }
+.probador .probador__secundario { background: transparent; color: var(--azul); border: 1px solid var(--azul); }
+.probador__resultado textarea { width: 100%; box-sizing: border-box; font-family: var(--fuente-cifras); font-size: 0.85rem; padding: 10px; border: 1px solid var(--borde); border-radius: 6px; background: var(--superficie); color: var(--texto); }

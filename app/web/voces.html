@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Probador de voces · Sucursal 1965</title>
+  <meta name="description" content="Escoger y probar la voz de cada personaje de la escena «Pana vs. el gota a gota».">
+  <link rel="stylesheet" href="estilos.css">
+  <script type="module" src="voces.js"></script>
+</head>
+<body class="probador">
+  <main class="probador__contenido">
+    <header class="probador__cabecera">
+      <h1>Probador de voces</h1>
+      <p>Escoge cómo suena cada personaje de la escena «Pana vs. el gota a gota». <strong>Piper</strong> es la voz local del proyecto y suena igual en cualquier computador. <strong>Voz del navegador</strong> usa las voces instaladas en este computador (en Windows, por ejemplo, una voz de Colombia si está instalada).</p>
+      <p>Cuando te guste, copia las líneas de abajo y pégalas en <code>config/voz.toml</code>, en la sección de cada personaje. Luego reinicia <code>make app</code>.</p>
+      <p class="probador__aviso" id="aviso-voces" aria-live="polite"></p>
+    </header>
+
+    <div class="probador__acciones">
+      <button type="button" id="escuchar-todos">Escuchar a todos en orden</button>
+      <button type="button" id="detener" class="probador__secundario">Detener</button>
+    </div>
+
+    <section class="probador__lista" id="lista" aria-label="Personajes"></section>
+
+    <section class="probador__resultado" aria-labelledby="titulo-toml">
+      <h2 id="titulo-toml">Líneas para config/voz.toml</h2>
+      <p>Cambia solo las líneas que aparecen aquí; deja el <code>modelo</code>, la <code>velocidad</code> y el <code>tono</code> de Piper como están.</p>
+      <textarea id="toml" rows="14" readonly spellcheck="false" aria-label="Líneas para config/voz.toml"></textarea>
+      <div class="probador__acciones">
+        <button type="button" id="copiar">Copiar las líneas</button>
+        <span id="copiado" aria-live="polite"></span>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

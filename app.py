@@ -8,7 +8,7 @@ host público.
 La API (``/api/...``) se registra en :func:`crear_app` **antes** de montar los
 estáticos, porque el montaje en ``/`` atiende todo lo que no haya reclamado una
 ruta anterior. Expone estado, Tablero, Bóveda, pipeline, Arqueo, Vestíbulo,
-``POST /api/preguntar`` y ``GET /health``: el grafo y sus dependencias se
+las voces de la escena, ``POST /api/preguntar`` y ``GET /health``: el grafo y sus dependencias se
 construyen en la primera pregunta, nunca al importar este módulo.
 
 La app web vive en ``app/web/`` y consume la API; la lógica del asistente está en
@@ -56,6 +56,13 @@ from banco_occidente_corpus.sucursal.costo import CacheRespuestas, GastoDiario
 from banco_occidente_corpus.sucursal.grafo import responder_turno
 from banco_occidente_corpus.sucursal.preguntar import PiezasGrafo, construir_piezas
 from banco_occidente_corpus.sucursal.transmision import cerrar_transmisiones
+from banco_occidente_corpus.voz.api import crear_router_voz
+from banco_occidente_corpus.voz.sintesis import (
+    VozEscena,
+    cargar_configuracion_voz,
+    crear_voz,
+    modelos_disponibles,
+)
 
 HOST = "127.0.0.1"
 PUERTO = 8000
@@ -92,12 +99,14 @@ def crear_app(
     cache: CacheRespuestas | None = None,
     piezas: Callable[[], PiezasGrafo] | None = None,
     mapa_boveda: ServicioMapa | None = None,
+    voz: VozEscena | None = None,
 ) -> FastAPI:
     """Crea la app FastAPI de la sucursal y monta la app web en ``/``.
 
     ``carpeta_web`` se puede cambiar en las pruebas para servir otra carpeta;
-    ``config``, ``ajustes``, ``cache``, ``piezas`` y ``mapa_boveda`` permiten
-    inyectar rutas, topes, un grafo simulado y un mapa sin tocar la red.
+    ``config``, ``ajustes``, ``cache``, ``piezas``, ``mapa_boveda`` y ``voz``
+    permiten inyectar rutas, topes, un grafo simulado, un mapa y unas voces sin
+    tocar la red ni los modelos de Piper.
     """
     configuracion = config or load_config()
     parametros = ajustes or cargar_configuracion_sucursal()
@@ -107,6 +116,12 @@ def crear_app(
     sal = os.getenv("WHATSAPP_ID_SALT", "").strip()
     ruta_canal = configuracion.paths.root / "data/asistente/whatsapp.sqlite"
     ruta_latencias = ruta_por_defecto(configuracion.paths.root)
+    config_voz = cargar_configuracion_voz()
+    if voz is not None:
+        voces, voces_disponibles = voz, None
+    else:
+        voces = crear_voz(config_voz, configuracion.paths.root)
+        voces_disponibles = modelos_disponibles(config_voz, configuracion.paths.root)
     cola = ColaMensajes()
     despachador: Despachador | None = None
 
@@ -209,6 +224,9 @@ def crear_app(
             piezas=piezas,
             mapa_boveda=mapa_boveda,
         )
+    )
+    app.include_router(
+        crear_router_voz(voces, voces_disponibles, None if voz else config_voz.personajes)
     )
     app.include_router(crear_router_canal(despachador.recibir if despachador is not None else None))
 
