@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Pana vs. el gota a gota · Sucursal 1965</title>
+  <meta name="description" content="Pantalla de la escena en vivo: los agentes hablan con voz y subtítulos.">
+  <link rel="stylesheet" href="escena/escena.css">
+  <script type="module" src="escena/escena.js"></script>
+</head>
+<body class="escena">
+  <main class="escena__pantalla" aria-label="Escena Pana vs. el gota a gota">
+    <header class="escena__barra">
+      <nav class="escena__pasos" id="escena-pasos" aria-label="Pasos de la escena"></nav>
+      <span class="escena__sello" id="escena-sello" hidden>Turnos de ejemplo</span>
+    </header>
+
+    <section class="escena__personajes" id="escena-personajes" aria-label="Personajes"></section>
+
+    <aside class="escena__panel" aria-label="Cifras de la escena">
+      <h2>Escenario</h2>
+      <div class="escena__chips" id="escena-escenario"></div>
+      <div class="escena__semaforo" id="escena-semaforo" data-color="">
+        <span class="escena__luz escena__luz--rojo"></span>
+        <span class="escena__luz escena__luz--amarillo"></span>
+        <span class="escena__luz escena__luz--verde"></span>
+        <span id="escena-semaforo-texto">Semáforo sin calcular</span>
+      </div>
+      <h2>Cifras</h2>
+      <p class="escena__vacio" id="escena-sin-cifras">Las cifras aparecen cuando las dice un personaje.</p>
+      <table class="escena__tabla">
+        <tbody id="escena-cifras"></tbody>
+      </table>
+      <div id="escena-caja-hallazgos" hidden>
+        <h2>Auditor</h2>
+        <p class="escena__conforme" id="escena-conforme">Sin objeciones: las cifras existen y cuadran.</p>
+        <ul class="escena__hallazgos" id="escena-hallazgos"></ul>
+      </div>
+    </aside>
+
+    <section class="escena__subtitulos" aria-live="polite" aria-label="Subtítulos">
+      <div class="escena__hablante" id="escena-quien"></div>
+      <p class="escena__texto" id="escena-texto">Cargando la escena…</p>
+    </section>
+  </main>
+
+  <div class="escena__controles">
+    <button type="button" id="escena-reproducir">Empezar</button>
+    <button type="button" id="escena-siguiente" class="escena__boton--secundario">Siguiente turno</button>
+    <button type="button" id="escena-reiniciar" class="escena__boton--secundario">Reiniciar</button>
+    <label class="escena__casilla" for="escena-solo-subtitulos">
+      <input type="checkbox" id="escena-solo-subtitulos">
+      Solo subtítulos (respaldo)
+    </label>
+    <span class="escena__estado" id="escena-contador"></span>
+    <span class="escena__estado" id="escena-voz"></span>
+    <span class="escena__estado">Teclas: Espacio siguiente · P reproducir/pausar · S subtítulos · R reiniciar</span>
+  </div>
+</body>
+</html>

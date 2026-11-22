@@ -1,0 +1,269 @@
+{
+  "descripcion": "Turnos de ejemplo de la escena «Pana vs. el gota a gota». Datos inventados; las cifras usan la tasa máxima de libre inversión y la usura de noviembre de 2026 de config/tasas.toml. En la escena real los turnos vienen del orquestador.",
+  "turnos": [
+    {
+      "personaje": "pana",
+      "texto": "¡Hola! Soy Pana. Hoy no hay diapositivas: la escena la hacemos los agentes. Necesito a alguien del público… fila tres, silla cinco.",
+      "cifras": [],
+      "escenario": {
+        "monto": 0,
+        "plazo": 0,
+        "semaforo": ""
+      },
+      "origen": "guion",
+      "hallazgos": []
+    },
+    {
+      "personaje": "pana",
+      "texto": "Invéntate un personaje. ¿Para qué necesitas la plata? A, estudio. B, un computador. C, una emergencia.",
+      "cifras": [],
+      "escenario": {
+        "monto": 0,
+        "plazo": 0,
+        "semaforo": ""
+      },
+      "origen": "guion",
+      "hallazgos": []
+    },
+    {
+      "personaje": "joven",
+      "texto": "B, un computador. Necesito un millón de pesos.",
+      "cifras": [],
+      "escenario": {
+        "monto": 0,
+        "plazo": 0,
+        "semaforo": ""
+      },
+      "origen": "guion",
+      "hallazgos": []
+    },
+    {
+      "personaje": "pana",
+      "texto": "Listo: un millón de pesos a seis meses para un computador. Ya tengo tus cuatro respuestas.",
+      "cifras": [
+        {
+          "nombre": "monto",
+          "valor": 1000000,
+          "fuente": "motor"
+        },
+        {
+          "nombre": "plazo_meses",
+          "valor": 6,
+          "fuente": "motor"
+        }
+      ],
+      "escenario": {
+        "monto": 1000000,
+        "plazo": 6,
+        "semaforo": ""
+      },
+      "origen": "motor",
+      "hallazgos": []
+    },
+    {
+      "personaje": "don_gota",
+      "texto": "Tranquilo, parcero, yo le presto ya mismo, sin papeles ni historial. Solo es el veinte por ciento al mes.",
+      "cifras": [
+        {
+          "nombre": "tasa_mensual_don_gota",
+          "valor": 0.2,
+          "fuente": "simulador"
+        },
+        {
+          "nombre": "tea_don_gota",
+          "valor": 7.9161,
+          "fuente": "simulador"
+        },
+        {
+          "nombre": "cuota_don_gota",
+          "valor": 300706,
+          "fuente": "simulador"
+        },
+        {
+          "nombre": "total_don_gota",
+          "valor": 1804234,
+          "fuente": "simulador"
+        }
+      ],
+      "escenario": {
+        "monto": 1000000,
+        "plazo": 6,
+        "semaforo": ""
+      },
+      "origen": "guion",
+      "hallazgos": []
+    },
+    {
+      "personaje": "pana",
+      "texto": "Veinte por ciento al mes suena poquito, pero en tasa efectiva anual es 791,6 por ciento. La usura de este mes es 28,3 por ciento. Con Don Gota pagarías 1.804.234 pesos en total.",
+      "cifras": [
+        {
+          "nombre": "tasa_mensual_don_gota",
+          "valor": 0.2,
+          "fuente": "simulador"
+        },
+        {
+          "nombre": "tea_don_gota",
+          "valor": 7.9161,
+          "fuente": "simulador"
+        },
+        {
+          "nombre": "cuota_don_gota",
+          "valor": 300706,
+          "fuente": "simulador"
+        },
+        {
+          "nombre": "total_don_gota",
+          "valor": 1804234,
+          "fuente": "simulador"
+        },
+        {
+          "nombre": "tea_banco",
+          "valor": 0.2817,
+          "fuente": "Tablero"
+        },
+        {
+          "nombre": "cuota_banco",
+          "valor": 179067,
+          "fuente": "motor"
+        },
+        {
+          "nombre": "total_banco",
+          "valor": 1074402,
+          "fuente": "motor"
+        },
+        {
+          "nombre": "usura",
+          "valor": 0.2834,
+          "fuente": "Tablero"
+        }
+      ],
+      "escenario": {
+        "monto": 1000000,
+        "plazo": 6,
+        "semaforo": ""
+      },
+      "origen": "motor",
+      "hallazgos": []
+    },
+    {
+      "personaje": "agente_joven",
+      "texto": "Mi cliente puede pagar hasta doscientos mil pesos al mes sin dejar de comer. ¿Qué plazo le ofrecen?",
+      "cifras": [
+        {
+          "nombre": "tea_banco",
+          "valor": 0.2817,
+          "fuente": "Tablero"
+        },
+        {
+          "nombre": "cuota_banco",
+          "valor": 179067,
+          "fuente": "motor"
+        },
+        {
+          "nombre": "total_banco",
+          "valor": 1074402,
+          "fuente": "motor"
+        },
+        {
+          "nombre": "usura",
+          "valor": 0.2834,
+          "fuente": "Tablero"
+        }
+      ],
+      "escenario": {
+        "monto": 1000000,
+        "plazo": 6,
+        "semaforo": ""
+      },
+      "origen": "modelo",
+      "hallazgos": []
+    },
+    {
+      "personaje": "agente_banco",
+      "texto": "A seis meses, con la tasa publicada de libre inversión, la cuota es de 179.067 pesos. Le cabe.",
+      "cifras": [
+        {
+          "nombre": "tea_banco",
+          "valor": 0.2817,
+          "fuente": "Tablero"
+        },
+        {
+          "nombre": "cuota_banco",
+          "valor": 179067,
+          "fuente": "motor"
+        },
+        {
+          "nombre": "total_banco",
+          "valor": 1074402,
+          "fuente": "motor"
+        },
+        {
+          "nombre": "usura",
+          "valor": 0.2834,
+          "fuente": "Tablero"
+        }
+      ],
+      "escenario": {
+        "monto": 1000000,
+        "plazo": 6,
+        "semaforo": "verde"
+      },
+      "origen": "modelo",
+      "hallazgos": []
+    },
+    {
+      "personaje": "auditor",
+      "texto": "Revisé las cifras: la cuota coincide con el motor y la tasa está por debajo de la usura. Semáforo verde. Es una orientación, no una aprobación.",
+      "cifras": [
+        {
+          "nombre": "tasa_mensual_don_gota",
+          "valor": 0.2,
+          "fuente": "simulador"
+        },
+        {
+          "nombre": "tea_don_gota",
+          "valor": 7.9161,
+          "fuente": "simulador"
+        },
+        {
+          "nombre": "cuota_don_gota",
+          "valor": 300706,
+          "fuente": "simulador"
+        },
+        {
+          "nombre": "total_don_gota",
+          "valor": 1804234,
+          "fuente": "simulador"
+        },
+        {
+          "nombre": "tea_banco",
+          "valor": 0.2817,
+          "fuente": "Tablero"
+        },
+        {
+          "nombre": "cuota_banco",
+          "valor": 179067,
+          "fuente": "motor"
+        },
+        {
+          "nombre": "total_banco",
+          "valor": 1074402,
+          "fuente": "motor"
+        },
+        {
+          "nombre": "usura",
+          "valor": 0.2834,
+          "fuente": "Tablero"
+        }
+      ],
+      "escenario": {
+        "monto": 1000000,
+        "plazo": 6,
+        "semaforo": "verde"
+      },
+      "origen": "reglas",
+      "hallazgos": []
+    }
+  ]
+}
