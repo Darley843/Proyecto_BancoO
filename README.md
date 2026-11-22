@@ -875,15 +875,7 @@ Resultados vigentes y respuestas completas de v1:
 │   ├── asistente/             # Q&A, FAQ, resumen y evaluación con DeepSeek
 │   ├── boveda/               # fragmentos, embeddings, índice Qdrant y recuperador
 │   ├── sucursal/             # digiturno (B/T/X/D), grafo y API de la fase 2
-│   ├── tablero/              # tarifario, tasas 2026 y tablas de Gold → data/estructurados/tablero.csv
-│   ├── canal/                # WhatsApp: webhook, firma, consentimiento, entrevista y envío
-│   ├── diagnostico/          # motor, semáforo, comité y «¿Y si…?»
-│   ├── pana/                 # personaje y tarjetas del resultado
-│   ├── roba/                 # Roba la Bóveda: clasificador, marcador y API
-│   ├── arqueo/               # métricas: recuperación, filtro de dominio y latencia
-│   ├── mcp_servidor/         # servidor MCP de solo lectura
-│   ├── simulador/            # personas sintéticas para recorrer el canal sin red
-│   └── voz/                  # voces de la escena con Piper
+│   └── tablero/              # tarifario y tablas de Gold → data/estructurados/tablero.csv
 ├── scripts/                   # demo_offline.py · scrape_empresa.py · tasks.py
 ├── config/ · data/ · docs/    # configuración, capas y documentación
 ├── config/sucursal.toml       # embeddings y recuperación de la fase 2
