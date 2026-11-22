@@ -15,10 +15,18 @@ código `tasa_no_disponible`; la escena no inventa una tasa.
 
 El turno de Pana se parte en tres plantillas fijas y cortas: el golpe (el
 supuesto de 36 renovaciones, el total de Don Gota frente al banco y cuántas
-veces más), la tasa (la E.A. de Don Gota, las veces la usura y la tasa máxima
-del banco) y la ley (artículo 305 y usura vigente con su período). Ninguno lo
-genera un modelo. Cada cifra del texto lleva su `CifraEscena` y su
-`FuenteCifra`.
+veces el total del banco), la tasa (la E.A. de Don Gota, las veces la usura y
+la tasa máxima del banco) y la ley (artículo 305 y usura vigente con su
+período). Ninguno lo genera un modelo. Cada cifra del texto lleva su
+`CifraEscena` y su `FuenteCifra`.
+
+El monto del voluntario se pasa al motor tal cual. Si queda fuera de
+`monto_minimo`/`monto_maximo` de `config/diagnostico.toml`, `motor.calcular`
+**no** valida ese rango —la validación vive en `diagnostico.escenarios`—: la
+comparación se calcula igual y ese caso queda para el 5.5 del plan. Lo que sí
+se propaga es `ValueError` si el monto no es positivo o el motor no puede
+simular el crédito, `pydantic.ValidationError` si la entrada no cumple el
+contrato y `TasaNoDisponible` si el Tablero no publica la tasa.
 """
 
 from __future__ import annotations
@@ -69,6 +77,13 @@ def comparar_gota_banco(
     monto del préstamo, 36 meses y `empleado`, para que la comparación use
     exactamente el mismo escenario.
 
+    El monto de `prestamo` se usa tal cual. `motor.calcular` no aplica los
+    límites `monto_minimo`/`monto_maximo` del diagnóstico: un monto fuera de
+    rango no lanza ninguna excepción aquí, la simulación se hace igual y el
+    caso queda para el 5.5 (Darley). Solo se propagan `ValidationError`/
+    `ValueError` si el monto no es positivo o el motor no puede simular el
+    crédito, y `TasaNoDisponible` si falta la tasa del producto.
+
     Args:
         prestamo: préstamo de Don Gota ya calculado con el mismo monto.
         entrada: insumos del diagnóstico del perfil.
@@ -84,7 +99,8 @@ def comparar_gota_banco(
 
     Raises:
         TasaNoDisponible: si el Tablero no publica la tasa de libre inversión.
-        ValueError: si el motor no pudo simular el crédito del banco.
+        ValueError: si el motor no pudo simular el crédito del banco o si la
+            usura certificada no trae una tasa E.A. positiva.
     """
     datos = entrada.model_dump()
     datos.update(
@@ -97,25 +113,32 @@ def comparar_gota_banco(
         }
     )
     entrada_banco = EntradaDiagnostico.model_validate(datos)
+    # El rango de monto del motor no se valida en `motor.calcular` (vive en
+    # `diagnostico.escenarios`): un monto fuera de límites sigue de largo y el
+    # caso queda para el 5.5; aquí solo se propagan ValidationError/ValueError
+    # por un monto no positivo y TasaNoDisponible si falta la tasa.
     resultado = motor.calcular(entrada_banco, hoy=hoy, raiz=raiz)
     banco = _datos_banco(resultado)
     ajustes = config_tasas if config_tasas is not None else cargar_config_tasas(ruta_tasas)
     usura = ajustes.usura
     certificada = usura.certificada
 
-    usura_ea: Decimal | None = Decimal(usura.tasa_ea) if certificada else None
+    usura_ea: Decimal | None = None
     usura_vigencia: str | None = None
     fuente_usura: FuenteCifra | None = None
     veces_usura: Decimal | None = None
     if certificada:
+        tasa_usura = Decimal(usura.tasa_ea)
+        if tasa_usura <= 0:
+            raise ValueError("la usura certificada debe traer una tasa E.A. positiva")
+        usura_ea = tasa_usura
         usura_vigencia = f"{usura.vigencia_desde.isoformat()}/{usura.vigencia_hasta.isoformat()}"
         fuente_usura = FuenteCifra(
             tipo="usura",
             referencia="config/tasas.toml#usura.tasa_ea",
             vigencia=usura_vigencia,
         )
-        assert usura_ea is not None
-        veces_usura = _cuantizar(prestamo.tasa_ea / usura_ea, 2)
+        veces_usura = _cuantizar(prestamo.tasa_ea / tasa_usura, 2)
 
     total_gota = prestamo.total_pagado_horizonte
     total_banco = banco["total_pagado"]
@@ -194,13 +217,13 @@ def turnos_pana_comparacion(
     total_banco = formatear_pesos(comparacion.total_banco)
     tasa_gota = formatear_tasa_ea(comparacion.tasa_ea_gota)
     tasa_banco = formatear_tasa_ea(comparacion.tasa_ea_banco)
-    veces_total_texto = str(int(_cuantizar(veces_total, 0)))
+    veces_total_texto, veces_total_frase = _texto_veces_total(veces_total)
     supuesto_texto = SUPUESTO_RENOVACION[0].upper() + SUPUESTO_RENOVACION[1:]
 
     texto_golpe = (
         f"{supuesto_texto}, con Don Gota pagarías "
         f"{total_gota} por {monto}; con el banco, a {plazo} meses, {total_banco}. "
-        f"Es casi {veces_total_texto} veces más."
+        f"Es {veces_total_frase} veces lo que pagarías con el banco."
     )
     cifras_golpe = (
         _cifra(
@@ -414,6 +437,28 @@ def _fuente_config(campo: str) -> FuenteCifra:
         La fuente con la ruta y la clave del TOML.
     """
     return FuenteCifra(tipo="config", referencia=f"config/escena.toml#gota.{campo}")
+
+
+def _texto_veces_total(valor: Decimal) -> tuple[str, str]:
+    """Escribe el ratio del total como «6», «casi 6» o «más de 6».
+
+    Redondea al entero más cercano: si redondea hacia arriba dice «casi» y si
+    redondea hacia abajo dice «más de», para no presentar un 6,3 como «casi 6»
+    ni un 5,7 como «más de 6». El número que se cita es el del valor legible de
+    la cifra y aparece en el texto del turno.
+
+    Args:
+        valor: veces que el total de Don Gota supera el del banco.
+
+    Returns:
+        El número que cita la cifra y la frase que acompaña a «veces».
+    """
+    cercano = int(_cuantizar(valor, 0))
+    if valor == Decimal(cercano):
+        return str(cercano), str(cercano)
+    if valor < Decimal(cercano):
+        return str(cercano), f"casi {cercano}"
+    return str(cercano), f"más de {cercano}"
 
 
 def _formatear_veces(valor: Decimal) -> str:

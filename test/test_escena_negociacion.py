@@ -43,6 +43,7 @@ from banco_occidente_corpus.escena.negociacion import (
     modo_demo,
     negociar,
 )
+from banco_occidente_corpus.sucursal.ajustes import leer_modo_demo
 from banco_occidente_corpus.tablero.tasas import FilaTasa, escribir_tabla
 
 #: Vigencia de la tabla Gold de prueba.
@@ -536,6 +537,37 @@ def test_un_argumento_con_lenguaje_de_aprobacion_se_descarta(raiz_tasas: Path) -
     assert resultado.acuerdo is not None
 
 
+@pytest.mark.parametrize(
+    ("argumento", "marca"),
+    [
+        ("Queda garantizado por el banco", "garantizado"),
+        ("Tranquilo: te lo aprueban hoy", "aprueban"),
+        ("Es como el gota a gota, pero formal", "gota"),
+        ("Don Gota te lo presta sin papeles", "Gota"),
+    ],
+)
+def test_un_argumento_con_promesas_o_gota_a_gota_se_descarta(
+    raiz_tasas: Path,
+    argumento: str,
+    marca: str,
+) -> None:
+    """Las promesas del comité y el gota a gota no llegan al turno."""
+    modelo = ModeloNegociacion(
+        [
+            {"codigo": "base", "decision": "propongo", "argumento": argumento},
+            {"codigo": "base", "decision": "recomiendo", "argumento": "Cabe con holgura."},
+        ]
+    )
+
+    resultado = _negociar_modelo(_verde(), modelo, raiz_tasas)
+
+    primer = resultado.negociacion.turnos[0]
+    assert marca not in primer.texto
+    assert primer.origen == "llm"
+    assert any("argumento descartado" in linea for linea in resultado.negociacion.registro)
+    assert resultado.acuerdo is not None
+
+
 def test_un_argumento_que_repite_la_plantilla_se_descarta(raiz_tasas: Path) -> None:
     """Si el argumento repite las palabras del turno, se usa solo la plantilla."""
     modelo = ModeloNegociacion(
@@ -667,6 +699,13 @@ def test_modo_demo_lee_la_bandera_y_la_clave() -> None:
     assert modo_demo({}) is True
     assert modo_demo({"DEEPSEEK_API_KEY": "prueba"}) is False
     assert modo_demo({"DEEPSEEK_API_KEY": "prueba", "SUCURSAL_DEMO": "1"}) is True
+
+
+def test_modo_demo_acepta_los_mismos_valores_que_la_sucursal() -> None:
+    """La escena y la Sucursal leen SUCURSAL_DEMO con la misma función."""
+    for bandera in ("1", "true", "TRUE", "si", "sí", " Sí ", "0", "no", ""):
+        entorno = {"DEEPSEEK_API_KEY": "clave-de-prueba", "SUCURSAL_DEMO": bandera}
+        assert modo_demo(entorno) is leer_modo_demo(entorno)
 
 
 def test_nunca_hay_mas_de_cuatro_turnos(raiz_tasas: Path) -> None:

@@ -19,8 +19,9 @@ La mesa es la única fuente de verdad de la negociación:
   joven prueba primero un plazo más largo (60 meses) y después el monto menor;
   si nada es aceptable, la negociación termina sin acuerdo.
 - La plantilla de cada turno pone las cifras desde el `EscenarioEscena`; el
-  modelo solo aporta un argumento corto, sin dígitos, sin colores del semáforo
-  y sin lenguaje de aprobación.
+  modelo solo aporta un argumento corto, sin dígitos, sin colores del semáforo,
+  sin lenguaje de aprobación —el de la escena y las promesas que detecta
+  `diagnostico.comite.auditar_texto`— y sin recomendar el gota a gota.
 - La aceptación la decide el código: solo se recomienda un escenario con
   semáforo verde o amarillo y margen mayor o igual que cero. Si el modelo
   propone algo distinto de la regla del color, el orquestador usa la política
@@ -28,8 +29,9 @@ La mesa es la única fuente de verdad de la negociación:
 - La negociación dura como máximo cuatro turnos, con 15 segundos en total y 4
   segundos por llamada, sin reintentos. Cuando una llamada falla o se agota el
   tiempo, el turno y los siguientes usan la política determinista.
-- Con `SUCURSAL_DEMO=1` o sin `DEEPSEEK_API_KEY` se usa la política
-  determinista de principio a fin, con `origen="reglas"`.
+- Con `SUCURSAL_DEMO` en («1», «true», «si», «sí») o sin
+  `DEEPSEEK_API_KEY` se usa la política determinista de principio a fin, con
+  `origen="reglas"`.
 
 Si ningún escenario es aceptable, la negociación termina sin acuerdo y el
 registro lo declara: es un final válido. El módulo no implementa el auditor de
@@ -61,7 +63,8 @@ from ..asistente.modelo import crear_modelo
 from ..asistente.prompts import cargar_prompt
 from ..canal.contratos import EntradaDiagnostico, ResultadoDiagnostico
 from ..config import PROJECT_ROOT
-from ..diagnostico import motor
+from ..diagnostico import comite, motor
+from ..sucursal.ajustes import leer_modo_demo
 from .contratos import (
     CifraEscena,
     EscenarioEscena,
@@ -146,12 +149,15 @@ FRASE_ASESOR = "La decisión final es de un asesor."
 _DIGITO = re.compile(r"\d")
 #: Nombres de color del semáforo; un argumento que los traiga se descarta.
 _COLOR = re.compile(r"\b(verde|amarillo|rojo|[aá]mbar)\b", re.IGNORECASE)
-#: Lenguaje de aprobación o de cierre que la escena prohíbe.
-_PROHIBIDAS = re.compile(
-    r"\b(acepto|aceptamos|cerramos|aprobad[oa]s?|aprobación|aprobamos)\b"
+#: Cierre o aceptación que la escena prohíbe; las promesas las revisa el
+#: auditor del comité con `auditar_texto`.
+_CIERRE = re.compile(
+    r"\b(acepto|aceptamos|cerramos)\b"
     r"|me quedo con el crédito",
     re.IGNORECASE,
 )
+#: Mención del gota a gota; un argumento que lo recomiende se descarta.
+_GOTA = re.compile(r"\bgota\b", re.IGNORECASE)
 #: Palabras vacías que no cuentan para medir si un argumento repite la plantilla.
 _PALABRAS_VACIAS = frozenset(
     {
@@ -355,7 +361,7 @@ class _Estado:
 class _PropuestaValidada:
     """Propuesta que pasó las validaciones del orquestador."""
 
-    codigo: str
+    escenario: EscenarioEscena
     decision: DecisionNegociacion
     argumento: str
 
@@ -404,8 +410,9 @@ def cargar_limites_negociacion(ruta: Path | None = None) -> LimitesNegociacion:
 def modo_demo(entorno: Mapping[str, str] | None = None) -> bool:
     """Indica si la negociación debe usar solo la política determinista.
 
-    La demo se activa con `SUCURSAL_DEMO=1` o cuando no hay
-    `DEEPSEEK_API_KEY` en el entorno. No lee archivos `.env`.
+    La demo se activa con la misma bandera que `sucursal.ajustes` —`SUCURSAL_DEMO`
+    en («1», «true», «si», «sí»)— o cuando no hay `DEEPSEEK_API_KEY` en el
+    entorno. No lee archivos `.env`.
 
     Args:
         entorno: variables de entorno; por defecto las del proceso.
@@ -414,9 +421,8 @@ def modo_demo(entorno: Mapping[str, str] | None = None) -> bool:
         `True` si la negociación no debe llamar a un modelo.
     """
     valores = os.environ if entorno is None else entorno
-    demo = valores.get("SUCURSAL_DEMO", "").strip() == "1"
     clave = bool(valores.get("DEEPSEEK_API_KEY", "").strip())
-    return demo or not clave
+    return leer_modo_demo(valores) or not clave
 
 
 def entrada_desde_perfil(
@@ -495,7 +501,8 @@ def construir_mesa(
     ajustes = config if config is not None else motor.cargar_config()
     monto = entrada.monto_credito
     plazo = entrada.plazo_meses
-    assert monto is not None and plazo is not None
+    if monto is None or plazo is None:
+        raise ValueError("la mesa exige un crédito con monto y plazo")
 
     escenarios: list[EscenarioEscena] = []
     base = motor.calcular(entrada, hoy=hoy, raiz=raiz, config=ajustes)
@@ -631,10 +638,10 @@ def negociar(
     inválida, un fallo o un tiempo agotado activan la política determinista
     para ese turno y los siguientes.
 
-    Con `SUCURSAL_DEMO=1` o sin `DEEPSEEK_API_KEY` se usa la política
-    determinista de principio a fin, con `origen="reglas"`. Las pruebas
-    inyectan el modelo y declaran una clave de prueba en `entorno` para recorrer
-    el camino con modelo sin abrir la red.
+    Con `SUCURSAL_DEMO` en («1», «true», «si», «sí») o sin
+    `DEEPSEEK_API_KEY` se usa la política determinista de principio a fin, con
+    `origen="reglas"`. Las pruebas inyectan el modelo y declaran una clave de
+    prueba en `entorno` para recorrer el camino con modelo sin abrir la red.
 
     Args:
         perfil: perfil de la escena o entrada del diagnóstico.
@@ -661,9 +668,11 @@ def negociar(
     ajustes = limites if limites is not None else cargar_limites_negociacion()
     mesa = construir_mesa(entrada, hoy=hoy, raiz=raiz, config=config)
     base = _buscar(mesa, "base")
-    assert base is not None
+    if base is None:
+        raise ValueError("la mesa no construyó el escenario base")
     solicitado = entrada.monto_credito
-    assert solicitado is not None
+    if solicitado is None:
+        raise ValueError("la negociación exige un crédito con monto")
     estado = _Estado(
         solicitado=solicitado,
         base=base,
@@ -742,7 +751,7 @@ def negociar(
                             esperada, escenario_esperado = _accion_banco(estado, mesa, cierra)
                             if (
                                 validada.decision == esperada
-                                and validada.codigo == escenario_esperado.codigo
+                                and validada.escenario.codigo == escenario_esperado.codigo
                             ):
                                 decision = validada.decision
                                 escenario = escenario_esperado
@@ -757,8 +766,7 @@ def negociar(
                                 )
                         else:
                             decision = validada.decision
-                            escenario = _buscar(mesa, validada.codigo)
-                            assert escenario is not None
+                            escenario = validada.escenario
                             argumento = validada.argumento
                             origen = "llm"
 
@@ -1241,7 +1249,7 @@ def _validar_propuesta(
         return None, "el rechazo no corresponde al escenario vigente"
     if propuesta.decision == "contrapropongo" and vigente is not None and codigo == vigente.codigo:
         return None, "la contrapropuesta repite el escenario vigente"
-    return _PropuestaValidada(codigo, propuesta.decision, propuesta.argumento.strip()), ""
+    return _PropuestaValidada(escenario, propuesta.decision, propuesta.argumento.strip()), ""
 
 
 def _decisiones_permitidas(
@@ -1545,19 +1553,31 @@ def _con_argumento(texto: str, argumento: str) -> str:
 def _motivo_argumento(argumento: str) -> str:
     """Devuelve por qué se descarta un argumento, o vacío si es válido.
 
+    Las promesas de aprobación las revisa el auditor del comité
+    (`comite.auditar_texto`) para no mantener una segunda lista de frases; la
+    escena añade el cierre, los colores del semáforo y la recomendación del
+    gota a gota, que el auditor del comité no conoce.
+
     Args:
         argumento: frase del modelo.
 
     Returns:
-        El motivo —dígitos, un color del semáforo o lenguaje de aprobación— o
-        una cadena vacía.
+        El motivo —dígitos, un color del semáforo, lenguaje de aprobación, una
+        promesa, datos personales o el gota a gota— o una cadena vacía.
     """
     if _DIGITO.search(argumento):
         return "contiene dígitos"
     if _COLOR.search(argumento):
         return "nombra un color del semáforo"
-    if _PROHIBIDAS.search(argumento):
+    if _CIERRE.search(argumento):
         return "usa lenguaje de aprobación"
+    if _GOTA.search(argumento):
+        return "recomienda el gota a gota"
+    hallazgos = comite.auditar_texto(argumento)
+    if any(hallazgo.startswith("Promesa de aprobación") for hallazgo in hallazgos):
+        return "usa lenguaje de aprobación"
+    if comite.MENSAJE_PII in hallazgos:
+        return "incluye datos personales"
     return ""
 
 
