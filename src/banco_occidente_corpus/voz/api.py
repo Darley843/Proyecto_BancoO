@@ -6,7 +6,8 @@
   motor usa (``piper`` o ``navegador``) y qué voz del navegador prefiere.
 - ``POST /api/voz``: convierte el texto de un personaje en audio OGG/Opus con
   su voz. Responde 503 si no hay modelo; la web entonces usa la voz del
-  navegador para ese personaje.
+  navegador para ese personaje. Con ``motor = "navegador"`` también responde:
+  es el respaldo cuando esa voz del navegador no está.
 
 El texto se convierte en el computador con Piper: no sale a ningún servicio.
 Las pruebas viven en ``test/test_voz.py``.
@@ -101,9 +102,7 @@ def crear_router_voz(
     estado = {
         nombre: _estado(
             configuradas.get(nombre, VOZ_POR_DEFECTO),
-            voz is not None
-            and configuradas.get(nombre, VOZ_POR_DEFECTO).motor == "piper"
-            and (disponibles is None or bool(disponibles.get(nombre))),
+            voz is not None and (disponibles is None or bool(disponibles.get(nombre))),
         )
         for nombre in PERSONAJES
     }

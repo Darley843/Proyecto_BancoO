@@ -10,6 +10,9 @@
  * - `navegador`: usa directamente la voz del navegador (`speechSynthesis`) que
  *   nombra la configuración, por ejemplo una voz de Windows con acento
  *   colombiano, con su tono y su velocidad.
+ *   Si esa voz no está en este navegador (por ejemplo, una voz «Online» de
+ *   Edge sin internet), usa su voz de Piper como respaldo en vez de otra voz
+ *   cualquiera.
  *
  * Si la API no responde, todos usan el navegador con los valores de
  * `RESPALDO_NAVEGADOR`. Nunca guarda los textos.
@@ -113,7 +116,10 @@ export async function decirComo(personaje, texto, opciones = {}) {
   if (lectura !== lecturaActual) {
     return "cancelada";
   }
-  if (ajuste.motor === "piper" && limpio.length <= LARGO_MAXIMO_VOZ) {
+  const usarPiper =
+    ajuste.motor === "piper" ||
+    (ajuste.motor === "navegador" && !tieneVozDelNavegador(ajuste.navegador?.voz ?? ""));
+  if (usarPiper && limpio.length <= LARGO_MAXIMO_VOZ) {
     const audio = await pedirAudio(quien, limpio);
     if (lectura !== lecturaActual) {
       return "cancelada";
@@ -313,6 +319,32 @@ export function decirConElNavegador(texto, ajuste, personaje = "pana", alTermina
 }
 
 /**
+ * Indica si el navegador tiene la voz pedida por su nombre.
+ *
+ * Un nombre vacío significa «la primera en español», así que cuenta como
+ * disponible si hay alguna voz.
+ *
+ * @param {string} nombre Parte del nombre de la voz, o vacío.
+ * @returns {boolean} `true` si la voz está en este navegador.
+ */
+export function tieneVozDelNavegador(nombre) {
+  if (!hayVozDelNavegador()) {
+    return false;
+  }
+  const buscado = nombre.trim().toLowerCase();
+  if (!buscado) {
+    return true;
+  }
+  try {
+    return window.speechSynthesis
+      .getVoices()
+      .some((voz) => voz.name.toLowerCase().includes(buscado));
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Elige la voz del navegador para un personaje.
  *
  * Si `nombre` no está vacío, toma la primera voz cuyo nombre lo contenga (sin
@@ -349,3 +381,28 @@ function elegirVoz(nombre, personaje) {
     return null;
   }
 }
+
+/**
+ * Pide la lista de voces apenas carga la página.
+ *
+ * Edge y Chrome llenan `getVoices()` un momento después; si se pide al cargar,
+ * la voz del primer turno (por ejemplo, Gonzalo para Pana) ya está lista y no
+ * se cae al respaldo de Piper sin necesidad.
+ *
+ * @returns {void}
+ */
+function precargarVoces() {
+  if (!hayVozDelNavegador()) {
+    return;
+  }
+  try {
+    window.speechSynthesis.getVoices();
+    window.speechSynthesis.addEventListener("voiceschanged", () => {
+      window.speechSynthesis.getVoices();
+    });
+  } catch {
+    // Sin voces del navegador: Piper sigue funcionando.
+  }
+}
+
+precargarVoces();

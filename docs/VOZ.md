@@ -38,13 +38,17 @@ La voz del navegador también es el respaldo cuando Piper falla.
 
 | Personaje | Modelo | Ajuste |
 |---|---|---|
-| `pana` | `es_MX-ald-medium` | voz de hombre, base, clara |
+| `pana` | navegador: «Microsoft Gonzalo Online (Natural)» (Edge, Colombia); respaldo `es_MX-ald-medium` | voz colombiana de hombre, tono 1,15 |
 | `don_gota` | `es_ES-davefx-medium` | más grave (tono 0,85) y algo más lento |
 | `joven` | `es_ES-sharvard-medium`, hablante 1 | no habla en la escena (es la persona voluntaria); solo respaldo |
-| `agente_joven` | `es_ES-sharvard-medium`, hablante 0 | algo más lento |
+| `agente_joven` | navegador: «Microsoft Juan Online (Natural)» (Edge); respaldo `es_ES-sharvard-medium`, hablante 0 | velocidad 1,1 |
 | `agente_banco` | `es_AR-daniela-high` | voz de mujer |
-| `auditor` | `es_MX-claude-high` | un poco más grave (tono 0,95) |
+| `auditor` | `es_ES-carlfm-x_low` | voz de hombre, un poco más grave (tono 0,95), como su retrato |
 
+- Con `motor = "navegador"` la voz sale de Edge. Las voces «Online (Natural)»
+  necesitan internet; si la voz nombrada no está, la web usa la voz de Piper
+  del personaje (por eso `make voz-modelo` también la descarga). Para la demo,
+  abrir la escena en **Microsoft Edge**.
 - `velocidad` es el `length_scale` de Piper: más de 1 habla más lento.
 - `tono` va de 0,7 a 1,4: menos de 1 suena más grave. El tono se cambia sin
   cambiar la duración.

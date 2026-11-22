@@ -139,27 +139,26 @@ def test_config_invalida_falla(tmp_path: Path, contenido: str, mensaje: str) -> 
         cargar_configuracion_voz(_toml(tmp_path, contenido))
 
 
-def test_motor_navegador_no_descarga_modelo(tmp_path: Path) -> None:
-    """Un personaje con motor navegador no suma modelos a `make voz-modelo`."""
+def test_motor_navegador_descarga_su_respaldo(tmp_path: Path) -> None:
+    """Un personaje con motor navegador también baja su Piper de respaldo."""
     ruta = _toml(
         tmp_path,
         '[personajes.pana]\nmotor = "navegador"\nmodelo = "solo-pana"\nnavegador = "Salome"\n',
     )
     config = cargar_configuracion_voz(ruta)
     assert config.personajes["pana"].navegador == "Salome"
-    assert "solo-pana" not in config.modelos()
+    assert "solo-pana" in config.modelos()
 
 
-def test_voz_del_navegador_no_llama_a_piper() -> None:
-    """Con motor navegador, VozEscena no sintetiza y avisa."""
+def test_voz_del_navegador_tiene_respaldo_en_piper() -> None:
+    """Con motor navegador, VozEscena igual sintetiza: Piper es el respaldo."""
     falso = TonoFalso()
     voces = VozEscena(
         sintetizador=falso,
         personajes={"pana": VozPersonaje(modelo="x", motor="navegador")},
     )
-    with pytest.raises(VozNoDisponible, match="navegador"):
-        voces.audio("Hola", "pana")
-    assert falso.llamadas == []
+    assert voces.audio("Hola", "pana")
+    assert len(falso.llamadas) == 1
 
 
 def test_ruta_modelo_relativa_y_absoluta(tmp_path: Path) -> None:
@@ -382,7 +381,7 @@ def test_api_personajes_segun_disponibles() -> None:
 
 
 def test_api_personaje_con_motor_navegador() -> None:
-    """Un personaje con motor navegador no tiene Piper y avisa su voz preferida."""
+    """Un personaje con motor navegador avisa su voz preferida y tiene Piper de respaldo."""
     voces, _ = _escena()
     personajes = dict(voces.personajes)
     personajes["joven"] = VozPersonaje(
@@ -393,11 +392,11 @@ def test_api_personaje_con_motor_navegador() -> None:
     joven = cliente.get("/api/voz/personajes").json()["personajes"]["joven"]
     assert joven == {
         "motor": "navegador",
-        "piper": False,
+        "piper": True,
         "navegador": {"voz": "Salome", "tono": 1.2, "velocidad": 1.0},
     }
     respuesta = cliente.post("/api/voz", json={"texto": "Hola", "personaje": "joven"})
-    assert respuesta.status_code == 503
+    assert respuesta.status_code == 200
 
 
 def test_api_presentacion() -> None:

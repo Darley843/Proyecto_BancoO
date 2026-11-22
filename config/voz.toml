@@ -26,12 +26,13 @@ carpeta = "data/modelos/voz"
 largo_maximo = 900
 
 [personajes.pana]
-# Pana: voz de hombre (Ald, México).
-motor = "piper"
+# Pana: voz colombiana de Edge («Microsoft Gonzalo Online (Natural)», necesita
+# internet). Si no está, la web usa su Piper de respaldo (Ald, México).
+motor = "navegador"
 modelo = "es_MX-ald-medium"
-velocidad = 1.0
+velocidad = 0.85
 tono = 1.0
-navegador = ""
+navegador = "Gonzalo"
 tono_navegador = 1.15
 velocidad_navegador = 1.0
 
@@ -57,12 +58,13 @@ tono_navegador = 1.35
 velocidad_navegador = 1.05
 
 [personajes.agente_joven]
-motor = "piper"
+# Agente del joven: voz de Edge («Microsoft Juan Online (Natural)»); respaldo Piper.
+motor = "navegador"
 modelo = "es_ES-sharvard-medium"
 hablante = 0
 velocidad = 0.95
 tono = 1.0
-navegador = ""
+navegador = "Microsoft Juan"
 tono_navegador = 1.0
 velocidad_navegador = 1.1
 
@@ -78,8 +80,8 @@ velocidad_navegador = 0.95
 
 [personajes.auditor]
 motor = "piper"
-modelo = "es_MX-claude-high"
-velocidad = 1.05
+modelo = "es_ES-carlfm-x_low"
+velocidad = 1.0
 tono = 0.95
 navegador = ""
 tono_navegador = 0.75
