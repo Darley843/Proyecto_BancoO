@@ -13,11 +13,11 @@ calcula un ratio contra una cifra que no existe. Si el Tablero no publica la
 tasa del producto, `diagnostico.motor.calcular` sube `TasaNoDisponible` con el
 código `tasa_no_disponible`; la escena no inventa una tasa.
 
-El turno de Pana se parte en tres plantillas fijas y cortas: el golpe (total de
-Don Gota frente al banco y cuántas veces más), la tasa (la E.A. de Don Gota, las
-veces la usura y la tasa máxima del banco) y la ley (artículo 305, usura vigente
-y el supuesto «si renuevas cada mes durante tres años; el capital no baja»).
-Ninguno lo genera un modelo. Cada cifra del texto lleva su `CifraEscena` y su
+El turno de Pana se parte en tres plantillas fijas y cortas: el golpe (el
+supuesto de 36 renovaciones, el total de Don Gota frente al banco y cuántas
+veces más), la tasa (la E.A. de Don Gota, las veces la usura y la tasa máxima
+del banco) y la ley (artículo 305 y usura vigente con su período). Ninguno lo
+genera un modelo. Cada cifra del texto lleva su `CifraEscena` y su
 `FuenteCifra`.
 """
 
@@ -189,15 +189,18 @@ def turnos_pana_comparacion(
     if veces_total is None:
         raise ValueError("la comparación necesita veces_total para el turno de Pana")
     monto = formatear_pesos(comparacion.monto)
+    plazo = str(comparacion.plazo_meses)
     total_gota = formatear_pesos(comparacion.total_gota)
     total_banco = formatear_pesos(comparacion.total_banco)
     tasa_gota = formatear_tasa_ea(comparacion.tasa_ea_gota)
     tasa_banco = formatear_tasa_ea(comparacion.tasa_ea_banco)
-    veces_total_texto = _formatear_veces(veces_total)
+    veces_total_texto = str(int(_cuantizar(veces_total, 0)))
+    supuesto_texto = SUPUESTO_RENOVACION[0].upper() + SUPUESTO_RENOVACION[1:]
 
     texto_golpe = (
-        f"Con Don Gota pagarías {total_gota} por {monto}. "
-        f"Con el banco, {total_banco}. Es casi {veces_total_texto} más."
+        f"{supuesto_texto}, con Don Gota pagarías "
+        f"{total_gota} por {monto}; con el banco, a {plazo} meses, {total_banco}. "
+        f"Es casi {veces_total_texto} veces más."
     )
     cifras_golpe = (
         _cifra(
@@ -208,6 +211,13 @@ def turnos_pana_comparacion(
             _fuente_gota("total_pagado_horizonte"),
         ),
         _cifra("monto", comparacion.monto, monto, "pesos", _fuente_gota("monto")),
+        _cifra(
+            "plazo del horizonte",
+            Decimal(comparacion.plazo_meses),
+            plazo,
+            "meses",
+            _fuente_config("meses_horizonte"),
+        ),
         _cifra(
             "total del banco en el horizonte",
             comparacion.total_banco,
@@ -266,8 +276,7 @@ def turnos_pana_comparacion(
         texto_ley = (
             "Si te cobran por encima de la usura, es delito "
             f"({comparacion.articulo_305}). Usura vigente: {usura_texto}, "
-            f"{_vigencia_texto(comparacion.usura_vigencia)}. "
-            f"Supuesto: {SUPUESTO_RENOVACION}, el capital no baja."
+            f"{_vigencia_texto(comparacion.usura_vigencia)}."
         )
         cifras_ley.append(
             _cifra(
@@ -282,8 +291,7 @@ def turnos_pana_comparacion(
     else:
         texto_ley = (
             "Si te cobran por encima de la usura, es delito "
-            f"({comparacion.articulo_305}). Hoy no hay usura certificada vigente. "
-            f"Supuesto: {SUPUESTO_RENOVACION}, el capital no baja."
+            f"({comparacion.articulo_305}). Hoy no hay usura certificada vigente."
         )
 
     escenario = EscenarioEscena(
@@ -394,6 +402,18 @@ def _fuente_gota(campo: str) -> FuenteCifra:
         La fuente con la referencia estable al cálculo.
     """
     return FuenteCifra(tipo="calculo_gota", referencia=f"escena.gota#{campo}")
+
+
+def _fuente_config(campo: str) -> FuenteCifra:
+    """Fuente de un parámetro leído de `config/escena.toml`.
+
+    Args:
+        campo: nombre del parámetro dentro de `[gota]`.
+
+    Returns:
+        La fuente con la ruta y la clave del TOML.
+    """
+    return FuenteCifra(tipo="config", referencia=f"config/escena.toml#gota.{campo}")
 
 
 def _formatear_veces(valor: Decimal) -> str:

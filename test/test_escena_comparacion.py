@@ -174,7 +174,6 @@ def test_los_turnos_de_pana_citan_el_articulo_305_y_el_supuesto(
     )
 
     turnos = turnos_pana_comparacion(comparacion)
-    textos = " ".join(turno.texto for turno in turnos)
 
     assert [turno.id for turno in turnos] == [
         "pana.golpe.v1",
@@ -185,15 +184,19 @@ def test_los_turnos_de_pana_citan_el_articulo_305_y_el_supuesto(
     assert all(turno.origen == "motor" for turno in turnos)
     assert all(turno.personaje == "pana" for turno in turnos)
     assert all(len(turno.texto.split()) <= 40 for turno in turnos)
-    assert "5,7 veces" in turnos[0].texto
+    assert "casi 6 veces más" in turnos[0].texto
+    assert "renuevas cada mes durante tres años" in turnos[0].texto
+    assert SUPUESTO_RENOVACION not in turnos[2].texto
     assert "27,9 veces" in turnos[1].texto
-    assert ARTICULO_305 in textos
-    assert "artículo 305" in textos
-    assert SUPUESTO_RENOVACION in textos
-    assert "Usura vigente: 28,34 % E.A." in textos
+    assert ARTICULO_305 in turnos[2].texto
+    assert "artículo 305" in turnos[2].texto
+    assert "Usura vigente: 28,34 % E.A." in turnos[2].texto
     assert turnos[0].escenario is not None
     assert turnos[0].escenario.codigo == "comparacion"
     assert turnos[0].escenario.total_pagado == comparacion.total_gota
+    veces = next(cifra for cifra in turnos[0].cifras if cifra.unidad == "veces")
+    assert veces.valor == Decimal("5.72")
+    assert veces.valor_legible == "6"
 
 
 def test_ninguna_cifra_del_turno_queda_sin_fuente(
