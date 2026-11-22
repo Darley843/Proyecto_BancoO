@@ -26,16 +26,19 @@ from langchain_core.runnables import RunnableLambda
 
 from banco_occidente_corpus.asistente.metricas import leer_uso
 from banco_occidente_corpus.asistente.prompts import cargar_prompt
-from banco_occidente_corpus.asistente.validacion import detectar_pii
+from banco_occidente_corpus.asistente.validacion import cifras_duras, detectar_pii
 from banco_occidente_corpus.canal.contratos import EntradaDiagnostico, ResultadoDiagnostico
 from banco_occidente_corpus.config import PROJECT_ROOT
 from banco_occidente_corpus.diagnostico import comite as comite_mod
 from banco_occidente_corpus.diagnostico import motor
 from banco_occidente_corpus.diagnostico.comite import (
+    CODIGOS_ESCENARIO,
+    MENSAJE_PII,
     EscenarioComite,
     PosturaAgente,
     RegistroComite,
     auditar,
+    auditar_texto,
     cargar_limites,
     construir_escenarios,
     deliberar,
@@ -1277,3 +1280,246 @@ def test_metricas_de_longitud_salen_de_la_excepcion() -> None:
     assert uso.finish_reason == "length"
     assert uso.salida == 1_200
     assert uso.razonamiento == 1_150
+
+
+# --- Tarea 4.1: `auditar_texto` sale de `auditar` sin cambiar su comportamiento ---
+
+#: Texto con un dato personal ficticio para las pruebas de PII.
+TEXTO_CON_PII = "Escríbeme a ana.prueba@ejemplo.com o al 300 123 4567."
+
+#: Combinaciones de posturas para comparar `auditar` con su versión anterior.
+VARIANTES_POSTURAS: tuple[tuple[dict[str, Any], ...], ...] = (
+    (
+        _postura("riesgo", "desfavorable", ["El margen después de la cuota es negativo."]),
+        _postura("comercial", "desfavorable", ["[compra_de_cartera] No alcanza."]),
+        _postura("auditor", "conforme", ["Sin hallazgos."]),
+    ),
+    (
+        _postura("riesgo", "desfavorable", ["El margen es negativo."], ["margen_despues_cuota"]),
+        _postura(
+            "comercial",
+            "favorable",
+            [
+                "[vivienda_240] Te ofrecemos vivienda a 240 meses.",
+                "Tu crédito está aprobado y garantizado.",
+                "La cuota sería de $9.999.999.",
+            ],
+        ),
+        _postura("auditor", "conforme", ["No hay hallazgos."]),
+    ),
+    (
+        _postura(
+            "riesgo",
+            "desfavorable",
+            ["La alerta vivienda_primera_cuota está presente.", TEXTO_CON_PII],
+            ["alertas[vivienda_primera_cuota]"],
+        ),
+        _postura(
+            "comercial",
+            "con_condiciones",
+            ["No está aprobado: depende del plazo.", "Aprobado, aprobado y aprobado."],
+        ),
+        _postura("auditor", "objeta", ["Tu crédito está aprobado.", "[vivienda_240]"]),
+    ),
+    (
+        _postura("riesgo", "abstencion", ["Tu crédito está aprobado por $1.234.567."]),
+        _postura("comercial", "favorable", ["Libranza y vivienda en [plazo_mas_largo]."]),
+        _postura("auditor", "conforme", []),
+    ),
+)
+
+#: Recomendaciones finales; `{aviso}` se reemplaza por el aviso del resultado.
+VARIANTES_RECOMENDACION: tuple[str | None, ...] = (
+    None,
+    "apto: el crédito cabe en el presupuesto.",
+    "no_apto: con estos datos la cuota no cabe.\n{aviso}",
+    "apto_con_condiciones: te lo aprueban seguro.\n{aviso}",
+    "no_apto: no conviene.\n" + TEXTO_CON_PII,
+)
+
+
+def _auditar_original(
+    posturas: Sequence[PosturaAgente],
+    resultado: ResultadoDiagnostico,
+    escenarios: Sequence[EscenarioComite],
+    *,
+    recomendacion: str | None = None,
+) -> list[str]:
+    """Copia de `auditar` tal como estaba antes de extraer `auditar_texto`.
+
+    Es la referencia de la prueba de equivalencia de la tarea 4.1. Si algún día
+    se cambia el comportamiento de `auditar` a propósito, esta copia se
+    actualiza en el mismo PR.
+
+    Args:
+        posturas: opiniones de los tres agentes.
+        resultado: resultado del motor.
+        escenarios: escenarios precalculados.
+        recomendacion: texto final, si ya se sintetizó.
+
+    Returns:
+        Los hallazgos que devolvía la versión anterior.
+    """
+    hallazgos: list[str] = []
+    permitidas = comite_mod._cifras_permitidas(resultado, escenarios)
+    productos = comite_mod._productos_permitidos(resultado, escenarios)
+
+    for postura in posturas:
+        if postura.agente == "auditor" or postura.postura == "abstencion":
+            continue
+        texto = comite_mod._texto_de(postura)
+        for cifra in sorted(cifras_duras(texto)):
+            if cifra not in permitidas:
+                hallazgos.append(f"Cifra no presente en la entrada: {cifra}")
+        for frase in comite_mod._promesas(texto):
+            hallazgos.append(f"Promesa de aprobación: «{frase}»")
+        for codigo in comite_mod._CODIGO.findall(texto.casefold()):
+            if codigo not in CODIGOS_ESCENARIO:
+                hallazgos.append(f"Alternativa fuera de los escenarios: [{codigo}]")
+        if postura.agente == "comercial":
+            sin_ids = comite_mod._sin_identificadores(texto)
+            for producto in comite_mod._productos_mencionados(sin_ids):
+                if producto not in productos:
+                    hallazgos.append(f"Producto fuera de los escenarios: {producto}")
+        if detectar_pii(texto) is not None:
+            hallazgos.append(f"Datos personales en la postura de {postura.agente}")
+
+    riesgo = comite_mod._buscar_postura(posturas, "riesgo")
+    comercial = comite_mod._buscar_postura(posturas, "comercial")
+    orden = comite_mod.ORDEN_POSTURA
+    if (
+        riesgo is not None
+        and comercial is not None
+        and "abstencion" not in {riesgo.postura, comercial.postura}
+        and riesgo.postura in orden
+        and comercial.postura in orden
+        and comite_mod._orden(comercial.postura) > comite_mod._orden(riesgo.postura)
+    ):
+        hallazgos.append("La postura del comercial es más favorable que la de riesgo.")
+
+    if recomendacion is not None:
+        etiqueta = comite_mod._etiqueta_recomendacion(recomendacion)
+        if (
+            riesgo is not None
+            and etiqueta in {"apto", "apto_con_condiciones"}
+            and comite_mod._orden(riesgo.postura) < orden["favorable"]
+        ):
+            hallazgos.append("La recomendación es más favorable que la postura de riesgo.")
+        if resultado.aviso not in recomendacion:
+            hallazgos.append("Falta el aviso orientativo.")
+        if detectar_pii(recomendacion) is not None:
+            hallazgos.append("Datos personales en la recomendación.")
+
+    return comite_mod._sin_repetir(hallazgos)
+
+
+@pytest.mark.parametrize("ident", ["independiente_rojo", "pensionado_amarillo"])
+@pytest.mark.parametrize("variante", range(len(VARIANTES_POSTURAS)))
+@pytest.mark.parametrize("recomendacion", VARIANTES_RECOMENDACION)
+def test_auditar_da_los_mismos_hallazgos_que_antes(
+    ident: str, variante: int, recomendacion: str | None, raiz_tasas: Path
+) -> None:
+    """Extraer `auditar_texto` no cambia ningún hallazgo ni su orden (4.1)."""
+    entrada, resultado = _diagnostico(ident, raiz_tasas)
+    escenarios = construir_escenarios(entrada, resultado, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
+    posturas = [PosturaAgente.model_validate(p) for p in VARIANTES_POSTURAS[variante]]
+    final = None if recomendacion is None else recomendacion.format(aviso=resultado.aviso)
+
+    nuevo = auditar(posturas, resultado, escenarios, recomendacion=final)
+    anterior = _auditar_original(posturas, resultado, escenarios, recomendacion=final)
+
+    assert nuevo == anterior
+
+
+def test_las_variantes_de_equivalencia_ejercitan_cada_comprobacion(raiz_tasas: Path) -> None:
+    """La prueba de equivalencia no pasa en vacío: cada tipo de hallazgo aparece."""
+    entrada, resultado = _diagnostico("independiente_rojo", raiz_tasas)
+    escenarios = construir_escenarios(entrada, resultado, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
+    todos: list[str] = []
+    for variante in VARIANTES_POSTURAS:
+        posturas = [PosturaAgente.model_validate(p) for p in variante]
+        for recomendacion in VARIANTES_RECOMENDACION:
+            final = None if recomendacion is None else recomendacion.format(aviso=resultado.aviso)
+            todos.extend(auditar(posturas, resultado, escenarios, recomendacion=final))
+
+    for inicio in (
+        "Cifra no presente en la entrada",
+        "Promesa de aprobación",
+        "Alternativa fuera de los escenarios",
+        "Producto fuera de los escenarios",
+        "Datos personales en la postura de riesgo",
+        "La postura del comercial es más favorable",
+        "La recomendación es más favorable",
+        "Falta el aviso orientativo",
+        "Datos personales en la recomendación",
+    ):
+        assert any(hallazgo.startswith(inicio) for hallazgo in todos), inicio
+
+
+def test_auditar_texto_sin_referencias_solo_revisa_promesas_y_pii() -> None:
+    """Sin cifras, códigos, productos ni aviso, solo quedan promesas y PII."""
+    assert detectar_pii(TEXTO_CON_PII) is not None
+
+    hallazgos = auditar_texto(
+        "Te presto $9.999.999 para [vivienda_240] y está aprobado. " + TEXTO_CON_PII
+    )
+
+    assert hallazgos == ["Promesa de aprobación: «aprobado»", MENSAJE_PII]
+
+
+def test_auditar_texto_no_marca_una_promesa_negada() -> None:
+    """«No está aprobado» no es una promesa."""
+    assert auditar_texto("Todavía no está aprobado: lo decide el banco.") == []
+
+
+def test_auditar_texto_revisa_cifras_contra_las_permitidas() -> None:
+    """Solo marca las cifras que no están en la lista permitida."""
+    texto = "Por $1.000.000 pagas $40.000 cada día."
+    permitidas = set(cifras_duras("$1.000.000"))
+
+    hallazgos = auditar_texto(texto, cifras_permitidas=permitidas)
+
+    assert len(hallazgos) == len(cifras_duras(texto) - permitidas) >= 1
+    assert all(hallazgo.startswith("Cifra no presente en la entrada") for hallazgo in hallazgos)
+    assert all(cifra not in hallazgo for cifra in permitidas for hallazgo in hallazgos)
+
+
+def test_auditar_texto_exige_el_aviso_completo() -> None:
+    """Con `aviso`, falta el hallazgo solo si el texto no lo trae completo."""
+    aviso = "Este resultado es orientativo."
+
+    assert auditar_texto("La cuota no cabe.", aviso=aviso) == ["Falta el aviso orientativo."]
+    assert auditar_texto(f"La cuota no cabe. {aviso}", aviso=aviso) == []
+
+
+def test_auditar_texto_ordena_los_hallazgos_y_no_repite() -> None:
+    """Orden fijo: cifras, promesas, códigos, productos, aviso y PII; sin repetidos."""
+    texto = (
+        "Tu crédito está aprobado, aprobado. [vivienda_240] Vivienda por $9.999.999. "
+        + TEXTO_CON_PII
+    )
+
+    hallazgos = auditar_texto(
+        texto,
+        cifras_permitidas=set(),
+        codigos_permitidos=CODIGOS_ESCENARIO,
+        productos_permitidos=frozenset(),
+        aviso="Este resultado es orientativo.",
+        mensaje_pii="Datos personales en el turno.",
+    )
+
+    categorias = [
+        "Cifra no presente en la entrada",
+        "Promesa de aprobación",
+        "Alternativa fuera de los escenarios",
+        "Producto fuera de los escenarios",
+        "Falta el aviso orientativo",
+        "Datos personales en el turno.",
+    ]
+    posiciones = [
+        next(i for i, hallazgo in enumerate(hallazgos) if hallazgo.startswith(categoria))
+        for categoria in categorias
+    ]
+    assert posiciones == sorted(posiciones)
+    assert len(hallazgos) == len(set(hallazgos))
+    assert hallazgos.count("Promesa de aprobación: «aprobado»") == 1

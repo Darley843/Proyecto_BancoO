@@ -13,12 +13,15 @@ amarillo o rojo, con tres miradas que se controlan entre sí
 
 El auditor también existe en código (`auditar`): ninguna cifra inventada, frase
 de aprobación, alternativa fuera de los escenarios ni recomendación más
-favorable que la de riesgo pasa la deliberación. La síntesis es determinística:
-el semáforo no cambia, gana la postura más prudente y, si el auditor vuelve a
-objetar tras una única corrección, se responde con el texto del diagnóstico. Si
-la corrección deja la validación determinística en limpio, la línea de la
-persona dice que el auditor está conforme aunque el agente haya objetado: su
-objeción original se conserva en `DeliberacionComite.posturas` para la pantalla.
+favorable que la de riesgo pasa la deliberación. Las comprobaciones sobre un
+texto suelto (cifras, promesas, códigos, productos, aviso y datos personales)
+viven en `auditar_texto`, que también usa el auditor de la escena «Pana vs. el
+gota a gota». La síntesis es determinística: el semáforo no cambia, gana la
+postura más prudente y, si el auditor vuelve a objetar tras una única
+corrección, se responde con el texto del diagnóstico. Si la corrección deja la
+validación determinística en limpio, la línea de la persona dice que el
+auditor está conforme aunque el agente haya objetado: su objeción original se
+conserva en `DeliberacionComite.posturas` para la pantalla.
 
 Límites: una sola ronda, máximo cuatro llamadas al modelo (tres agentes, una
 corrección y los reintentos por JSON inválido comparten ese tope), tope de
@@ -34,7 +37,7 @@ import re
 import threading
 import time
 import tomllib
-from collections.abc import Callable, Iterator, Mapping, Sequence
+from collections.abc import Callable, Collection, Iterator, Mapping, Sequence
 from concurrent.futures import Future, ThreadPoolExecutor, as_completed
 from dataclasses import dataclass, field
 from datetime import date
@@ -145,6 +148,9 @@ PORCENTAJES_ESTRES: tuple[int, ...] = (10, 20)
 
 #: Frase con la que la recomendación ofrece hablar con un asesor.
 _OFERTA_ASESOR = "habla con un asesor"
+
+#: Hallazgo por datos personales cuando no se dice dónde aparecieron.
+MENSAJE_PII = "Datos personales en el texto."
 
 #: Línea corta del auditor cuando no objeta; el detalle va en `posturas`.
 AUDITOR_CONFORME = "Auditor: revisó las cifras y está conforme"
@@ -509,6 +515,64 @@ def construir_escenarios(
     return escenarios
 
 
+def auditar_texto(
+    texto: str,
+    *,
+    cifras_permitidas: Collection[str] | None = None,
+    revisar_promesas: bool = True,
+    codigos_permitidos: Collection[str] | None = None,
+    productos_permitidos: Collection[str] | None = None,
+    aviso: str | None = None,
+    mensaje_pii: str = MENSAJE_PII,
+) -> list[str]:
+    """Revisa un texto con las comprobaciones determinísticas del auditor.
+
+    Es la parte del auditor que no depende del comité: `auditar` la aplica a
+    cada postura y a la recomendación final, y el auditor de la escena «Pana
+    vs. el gota a gota» la aplica a cada turno. Cada comprobación se activa
+    solo si recibe su referencia, y los hallazgos salen siempre en el mismo
+    orden: cifras, promesas, códigos, productos, aviso y datos personales.
+
+    Args:
+        texto: lo que se revisa.
+        cifras_permitidas: cifras normalizadas (solo dígitos, como las devuelve
+            `cifras_duras`) que el texto puede citar; con ``None`` no se
+            revisan cifras.
+        revisar_promesas: si busca frases que prometen una aprobación.
+        codigos_permitidos: códigos que el texto puede citar entre corchetes,
+            como ``[plazo_mas_largo]``; con ``None`` no se revisan.
+        productos_permitidos: nombres de producto del Tablero, en minúsculas,
+            que el texto puede mencionar; con ``None`` no se revisan.
+        aviso: texto que debe aparecer completo; con ``None`` no se exige.
+        mensaje_pii: hallazgo que se reporta si el texto trae datos personales.
+
+    Returns:
+        Los hallazgos en español, sin repetir; una lista vacía significa que el
+        texto pasa.
+    """
+    hallazgos: list[str] = []
+    if cifras_permitidas is not None:
+        for cifra in sorted(cifras_duras(texto)):
+            if cifra not in cifras_permitidas:
+                hallazgos.append(f"Cifra no presente en la entrada: {cifra}")
+    if revisar_promesas:
+        for frase in _promesas(texto):
+            hallazgos.append(f"Promesa de aprobación: «{frase}»")
+    if codigos_permitidos is not None:
+        for codigo in _CODIGO.findall(texto.casefold()):
+            if codigo not in codigos_permitidos:
+                hallazgos.append(f"Alternativa fuera de los escenarios: [{codigo}]")
+    if productos_permitidos is not None:
+        for producto in _productos_mencionados(_sin_identificadores(texto)):
+            if producto not in productos_permitidos:
+                hallazgos.append(f"Producto fuera de los escenarios: {producto}")
+    if aviso is not None and aviso not in texto:
+        hallazgos.append("Falta el aviso orientativo.")
+    if detectar_pii(texto) is not None:
+        hallazgos.append(mensaje_pii)
+    return _sin_repetir(hallazgos)
+
+
 def auditar(
     posturas: Sequence[PosturaAgente],
     resultado: ResultadoDiagnostico,
@@ -541,24 +605,18 @@ def auditar(
     for postura in posturas:
         if postura.agente == "auditor" or postura.postura == "abstencion":
             continue
-        texto = _texto_de(postura)
-        for cifra in sorted(cifras_duras(texto)):
-            if cifra not in permitidas:
-                hallazgos.append(f"Cifra no presente en la entrada: {cifra}")
-        for frase in _promesas(texto):
-            hallazgos.append(f"Promesa de aprobación: «{frase}»")
-        for codigo in _CODIGO.findall(texto.casefold()):
-            if codigo not in CODIGOS_ESCENARIO:
-                hallazgos.append(f"Alternativa fuera de los escenarios: [{codigo}]")
-        if postura.agente == "comercial":
-            # Solo las alternativas del comercial se contrastan con el
-            # catálogo: una alerta como `vivienda_primera_cuota` en la postura
-            # de riesgo no es un producto fuera de los escenarios.
-            for producto in _productos_mencionados(_sin_identificadores(texto)):
-                if producto not in productos:
-                    hallazgos.append(f"Producto fuera de los escenarios: {producto}")
-        if detectar_pii(texto) is not None:
-            hallazgos.append(f"Datos personales en la postura de {postura.agente}")
+        hallazgos.extend(
+            auditar_texto(
+                _texto_de(postura),
+                cifras_permitidas=permitidas,
+                codigos_permitidos=CODIGOS_ESCENARIO,
+                # Solo las alternativas del comercial se contrastan con el
+                # catálogo: una alerta como `vivienda_primera_cuota` en la
+                # postura de riesgo no es un producto fuera de los escenarios.
+                productos_permitidos=productos if postura.agente == "comercial" else None,
+                mensaje_pii=f"Datos personales en la postura de {postura.agente}",
+            )
+        )
 
     riesgo = _buscar_postura(posturas, "riesgo")
     comercial = _buscar_postura(posturas, "comercial")
@@ -580,10 +638,14 @@ def auditar(
             and _orden(riesgo.postura) < ORDEN_POSTURA["favorable"]
         ):
             hallazgos.append("La recomendación es más favorable que la postura de riesgo.")
-        if resultado.aviso not in recomendacion:
-            hallazgos.append("Falta el aviso orientativo.")
-        if detectar_pii(recomendacion) is not None:
-            hallazgos.append("Datos personales en la recomendación.")
+        hallazgos.extend(
+            auditar_texto(
+                recomendacion,
+                revisar_promesas=False,
+                aviso=resultado.aviso,
+                mensaje_pii="Datos personales en la recomendación.",
+            )
+        )
 
     return _sin_repetir(hallazgos)
 
