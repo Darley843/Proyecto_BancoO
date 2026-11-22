@@ -35,6 +35,42 @@ simulador de personas sintéticas: los ids de aquí son los únicos válidos.
 
 Para `objetivo.ahorro` se omiten los pasos 6, 7 y 6b.
 
+## HITL con el asesor
+
+El humano en el bucle es el asesor del banco, y el bot no se queda esperando a
+que escriba: **suspende el turno** y lo reanuda la propia persona con un botón.
+La entrevista es una máquina de estados (`canal/entrevista.py`); el HITL es un
+grafo mínimo de dos nodos en `canal/hitl.py`, porque `interrupt()` y
+`Command(resume=...)` solo existen dentro de un grafo con checkpointer.
+
+- **Cuándo se suspende:** cuando el semáforo es `rojo`. El nodo `ofrecer` llama
+  a `interrupt({"tipo": "asesor", "caso": {...}})` y el turno termina sin la
+  tarjeta final.
+- **Qué ve la persona:** el resumen del diagnóstico y dos botones,
+  `Contactar` (`diagnostico.contactar`) y `Descartar` (`diagnostico.descartar`).
+  Mientras el hilo está suspendido, cualquier otro mensaje repite esos botones.
+- **Cómo se reanuda:** con `Command(resume={"accion": "contactar"|"descartar"})`
+  sobre el mismo checkpoint. El despachador entrega el mensaje a la entrevista
+  antes que al grafo de preguntas, así que el botón encuentra su hilo por
+  `usuario_id` y no toca el de otra persona.
+- **Contactar:** abre un `CasoAsesor` con `usuario_id`, motivo
+  (`semaforo_rojo` o `asesor_solicitado`), semáforo, fecha y estado `pendiente`;
+  responde que un asesor revisará el caso y envía la tarjeta.
+- **Descartar:** no crea caso, cierra el turno y agradece.
+- **Una segunda pulsación:** responde el aviso de «no hay caso pendiente» y no
+  duplica la fila.
+- **«Olvida mis datos»:** revoca el consentimiento y borra también el hilo
+  suspendido, así no queda un caso a medias en la base.
+- **Solicitud directa:** «quiero un asesor» a mitad de la entrevista abre el
+  caso con semáforo `pendiente` y deja la entrevista.
+
+El checkpoint solo guarda motivo, semáforo y la acción: el resultado del
+diagnóstico sigue en `resultados_diagnostico`, que vence a las 24 horas, y el
+hilo se borra al reanudar. La tabla `casos` no guarda nombre, número ni texto de
+la conversación; el asesor lo ve en la vista Operación con motivo, semáforo,
+estado y fecha. Las pruebas están en `test/test_canal_hitl.py` y
+`test/test_canal_casos.py`.
+
 ## Ids canónicos
 
 ### objetivo
@@ -215,8 +251,8 @@ ejecuta con `diagnostico.motor.calcular`.
 - **Amarillo:** la cuota cabe pero con poco margen. Sugerir un plazo más largo
   o un monto menor, y simular de nuevo ("¿y si…?").
 - **Rojo:** con estos datos la cuota compromete demasiado el ingreso. Sugerir
-  monto menor o plazo mayor, compra de cartera si hay deudas caras, y ofrecer
-  hablar con un asesor (HITL).
+  monto menor o plazo mayor, compra de cartera si hay deudas caras, y suspender
+  el turno con el HITL para ofrecer hablar con un asesor.
 - **Ahorro sin capacidad (cero o negativa):** sugerir revisar los gastos fijos
   y renegociar las cuotas que más pesan; no proponer automatizar el ahorro
   hasta que haya margen.

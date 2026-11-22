@@ -70,6 +70,7 @@ from .contratos import (
     RespuestaCanal,
     ResultadoDiagnostico,
 )
+from .hitl import MOTIVO_ROJO, AccionHitl, HitlAsesor
 
 logger = logging.getLogger(__name__)
 
@@ -86,9 +87,33 @@ TEXTO_CANCELADO = (
 )
 #: Texto cuando la persona prefiere un asesor.
 TEXTO_ASESOR = (
-    "Entendido, dejé la entrevista. Un asesor puede revisar tu caso contigo; "
-    "escríbenos cuando quieras retomarla."
+    "Listo, dejé tu solicitud para que un asesor te contacte. No necesito más datos por este canal."
 )
+#: Pregunta del HITL cuando el semáforo sale rojo.
+PREGUNTA_HITL = (
+    "Con estos datos el crédito aprieta tu presupuesto. ¿Quieres que un asesor "
+    "revise tu caso? Puede ayudarte a ajustar el monto o el plazo."
+)
+#: Confirmación después de pulsar «Contactar».
+TEXTO_CONTACTADO = (
+    "Listo, un asesor revisará tu caso y te contactará por este canal. No necesito más datos."
+)
+#: Respuesta después de pulsar «Descartar».
+TEXTO_DESCARTADO = "Listo, no envío tu caso a un asesor. Si cambias de idea, escribe «asesor»."
+#: Recordatorio si hay un caso suspendido y el mensaje no elige.
+TEXTO_RECORDAR_HITL = (
+    "Tienes un caso pendiente con un asesor. Elige «Contactar» para que te "
+    "contacten o «Descartar» para cerrarlo."
+)
+#: Respuesta a una reanudación sin hilo suspendido.
+TEXTO_SIN_CASO = (
+    "No tengo un caso pendiente para reanudar. Escribe «quiero hacer el "
+    "diagnóstico» para empezar de nuevo o «asesor» si quieres que te contacten."
+)
+#: Identificador del botón que confirma el contacto con el asesor.
+ID_CONTACTAR = "diagnostico.contactar"
+#: Identificador del botón que descarta la asesoría.
+ID_DESCARTAR = "diagnostico.descartar"
 #: Texto cuando el mensaje no corresponde a ninguna opción.
 TEXTO_NO_ENTENDI = "No alcancé a entender esa respuesta. Elige una de estas opciones."
 #: Texto cuando el producto no tiene una tasa vigente publicada.
@@ -114,6 +139,10 @@ TEXTOS_CANCELAR = frozenset({"cancelar", "salir", "dejalo", "dejar"})
 TEXTOS_ASESOR = frozenset(
     {"asesor", "prefiero un asesor", "hablar con un asesor", "quiero un asesor"}
 )
+#: Frases con las que se confirma el contacto con el asesor.
+TEXTOS_CONTACTAR = frozenset({"contactar", "contacten", "que me contacten"})
+#: Frases con las que se descarta la asesoría.
+TEXTOS_DESCARTAR = frozenset({"descartar", "no gracias"})
 
 #: Pregunta del primer paso.
 PREGUNTA_OBJETIVO = "¿Qué te gustaría revisar?"
@@ -334,6 +363,14 @@ def _texto_sin_tarjeta(resultado: ResultadoDiagnostico) -> str:
     return "\n".join(linea for linea in lineas if linea)
 
 
+def _botones_hitl() -> list[BotonCanal]:
+    """Botones de decisión del HITL, en el orden de `docs/DIAGNOSTICO.md`."""
+    return [
+        BotonCanal(id=ID_CONTACTAR, titulo="Contactar"),
+        BotonCanal(id=ID_DESCARTAR, titulo="Descartar"),
+    ]
+
+
 @dataclass
 class EntrevistaCanal:
     """Máquina de estados de la entrevista del diagnóstico.
@@ -354,12 +391,14 @@ class EntrevistaCanal:
     reloj: Callable[[], datetime] = field(default_factory=lambda: lambda: datetime.now(UTC))
     _config: motor.ConfigDiagnostico | None = field(default=None, init=False, repr=False)
     _bloques: dict[str, BloqueEntrevista] | None = field(default=None, init=False, repr=False)
+    _hitl: HitlAsesor = field(init=False, repr=False, compare=False)
 
     def __post_init__(self) -> None:
         """Crea la tabla de entrevistas y prepara las cachés del catálogo."""
         inicializar_almacen(self.ruta)
         self._config = None
         self._bloques = None
+        self._hitl = HitlAsesor(self.ruta)
 
     def _ajustes(self) -> motor.ConfigDiagnostico:
         """Carga y memoriza los umbrales y valores del motor."""
@@ -488,6 +527,7 @@ class EntrevistaCanal:
                 )
             if comando in TEXTOS_ASESOR:
                 self.descartar(usuario_id)
+                self._hitl.contactar_directo(usuario_id)
                 return Avance(respuesta=self._texto(usuario_id, mensaje.id_mensaje, TEXTO_ASESOR))
 
         pasos = self._pasos(_producto(estado.respuestas))
@@ -566,6 +606,8 @@ class EntrevistaCanal:
             return self._texto(usuario_id, id_mensaje, TEXTO_SIN_TASA)
         self._guardar_resultado(usuario_id, resultado)
         deliberacion = self._deliberar(entrada, resultado)
+        if resultado.semaforo == "rojo":
+            return self._suspender_hitl(usuario_id, id_mensaje, resultado, deliberacion)
         try:
             png, texto_tarjeta = tarjeta_y_texto(resultado)
         except SinTarjeta:
@@ -578,6 +620,100 @@ class EntrevistaCanal:
             usuario_id=usuario_id,
             id_mensaje_origen=id_mensaje,
             texto=_componer_texto(texto_tarjeta, resultado, deliberacion),
+            tipo="imagen",
+            imagen=png,
+        )
+
+    def reanudar(self, mensaje: MensajeEntrante, usuario_id: str) -> RespuestaCanal | None:
+        """Resuelve el turno si el hilo está suspendido en el HITL.
+
+        El botón o el texto eligen entre contactar y descartar; cualquier otro
+        mensaje repite los botones. «Cancelar» cierra el caso pendiente sin
+        escalarlo.
+
+        Args:
+            mensaje: mensaje entrante del webhook.
+            usuario_id: huella del número.
+
+        Returns:
+            La respuesta del HITL, o ``None`` si no hay un caso suspendido y el
+            turno debe seguir su camino normal.
+        """
+        if not self._hitl.suspendido(usuario_id):
+            comando = _normalizar(mensaje.texto) if not mensaje.id_boton else ""
+            pide_hitl = (
+                mensaje.id_boton in {ID_CONTACTAR, ID_DESCARTAR}
+                or comando in TEXTOS_CONTACTAR
+                or comando in TEXTOS_DESCARTAR
+            )
+            if pide_hitl:
+                return self._texto(usuario_id, mensaje.id_mensaje, TEXTO_SIN_CASO)
+            return None
+        comando = _normalizar(mensaje.texto) if not mensaje.id_boton else ""
+        if mensaje.id_boton == ID_CONTACTAR or comando in TEXTOS_CONTACTAR:
+            return self._cerrar_hitl(mensaje, usuario_id, "contactar")
+        if mensaje.id_boton == ID_DESCARTAR or comando in TEXTOS_DESCARTAR:
+            return self._cerrar_hitl(mensaje, usuario_id, "descartar")
+        if comando in TEXTOS_CANCELAR:
+            self._hitl.limpiar(usuario_id)
+            self.descartar(usuario_id)
+            return self._texto(usuario_id, mensaje.id_mensaje, TEXTO_CANCELADO)
+        return RespuestaCanal(
+            usuario_id=usuario_id,
+            id_mensaje_origen=mensaje.id_mensaje,
+            texto=TEXTO_RECORDAR_HITL,
+            tipo="botones",
+            botones=_botones_hitl(),
+        )
+
+    def _suspender_hitl(
+        self,
+        usuario_id: str,
+        id_mensaje: str,
+        resultado: ResultadoDiagnostico,
+        deliberacion: comite.DeliberacionComite | None,
+    ) -> RespuestaCanal:
+        """Suspende el turno en rojo y ofrece hablar con un asesor."""
+        self._hitl.suspender(usuario_id, motivo=MOTIVO_ROJO, semaforo=resultado.semaforo or "rojo")
+        try:
+            _, texto_tarjeta = tarjeta_y_texto(resultado)
+            detalle = _componer_texto(texto_tarjeta, resultado, deliberacion)
+        except SinTarjeta:
+            detalle = _componer_texto(_texto_sin_tarjeta(resultado), resultado, deliberacion)
+        return RespuestaCanal(
+            usuario_id=usuario_id,
+            id_mensaje_origen=id_mensaje,
+            texto=f"{detalle}\n\n{PREGUNTA_HITL}",
+            tipo="botones",
+            botones=_botones_hitl(),
+        )
+
+    def _cerrar_hitl(
+        self,
+        mensaje: MensajeEntrante,
+        usuario_id: str,
+        accion: AccionHitl,
+    ) -> RespuestaCanal:
+        """Reanuda el HITL, abre o descarta el caso y envía la tarjeta."""
+        decision = self._hitl.reanudar(usuario_id, accion)
+        if decision is None:
+            return self._texto(usuario_id, mensaje.id_mensaje, TEXTO_SIN_CASO)
+        cabecera = TEXTO_CONTACTADO if accion == "contactar" else TEXTO_DESCARTADO
+        resultado = self.ultimo_resultado(usuario_id)
+        if resultado is None:
+            return self._texto(usuario_id, mensaje.id_mensaje, cabecera)
+        try:
+            png, texto = tarjeta_y_texto(resultado)
+        except SinTarjeta:
+            return self._texto(
+                usuario_id,
+                mensaje.id_mensaje,
+                f"{cabecera}\n\n{_texto_sin_tarjeta(resultado)}",
+            )
+        return RespuestaCanal(
+            usuario_id=usuario_id,
+            id_mensaje_origen=mensaje.id_mensaje,
+            texto=f"{cabecera}\n\n{texto}",
             tipo="imagen",
             imagen=png,
         )

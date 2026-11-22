@@ -136,6 +136,8 @@ class Despachador:
                 return
 
             respuesta = self.maquina.decidir(mensaje, usuario_id)
+            if respuesta is None and self.entrevista is not None:
+                respuesta = self.entrevista.reanudar(mensaje, usuario_id)
             if respuesta is None:
                 respuesta = self._turno_entrevista(mensaje, usuario_id)
             if respuesta is None and self.entrevista is not None:

@@ -1,8 +1,9 @@
-# Corpus web — Banco de Occidente
+# Sucursal 1965 — Banco de Occidente
 
 Pipeline **Medallion** (Bronze → Silver → Gold) del sitio público de **Banco de
-Occidente** (`https://www.bancodeoccidente.com.co`) y asistente que responde solo
-con el contexto consolidado del corpus, citando la fuente.
+Occidente** (`https://www.bancodeoccidente.com.co`), asistente que responde solo
+con el corpus citando la fuente, y **Pana**, un corresponsal por WhatsApp que
+orienta a jóvenes que van a pedir su primer crédito.
 
 [![CI](https://github.com/Darley843/Proyecto_BancoO/actions/workflows/ci.yml/badge.svg)](https://github.com/Darley843/Proyecto_BancoO/actions/workflows/ci.yml)
 ![Python 3.13](https://img.shields.io/badge/python-3.13-3776AB?logo=python&logoColor=white)
@@ -18,7 +19,83 @@ contexto único que alimenta un asistente LangChain con DeepSeek, con validació
 fuente y una app web local. El Módulo 1 usa el **contexto consolidado completo** en
 el prompt de sistema; el Módulo 2 añade la Bóveda (fragmentos, Ollama/Qdrant y
 recuperación híbrida), el Tablero de tarifas, el grafo con memoria y la app web de
-la Sucursal 1965.
+la Sucursal 1965. La entrega final lleva todo eso a WhatsApp con **Pana**.
+
+## Entrega final: Pana, el corresponsal por WhatsApp
+
+**Para quién.** Jóvenes que van a pedir su primer crédito y no saben si la cuota
+les cabe. Pana les responde con las tasas que publica el banco, les hace un
+diagnóstico por rangos y les muestra con un semáforo si el crédito es sano. Es
+una **orientación, no una aprobación**: la decisión final la toma el banco.
+
+```mermaid
+flowchart LR
+    WA["WhatsApp<br/>número de prueba"] -->|"firma X-Hub-Signature-256"| WH["Webhook<br/>dedupe + cola"]
+    WH --> DS["Despachador"]
+    DS --> CO{"Consentimiento<br/>Ley 1581"}
+    CO -->|"pregunta"| G["Grafo de la Sucursal<br/>Bóveda + Tablero"]
+    CO -->|"diagnóstico"| EN["Entrevista por rangos<br/>listas y botones"]
+    EN --> MO["Motor<br/>cuota francesa · Decimal"]
+    MO --> SE["Semáforo<br/>verde · amarillo · rojo"]
+    SE -->|"amarillo o rojo"| CM["Comité<br/>riesgo · comercial · auditor"]
+    SE --> TJ["Tarjeta de Pana<br/>PNG + texto"]
+    CM --> TJ
+    TJ --> YS["«¿Y si…?»<br/>otro plazo o monto"]
+    SE -->|"rojo o «prefiero un asesor»"| HI["Asesor humano<br/>(HITL)"]
+    T26[("Tasas 2026<br/>Gold versionada")] --> MO
+```
+
+| Pieza | Qué hace | Dónde | Documento |
+|---|---|---|---|
+| Canal | Recibe y responde por WhatsApp Cloud API: firma, deduplicación, cola, huella del número (nunca el número en claro) | `canal/` | [`OPERACION_WHATSAPP.md`](./docs/OPERACION_WHATSAPP.md) |
+| Consentimiento | Aviso de la Ley 1581, «Acepto» y «olvida mis datos» con borrado | `canal/consentimiento.py` | [`SEGURIDAD.md`](./docs/SEGURIDAD.md) |
+| Tasas 2026 | Lee el PDF de tasas del banco a una tabla Gold con vigencia, fuente y `sha256`, y la valida contra la usura | `tablero/tasas.py` | [`DIAGNOSTICO.md`](./docs/DIAGNOSTICO.md) |
+| Diagnóstico | Entrevista por rangos, motor determinista y semáforo con umbrales en `config/diagnostico.toml` | `diagnostico/` | [`DIAGNOSTICO.md`](./docs/DIAGNOSTICO.md) |
+| Comité | Tres miradas (riesgo, comercial, auditor) en una sola ronda para casos amarillos y rojos | `diagnostico/comite.py` | [`COMITE.md`](./docs/COMITE.md) |
+| Pana y tarjetas | El personaje y la tarjeta del resultado (PNG + texto equivalente) | `pana/` | — |
+| «¿Y si…?» | Compara otro plazo o monto sin tocar el diagnóstico original | `diagnostico/escenarios.py` | [`DIAGNOSTICO.md`](./docs/DIAGNOSTICO.md) |
+| MCP | Servidor de solo lectura: `consultar_tasa`, `simular_cuota`, `buscar_en_boveda` | `mcp_servidor/` | [`MCP.md`](./docs/MCP.md) |
+| Roba la Bóveda | Juego de ataque: inyección, extracción del prompt, datos personales y fuera de tema | `roba/` | [`ROBA_BOVEDA.md`](./docs/ROBA_BOVEDA.md) |
+| Operación y latencia | Vista con mensajes, consentimientos, casos y p50/p95 real por flujo | `arqueo/latencia.py`, `app/web/vistas/operacion.js` | [`ARQUEO.md`](./docs/ARQUEO.md) |
+| Simulador | Personas sintéticas que recorren el canal con el enviador falso | `simulador/` | — |
+
+**Probar sin WhatsApp ni claves:**
+
+```bash
+make simular     # recorre el canal con las personas sintéticas (sin red)
+make app         # app web: Operación y Roba la Bóveda incluidas
+make arqueo      # métricas: recuperación, filtro de dominio y latencia
+```
+
+Para conectar el número de prueba de Meta, sigue la sección
+[Canal de WhatsApp](#canal-de-whatsapp) y [`docs/LISTA_DEMO.md`](./docs/LISTA_DEMO.md).
+
+### La presentación: «Pana vs. el gota a gota»
+
+La presentación final no es una sustentación con diapositivas: **los agentes se
+presentan solos**, en vivo, con voz y subtítulos. Una persona del público inventa
+un personaje y responde cuatro preguntas; **Don Gota** le ofrece plata al 20 %
+mensual; Pana compara en tasa efectiva anual con la usura como referencia; el
+agente del joven y la agente del banco negocian; y el **auditor** revisa las
+cifras y da el veredicto. Si sale rojo, Pana sugiere alternativas formales, nunca
+el gota a gota.
+
+| Regla | Por qué |
+|---|---|
+| El voluntario inventa su personaje | Nunca datos reales |
+| Don Gota sale del código, nunca de un modelo | Sus cifras son fijas y verificables |
+| Cada cifra lleva su fuente (motor, simulador o Tablero) | El auditor la revisa antes de decirla |
+| Subtítulos siempre visibles | Si la voz falla, la escena sigue con clics |
+
+Cada personaje habla con una voz distinta, generada en el computador con Piper:
+
+```bash
+make voz-modelo     # una vez: baja las voces que nombra config/voz.toml
+make voces-prueba   # una muestra .ogg por personaje en data/modelos/voz/muestras/
+```
+
+Con `make app` abierto, `http://127.0.0.1:8000/voces.html` permite escoger y
+probar las voces. Detalle en [`docs/VOZ.md`](./docs/VOZ.md).
 
 ## Arquitectura
 
@@ -211,8 +288,9 @@ propios: sin frameworks, sin Node y sin paso de compilación.
 | `app/web/estilos.css` | Identidad visual (colores como variables, modo oscuro, celular) |
 | `app/web/app.js` | Cambia de vista y decide si usa la API o los datos de ejemplo |
 | `app/web/comun.js` | Utilidades de presentación que comparten `app.js` y las vistas |
-| `app/web/vistas/` | Una vista por archivo: `vestibulo`, `ventanilla`, `boveda`, `tablero`, `camara`, `arqueo`; cada una exporta `render(contenedor, estado)` |
-| `app/web/datos-ejemplo/` | Un JSON por endpoint, con la misma forma que la API (`estado`, `preguntar`, `tablero`, `mapa`, `pipeline`, `arqueo`, `vestibulo`) |
+| `app/web/vistas/` | Una vista por archivo: `vestibulo`, `ventanilla`, `boveda`, `tablero`, `camara`, `arqueo`, `operacion`, `roba`; cada una exporta `render(contenedor, estado)` |
+| `app/web/datos-ejemplo/` | Un JSON por endpoint, con la misma forma que la API (`estado`, `preguntar`, `tablero`, `mapa`, `pipeline`, `arqueo`, `vestibulo`, `operacion`, `roba`) |
+| `app/web/voz.js` · `voces.html` | Voces de la escena y su probador |
 
 **Maqueta frente a API.** Al abrir, `app.js` pide `/api/estado`. Si la API
 responde, todas las vistas usan la API; si no, usan `app/web/datos-ejemplo/`
@@ -762,8 +840,8 @@ with sqlite3.connect("data/asistente/whatsapp.sqlite") as c:
 ## Capturas
 
 La app vigente es `app/web/` y se abre con `make app` en
-`http://127.0.0.1:8000`. Sus seis vistas son Vestíbulo, Ventanilla, Bóveda,
-Tablero, Cámara y Arqueo. Las imágenes de `docs/capturas/` pertenecen a la app
+`http://127.0.0.1:8000`. Sus ocho vistas son Vestíbulo, Ventanilla, Bóveda,
+Tablero, Cámara, Arqueo, Operación y Roba la Bóveda. Las imágenes de `docs/capturas/` pertenecen a la app
 Streamlit retirada en la fase 2 y se conservan solo como registro histórico; las
 capturas vigentes deben tomarse de la app web.
 
@@ -876,6 +954,13 @@ no forma parte de `make all`, `make gold`, `make deliver`, `make docs`, `make do
 [`docs/RESULTADOS_FASE2.md`](./docs/RESULTADOS_FASE2.md) (44 preguntas de la fase 2) ·
 [`docs/SEGURIDAD.md`](./docs/SEGURIDAD.md) (modelo de amenazas) ·
 [`docs/MCP.md`](./docs/MCP.md) (servidor MCP de solo lectura) ·
+[`docs/OPERACION_WHATSAPP.md`](./docs/OPERACION_WHATSAPP.md) (canal de WhatsApp) ·
+[`docs/DIAGNOSTICO.md`](./docs/DIAGNOSTICO.md) (entrevista, motor y semáforo) ·
+[`docs/COMITE.md`](./docs/COMITE.md) (comité de crédito) ·
+[`docs/ROBA_BOVEDA.md`](./docs/ROBA_BOVEDA.md) (juego de ataque) ·
+[`docs/EXPERIMENTO_LLAMADA.md`](./docs/EXPERIMENTO_LLAMADA.md) (llamada por WhatsApp, aplazada) ·
+[`docs/LISTA_DEMO.md`](./docs/LISTA_DEMO.md) (lista del día de la demo) ·
+[`docs/VOZ.md`](./docs/VOZ.md) (voces de la escena) ·
 [`AGENTS.md`](./AGENTS.md).
 
 ## Ética y legalidad

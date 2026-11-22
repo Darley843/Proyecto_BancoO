@@ -183,6 +183,8 @@ rol declarados, con consentimiento.
 | `.../roba/` | Roba la Bóveda: clasificador, marcador, respondedor e API |
 | `.../simulador/` | Recorrido sintético del canal con `EnviadorFalso` |
 | `.../sucursal/operacion.py` | Panel de operación y latencias p50/p95 |
+| `.../canal/entrevista.py` | Entrevista del diagnóstico por WhatsApp: pasos, comandos y tarjeta |
+| `.../canal/hitl.py` | HITL del asesor: `interrupt()`, botones Contactar/Descartar y caso |
 | `.../sucursal/grafo.py` | StateGraph con memoria, rutas y redacción |
 | `.../sucursal/ajustes.py` | Tope de gasto, TTL y modo demo |
 | `.../sucursal/costo.py` | Tarifas valle/pico, gasto diario y caché |
@@ -215,6 +217,7 @@ REJECT if:
   La regla anterior cubre el sitio del banco y las fuentes del corpus; las llamadas a la API del modelo desde `asistente/` van por el cliente de LangChain, con `timeout`, sin claves en el código y sin leer `.env`.
   Las llamadas a Ollama desde `boveda/` van por `langchain-ollama` con `timeout` explícito (`embeddings.timeout_segundos`); no aplican `robots.txt`, `From` ni 1,5 s porque el destino es local y no es scraping, pero el `timeout` sí es obligatorio.
   Las llamadas del canal de WhatsApp a la API de Meta (`graph.facebook.com`, desde `canal/envio.py`) van con `timeout` explícito, el User-Agent del proyecto y el header `From`; no aplican `robots.txt` ni la pausa de 1,5 s porque no son scraping del sitio del banco, pero el `timeout` sí es obligatorio y nunca se usa `verify=False`.
+  La descarga de los modelos de voz de Piper (`make voz-modelo`, desde `voz/descarga.py`, al repositorio público `huggingface.co/rhasspy/piper-voices`) va con `httpx`, `timeout` explícito, el User-Agent del proyecto y el header `From`; no aplican `robots.txt` ni la pausa de 1,5 s porque no es scraping del sitio del banco, y nunca se usa `verify=False`.
   El User-Agent de navegador de `config/site.toml` es una decisión del grupo documentada en `CONSTITUTION.md` §10 (el WAF responde 403 a todo User-Agent que se declare bot): **no** es motivo de REJECT ni cuenta como evasión, siempre que se envíe el header `From`, se respete `robots.txt` y el ritmo de 1,5 s, y ante un 403 el pipeline se detenga sin reintentar con otro cliente.
 - Se descarga una URL sin consultar antes `robots.txt` o se baja el ritmo de cortesía de 1,5 s entre peticiones (decisión del proyecto; `robots.txt` no declara `Crawl-delay`).
 - Se captura una página con login, formulario, simulador o datos personales (Ley 1581 de 2012).

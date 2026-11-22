@@ -6,12 +6,12 @@ perfil; el estado queda en ``consentimientos`` y la versión del aviso se guarda
 para poder auditar qué texto se aceptó.
 
 «Olvida mis datos» revoca la autorización y borra los datos del diagnóstico:
-los casos, el avance de la entrevista y el último resultado guardado para el
-«¿Y si…?». La fila del consentimiento **no se borra**: queda con
-``revocado_en`` como prueba de la autorización (Decreto 1377 de 2013, art. 8);
-solo guarda la huella, la versión del aviso y las fechas. El perfil del store lo
-borra la tarea 2.6 y el id de deduplicación se conserva porque no contiene datos
-personales.
+los casos, el avance de la entrevista, el último resultado guardado para el
+«¿Y si…?», el hilo suspendido del HITL y el perfil del store. La fila del
+consentimiento **no se borra**: queda con ``revocado_en`` como prueba de la
+autorización (Decreto 1377 de 2013, art. 8); solo guarda la huella, la versión
+del aviso y las fechas. El id de deduplicación se conserva porque no contiene
+datos personales.
 
 El plazo máximo del aviso (``retencion_dias``, 30 por defecto) sigue siendo
 cierto: la entrevista se purga a los ``entrevista_ttl_minutos`` sin actividad y
@@ -27,6 +27,7 @@ ejercerlos.
 from __future__ import annotations
 
 import unicodedata
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -34,6 +35,7 @@ from typing import Literal
 
 from .almacen import conectar, inicializar_almacen
 from .contratos import BotonCanal, MensajeEntrante, RespuestaCanal
+from .hitl import limpiar_hilo
 
 #: El usuario todavía no aceptó el aviso.
 ESTADO_SIN_CONSENTIMIENTO = "sin_consentimiento"
@@ -136,11 +138,20 @@ def es_revocacion(mensaje: MensajeEntrante) -> bool:
 
 @dataclass
 class MaquinaConsentimiento:
-    """Estado de consentimiento de los usuarios del canal."""
+    """Estado de consentimiento de los usuarios del canal.
+
+    Attributes:
+        ruta: base `whatsapp.sqlite` del canal.
+        version: versión vigente del aviso de la Ley 1581.
+        retencion_dias: plazo de conservación de los casos del asesor.
+        borrar_perfil: callback que borra el perfil de la persona; si falta, la
+            revocación solo limpia las tablas del canal.
+    """
 
     ruta: Path
     version: str = VERSION_POR_DEFECTO
     retencion_dias: int = RETENCION_POR_DEFECTO
+    borrar_perfil: Callable[[str], None] | None = None
 
     def __post_init__(self) -> None:
         """Crea el almacén y sus tablas si no existen."""
@@ -184,11 +195,11 @@ class MaquinaConsentimiento:
     def revocar(self, usuario_id: str, momento: datetime | None = None) -> None:
         """Revoca la autorización y borra los datos del diagnóstico.
 
-        Borra los casos, el avance de la entrevista y el último resultado del
-        «¿Y si…?». La fila del consentimiento se conserva con ``revocado_en``
-        como prueba de la autorización (Decreto 1377 de 2013, art. 8). No
-        contiene datos personales: solo la huella, la versión del aviso y las
-        fechas.
+        Borra los casos, el avance de la entrevista, el último resultado del
+        «¿Y si…?», el hilo suspendido del HITL y el perfil del store. La fila del
+        consentimiento se conserva con ``revocado_en`` como prueba de la
+        autorización (Decreto 1377 de 2013, art. 8). No contiene datos
+        personales: solo la huella, la versión del aviso y las fechas.
 
         Args:
             usuario_id: huella del número.
@@ -206,6 +217,9 @@ class MaquinaConsentimiento:
             conexion.execute(
                 "DELETE FROM resultados_diagnostico WHERE usuario_id = ?", (usuario_id,)
             )
+        limpiar_hilo(self.ruta, usuario_id)
+        if self.borrar_perfil is not None:
+            self.borrar_perfil(usuario_id)
 
     def purgar_casos_vencidos(self, momento: datetime | None = None) -> int:
         """Borra los casos más viejos que el plazo de conservación del aviso.

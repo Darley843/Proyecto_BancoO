@@ -387,7 +387,8 @@ una prueba que depende de Meta no es reproducible ni corre en CI.
 4. Sin consentimiento, se envía el aviso de la Ley 1581 con «Acepto» y «Ahora
    no»; sin aceptación no se invoca el grafo.
 5. Con consentimiento, el despachador decide si el turno va al grafo de
-   preguntas, al diagnóstico o a un asesor.
+   preguntas, al diagnóstico o a un asesor. Si hay un caso del HITL suspendido,
+   los botones «Contactar» y «Descartar» lo reanudan antes que nada.
 
 ## Problemas frecuentes
 

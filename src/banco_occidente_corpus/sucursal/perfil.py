@@ -15,12 +15,15 @@ from __future__ import annotations
 
 import hashlib
 import re
+import sqlite3
 import unicodedata
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal
 
 from langgraph.store.base import BaseStore
+from langgraph.store.sqlite import SqliteStore
 
 from ..texto import normalizar
 
@@ -224,6 +227,27 @@ def normalizar_perfil_id(valor: str) -> str:
 def huella_perfil(perfil_id: str) -> str:
     """Devuelve el SHA-256 del identificador; es el namespace del store."""
     return hashlib.sha256(perfil_id.encode("utf-8")).hexdigest()
+
+
+def borrar_perfil_en(ruta: Path, usuario_id: str) -> None:
+    """Borra el perfil de una persona en el store SQLite de la Sucursal.
+
+    La revocación del canal («olvida mis datos») llama a esta función con la
+    huella HMAC del número, que es el ``perfil_id`` con el que el canal guarda
+    el perfil. Si el archivo no existe, no hay nada que borrar.
+
+    Args:
+        ruta: archivo del store de perfil (`data/asistente/perfil.sqlite`).
+        usuario_id: huella HMAC del número.
+    """
+    if not ruta.exists():
+        return
+    # SqliteStore abre sus propias transacciones: la conexión va en autocommit.
+    conexion = sqlite3.connect(str(ruta), check_same_thread=False, isolation_level=None)
+    try:
+        AlmacenPerfil(SqliteStore(conexion)).borrar(huella_perfil(usuario_id))
+    finally:
+        conexion.close()
 
 
 def detectar_intencion(texto: str) -> IntencionPerfil | None:

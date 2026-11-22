@@ -28,7 +28,7 @@
 - [x] 2.5 Implementar la autorización contra las cinco huellas de `config/whatsapp.toml`; verificar con payloads simulados que un número autorizado sigue el flujo y uno desconocido recibe el aviso de prueba sin crear perfil ni consentimiento.
   > Nota (21 nov): resuelta en el #144.
 - [x] 2.6 Implementar el perfil en el `SqliteStore` bajo `("whatsapp", usuario_id)`, el `thread_id` `wa:<usuario_id>` y la inyección de `perfil=huella_perfil(usuario_id)` al grafo actual; verificar con dos usuarios simultáneos que no comparten historial, perfil ni caché.
-  > Nota (21 nov): resuelta en el #144, con una diferencia: el perfil se guarda en el namespace `("perfil", hash)` del `SqliteStore` y se inyecta al grafo con `huella_perfil(usuario_id)`; el `thread_id` sí es `wa:<usuario_id>`.
+  > Nota (21 nov): `thread_id` `wa:<usuario_id>` e inyección de `huella_perfil` ya estaban en `canal/despachador.py` y `sucursal/grafo.py::responder_turno`. El perfil **no** vive bajo `("whatsapp", usuario_id)`: se queda en `("perfil", sha256(usuario_id))` (`sucursal/perfil.py`), que aísla igual sin usar la huella HMAC como clave del store; se corrige la tarea, no el código. La revocación «olvida mis datos» ahora borra el perfil con `borrar_perfil_en` inyectado en `MaquinaConsentimiento`, y el aislamiento entre dos números se comprueba en `test/test_canal_despachador.py::test_dos_usuarios_no_comparten_hilo_ni_perfil` y `test/test_canal_perfil.py::test_revocar_borra_el_perfil`.
 - [x] 2.7 Implementar la máquina de consentimiento con el aviso de la Ley 1581, el botón «Acepto», la versión y la revocación «olvida mis datos»; verificar con `test/test_canal_consentimiento.py` los casos primer contacto, aceptación, rechazo, silencio y revocación con borrado.
   > Nota (21 nov): resuelta en el #139; la máquina nació en el #123 y el #139 conservó la prueba de la autorización y ajustó el aviso a la Ley 1581.
 - [x] 2.8 Implementar `EnviadorFalso` y `EnviadorMeta` detrás del Protocol `Enviador`, con `timeout`, User-Agent, `From`, reintentos solo 429/5xx y límites de 4096 caracteres y tres botones; verificar con `test/test_canal_envio.py` el envío falso, el rechazo de destino no autorizado, el texto largo partido y la ausencia del token en logs.
@@ -66,16 +66,16 @@
 
 ## 4. HITL y casos de asesor — Darley (18–19 nov)
 
-- [ ] 4.1 Integrar el nodo `hitl` del grafo de diagnóstico con `interrupt({"tipo": "asesor", "caso": ...})` para rojo o solicitud expresa; verificar con `test/test_diagnostico_hitl.py` que el turno se suspende sin respuesta final y que el estado queda identificable.
-  > Estado (21 nov): pendiente. No hay nodo `hitl`, ni `interrupt()`, ni `test/test_diagnostico_hitl.py`; el diagnóstico actual termina en el resultado.
-- [ ] 4.2 Implementar la reanudación con `Command(resume={"accion": ...})` para «Contactar» y «Descartar»; verificar que contactar crea un `CasoAsesor`, descartar lo cierra y una segunda reanudación devuelve error sin duplicar.
-  > Estado (21 nov): pendiente; depende de 4.1, no hay reanudación con `Command(resume=...)`.
-- [ ] 4.3 Implementar la creación, listado y cierre de `CasoAsesor` sin número, nombre ni texto libre; verificar con una inspección de la tabla `casos` y con una prueba que el caso solo contiene `usuario_id`, motivo, semáforo, resultado y estado.
-  > Estado (21 nov): pendiente. El contrato `CasoAsesor` y la tabla `casos` existen, pero no hay creación, listado ni cierre conectados al flujo.
-- [ ] 4.4 Conectar la reanudación al despachador cuando el mensaje llega como botón o texto «contactar»/«descartar»; verificar con `test/test_canal_hitl.py` que el botón reanuda el hilo correcto y que un hilo ajeno no se ve afectado.
-  > Estado (21 nov): pendiente; depende de 4.1 y 4.2.
-- [ ] 4.5 Documentar en `docs/DIAGNOSTICO.md` el flujo HITL, los botones y el estado del caso; verificar que el texto coincide con los identificadores de botón usados en el código.
-  > Estado (21 nov): pendiente; no hay flujo HITL que documentar.
+- [x] 4.1 Integrar el nodo `hitl` del grafo de diagnóstico con `interrupt({"tipo": "asesor", "caso": ...})` para rojo o solicitud expresa; verificar con `test/test_diagnostico_hitl.py` que el turno se suspende sin respuesta final y que el estado queda identificable.
+  > Nota (21 nov): `canal/hitl.py` compila el grafo mínimo del HITL (`ofrecer` → `decidir`) con `SqliteSaver` en el mismo `whatsapp.sqlite`; el rojo suspende y deja `__interrupt__` y `next` en `ofrecer`. La solicitud expresa pasa por el mismo nodo y se reanuda en el acto con `contactar`, para no volver a preguntar lo que la persona ya decidió. El estado del checkpoint solo guarda motivo y semáforo, sin el resultado.
+- [x] 4.2 Implementar la reanudación con `Command(resume={"accion": ...})` para «Contactar» y «Descartar»; verificar que contactar crea un `CasoAsesor`, descartar lo cierra y una segunda reanudación devuelve error sin duplicar.
+  > Nota (21 nov): contactar abre el caso con `abrir_caso`, que reutiliza el vivo por `usuario_id` y motivo; descartar no crea fila. La segunda pulsación responde el aviso de «no hay caso pendiente» y no escribe nada (`test/test_canal_hitl.py::test_una_segunda_pulsacion_no_duplica`). El hilo se borra al reanudar.
+- [x] 4.3 Implementar la creación, listado y cierre de `CasoAsesor` sin número, nombre ni texto libre; verificar con una inspección de la tabla `casos` y con una prueba que el caso solo contiene `usuario_id`, motivo, semáforo, resultado y estado.
+  > Nota (21 nov): `canal/almacen.py` añade `registrar_caso`, `abrir_caso`, `cerrar_caso`, `listar_casos` y `obtener_caso` sobre el estado canónico `pendiente|contactado|descartado|cerrado`; `CasoAsesor.semaforo` admite `pendiente`. Pruebas en `test/test_canal_casos.py`; el caso real del HITL se comprueba en `test/test_canal_hitl.py`.
+- [x] 4.4 Conectar la reanudación al despachador cuando el mensaje llega como botón o texto «contactar»/«descartar»; verificar con `test/test_canal_hitl.py` que el botón reanuda el hilo correcto y que un hilo ajeno no se ve afectado.
+  > Nota (21 nov): el despachador entrega el turno a `EntrevistaCanal.reanudar` antes de la entrevista y del grafo; el botón encuentra su hilo por `usuario_id`. `test/test_canal_hitl.py` recorre dos números a la vez y comprueba que el caso es solo del que pulsa; el simulador (`make simular`) también pulsa «Contactar» para cerrar el rojo.
+- [x] 4.5 Documentar en `docs/DIAGNOSTICO.md` el flujo HITL, los botones y el estado del caso; verificar que el texto coincide con los identificadores de botón usados en el código.
+  > Nota (21 nov): `docs/DIAGNOSTICO.md` § «HITL con el asesor» usa los ids reales `diagnostico.contactar` y `diagnostico.descartar` de `canal/entrevista.py`, y describe la suspensión, la reanudación, el caso y la segunda pulsación. `docs/OPERACION_WHATSAPP.md` actualiza el flujo del mensaje.
 
 ## 5. MCP de solo lectura — Nayla (19–20 nov)
 
@@ -139,8 +139,8 @@
   > Nota (21 nov): resuelta en el #120.
 - [x] 8.9 Implementar la terminal de Roba la Bóveda en `roba.js` con envío, categoría, resultado, marcador, reinicio y exportación; verificar que no usa librerías externas ni llama a otra API que `/api/roba`.
   > Nota (21 nov): resuelta en el #120; el backend de Roba la Bóveda se completó en el #147.
-- [ ] 8.10 Preparar el guion de sustentación en `docs/SUSTENTACION.md` con el recorrido consentimiento → pregunta → diagnóstico → HITL → «¿Y si…?» → comité → Roba la Bóveda → Arqueo; verificar que cada paso tiene el comando o la pantalla que lo demuestra.
-  > Estado (21 nov): pendiente. No existe `docs/SUSTENTACION.md`.
+- [x] 8.10 ~~Preparar el guion de sustentación en `docs/SUSTENTACION.md` con el recorrido consentimiento → pregunta → diagnóstico → HITL → «¿Y si…?» → comité → Roba la Bóveda → Arqueo; verificar que cada paso tiene el comando o la pantalla que lo demuestra.~~
+  > Estado (22 nov): **descartada**. La sustentación es 100 % en vivo, sin guion escrito ni video: los agentes se presentan solos en la escena «Pana vs. el gota a gota» (README, sección «La presentación»). No se crea `docs/SUSTENTACION.md`.
 - [x] 8.11 Crear el paquete `pana` con el dibujo del personaje (foto de perfil y tres caras), las tarjetas PNG del diagnóstico y del «¿Y si…?» y su texto equivalente, con Pillow fijo y DejaVu Sans versionada; verificar con `test/test_pana_tarjetas.py` que la imagen pesa menos de 1 MB, se genera en memoria, rechaza teléfonos y documentos y que el texto lleva los mismos datos.
   > Nota (21 nov): resuelta en el #138.
 - [x] 8.12a Convertir el `ResultadoDiagnostico` del motor (#136) y la `ComparacionEscenario` del «¿Y si…?» en datos de tarjeta, con `pana/desde_diagnostico.py` (`tarjeta_y_texto`, `escenario_y_texto`): crédito con cuota → diagnóstico, ahorro → ahorro, libranza de independiente o capacidad negativa → «no aplica»; la tarjeta usa la tasa mensual máxima (la del semáforo) y un nombre corto de la fuente; verificar con `test/test_pana_desde_diagnostico.py` contra el motor real y una tabla Gold temporal.
@@ -150,8 +150,8 @@
 
 ## 9. Integración y cierre — equipo (21–23 nov)
 
-- [ ] 9.1 Ejecutar `make fmt`, `make check` y `make demo`; verificar que lint, tipos, pruebas y pipeline offline pasan al 100 % sin `DEEPSEEK_API_KEY` y con Ollama apagado.
-  > Estado (21 nov): pendiente; es la verificación de cierre y debe correr después de los PR abiertos.
+- [x] 9.1 Ejecutar `make fmt`, `make check` y `make demo`; verificar que lint, tipos, pruebas y pipeline offline pasan al 100 % sin `DEEPSEEK_API_KEY` y con Ollama apagado.
+  > Nota (21 nov): en el computador de la demo, make fmt sin cambios (780 archivos), make check en verde (ruff, ty y 1947 pruebas) y make demo con el pipeline sin red de Bronze a Silver y Gold.
 - [x] 9.2 Ejecutar `make tablero` y `make arqueo`; verificar que el CSV conserva las diez columnas, que aparecen las tasas 2026 con su vigencia, que la cuota se muestra en rango, que el reporte incluye dominio y latencia y que no hay llamadas a DeepSeek.
   > Nota (21 nov): `make tablero` reproducible (632 filas, 10 columnas, 12/12 preguntas verificadas, `tablero.csv` sin cambios) y `make arqueo` regenerado en el computador de la demo con el índice en Qdrant: 1/0 hit@5 0,75 (27/36) y 0/1 0,53 (19/36), más la sección del filtro de dominio del #158.
 - [ ] 9.3 Ejecutar el recorrido sintético completo por el webhook con las seis personas y `EnviadorFalso`: consentimiento, pregunta, diagnóstico, HITL, «¿Y si…?», comité y Roba la Bóveda; verificar que cada respuesta sale una sola vez y que no se envía nada por WhatsApp real.
@@ -163,8 +163,14 @@
   > Estado (21 nov): pendiente; se hace al cerrar el cambio.
 - [x] 9.6 Actualizar `CONSTITUTION.md`, `AGENTS.md`, `docs/ESTANDAR.md`, `docs/DIAGNOSTICO.md`, `README.md` y la skill `boveda-rag` con el canal, el diagnóstico, el MCP, Roba la Bóveda, la tabla Gold de tasas 2026 y las nuevas pruebas; verificar que las rutas y comandos documentados existen.
   > Nota (21 nov): cerrada. `CONSTITUTION.md` §4/§7/§9 lista `canal/`, `diagnostico/`, `mcp_servidor/`, `roba/`, `simulador/` y la tabla de tasas 2026; `AGENTS.md` añade los comandos (`make simular`, `make arqueo`, `make migrar-qdrant`) y una sección con contrato y pruebas de cada pieza; `docs/ESTANDAR.md` §11 traza la fase 2; `docs/DIAGNOSTICO.md` documenta la implementación y sus pruebas; `README.md` actualiza la estructura, las pruebas y los cuatro diagramas de Archify; la skill `boveda-rag` dice quién consume la Bóveda y que el Tablero no. Cada ruta y comando citado se comprobó contra el árbol del repositorio antes de marcar la casilla.
+- [x] 9.4 Arrancar `make app` y recorrer las ocho vistas; verificar `/api/operacion`, `/api/roba`, `/api/estado`, `/api/preguntar` y el webhook local contra el contrato.
+  > Nota (21 nov): make app en el computador de la demo; /health, /api/estado, /api/operacion y /api/roba?sesion=… responden 200 (sin el parámetro sesion, /api/roba responde 422 por diseño). Las ocho vistas cargan con datos; la Ventanilla responde y Roba la Bóveda acepta intentos y actualiza el marcador.
+- [x] 9.5 Revisar `git status` y el diff final: sin `data/asistente/*.sqlite`, sin `data/boveda/`, sin `.env`, sin claves, sin cambios en `data/raw/` salvo el PDF de tasas capturado, sin cambios en el resto de `data/gold/` y con `data/gold/tasas/` y `data/estructurados/tablero.csv` regenerados.
+  > Nota (21 nov): git ls-files no incluye bases SQLite, .env, data/boveda/, data/asistente/ ni archivos de secretos; config/whatsapp.toml conserva las huellas de ejemplo. Las únicas coincidencias del patrón de claves están en el contenido base64 incrustado de docs/arquitectura.html y docs/datos.html (verificado por número de línea): son falsos positivos.
+- [ ] 9.6 Actualizar `CONSTITUTION.md`, `AGENTS.md`, `docs/ESTANDAR.md`, `docs/DIAGNOSTICO.md`, `README.md` y la skill `boveda-rag` con el canal, el diagnóstico, el MCP, Roba la Bóveda, la tabla Gold de tasas 2026 y las nuevas pruebas; verificar que las rutas y comandos documentados existen.
+  > Estado (21 nov): pendiente como revisión final, aunque cada PR ya actualizó la documentación de su alcance.
 - [ ] 9.7 Confirmar el congelamiento del sábado 21 con `make check` y `make arqueo` en verde, y cerrar el 23 con la revisión de la sustentación y el `git status` limpio.
-  > Estado (21 nov): pendiente; depende de 8.10 y 9.1–9.6.
+  > Estado (22 nov): pendiente; depende de 9.1–9.6 (8.10 quedó descartada).
 
 ## Workflow follow-up
 
