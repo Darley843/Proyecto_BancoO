@@ -139,8 +139,8 @@
   > Nota (21 nov): resuelta en el #120.
 - [x] 8.9 Implementar la terminal de Roba la Bóveda en `roba.js` con envío, categoría, resultado, marcador, reinicio y exportación; verificar que no usa librerías externas ni llama a otra API que `/api/roba`.
   > Nota (21 nov): resuelta en el #120; el backend de Roba la Bóveda se completó en el #147.
-- [ ] 8.10 Preparar el guion de sustentación en `docs/SUSTENTACION.md` con el recorrido consentimiento → pregunta → diagnóstico → HITL → «¿Y si…?» → comité → Roba la Bóveda → Arqueo; verificar que cada paso tiene el comando o la pantalla que lo demuestra.
-  > Estado (21 nov): pendiente. No existe `docs/SUSTENTACION.md`.
+- [x] 8.10 ~~Preparar el guion de sustentación en `docs/SUSTENTACION.md` con el recorrido consentimiento → pregunta → diagnóstico → HITL → «¿Y si…?» → comité → Roba la Bóveda → Arqueo; verificar que cada paso tiene el comando o la pantalla que lo demuestra.~~
+  > Estado (22 nov): **descartada**. La sustentación es 100 % en vivo, sin guion escrito ni video: los agentes se presentan solos en la escena «Pana vs. el gota a gota» (README, sección «La presentación»). No se crea `docs/SUSTENTACION.md`.
 - [x] 8.11 Crear el paquete `pana` con el dibujo del personaje (foto de perfil y tres caras), las tarjetas PNG del diagnóstico y del «¿Y si…?» y su texto equivalente, con Pillow fijo y DejaVu Sans versionada; verificar con `test/test_pana_tarjetas.py` que la imagen pesa menos de 1 MB, se genera en memoria, rechaza teléfonos y documentos y que el texto lleva los mismos datos.
   > Nota (21 nov): resuelta en el #138.
 - [x] 8.12a Convertir el `ResultadoDiagnostico` del motor (#136) y la `ComparacionEscenario` del «¿Y si…?» en datos de tarjeta, con `pana/desde_diagnostico.py` (`tarjeta_y_texto`, `escenario_y_texto`): crédito con cuota → diagnóstico, ahorro → ahorro, libranza de independiente o capacidad negativa → «no aplica»; la tarjeta usa la tasa mensual máxima (la del semáforo) y un nombre corto de la fuente; verificar con `test/test_pana_desde_diagnostico.py` contra el motor real y una tabla Gold temporal.
@@ -163,7 +163,7 @@
 - [ ] 9.6 Actualizar `CONSTITUTION.md`, `AGENTS.md`, `docs/ESTANDAR.md`, `docs/DIAGNOSTICO.md`, `README.md` y la skill `boveda-rag` con el canal, el diagnóstico, el MCP, Roba la Bóveda, la tabla Gold de tasas 2026 y las nuevas pruebas; verificar que las rutas y comandos documentados existen.
   > Estado (21 nov): pendiente como revisión final, aunque cada PR ya actualizó la documentación de su alcance.
 - [ ] 9.7 Confirmar el congelamiento del sábado 21 con `make check` y `make arqueo` en verde, y cerrar el 23 con la revisión de la sustentación y el `git status` limpio.
-  > Estado (21 nov): pendiente; depende de 8.10 y 9.1–9.6.
+  > Estado (22 nov): pendiente; depende de 9.1–9.6 (8.10 quedó descartada).
 
 ## Workflow follow-up
 
