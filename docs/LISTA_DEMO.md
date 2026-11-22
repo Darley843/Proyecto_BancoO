@@ -94,7 +94,10 @@ esta lista se escribe en el repositorio, en capturas ni en el chat del grupo.
 ### Ensayo general
 
 - [ ] Recorrer la **prueba de humo** completa (sección 3) con `WHATSAPP_MODO=real`.
-- [ ] Grabar un video corto o tomar capturas de cada flujo: es el plan B.
+- [ ] En el paso 4, la respuesta dice **1965** (no el fragmento de 1991–1993
+      que sale en modo demo; ver la nota al final de la sección 3).
+- [ ] Tomar capturas de cada flujo como respaldo. La sustentación es en vivo y
+      sin video: las capturas solo se usan si algo no se puede mostrar.
 
 ## 2. Una hora antes
 
@@ -155,7 +158,7 @@ curl.exe "https://<url-del-tunel>/webhooks/whatsapp?hub.mode=subscribe&hub.verif
 | 1 | `hola` por WhatsApp | Aviso de la Ley 1581 con **Acepto** y **Ahora no**; menciona a DeepSeek como proveedor externo |
 | 2 | **Acepto** | Confirmación; el consentimiento queda guardado |
 | 3 | «¿Cuál es la cuota de manejo de la tarjeta débito?» | Respuesta del Tablero (`T`) con su fuente |
-| 4 | «¿En qué año se fundó el Banco de Occidente?» | Respuesta de la Bóveda (`B`) con cita |
+| 4 | «¿En qué año se fundó el Banco de Occidente?» | Respuesta de la Bóveda (`B`) con cita; dice **1965** |
 | 5 | «¿Qué clima hace hoy en Cali?» | Rechazo (`X`) con la respuesta estándar |
 | 6 | «¿Me alcanza para un crédito?» | Arranca la entrevista del diagnóstico por WhatsApp |
 | 7 | Entrevista con la persona `empleada_verde` | Verde y tarjeta de Pana |
@@ -183,15 +186,22 @@ Para la sustentación de Roba la Bóveda: en modo demo mide sobre todo las
 robustez del modelo frente a la inyección se muestra con el caso 5
 (`SUCURSAL_DEMO_INYECCION`).
 
+En **modo demo** la Ventanilla no llama al modelo: responde con el fragmento
+principal de la Bóveda. Probado el 21 de noviembre: «¿En qué año se fundó el
+Banco de Occidente?», que además es el primer ejemplo de la Ventanilla, trae
+el fragmento de 1991–1993 y no el de 1965. Para mostrar la Bóveda en modo demo
+se usa «¿Cuál es el propósito o misión del banco?», que contesta con la página
+*Nuestro Banco*, o «¿Puedo abrir una cuenta en línea?».
+
 ## 4. Plan B
 
 | Si falla… | Qué hacer |
 |---|---|
 | El túnel se cae | Reiniciar `cloudflared`, copiar la URL nueva, actualizar el callback en Meta (Nayla o Darley) y verificar (unos 2 minutos) |
-| Meta no entrega los mensajes | Mostrar el flujo con la app web y el simulador: `make simular` firma las conversaciones de las personas, las entrega al webhook real con el enviador falso y muestra por persona el semáforo, el comité y el «¿Y si…?»; también el video del ensayo |
+| Meta no entrega los mensajes | Mostrar el flujo con la app web y el simulador: `make simular` firma las conversaciones de las personas, las entrega al webhook real con el enviador falso y muestra por persona el semáforo, el comité y el «¿Y si…?»; también las capturas del ensayo |
 | `ErrorEnvio: destino no autorizado` | Falta la huella del número o cambió la sal: regenerarla, pegarla en `config/whatsapp.toml` y reiniciar la app |
-| DeepSeek falla o se alcanza el tope | Ventanilla en modo demo (`$env:SUCURSAL_DEMO = "1"` y reiniciar la app); el comité se muestra con la corrida grabada del ensayo |
-| Ollama o el índice no responden | La Ventanilla y Roba responden 503: arrancar Ollama, revisar `data/boveda/indice.json` y, si no se recupera, usar capturas o video |
+| DeepSeek falla o se alcanza el tope | Ventanilla en modo demo (`$env:SUCURSAL_DEMO = "1"` y reiniciar la app); para la Bóveda, «¿Cuál es el propósito o misión del banco?» en vez de la pregunta del año (nota de la sección 3); el comité se muestra con la corrida grabada del ensayo |
+| Ollama o el índice no responden | La Ventanilla y Roba responden 503: arrancar Ollama, revisar `data/boveda/indice.json` y, si no se recupera, usar las capturas |
 | Sin internet | Todo lo local sigue: app web en modo demo, Roba, Operación y la suite (`make check`) |
 
 ## 5. Al terminar
@@ -220,4 +230,4 @@ robustez del modelo frente a la inyección se muestra con el caso 5
 | App de Meta, huellas de los números y respaldo del callback | Darley |
 | Tasas del Tablero y comité | Nayla |
 | Tablero de operación, latencia y calentamiento | Yoldy |
-| Video, capturas de respaldo y guion de la sustentación | Yoldy |
+| Capturas de respaldo y guion de la sustentación | Yoldy |
