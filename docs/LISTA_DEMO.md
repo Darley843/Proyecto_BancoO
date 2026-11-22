@@ -91,6 +91,25 @@ esta lista se escribe en el repositorio, en capturas ni en el chat del grupo.
   ```
   Nunca se escribe en el chat, en una captura ni en el repositorio.
 
+### Escena «Pana vs. el gota a gota» (pantalla y voces)
+
+- [ ] `main` con la pantalla (#169) y las voces (#171) fusionadas.
+- [ ] Voces de Piper descargadas una vez (son el respaldo de todos los
+      personajes; necesita internet solo esta vez):
+  ```powershell
+  make voz-modelo
+  ```
+- [ ] **Microsoft Edge** instalado y con internet: Pana habla con
+      «Microsoft Gonzalo Online (Natural)» y el agente del joven con
+      «Microsoft Juan Online (Natural)». En otro navegador o sin internet
+      vuelven a su voz de Piper (suena, pero menos natural).
+- [ ] Con `make app` encendida, abrir en Edge `http://127.0.0.1:8000/voces.html`
+      y pulsar **Escuchar** en los seis personajes: Pana y el agente del joven
+      con su voz de Edge; el Auditor con voz de hombre.
+- [ ] Abrir en Edge `http://127.0.0.1:8000/escena.html`, pulsar **Empezar** y
+      escuchar la escena completa con el sonido del proyector o los parlantes
+      de la sala.
+
 ### Ensayo general
 
 - [ ] Recorrer la **prueba de humo** completa (sección 3) con `WHATSAPP_MODO=real`.
@@ -115,6 +134,8 @@ make app
 - [ ] La consulta de `LANGSMITH|LANGCHAIN` no muestra nada, salvo que el grupo
       decida mostrar trazas (`docs/SEGURIDAD.md` §5.1).
 - [ ] La app queda en `http://127.0.0.1:8000` y `GET /health` responde 200.
+- [ ] La escena abierta en **Edge**, en pantalla completa (F11), en
+      `http://127.0.0.1:8000/escena.html`, con el volumen probado.
 
 **Ventana 2: el túnel.**
 
@@ -202,6 +223,8 @@ se usa «¿Cuál es el propósito o misión del banco?», que contesta con la p�
 | `ErrorEnvio: destino no autorizado` | Falta la huella del número o cambió la sal: regenerarla, pegarla en `config/whatsapp.toml` y reiniciar la app |
 | DeepSeek falla o se alcanza el tope | Ventanilla en modo demo (`$env:SUCURSAL_DEMO = "1"` y reiniciar la app); para la Bóveda, «¿Cuál es el propósito o misión del banco?» en vez de la pregunta del año (nota de la sección 3); el comité se muestra con la corrida grabada del ensayo |
 | Ollama o el índice no responden | La Ventanilla y Roba responden 503: arrancar Ollama, revisar `data/boveda/indice.json` y, si no se recupera, usar las capturas |
+| La escena no suena (sin parlantes, voz que no carga) | Marcar **Solo subtítulos (respaldo)** (tecla S) y pasar los turnos con la barra espaciadora: el público lee los subtítulos y las cifras |
+| Pana suena con la voz de Piper y no con Gonzalo | Falta internet o no se abrió en Edge: abrir la escena en Edge; si no hay red, seguir con Piper o con solo subtítulos |
 | Sin internet | Todo lo local sigue: app web en modo demo, Roba, Operación y la suite (`make check`) |
 
 ## 5. Al terminar
@@ -230,4 +253,5 @@ se usa «¿Cuál es el propósito o misión del banco?», que contesta con la p�
 | App de Meta, huellas de los números y respaldo del callback | Darley |
 | Tasas del Tablero y comité | Nayla |
 | Tablero de operación, latencia y calentamiento | Yoldy |
+| Pantalla de la escena, voces y modo solo subtítulos | Yoldy |
 | Capturas de respaldo y guion de la sustentación | Yoldy |
