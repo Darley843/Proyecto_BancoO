@@ -37,9 +37,7 @@ Ver `proposal.md` para la motivación. El estado actual que condiciona el diseñ
 La escena es una lista ordenada de `TurnoEscena`. La voz, los subtítulos, la entrada por voz y el auditor consumen el mismo objeto; la pantalla no calcula cifras ni decide rutas.
 
 ```python
-PersonajeEscena = Literal[
-    "pana", "don_gota", "joven", "agente_joven", "agente_banco", "auditor"
-]
+PersonajeEscena = Literal["pana", "don_gota", "joven", "agente_joven", "agente_banco", "auditor"]
 OrigenTurno = Literal["guion_fijo", "motor", "llm", "reglas", "entrada_voz"]
 
 
