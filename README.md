@@ -105,10 +105,16 @@ Ollama local y DeepSeek como servicio externo, vive en
 [`docs/arquitectura.html`](./docs/arquitectura.html). Su fuente tipada es
 `docs/arquitectura.json`; el HTML se genera, nunca se edita a mano.
 
-El flujo de datos — **Gold → chunks → fragmentos → Ollama → Qdrant →
-recuperación → respuesta citada**, y **PDF/tablas → CSV → plantilla** — vive en
+El flujo de datos - **Gold → chunks → fragmentos → Ollama → Qdrant →
+recuperación → respuesta citada**, y **PDF/tablas → CSV → plantilla** - vive en
 [`docs/datos.html`](./docs/datos.html). Su fuente es `docs/datos.json` y también
 se genera con Archify.
+
+El turno del canal - **Meta → webhook → despachador → entrevista o grafo →
+Bóveda → EnviadorMeta** - vive en [`docs/canal.html`](./docs/canal.html), con su
+fuente `docs/canal.json`. Y la entrevista del diagnóstico, del aviso de la Ley
+1581 al semáforo y la tarjeta, vive en
+[`docs/diagnostico.html`](./docs/diagnostico.html), con `docs/diagnostico.json`.
 
 ```bash
 # una vez: instala Archify v3.2.0 en el commit auditado (Node >= 18).
@@ -128,6 +134,10 @@ node ~/.agents/skills/archify/bin/archify.mjs finalize architecture \
   docs/arquitectura.json docs/arquitectura.html --repo-root . --quality showcase --json
 node ~/.agents/skills/archify/bin/archify.mjs finalize dataflow \
   docs/datos.json docs/datos.html --repo-root . --quality showcase --json
+node ~/.agents/skills/archify/bin/archify.mjs finalize sequence \
+  docs/canal.json docs/canal.html --repo-root . --quality showcase --json
+node ~/.agents/skills/archify/bin/archify.mjs finalize workflow \
+  docs/diagnostico.json docs/diagnostico.html --repo-root . --quality showcase --json
 ```
 
 En PowerShell, la instalación equivalente es la que se probó en Windows:
@@ -147,8 +157,9 @@ La skill instalada debe tener 206 archivos, como en la auditoría.
 
 En PowerShell el CLI queda en `$HOME\.agents\skills\archify\bin\archify.mjs`. La
 corrida deja los recibos `docs/arquitectura.finalize*.json`,
-`docs/arquitectura.browser-check.json` y los equivalentes `docs/datos.*.json`; si
-algún gate falla, se corrige el JSON y se repite el comando completo.
+`docs/arquitectura.browser-check.json` y los equivalentes `docs/datos.*.json`,
+`docs/canal.*.json` y `docs/diagnostico.*.json`; si algún gate falla, se corrige
+el JSON y se repite el comando completo.
 
 ## Requisitos e instalación
 
@@ -796,15 +807,30 @@ Resultados vigentes y respuestas completas de v1:
 │   ├── contexto.py · knowledge.py · documents.py · videos.py · news.py
 │   ├── asistente/             # Q&A, FAQ, resumen y evaluación con DeepSeek
 │   ├── boveda/               # fragmentos, embeddings, índice Qdrant y recuperador
-│   ├── sucursal/             # digiturno (B/T/X/D), grafo y API de la fase 2
+│   ├── sucursal/             # digiturno (B/T/X/D), grafo, perfil y API de la fase 2
+│   ├── canal/                # WhatsApp: webhook, identidad, consentimiento, HITL y envío
+│   ├── diagnostico/          # entrevista guiada, motor, «¿Y si…?» y comité
+│   ├── mcp_servidor/         # servidor MCP de solo lectura
+│   ├── roba/                 # Roba la Bóveda: clasificador y marcador
+│   ├── simulador/            # recorrido sintético del canal sin red
+│   ├── pana/                 # personaje y tarjetas PNG del diagnóstico
 │   └── tablero/              # tarifario y tablas de Gold → data/estructurados/tablero.csv
 ├── scripts/                   # demo_offline.py · scrape_empresa.py · tasks.py
 ├── config/ · data/ · docs/    # configuración, capas y documentación
 ├── config/sucursal.toml       # embeddings y recuperación de la fase 2
+├── config/diagnostico.toml    # umbrales, límites y mapeo producto → objetivo
+├── config/tasas.toml          # usura certificada y archivos del tarifario
+├── config/whatsapp.toml       # canal: modo, aviso y huellas autorizadas (local)
 ├── test/                      # pytest con fixtures locales, sin red
 ├── makefile · pyproject.toml · uv.lock
 └── CONSTITUTION.md · AGENTS.md
 ```
+
+Las pruebas de la fase 2 también corren sin red: `test/test_canal_*.py`,
+`test/test_diagnostico_*.py`, `test/test_mcp_servidor.py`,
+`test/test_roba_*.py`, `test/test_simulador_*.py` y `test/test_web_roba.py`.
+`make simular` recorre el canal completo con el enviador falso; el ensayo con
+`WHATSAPP_MODO=real` es aparte y nunca forma parte de `make check`.
 
 ## Contrato de Gold
 

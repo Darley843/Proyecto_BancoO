@@ -55,6 +55,9 @@ make indice      # indexa la Bóveda con Ollama (web + PDF de producto + hechos)
 make indice-completo  # añade el resto de PDF y los videos
 make tablero     # tarifario + tablas de Gold -> data/estructurados/tablero.csv
 make app         # Sucursal 1965: FastAPI + app web en 127.0.0.1:8000
+make simular     # canal completo con las personas sintéticas y el enviador falso (sin red)
+make arqueo      # data/evaluacion/arqueo.json y docs/ARQUEO.md (sin DeepSeek)
+make migrar-qdrant # copia un índice Chroma ya construido a Qdrant sin revectorizar
 make evaluar     # 20 preguntas del alcance -> docs/RESULTADOS_20_PREGUNTAS.md
 make check       # lint + typecheck + pruebas
 make health      # integridad de las capas y del contrato de Gold
@@ -102,6 +105,30 @@ pipeline: no entra en `uv.lock`, no escribe en Bronze/Silver/Gold y ningún
 aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 (ver `CONSTITUTION.md` §3).
 
+## Piezas de la fase 2
+
+| Pieza | Entrada | Contrato | Pruebas |
+|---|---|---|---|
+| Canal de WhatsApp | `canal/webhook.py` → `canal/cola.py` → `canal/despachador.py` → `canal/envio.py` | `docs/OPERACION_WHATSAPP.md` | `test/test_canal_*.py` |
+| Diagnóstico guiado | `canal/entrevista.py` + `diagnostico/motor.py` | `docs/DIAGNOSTICO.md` | `test/test_diagnostico_*.py`, `test/test_canal_entrevista.py` |
+| Comité de crédito | `diagnostico/comite.py` | `docs/COMITE.md` | `test/test_diagnostico_comite.py` |
+| MCP de solo lectura | `uv run python -m banco_occidente_corpus.mcp_servidor` | `docs/MCP.md` | `test/test_mcp_servidor.py` |
+| Roba la Bóveda | `roba/` + `/api/roba/*` | `docs/ROBA_BOVEDA.md` | `test/test_roba_*.py`, `test/test_web_roba.py` |
+| Simulador sin red | `make simular` + `simulador/` | este archivo | `test/test_simulador_*.py` |
+
+Tasas 2026: las responde el **Tablero** (`data/gold/tasas/tasas-personas-AAAA-MM.jsonl`
+→ `data/estructurados/tablero.csv`), no la Bóveda. La Bóveda cubre la ruta B
+(preguntas de producto y política); el Tablero cubre la ruta T (tasa, cuota y
+tarifa). El diagnóstico usa solo el Tablero para la tasa y nunca inventa una.
+
+El canal tiene dos modos. `WHATSAPP_MODO=falso` (y `make simular`) recorre el
+webhook con `EnviadorFalso`: no toca Meta ni necesita `DEEPSEEK_API_KEY`. El
+modo `real` exige token vigente, app publicada, números autorizados con huella
+en `config/whatsapp.toml` (local, nunca versionado) y consentimiento previo; es
+un ensayo de demo, no una prueba de `make check`. No se guardan números en
+claro, nombres de terceros ni textos libres: solo `usuario_id` HMAC, nombre y
+rol declarados, con consentimiento.
+
 ## Mapa del código
 
 | Archivo | Responsabilidad |
@@ -143,6 +170,19 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | `.../canal/entrada.py` | Extrae y normaliza texto, botones y listas del payload de Meta |
 | `.../canal/cola.py` | Cola de un trabajador para procesar fuera del webhook |
 | `.../canal/despachador.py` | Identidad, autorización, consentimiento y respuesta del canal |
+| `.../canal/firma.py` | Verifica `X-Hub-Signature-256` antes de procesar el payload |
+| `.../canal/webhook.py` | Verificación de Meta y recepción del webhook |
+| `.../canal/entrevista.py` | Entrevista del diagnóstico por WhatsApp y tarjeta |
+| `.../canal/hitl.py` | `interrupt()`, botones Contactar/Descartar y caso de asesor |
+| `.../canal/envio.py` | Cliente de Meta: `timeout`, User-Agent y `From` |
+| `.../canal/almacen.py` | Mensajes, consentimientos y casos en SQLite |
+| `.../diagnostico/motor.py` | Contratos del canal → cálculo → `ResultadoDiagnostico` |
+| `.../diagnostico/calculo.py` | Tasa mensual y cuota francesa |
+| `.../diagnostico/escenarios.py` | «¿Y si…?» con `thread_id` nuevo |
+| `.../diagnostico/comite.py` | Comité de crédito con auditor determinístico |
+| `.../roba/` | Roba la Bóveda: clasificador, marcador, respondedor e API |
+| `.../simulador/` | Recorrido sintético del canal con `EnviadorFalso` |
+| `.../sucursal/operacion.py` | Panel de operación y latencias p50/p95 |
 | `.../sucursal/grafo.py` | StateGraph con memoria, rutas y redacción |
 | `.../sucursal/ajustes.py` | Tope de gasto, TTL y modo demo |
 | `.../sucursal/costo.py` | Tarifas valle/pico, gasto diario y caché |

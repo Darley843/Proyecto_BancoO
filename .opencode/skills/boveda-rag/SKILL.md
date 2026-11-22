@@ -38,9 +38,9 @@ consume los chunks y los hechos que producen esas dos skills.
    la usa `asistente/rag.py` sobre la pregunta y la respuesta; `boveda/fragmentos.py`
    la aplica a los hechos antes de indexarlos. `sucursal/grafo.py`
    (`responder_turno`) bloquea la PII antes de escribir en
-   `data/asistente/memoria.sqlite` y ese bloqueo **entra con el #67**; mientras
-   el PR no esté fusionado, `sucursal/digiturno.py` sigue aplicando
-   `detectar_pii` como primera regla. Ley 1581 de 2012.
+   `data/asistente/memoria.sqlite`, y `sucursal/digiturno.py` aplica
+   `detectar_pii` como primera regla, así que también cubre los turnos del
+   canal antes de la entrevista. Ley 1581 de 2012.
 4. **El índice no se versiona.** `.gitignore` contiene `data/boveda/`, que
    incluye Qdrant (`data/boveda/qdrant/`), Chroma opcional, `indice.json` y
    `mediciones/`. Se comprueba con `git check-ignore -v data/boveda/qdrant`.
@@ -117,8 +117,8 @@ Con la app web:
 make app   # http://127.0.0.1:8000
 ```
 
-La API `/api/preguntar` llega con el PR 10b; mientras tanto, la app sirve la
-vista web y el recuperador se puede consultar directamente:
+La API `/api/preguntar` atiende el turno completo con `sucursal/preguntar.py`;
+mientras la app arranca, el recuperador también se puede consultar directamente:
 
 ```bash
 uv run python -c "from banco_occidente_corpus.config import load_config; from banco_occidente_corpus.boveda.recuperador import crear_recuperador; [print(f'{f.puntaje:.3f}  {f.url}  {f.encabezado}') for f in crear_recuperador(load_config()).buscar('¿Cuál es la línea de atención?', 5)]"
@@ -127,6 +127,31 @@ uv run python -c "from banco_occidente_corpus.config import load_config; from ba
 Revisa que cada resultado traiga `id`, `url`, `titulo`, `seccion`,
 `encabezado`, `tipo`, `tokens` y `puntaje` entre 0 y 1. Si el `puntaje` no
 significa `1 - distancia coseno`, el índice o el recuperador están desalineados.
+
+## Quién consume la Bóveda
+
+| Consumidor | Entrada | Qué espera del índice |
+|---|---|---|
+| Canal de WhatsApp | `canal/despachador.py` → `sucursal/grafo.py` | fragmentos para la respuesta citada de la ruta B |
+| Ventanilla web | `POST /api/preguntar` | el mismo turno, con la caché aparte |
+| Servidor MCP | `buscar_en_boveda` | cinco fragmentos con URL, encabezado y puntaje |
+| Arqueo | `arqueo/experimentos.py` | el índice `base` o `completo` para medir hit@5 y MRR |
+
+No consumen la Bóveda:
+
+- **Tablero y diagnóstico:** las tasas 2026 salen de
+  `data/gold/tasas/tasas-personas-2026-11.jsonl` y de
+  `data/estructurados/tablero.csv` (ruta T). Un spread se presenta como
+  «IPC + X puntos», nunca como tasa.
+- **Comité de crédito:** recibe `resultado.model_dump()` y escenarios
+  precalculados; no consulta fragmentos ni escribe en `data/boveda/`.
+- **Roba la Bóveda:** juega con un corpus sintético y su marcador vive en
+  `data/asistente/roba.sqlite`; no indexa ni mide el índice real.
+
+Las pruebas que fijan ese consumo son `test/test_sucursal_grafo.py`,
+`test/test_canal_despachador.py`, `test/test_mcp_servidor.py`,
+`test/test_diagnostico_comite.py` y `test/test_roba_respondedor.py`; todas usan
+dobles y no necesitan Ollama ni DeepSeek.
 
 ## Medir
 

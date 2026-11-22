@@ -215,7 +215,31 @@ ProyectoAvance1/
 │   │   ├── grafo.py      # StateGraph con memoria, rutas y redacción
 │   │   ├── ajustes.py    # tope de gasto, TTL y modo demo
 │   │   ├── costo.py      # tarifas valle/pico, gasto diario y caché
+│   │   ├── perfil.py     # memoria de perfil (nombre y empresa) sobre LangGraph
+│   │   ├── preguntar.py  # turno completo con caché y sin PII
+│   │   ├── operacion.py  # panel de operación y latencias p50/p95
+│   │   ├── transmision.py # streaming del turno para la Ventanilla
 │   │   └── api.py        # endpoints de estado, datos y trazabilidad
+│   ├── canal/            # CANAL: WhatsApp de punta a punta
+│   │   ├── identidad.py  # E.164 y usuario_id = HMAC-SHA256(número, salt)
+│   │   ├── firma.py      # validación de la firma X-Hub-Signature-256
+│   │   ├── webhook.py    # verificación y recepción de Meta
+│   │   ├── entrada.py    # texto, botones y listas del payload
+│   │   ├── consentimiento.py # aviso de la Ley 1581, aceptación y revocación
+│   │   ├── entrevista.py # entrevista del diagnóstico por WhatsApp
+│   │   ├── hitl.py       # interrupt(), botones Contactar/Descartar y caso
+│   │   ├── cola.py       # un trabajador procesa fuera del webhook
+│   │   ├── despachador.py # identidad, consentimiento y respuesta
+│   │   ├── envio.py      # cliente de Meta: timeout, User-Agent y From
+│   │   └── almacen.py    # mensajes, consentimientos y casos en SQLite
+│   ├── diagnostico/      # DIAGNÓSTICO: entrevista guiada y motor
+│   │   ├── motor.py      # contratos del canal -> cálculo -> resultado
+│   │   ├── calculo.py    # tasa mensual y cuota francesa
+│   │   ├── escenarios.py # «¿Y si…?» con un thread_id nuevo
+│   │   └── comite.py     # comité de crédito multiagente con auditor
+│   ├── mcp_servidor/     # MCP de solo lectura: tasas, cuota y Bóveda
+│   ├── roba/             # ROBA LA BÓVEDA: clasificador, marcador y API
+│   ├── simulador/        # recorrido sintético del canal con enviador falso
 │   ├── checklist.py      # 24 casillas del Taller 1
 │   ├── stats.py          # _INDICE.md
 │   └── utils.py          # hashing, JSONL, tokens, slugs
@@ -224,6 +248,9 @@ ProyectoAvance1/
 ├── config/contexto.toml  # secciones, prioridad y presupuesto del contexto
 ├── config/prompts/       # prompts versionados (qa_v0.md, qa_v1.md, qa_v2.md, faq_v1.md, resumen_v1.md)
 ├── config/sucursal.toml  # embeddings locales, prefijos y recuperación de la fase 2
+├── config/diagnostico.toml # umbrales, límites y mapeo producto -> objetivo
+├── config/tasas.toml     # usura certificada y archivos del tarifario
+├── config/whatsapp.toml  # canal: modo, aviso y huellas autorizadas (local)
 ├── data/
 │   ├── raw/              # Bronze (ignorado por Git)
 │   ├── processed/        # Silver (ignorado por Git)
@@ -232,6 +259,7 @@ ProyectoAvance1/
 │   ├── knowledge/        # Knowledge (VERSIONADO) → entidades, hechos, relaciones
 │   └── evaluacion/       # EVALUACIÓN (VERSIONADO) → resultados v2 y arqueo.json
 ├── data/boveda/          # BÓVEDA (ignorado) → Qdrant, fragmentos e indice.json
+├── data/asistente/       # ASISTENTE (ignorado) → memoria, caché, gasto y latencias
 ├── data/estructurados/   # TABLERO (VERSIONADO) → tablero.csv
 ├── scripts/
 │   ├── tasks.py          # tareas del Makefile portables (Windows/Unix)
@@ -240,6 +268,10 @@ ProyectoAvance1/
 ├── app/
 │   └── web/              # APP: HTML/CSS/JS de la Sucursal 1965 (make app)
 ├── docs/ESTANDAR.md      # trazabilidad regla de la clase → implementación
+├── docs/OPERACION_WHATSAPP.md # canal: arranque, túnel, callback y modos
+├── docs/DIAGNOSTICO.md   # entrevista, cálculo, semáforo y comité
+├── docs/MCP.md           # servidor MCP de solo lectura
+├── docs/ROBA_BOVEDA.md   # juego y marcador seguro
 ├── .opencode/skills/corpus-extraction/    # skill operativa del pipeline
 ├── .opencode/skills/semantic-extraction/  # skill de conocimiento semántico
 ├── .opencode/skills/boveda-rag/          # skill de operación y medición de la Bóveda
@@ -252,6 +284,13 @@ ProyectoAvance1/
 ├── pyproject.toml / uv.lock / .python-version
 └── LICENSE
 ```
+
+La fase 2 añade cinco piezas que no reemplazan el corpus: el **canal de
+WhatsApp** (`canal/`), el **motor del diagnóstico** (`diagnostico/`), el
+**servidor MCP de solo lectura** (`mcp_servidor/`), **Roba la Bóveda** (`roba/`)
+y el **simulador sin red** (`simulador/`). Sus contratos viven en
+`docs/OPERACION_WHATSAPP.md`, `docs/DIAGNOSTICO.md`, `docs/MCP.md` y
+`docs/ROBA_BOVEDA.md`; el detalle de las rutas está en `AGENTS.md`.
 
 ## 5. Convenciones de código
 
@@ -459,10 +498,12 @@ Reglas:
 
 Comandos: `make docs`, `make videos`, `make media`.
 
-### Tabla Gold de tasas (versionada)
+### Tabla Gold de tasas 2026 (versionada)
 
 El PDF de tasas de personas se estructura en una tabla Gold por vigencia; no
-pasa por `make gold` ni se mezcla con las páginas Gold.
+pasa por `make gold` ni se mezcla con las páginas Gold. La tabla vigente es la
+del tarifario de noviembre de 2026 (`tasas-personas-2026-11.jsonl`); si el banco
+publica otra, se regenera con el `sha256` nuevo y el Tablero toma esas filas.
 
 ```text
 data/raw/documents/<sha>.pdf                    BRONZE  PDF tal como se descargó
@@ -600,6 +641,8 @@ make all             # discover -> fetch -> extract -> gold -> stats
 make noticias        # hechos oficiales y prensa curada
 make contexto        # prompt del asistente desde Gold (data/contexto/)
 make app             # Sucursal 1965: FastAPI + app web en 127.0.0.1:8000
+make simular         # recorrido del canal con las personas sintéticas (sin red)
+make arqueo          # arqueo.json y ARQUEO.md (sin DeepSeek)
 
 # 4. Commit (los hooks corren solos)
 git add -A

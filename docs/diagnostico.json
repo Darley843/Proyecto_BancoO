@@ -1,0 +1,54 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Sucursal 1965: diagnóstico guiado",
+    "locale": "es",
+    "output": "docs/diagnostico.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Darley843/Proyecto_BancoO",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "3dbcb74f0c6883ce032ab613212b8b6b86ee2a64"
+    }
+  },
+  "lanes": [
+    { "id": "cliente", "label": "Cliente y canal" },
+    { "id": "entrevista", "label": "Entrevista" },
+    { "id": "motor", "label": "Motor y Tablero" },
+    { "id": "salida", "label": "Respuesta" },
+    { "id": "asesor", "label": "Asesor", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "datos", "label": "Datos", "fromCol": 0, "toCol": 3 },
+    { "id": "calculo", "label": "Cálculo", "fromCol": 4, "toCol": 5, "variant": "emphasis" }
+  ],
+  "mainPath": ["saludo", "aviso", "entrevista", "ids", "motor", "semaforo", "tarjeta"],
+  "nodes": [
+    { "id": "saludo", "lane": "cliente", "col": 0, "type": "external", "label": "Cliente", "sublabel": "pide el diagnóstico", "sources": [{ "path": "src/banco_occidente_corpus/canal/entrevista.py", "line": 338 }] },
+    { "id": "aviso", "lane": "cliente", "col": 1, "type": "security", "label": "Aviso Ley 1581", "sublabel": "«Acepto» o «Ahora no»", "tag": "sin aceptación no hay turno", "sources": [{ "path": "src/banco_occidente_corpus/canal/consentimiento.py", "line": 1 }] },
+    { "id": "entrevista", "lane": "entrevista", "col": 2, "type": "backend", "label": "Pasos 1 a 7", "sublabel": "botones y listas", "tag": "sin modelo", "sources": [{ "path": "src/banco_occidente_corpus/canal/entrevista.py", "line": 338 }] },
+    { "id": "ids", "lane": "entrevista", "col": 3, "type": "backend", "label": "Ids canónicos", "sublabel": "respuestas normalizadas", "sources": [{ "path": "src/banco_occidente_corpus/diagnostico/motor.py", "line": 212 }] },
+    { "id": "tablero", "lane": "motor", "col": 3, "type": "database", "label": "Tablero 2026", "sublabel": "tasa y vigencia", "tag": "no es la Bóveda", "sources": [{ "path": "src/banco_occidente_corpus/tablero/consultas.py", "line": 220 }] },
+    { "id": "motor", "lane": "motor", "col": 4, "type": "backend", "label": "Motor", "sublabel": "capacidad y cuota", "tag": "config/diagnostico.toml", "sources": [{ "path": "src/banco_occidente_corpus/diagnostico/motor.py", "line": 298 }] },
+    { "id": "semaforo", "lane": "motor", "col": 5, "type": "backend", "label": "Semáforo", "sublabel": "verde, amarillo o rojo", "sources": [{ "path": "src/banco_occidente_corpus/diagnostico/calculo.py", "line": 324 }] },
+    { "id": "tarjeta", "lane": "salida", "col": 5, "type": "backend", "label": "Tarjeta de Pana", "sublabel": "texto + PNG", "sources": [{ "path": "src/banco_occidente_corpus/pana/desde_diagnostico.py", "line": 333 }] },
+    { "id": "asesor", "lane": "asesor", "col": 5, "type": "security", "label": "Oferta de asesor", "sublabel": "solo en rojo", "tag": "revisión humana", "sources": [{ "path": "docs/DIAGNOSTICO.md", "line": 219 }] }
+  ],
+  "edges": [
+    { "id": "saludo-aviso", "from": "saludo", "to": "aviso", "variant": "security" },
+    { "id": "aviso-entrevista", "from": "aviso", "to": "entrevista", "label": "acepta", "variant": "emphasis" },
+    { "id": "entrevista-ids", "from": "entrevista", "to": "ids", "label": "responde", "variant": "emphasis" },
+    { "id": "ids-motor", "from": "ids", "to": "motor", "label": "entrada", "variant": "emphasis" },
+    { "id": "tablero-motor", "from": "tablero", "to": "motor", "label": "tasa", "variant": "default" },
+    { "id": "motor-semaforo", "from": "motor", "to": "semaforo", "label": "evalúa", "variant": "emphasis" },
+    { "id": "semaforo-tarjeta", "from": "semaforo", "to": "tarjeta", "label": "verde o amarillo", "variant": "default" },
+    { "id": "semaforo-asesor", "from": "semaforo", "to": "asesor", "label": "rojo", "variant": "security", "role": "branch" }
+  ],
+  "cards": [
+    { "dot": "emerald", "title": "Determinista", "items": ["Los siete pasos son una máquina de estados sin modelo", "Los ids canónicos son los del contrato de docs/DIAGNOSTICO.md", "La tarjeta repite en texto lo que muestra la imagen"] },
+    { "dot": "orange", "title": "Tasas", "items": ["La tasa sale del Tablero 2026, nunca de la Bóveda", "Un spread se presenta como «IPC + X puntos»", "Si la vigencia venció, el resultado lo declara"] },
+    { "dot": "rose", "title": "Límites", "items": ["El aviso de la Ley 1581 se acepta antes de la entrevista", "No se piden nombres, teléfonos ni documentos", "El resultado no sustituye la evaluación del banco"] }
+  ]
+}

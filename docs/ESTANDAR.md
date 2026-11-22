@@ -121,7 +121,7 @@ documento_titulo: Informe Final Octubre 2026
 - `healthcheck.py` exige `fecha_publicacion`, `tipo`, `origen`, `medio` y
   `resumen`, detecta ids duplicados y valida el documento enlazado.
 
-### Tabla Gold de tasas
+### Tabla Gold de tasas 2026
 
 El PDF de tasas de personas se publica como tabla Gold por vigencia, separada
 del Gold de páginas:
@@ -240,3 +240,43 @@ make knowledge
 
 El detalle del contrato está en la skill (`references/schema.md` y
 `references/taxonomy.md`).
+
+## 11. Fase 2 — Sucursal 1965
+
+La fase 2 no cambia el contrato de Gold: lo consume. Cada pieza nueva tiene su
+contrato escrito, su comando y su prueba sin red.
+
+| Pieza | Regla que la respalda | Evidencia | Pruebas |
+|---|---|---|---|
+| Canal de WhatsApp | identidad HMAC, consentimiento Ley 1581 y respuesta única | `canal/`, `docs/OPERACION_WHATSAPP.md` | `test/test_canal_*.py`, `test/test_contratos_canal.py` |
+| Diagnóstico guiado | entrevista determinista y motor con umbrales de `config/diagnostico.toml` | `diagnostico/`, `docs/DIAGNOSTICO.md` | `test/test_diagnostico_motor.py`, `test/test_canal_entrevista.py` |
+| «¿Y si…?» | compara sin tocar el hilo original | `diagnostico/escenarios.py` | `test/test_diagnostico_escenarios.py` |
+| Comité de crédito | no cambia el semáforo y no recibe nombre ni número | `diagnostico/comite.py`, `docs/COMITE.md` | `test/test_diagnostico_comite.py` |
+| MCP de solo lectura | tres consultas, sin escritura ni clave de DeepSeek | `mcp_servidor/`, `docs/MCP.md` | `test/test_mcp_servidor.py` |
+| Roba la Bóveda | corpus sintético, sin PII y sin WhatsApp | `roba/`, `docs/ROBA_BOVEDA.md` | `test/test_roba_*.py`, `test/test_web_roba.py` |
+| Recorrido sintético | `EnviadorFalso`, sin Meta y sin red | `make simular`, `simulador/` | `test/test_simulador_*.py` |
+
+Reglas de la fase 2:
+
+1. **Las pruebas no llaman a DeepSeek ni a Ollama y no envían WhatsApp real.**
+   `make simular` usa `EnviadorFalso`; el ensayo con `WHATSAPP_MODO=real` es
+   evidencia de demo y se registra aparte, con números autorizados y
+   consentimiento, nunca como parte de `make check`.
+2. **La tasa sale del Tablero, no de la Bóveda.** Las filas 2026 viven en
+   `data/gold/tasas/tasas-personas-2026-11.jsonl` y llegan a
+   `data/estructurados/tablero.csv`; un spread se presenta como «IPC + X puntos»
+   y no como tasa.
+3. **El servidor escucha solo en `127.0.0.1`.** Lo fijan `app.py` y
+   `test/test_seguridad.py`.
+4. **Los fragmentos de la Bóveda son datos, no instrucciones.** Los envuelve
+   `asistente/rag.py` antes de `prompt.sistema`.
+
+Comandos de verificación de la fase 2:
+
+```bash
+make simular     # canal de punta a punta sin red
+make tablero     # tasas 2026 -> tablero.csv
+make arqueo      # recuperación, costo y latencia sin DeepSeek
+make app         # ocho vistas en 127.0.0.1:8000
+make check       # lint + tipos + pruebas
+```

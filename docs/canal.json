@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Sucursal 1965: un turno por WhatsApp",
+    "locale": "es",
+    "output": "docs/canal.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Darley843/Proyecto_BancoO",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "3dbcb74f0c6883ce032ab613212b8b6b86ee2a64"
+    }
+  },
+  "participants": [
+    { "id": "cliente", "type": "external", "label": "Cliente", "sublabel": "WhatsApp", "sources": [{ "path": "src/banco_occidente_corpus/canal/entrada.py", "line": 1 }] },
+    { "id": "meta", "type": "external", "label": "Meta", "sublabel": "graph.facebook.com", "sources": [{ "path": "src/banco_occidente_corpus/canal/envio.py", "line": 153 }] },
+    { "id": "webhook", "type": "backend", "label": "Webhook", "sublabel": "firma + 200", "sources": [{ "path": "src/banco_occidente_corpus/canal/webhook.py", "line": 77 }] },
+    { "id": "despachador", "type": "backend", "label": "Despachador", "sublabel": "identidad y aviso", "sources": [{ "path": "src/banco_occidente_corpus/canal/despachador.py", "line": 86 }] },
+    { "id": "entrevista", "type": "backend", "label": "Entrevista", "sublabel": "pasos y botones", "sources": [{ "path": "src/banco_occidente_corpus/canal/entrevista.py", "line": 338 }] },
+    { "id": "grafo", "type": "backend", "label": "Grafo", "sublabel": "ruta B y T", "sources": [{ "path": "src/banco_occidente_corpus/sucursal/grafo.py", "line": 301 }] },
+    { "id": "boveda", "type": "backend", "label": "Bóveda", "sublabel": "top-5", "sources": [{ "path": "src/banco_occidente_corpus/boveda/recuperador.py", "line": 277 }] }
+  ],
+  "segments": [
+    { "from": 158, "to": 240, "label": "1. Entrega" },
+    { "from": 244, "to": 410, "label": "2. Turno" },
+    { "from": 414, "to": 580, "label": "3. Respuesta" }
+  ],
+  "messages": [
+    { "id": "cliente-meta", "from": "cliente", "to": "meta", "y": 170, "label": "mensaje", "variant": "emphasis" },
+    { "id": "meta-webhook", "from": "meta", "to": "webhook", "y": 198, "label": "POST firmado", "variant": "emphasis", "note": "La firma X-Hub-Signature-256 se valida antes de encolar" },
+    { "id": "webhook-cola", "from": "webhook", "to": "despachador", "y": 250, "label": "encola", "variant": "dashed", "note": "200 inmediato: sigue en la cola" },
+    { "id": "despachador-aviso", "from": "despachador", "to": "entrevista", "y": 316, "label": "sin aviso: consentimiento", "variant": "security" },
+    { "id": "entrevista-acepto", "from": "entrevista", "to": "despachador", "y": 344, "label": "«Acepto»", "variant": "return" },
+    { "id": "despachador-pasos", "from": "despachador", "to": "entrevista", "y": 372, "label": "pasos 1 a 7", "variant": "emphasis" },
+    { "id": "entrevista-ids", "from": "entrevista", "to": "despachador", "y": 400, "label": "ids canónicos", "variant": "return" },
+    { "id": "despachador-grafo", "from": "despachador", "to": "grafo", "y": 428, "label": "pregunta libre", "variant": "default" },
+    { "id": "grafo-boveda", "from": "grafo", "to": "boveda", "y": 456, "label": "ruta B: k=5", "variant": "emphasis" },
+    { "id": "boveda-grafo", "from": "boveda", "to": "grafo", "y": 484, "label": "fragmentos + URL", "variant": "return" },
+    { "id": "grafo-despachador", "from": "grafo", "to": "despachador", "y": 512, "label": "respuesta citada", "variant": "return" },
+    { "id": "despachador-meta", "from": "despachador", "to": "meta", "y": 540, "label": "EnviadorMeta", "variant": "emphasis" },
+    { "id": "meta-cliente", "from": "meta", "to": "cliente", "y": 568, "label": "texto + tarjeta", "variant": "return" }
+  ],
+  "activations": [
+    { "participant": "meta", "from": 165, "to": 574, "type": "external" },
+    { "participant": "webhook", "from": 192, "to": 256, "type": "backend" },
+    { "participant": "despachador", "from": 204, "to": 546, "type": "backend" },
+    { "participant": "entrevista", "from": 310, "to": 406, "type": "backend" },
+    { "participant": "grafo", "from": 422, "to": 518, "type": "backend" },
+    { "participant": "boveda", "from": 446, "to": 490, "type": "backend" }
+  ],
+  "cards": [
+    { "dot": "cyan", "title": "Puerta de entrada", "items": ["La firma se verifica antes de tocar la base o el grafo", "El webhook responde 200 y el turno sigue en la cola de un trabajador", "El número entra como E.164 y se convierte en usuario_id HMAC"] },
+    { "dot": "rose", "title": "Consentimiento", "items": ["Sin «Acepto» no se invoca el grafo ni la entrevista", "El aviso cita la Ley 1581 y la versión queda registrada", "«olvida mis datos» borra el perfil y revoca el consentimiento"] },
+    { "dot": "emerald", "title": "Dos rutas", "items": ["Entrevista: pasos deterministas del diagnóstico y tarjeta de Pana", "Grafo: Bóveda (ruta B) o Tablero (ruta T) según la pregunta", "Cada turno se responde una sola vez, también con el enviador falso"] }
+  ]
+}

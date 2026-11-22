@@ -15,9 +15,9 @@ repos:
     hooks:
       # los HTML de Archify se generan (docs/arquitectura.json, docs/datos.json) y no se editan a mano
       - id: trailing-whitespace
-        exclude: ^data/|^docs/(arquitectura|datos)\.html$
+        exclude: ^data/|^docs/(arquitectura|datos|canal|diagnostico)\.html$
       - id: end-of-file-fixer
-        exclude: ^data/|^docs/(arquitectura|datos)\.html$
+        exclude: ^data/|^docs/(arquitectura|datos|canal|diagnostico)\.html$
       - id: check-yaml
       - id: check-toml
       - id: check-merge-conflict

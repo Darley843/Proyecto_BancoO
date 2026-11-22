@@ -259,3 +259,32 @@ ejecuta con `diagnostico.motor.calcular`.
 
 Los resultados esperados se confirman con el motor implementado; si alguno no
 coincide, se ajusta la persona, no la regla.
+
+## Implementación y pruebas
+
+| Pieza | Archivo | Qué hace |
+|---|---|---|
+| Configuración | `config/diagnostico.toml` | umbrales, límites de monto y plazo y mapeo producto → objetivo |
+| Entrada | `diagnostico/motor.py::entrada_desde_respuestas` | ids de la entrevista → `EntradaDiagnostico` |
+| Motor | `diagnostico/motor.py::calcular` | `ResultadoDiagnostico` con semáforo, cuota, tasas y avisos |
+| Cálculo | `diagnostico/calculo.py` | `tasa_mensual`, `cuota_francesa`, capacidad y razón de endeudamiento |
+| Tasas | `tablero/tasas.py` → `calculo.tasa_de_tablero` | solo la tabla Gold 2026; un spread no es una tasa |
+| Escenarios | `diagnostico/escenarios.py` | `bifurcar_escenario`, `comparar_resultado` e `interpretar_pedido` |
+| Comité | `diagnostico/comite.py` | `deliberar` con riesgo, comercial y auditor determinístico |
+| Canal | `canal/entrevista.py` | pasos, botones y listas; el resultado vive 24 h por huella |
+| Tarjeta | `pana/desde_diagnostico.py` | `tarjeta_y_texto` y `escenario_y_texto` |
+| MCP | `mcp_servidor/servidor.py` | `simular_cuota` con las mismas primitivas, para que la cuota coincida |
+
+Las pruebas que fijan este contrato, todas sin red:
+
+```bash
+uv run pytest test/test_diagnostico_calculo.py test/test_diagnostico_motor.py \
+  test/test_diagnostico_escenarios.py test/test_diagnostico_comite.py \
+  test/test_canal_entrevista.py test/test_pana_desde_diagnostico.py -q
+```
+
+`test/test_diagnostico_motor.py` recorre las cinco personas sintéticas de
+`data/evaluacion/personas_sinteticas.json`; `test/test_canal_entrevista.py`
+comprueba la tarjeta, el «¿Y si…?» y el vencimiento a las 24 horas; y
+`test_simular_cuota_coincide_con_el_diagnostico` fija que el MCP y el motor dan
+la misma cuota.

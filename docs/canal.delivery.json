@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "9ce4acaa-36c0-4058-93c0-d87339da05d1",
+  "status": "current",
+  "command": "deliver",
+  "type": "sequence",
+  "input": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1-96\\docs\\canal.json",
+  "output": "D:\\Documentos_Loni\\Maestria_IA_Autonoma_Y_CienciaDeDatos\\SegundoSemestre\\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\\ProyectoAvance1-96\\docs\\canal.html",
+  "specification": {
+    "sha256": "7b974b506835fdf33478e7428ec88acfd549521328e758de4c1f0963d316f3ef",
+    "bytes": 4944
+  },
+  "artifact": {
+    "sha256": "d60c203b6b92f42674072dc9dad15e7fedf791fd2ac870779a301073550fd9fc",
+    "bytes": 847943
+  }
+}
