@@ -94,6 +94,20 @@ def test_cifra_sin_fuente_falla() -> None:
         )
 
 
+def test_cifra_con_fuente_documento_es_valida() -> None:
+    """Una cifra citada de un documento del repositorio usa `ruta#ancla`."""
+    cifra = CifraEscena(
+        etiqueta="monto citado en el documento",
+        valor=Decimal("1000000"),
+        valor_legible="$1.000.000",
+        unidad="pesos",
+        fuente=FuenteCifra(tipo="documento", referencia="docs/ARQUEO.md#ancla"),
+    )
+
+    assert cifra.fuente.tipo == "documento"
+    assert cifra.fuente.referencia == "docs/ARQUEO.md#ancla"
+
+
 @pytest.mark.parametrize("veredicto", ["conforme", "con_observaciones", "objeta"])
 def test_veredicto_acepta_los_tres_valores(veredicto: str) -> None:
     """El auditor solo usa los tres veredictos del diseño."""

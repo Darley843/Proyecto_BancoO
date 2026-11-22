@@ -25,8 +25,9 @@ from ..canal.contratos import ResultadoDiagnostico
 PersonajeEscena = Literal["pana", "don_gota", "joven", "agente_joven", "agente_banco", "auditor"]
 #: Origen de un turno. Don Gota siempre usa `guion_fijo`.
 OrigenTurno = Literal["guion_fijo", "motor", "llm", "reglas", "entrada_voz"]
-#: Naturaleza verificable de una cifra.
-TipoFuente = Literal["config", "gold", "motor", "calculo_gota", "usura", "guion"]
+#: Naturaleza verificable de una cifra. `documento` cita un archivo del
+#: repositorio con su ancla (`docs/ARQUEO.md#ancla`).
+TipoFuente = Literal["config", "gold", "motor", "calculo_gota", "usura", "guion", "documento"]
 #: Unidad de una cifra. Las tasas se guardan como fracción (0,2834 = 28,34 %).
 UnidadCifra = Literal["pesos", "porcentaje_ea", "porcentaje", "meses", "dias", "veces"]
 #: Semáforo financiero del crédito, distinto del veredicto del auditor.
