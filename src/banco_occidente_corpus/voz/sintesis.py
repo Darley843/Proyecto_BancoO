@@ -126,12 +126,11 @@ class ConfiguracionVoz:
     def modelos(self) -> tuple[str, ...]:
         """Devuelve los modelos de Piper distintos que se usan, ordenados.
 
-        Los personajes con ``motor = "navegador"`` no cuentan: no hay que
-        descargar nada para ellos.
+        También cuentan los personajes con ``motor = "navegador"``: su voz de
+        Piper es el respaldo cuando la voz del navegador no está (por ejemplo,
+        una voz «Online» de Edge sin internet).
         """
-        return tuple(
-            sorted({voz.modelo for voz in self.personajes.values() if voz.motor == "piper"})
-        )
+        return tuple(sorted({voz.modelo for voz in self.personajes.values()}))
 
 
 def _voz_personaje(nombre: str, datos: Mapping[str, Any]) -> VozPersonaje:
@@ -350,8 +349,6 @@ class VozEscena:
             if clave in self._memoria:
                 return self._memoria[clave]
         voz = self.personajes.get(personaje, VOZ_POR_DEFECTO)
-        if voz.motor != "piper":
-            raise VozNoDisponible(f"{personaje} usa la voz del navegador")
         try:
             muestras, frecuencia = self.sintetizador(limpio, voz)
         except VozNoDisponible:
@@ -390,7 +387,9 @@ def crear_voz(config: ConfiguracionVoz, raiz: Path = PROJECT_ROOT) -> VozEscena 
 
 
 def modelos_disponibles(config: ConfiguracionVoz, raiz: Path = PROJECT_ROOT) -> dict[str, bool]:
-    """Dice qué personajes tienen voz de Piper lista (motor piper y modelo descargado).
+    """Dice qué personajes tienen voz de Piper lista (modelo descargado).
+
+    Cuenta también a los de ``motor = "navegador"``: Piper es su respaldo.
 
     Args:
         config: valores de ``config/voz.toml``.
@@ -400,8 +399,6 @@ def modelos_disponibles(config: ConfiguracionVoz, raiz: Path = PROJECT_ROOT) -> 
         ``{personaje: True/False}`` en el orden de `PERSONAJES`.
     """
     return {
-        nombre: config.activa
-        and voz.motor == "piper"
-        and config.ruta_modelo(voz.modelo, raiz).exists()
+        nombre: config.activa and config.ruta_modelo(voz.modelo, raiz).exists()
         for nombre, voz in config.personajes.items()
     }
