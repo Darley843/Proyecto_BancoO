@@ -1,0 +1,47 @@
+# Escena demo «Pana vs. el gota a gota»: parámetros de Don Gota.
+#
+# Don Gota es un personaje ficticio. Este archivo no contiene secretos ni datos
+# personales. Las fórmulas viven en `escena/gota.py` y se aplican en `Decimal`:
+# el interés es mensual y simple, sin capitalizar, para que la comparación de
+# 36 meses sea defendible. La tasa E.A. es la equivalente compuesta del 20 %
+# mensual: (1,20)^12 - 1 = 791,61 % E.A.
+#
+# Las secciones de los demás dueños ([comparacion], [negociacion], [auditor],
+# [voluntario], [seguro] y [ui]) se añaden en sus tareas; este archivo no las
+# declara vacías para no pisar su trabajo.
+
+[gota]
+# Tasa mensual que cobra el personaje, como fracción (0,20 = 20 %).
+tasa_mensual = 0.20
+# Días del ciclo de cobro; la cuota diaria reparte el total del ciclo.
+dias_ciclo = 30
+# Meses del horizonte que se comparan con el banco y con la usura.
+meses_horizonte = 36
+
+[gota.frases]
+# Cada grupo elige una frase por índice determinista (SHA-256 del perfil) y
+# rellena solo estas variables: monto, tasa_mensual, interes_mensual,
+# total_ciclo, cuota_diaria y dias_ciclo. Don Gota vende lo fácil: no dice la
+# tasa E.A., ni los totales de 36 meses, ni el supuesto de renovación; esas
+# cifras las revela Pana. Los turnos de Don Gota son origen="guion_fijo":
+# nunca los genera un modelo.
+oferta = [
+  "¿Necesitas {monto}? Te los presto hoy. Solo el {tasa_mensual} al mes: me devuelves {total_ciclo} en {dias_ciclo} días, sin papeles.",
+  "Por {monto} no hay papeleo: solo el {tasa_mensual} al mes. En {dias_ciclo} días me pagas {total_ciclo} y sigues.",
+  "Te presto {monto} y me pagas {total_ciclo} dentro de {dias_ciclo} días. Solo el {tasa_mensual} al mes y sin papeles.",
+]
+presion_diaria = [
+  "Son solo {cuota_diaria} al día: divides {total_ciclo} entre {dias_ciclo} días y listo. Si no pagas, la cuota sube.",
+  "Con {cuota_diaria} diarios no duele: {total_ciclo} repartidos en {dias_ciclo} días. Si te atrasas, el interés sigue corriendo.",
+  "Paga {cuota_diaria} al día y quedas al día. Son {total_ciclo} en {dias_ciclo} días; si no pagas, el cobro se hace difícil.",
+]
+renovacion = [
+  "Renuevas cuando quieras: solo el {tasa_mensual} al mes y {cuota_diaria} diarios. Sin papeles, sin fila y sin consulta.",
+  "Solo el {tasa_mensual} al mes y {cuota_diaria} diarios. Renuevas cuando quieras, sin papeles.",
+  "Cuando quieras renuevas: solo el {tasa_mensual} al mes y {cuota_diaria} diarios. Sin fila, sin papeles y sin consulta.",
+]
+cierre = [
+  "Firma hoy y te doy {monto}. Solo necesito tu compromiso y {cuota_diaria} al día.",
+  "La plata es tuya hoy: {monto}. Empieza a pagar {cuota_diaria} al día y no hay trámite.",
+  "Cierro contigo ahora: {monto} y {cuota_diaria} diarios. Sin papeleo y sin espera.",
+]
