@@ -515,3 +515,17 @@ def test_descarga_sin_from_se_niega(tmp_path: Path) -> None:
             crear_cliente=_cliente_falso(pedidos),
         )
     assert pedidos == []
+
+
+def test_voz_js_sin_internet_vuelve_a_piper() -> None:
+    """Sin internet, una voz «Online» de Edge no cuenta: el personaje usa su Piper.
+
+    Edge deja las voces en línea en `getVoices()` aunque no haya red y las cambia
+    en silencio por una voz local de Windows (hallazgo de la revisión del #171).
+    """
+    codigo = (RAIZ / "app" / "web" / "voz.js").read_text(encoding="utf-8")
+    inicio = codigo.index("export function tieneVozDelNavegador")
+    cuerpo = codigo[inicio : codigo.index("\n}\n", inicio)]
+    assert "localService !== false" in cuerpo
+    assert "hayInternet()" in cuerpo
+    assert "navigator.onLine !== false" in codigo
