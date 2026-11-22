@@ -376,7 +376,7 @@ La mesa no incluye el estrés como oferta; el auditor puede citarlo como prueba,
 - `app/web/escena/contrato.js` es el espejo de cliente de `TurnoEscena`: `fuente` con `tipo` y `referencia`, `valor_legible`, `unidad`, los orígenes `guion_fijo`, `motor`, `llm`, `reglas` y `entrada_voz`, el `escenario` completo y el veredicto del auditor en un campo aparte del `semaforo`. Se alinea con `escena/contratos.py` y con la salida de `make escena-proyectada`.
 - `turnos-ejemplo.json` es solo andamio de maquetación. Cuando exista `make escena-proyectada`, se reemplaza por su salida real (`data/escena/proyectado.json`) y la página deja de depender de datos escritos a mano.
 - Reutiliza `app/web/voz.js`: cada turno llama `decirComo(turno.personaje, turno.texto, {alTerminar, soloSubtitulos})`. El `personaje` del contrato es la misma clave de `config/voz.toml` y de `PERSONAJES`.
-- Avatares vectoriales locales; Pana reutiliza `dibujar_pana` si entra el endpoint de avatar, y si no, un SVG consistente. El que habla se ilumina; los demás se atenúan.
+- Retratos locales y respaldo vectorial: los avatares pueden ser retratos generados con IA y guardados en `app/web/escena/rostros/*.webp`, de personajes inventados, sin parecido con personas reales, sin URLs externas ni CDN y sin fotos de terceros. Cada retrato lleva su texto alternativo; si el archivo no carga o falta, `app/web/escena/rostros.js` pinta el dibujo SVG del personaje como respaldo (`onerror`), y Pana reutiliza `dibujar_pana` si entra el endpoint de avatar. El retrato no reemplaza al SVG: conviven. El que habla se ilumina; los demás se atenúan.
 - Subtítulos grandes, `aria-live`, alto contraste y botones: **Siguiente**, **Solo subtítulos**, **Núcleo**, **Perfil seguro**, **Reiniciar**. Teclado: espacio/Enter avanza, `S` subtítulos, `N` núcleo.
 - Panel de trazabilidad para el facilitador: `id` del turno, `origen`, `escenario.codigo`, `fuente` de cada cifra y hallazgos. El público no lo ve por defecto.
 - En `soloSubtitulos`, no se llama a `/api/voz`; se muestra el turno y se espera clic/tecla. Si `decirComo` devuelve `ninguna`, la UI cambia sola a ese modo.
@@ -394,12 +394,25 @@ La API es sin estado: no crea SQLite ni guarda perfiles. La UI conserva la escen
 | POST | `/api/escena/interpretar` | `{texto, pregunta}` | `RespuestaVoz` determinista |
 | POST | `/api/escena` | `{perfil_id?, respuestas?, monto?, seleccion?}` | `Escena` de fase 1: perfil, diagnóstico, gota, comparación y turnos base |
 | POST | `/api/escena/negociacion` | `{perfil, seleccion?}` | `NegociacionEscena`: cuatro turnos, escenarios y veredicto |
+| POST | `/api/escena/pregunta` | `{pregunta}` | un `TurnoEscena` de Pana, máximo 40 palabras |
 | GET | `/api/escena/proyectado` | `?modo=nucleo` | `Escena` precalculada desde `data/escena/*.json` |
 
 - La fase 1 se pide al confirmar; la fase 2 se pide en paralelo. La UI empieza a hablar la fase 1 mientras la negociación se calcula. Si la fase 2 falla o tarda, la UI usa el núcleo que devuelve el mismo endpoint.
 - El backend **MUST NOT** confiar en cifras del cliente: recalcula desde `PerfilEscena` y `config/`.
 - `app.py` registra el router antes de los estáticos, como los routers actuales, y mantiene `HOST = "127.0.0.1"`.
 - `pyproject` no cambia; no hay dependencias nuevas.
+
+`POST /api/escena/pregunta` atiende las preguntas del público en la escena, con Pana como anfitrión:
+
+- **Entrada**: `{"pregunta": "<texto del público>"}`, saneada con `sanear_pregunta`; no acepta perfil, cifras ni turnos previos del cliente. Es un turno aislado: no hay memoria conversacional, no se guarda la pregunta y no se escribe en `data/asistente/`.
+- **Recorrido**: reutiliza la Ventanilla con el mismo filtro de dominio del Digiturno y las mismas rutas: ruta **T** para tasa, cuota o tarifa desde el Tablero, ruta **B** para producto o política desde la Bóveda, ruta **X** para lo que queda fuera del alcance. No hay índice, Tablero ni modelo nuevos.
+- **Salida**: un `TurnoEscena` único con `personaje="pana"`, `cifras` con su `FuenteCifra` y `hallazgos` del auditor. El `origen` es `llm` cuando redacta el modelo y `reglas` cuando responde el Tablero con plantilla, el rechazo fuera de dominio o el respaldo; la presentación `guion_fijo` de Pana es un turno fijo de la página y no pasa por este endpoint. Nunca es `motor`: la escena no recalcula el diagnóstico por esta ruta.
+- **Límite**: el texto se recorta con `limitar_palabras(..., 40)` de `asistente/validacion.py`, que conserva la línea `Fuente:`; las 40 palabras incluyen esa línea. Cada cifra del texto **MUST** tener su `CifraEscena` con `tipo` y `referencia` verificables (Tablero → `gold`, config → `config`, motor → `motor`).
+- **Auditor**: el turno pasa por `auditar_texto` y las reglas de `escena/auditor.py` antes de devolverse. Si hay un hallazgo **alto** (`cifra_inventada`, `fuente_ausente`, `promesa_aprobacion`, `dato_personal`), el texto se descarta y se devuelve la respuesta fija de respaldo con `origen="reglas"`; el veredicto se adjunta en `hallazgos`, nunca como color.
+- **Fuera de dominio**: si la ruta es **X**, Pana lo rechaza en voz alta con una frase fija de `config/escena.toml` y `origen="reglas"`, sin consultar la Bóveda ni el modelo. La frase invita a preguntar por productos, tasas, tarifas o políticas del Banco.
+- **Tiempo máximo**: 8 segundos en total y 4 segundos por llamada al modelo, sin reintentos, con el mismo reloj por `ThreadPoolExecutor` de la negociación.
+- **Si DeepSeek falla** (timeout, error de red, clave ausente o `SUCURSAL_DEMO=1`): Pana responde con una frase fija de respaldo de `config/escena.toml` y `origen="reglas"`, sin cifras inventadas y sin detener la escena. Si la pregunta era de tasa, el respaldo remite al Tablero visible en la pantalla.
+- **Datos personales**: la respuesta **MUST NOT** contener teléfonos, correos, documentos ni nombres de personas; tampoco se escriben en los registros (`LOGGER` sigue sin recibir la pregunta ni la respuesta) ni en `sessionStorage`.
 
 `escena/__main__.py` genera la escena de respaldo:
 
@@ -474,6 +487,7 @@ $env:SUCURSAL_DEMO = "1"; make app
 - `test_escena_estres.py`: 100 perfiles aleatorios con semilla y los extremos; mutaciones de cifra, fuente, promesa, gota, semáforo y PII; el auditor nunca deja pasar un hallazgo alto.
 - `test_escena_entrada.py`: letras, montos, confirmación, ambigüedad, monto fuera de rango y datos personales.
 - `test_escena_api.py` y `test_app_web.py`: opciones, voluntario con semilla, interpretar, escena, negociación, proyectado, router montado y `app/web/escena.html` servida con `contrato.js`; sin red.
+- `test_escena_pregunta.py`: pregunta de producto (Bóveda), de tasa (Tablero), fuera de dominio (rechazo en voz alta sin consultar la Bóveda), tope de 40 palabras con la línea `Fuente:`, cifra sin fuente → hallazgo alto → respaldo con `origen="reglas"`, fallo de DeepSeek → respaldo, y ausencia de PII en la respuesta y en los registros.
 - `test_seguridad.py`: `data/escena/` ignorado; sin secretos ni PII en `config/escena.toml`; el servidor sigue en loopback.
 
 ## Risks / Trade-offs
@@ -485,6 +499,7 @@ $env:SUCURSAL_DEMO = "1"; make app
 - **El auditor produce falsos positivos por números estructurales** → solo se auditan cifras financieras de turnos con `escenario` o `cifras`; fila, silla, letras y conteos de turnos se excluyen.
 - **La comparación de 36 meses se malinterpreta** → la escena dice el supuesto en voz y el panel muestra “renovación mensual sin capitalizar”; no se presenta como una deuda única.
 - **El reconocimiento del navegador usa un servicio externo** → aviso visible, sin datos reales, teclado como respaldo y ninguna grabación.
+- **El público pregunta algo fuera de dominio o pide un dato personal** → Pana rechaza en voz alta con `origen="reglas"` y frase fija; no se consulta la Bóveda ni se repite el texto, y la escena sigue con el siguiente turno.
 - **El tiempo de la presentación se alarga** → cuatro preguntas, cuatro turnos y botón Núcleo; el ensayo mide menos de seis minutos.
 - **Confundir semáforo y veredicto** → el veredicto no usa colores y la UI los muestra en dos etiquetas separadas.
 
