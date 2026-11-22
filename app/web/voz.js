@@ -10,9 +10,9 @@
  * - `navegador`: usa directamente la voz del navegador (`speechSynthesis`) que
  *   nombra la configuración, por ejemplo una voz de Windows con acento
  *   colombiano, con su tono y su velocidad.
- *   Si esa voz no está en este navegador (por ejemplo, una voz «Online» de
- *   Edge sin internet), usa su voz de Piper como respaldo en vez de otra voz
- *   cualquiera.
+ *   Si esa voz no está en este navegador, o es una voz «Online» de Edge y no
+ *   hay internet (Edge la cambiaría por una voz local de Windows), usa su voz
+ *   de Piper como respaldo en vez de otra voz cualquiera.
  *
  * Si la API no responde, todos usan el navegador con los valores de
  * `RESPALDO_NAVEGADOR`. Nunca guarda los textos.
@@ -319,13 +319,16 @@ export function decirConElNavegador(texto, ajuste, personaje = "pana", alTermina
 }
 
 /**
- * Indica si el navegador tiene la voz pedida por su nombre.
+ * Indica si el navegador puede decir el texto con la voz pedida por su nombre.
  *
  * Un nombre vacío significa «la primera en español», así que cuenta como
- * disponible si hay alguna voz.
+ * disponible si hay alguna voz. Las voces «Online» de Edge (`localService`
+ * falso) siguen en la lista sin internet, pero Edge las cambia en silencio por
+ * una voz local de Windows; por eso, sin conexión (`navigator.onLine` falso),
+ * una voz en línea cuenta como no disponible y el personaje usa su Piper.
  *
  * @param {string} nombre Parte del nombre de la voz, o vacío.
- * @returns {boolean} `true` si la voz está en este navegador.
+ * @returns {boolean} `true` si la voz está y puede sonar ahora.
  */
 export function tieneVozDelNavegador(nombre) {
   if (!hayVozDelNavegador()) {
@@ -336,12 +339,28 @@ export function tieneVozDelNavegador(nombre) {
     return true;
   }
   try {
-    return window.speechSynthesis
+    const voz = window.speechSynthesis
       .getVoices()
-      .some((voz) => voz.name.toLowerCase().includes(buscado));
+      .find((candidata) => candidata.name.toLowerCase().includes(buscado));
+    if (!voz) {
+      return false;
+    }
+    return voz.localService !== false || hayInternet();
   } catch {
     return false;
   }
+}
+
+/**
+ * Indica si el navegador cree que hay conexión a internet.
+ *
+ * `navigator.onLine` falso es seguro (no hay red); verdadero solo dice que hay
+ * alguna red, que es lo que necesitan las voces en línea de Edge.
+ *
+ * @returns {boolean} `false` solo si el navegador sabe que no hay conexión.
+ */
+function hayInternet() {
+  return typeof navigator === "undefined" || navigator.onLine !== false;
 }
 
 /**
