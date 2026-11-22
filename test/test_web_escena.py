@@ -66,15 +66,51 @@ def test_don_gota_nunca_sale_de_un_modelo() -> None:
     assert all(t["origen"] != "modelo" for t in _turnos() if t["personaje"] == "don_gota")
 
 
-def test_cifras_de_don_gota_cuadran() -> None:
-    """La TEA es (1 + mensual)^12 − 1 y el total es cuota × plazo."""
+def test_cifras_de_don_gota_siguen_el_diseno() -> None:
+    """Fórmulas del design.md §2: 20 % mensual, ciclo de 30 días, 36 renovaciones."""
     cifras = _cifras()
+    monto = cifras["monto"]
     mensual = cifras["tasa_mensual_don_gota"]
+    assert cifras["plazo_meses"] == 36
+    assert cifras["interes_mensual_don_gota"] == monto * mensual
+    assert cifras["cuota_diaria_don_gota"] == (monto + monto * mensual) / 30
+    assert cifras["total_don_gota"] == monto + monto * mensual * 36
     assert cifras["tea_don_gota"] == pytest.approx((1 + mensual) ** 12 - 1, abs=1e-4)
-    plazo = cifras["plazo_meses"]
-    cuota = cifras["monto"] * mensual / (1 - (1 + mensual) ** -plazo)
-    assert cifras["cuota_don_gota"] == pytest.approx(cuota, abs=1)
-    assert cifras["total_don_gota"] == pytest.approx(cuota * plazo, abs=plazo)
+
+
+def test_cifras_del_banco_salen_del_motor() -> None:
+    """Cuota y total del banco son los del motor con la tasa máxima publicada."""
+    from datetime import date
+    from decimal import Decimal
+
+    from banco_occidente_corpus.canal.contratos import EntradaDiagnostico
+    from banco_occidente_corpus.diagnostico.motor import calcular
+
+    cifras = _cifras()
+    entrada = EntradaDiagnostico.model_validate(
+        {
+            "producto": "libre_inversion",
+            "vinculacion": "empleado",
+            "ingreso_mensual": Decimal(1_500_000),
+            "gastos_mensuales": Decimal(750_000),
+            "cuotas_deudas": Decimal(0),
+            "monto_credito": Decimal(int(cifras["monto"])),
+            "plazo_meses": int(cifras["plazo_meses"]),
+            "rango_usado": {},
+        }
+    )
+    resultado = calcular(entrada, hoy=date(2026, 11, 27))
+    assert cifras["cuota_banco"] == int(resultado.cuota_mensual.hasta)
+    assert cifras["total_banco"] == int(resultado.total_pagado.hasta)
+    assert cifras["tea_banco"] == float(resultado.tasa_ea.hasta)
+    assert resultado.semaforo == _turnos()[-1]["escenario"]["semaforo"]
+
+
+def test_el_ejemplo_se_declara_ejemplo() -> None:
+    """El JSON dice que es maquetación y que lo reemplaza make escena-proyectada."""
+    datos = json.loads((ESCENA / "turnos-ejemplo.json").read_text(encoding="utf-8"))
+    assert "EJEMPLO DE MAQUETACIÓN" in datos["descripcion"]
+    assert "make escena-proyectada" in datos["descripcion"]
 
 
 def test_cifras_del_banco_usan_la_usura_y_quedan_debajo() -> None:

@@ -67,7 +67,12 @@ muestra en subtítulos. Las voces vienen de `app/web/voz.js` (ver
 [`VOZ.md`](./VOZ.md)); si Piper falla, se usa la voz del navegador y los
 subtítulos siguen visibles.
 
-Las cifras del ejemplo son inventadas para un millón de pesos a seis meses, con
-la tasa máxima de libre inversión y la usura de noviembre de 2026 de
-`config/tasas.toml`. `test/test_web_escena.py` comprueba que cumplen el contrato
-y que cuadran con las fórmulas.
+`turnos-ejemplo.json` es **solo un ejemplo de maquetación** (lo dice su campo
+`descripcion` y la pantalla muestra el sello «Turnos de ejemplo»). Se reemplaza
+por la salida de `make escena-proyectada` cuando exista (tarea 6.11 del cambio
+`demo-gota-a-gota`). Mientras tanto sigue el diseño: el voluntario dice el «para
+qué» con sus palabras y responde con letras monto, ingresos, gastos y cuotas; el
+horizonte es de 36 meses. Las cifras del banco salen de
+`diagnostico.motor.calcular` (un millón, empleado, tasa máxima de noviembre de
+2026) y las de Don Gota de las fórmulas del diseño (20 % mensual, renovación
+mensual sin capitalizar). `test/test_web_escena.py` comprueba ambas.

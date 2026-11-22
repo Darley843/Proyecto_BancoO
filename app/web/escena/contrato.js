@@ -50,9 +50,11 @@ const ETIQUETAS = Object.freeze({
   monto: "Monto",
   plazo_meses: "Plazo",
   tasa_mensual_don_gota: "Tasa mensual de Don Gota",
+  interes_mensual_don_gota: "Interés mensual de Don Gota",
+  cuota_diaria_don_gota: "Cuota diaria de Don Gota",
   tea_don_gota: "TEA de Don Gota",
   cuota_don_gota: "Cuota de Don Gota",
-  total_don_gota: "Total con Don Gota",
+  total_don_gota: "Total con Don Gota (36 renovaciones)",
   tea_banco: "TEA del banco",
   cuota_banco: "Cuota del banco",
   total_banco: "Total con el banco",
@@ -137,7 +139,7 @@ export function pasoDelTurno(turno, anterior) {
  * Da formato a una cifra según su nombre.
  *
  * Tasas, TEA y usura van como porcentaje; plazos en meses; montos, cuotas y
- * totales en pesos. Cualquier otra cifra sale como número.
+ * totales e intereses en pesos. Cualquier otra cifra sale como número.
  *
  * @param {{nombre: string, valor: number}} cifra Cifra del turno.
  * @returns {{etiqueta: string, texto: string}} Nombre visible y valor con formato.
@@ -153,7 +155,7 @@ export function formatearCifra(cifra) {
     texto = `${porcentaje} %`;
   } else if (/plazo/.test(nombre)) {
     texto = `${cifra.valor} meses`;
-  } else if (/monto|cuota|total/.test(nombre)) {
+  } else if (/monto|cuota|total|interes/.test(nombre)) {
     texto = `$${Math.round(cifra.valor).toLocaleString("es-CO")}`;
   } else {
     texto = cifra.valor.toLocaleString("es-CO");
