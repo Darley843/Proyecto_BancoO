@@ -59,6 +59,8 @@ from banco_occidente_corpus.canal.consentimiento import MaquinaConsentimiento
 from banco_occidente_corpus.canal.contratos import MensajeEntrante
 from banco_occidente_corpus.canal.despachador import Despachador, RespuestaGrafo
 from banco_occidente_corpus.canal.entrevista import (
+    ID_CONTACTAR,
+    PREGUNTA_HITL,
     TEXTO_NO_ENTENDI,
     TEXTO_SIN_TASA,
     EntrevistaCanal,
@@ -68,7 +70,11 @@ from banco_occidente_corpus.canal.identidad import calcular_usuario_id
 from banco_occidente_corpus.canal.webhook import crear_router_canal
 from banco_occidente_corpus.config import PROJECT_ROOT
 from banco_occidente_corpus.pana.tarjetas import TITULO_SEMAFORO
-from banco_occidente_corpus.simulador.payloads import enviar_a_webhook
+from banco_occidente_corpus.simulador.payloads import (
+    MARCA_TIEMPO_BASE,
+    enviar_a_webhook,
+    payload_boton,
+)
 from banco_occidente_corpus.simulador.personas import (
     Persona,
     SemaforoEsperado,
@@ -238,15 +244,35 @@ def _numero_en_la_base(carpeta: Path, numero: str) -> bool:
     )
 
 
+def _es_hitl(tramo: Sequence[tuple[str, str]]) -> bool:
+    """Dice si el tramo terminó con la pregunta del HITL.
+
+    Args:
+        tramo: lo que registró el enviador falso en ese turno.
+
+    Returns:
+        ``True`` si la respuesta trae el resumen con los botones del asesor.
+    """
+    return any(tipo == "texto" and PREGUNTA_HITL in valor for tipo, valor in tramo)
+
+
 def _verificar(
     persona: Persona,
     tramos: Sequence[Sequence[tuple[str, str]]],
+    *,
+    indice_diagnostico: int,
+    indice_escenario: int,
+    tramo_hitl: int | None = None,
 ) -> ResultadoPersona:
     """Compara lo que recibió la persona con lo que espera su guion.
 
     Args:
         persona: persona sintética con su resultado esperado.
         tramos: lo que registró el enviador falso por cada turno, en orden.
+        indice_diagnostico: posición del turno que cierra la entrevista.
+        indice_escenario: posición del «¿Y si…?».
+        tramo_hitl: posición del turno en que la persona pulsó «Contactar», si
+            el diagnóstico suspendió para ofrecer un asesor.
 
     Returns:
         El resultado de la persona con las fallas encontradas.
@@ -257,22 +283,23 @@ def _verificar(
         if len(textos) != 1:
             fallas.append(f"el turno {posicion} recibió {len(textos)} respuestas")
 
-    inicio = len(PREAMBULO)
-    diagnostico = tramos[inicio + len(persona.turnos) - 1]
+    diagnostico = tramos[indice_diagnostico]
     texto = next((valor for tipo, valor in diagnostico if tipo == "texto"), "")
     esperado_enum = persona.esperado.semaforo
     esperado = esperado_enum.value if esperado_enum is not None else SIN_SEMAFORO
     obtenido = _semaforo_en(texto)
     if obtenido != esperado:
         fallas.append(f"se esperaba «{esperado}» y llegó «{obtenido}»")
-    if esperado_enum is not SemaforoEsperado.SIN_TASA and all(
-        tipo != "imagen" for tipo, _ in diagnostico
-    ):
+    tarjeta = any(tipo == "imagen" for tipo, _ in diagnostico)
+    if tramo_hitl is not None:
+        tarjeta = tarjeta or any(tipo == "imagen" for tipo, _ in tramos[tramo_hitl])
+    if esperado_enum is not SemaforoEsperado.SIN_TASA and not tarjeta:
         fallas.append("el diagnóstico llegó sin tarjeta")
     if persona.esperado.deriva_asesor and "asesor" not in texto.casefold():
         fallas.append("el rojo no ofreció hablar con un asesor")
 
     if persona.esperado.bloquea_inyeccion:
+        inicio = len(PREAMBULO)
         for indice, turno in enumerate(persona.turnos[1:], start=1):
             if turno.tipo != "texto":
                 continue
@@ -282,7 +309,7 @@ def _verificar(
             if TEXTO_NO_ENTENDI not in respuesta:
                 fallas.append(f"el texto del turno {inicio + indice + 1} salió del guion")
 
-    escenario = tramos[inicio + len(persona.turnos)]
+    escenario = tramos[indice_escenario]
     return ResultadoPersona(
         persona=persona.id,
         esperado=esperado,
@@ -347,19 +374,45 @@ def recorrer(
             usuario_id = huellas[persona.id]
             enviador = crear_enviador(usuario_id, persona.numero)
             payloads = conversacion(persona, preambulo=PREAMBULO, cierre=CIERRE)
+            indice_diagnostico = len(PREAMBULO) + len(persona.turnos) - 1
+            indice_escenario = len(PREAMBULO) + len(persona.turnos)
+            tramo_hitl: int | None = None
             tramos: list[list[tuple[str, str]]] = []
             rechazos = 0
-            for payload in payloads:
+            for posicion, payload in enumerate(payloads):
                 antes = len(enviador.registro)
                 respuesta = enviar_a_webhook(cliente, payload, SECRETO_SIMULADO, ruta=RUTA_WEBHOOK)
                 rechazos += int(respuesta.status_code != 200)
-                tramos.append(list(enviador.registro[antes:]))
+                tramo = list(enviador.registro[antes:])
+                tramos.append(tramo)
+                if posicion == indice_diagnostico and _es_hitl(tramo):
+                    # El rojo ofrece asesor: la persona pulsa «Contactar» y la
+                    # tarjeta llega en ese turno. Sin esto, el «¿Y si…?» del
+                    # cierre caería en el recordatorio del HITL.
+                    antes = len(enviador.registro)
+                    contacto = payload_boton(
+                        persona.numero,
+                        ID_CONTACTAR,
+                        "Contactar",
+                        marca_tiempo=MARCA_TIEMPO_BASE,
+                        nombre=persona.nombre,
+                    )
+                    enviar_a_webhook(cliente, contacto, SECRETO_SIMULADO, ruta=RUTA_WEBHOOK)
+                    tramos.append(list(enviador.registro[antes:]))
+                    tramo_hitl = len(tramos) - 1
+                    indice_escenario += 1
 
             antes = len(enviador.registro)
             enviar_a_webhook(cliente, payloads[0], SECRETO_SIMULADO, ruta=RUTA_WEBHOOK)
             repetidos = len(enviador.registro) - antes
 
-            resultado = _verificar(persona, tramos)
+            resultado = _verificar(
+                persona,
+                tramos,
+                indice_diagnostico=indice_diagnostico,
+                indice_escenario=indice_escenario,
+                tramo_hitl=tramo_hitl,
+            )
             if rechazos:
                 resultado.fallas.append(f"el webhook rechazó {rechazos} mensajes")
             if repetidos:
