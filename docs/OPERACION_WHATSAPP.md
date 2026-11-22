@@ -359,6 +359,26 @@ make simular
 uv run python -m banco_occidente_corpus.simulador --solo pensionado_amarillo
 ```
 
+### Ensayo con WhatsApp real (evidencia aparte)
+
+El recorrido sintético y el ensayo real no compiten: prueban cosas distintas y
+se registran por separado.
+
+- **Sintético (`make simular`, `EnviadorFalso`):** demuestra que el canal
+  completo responde una sola vez por turno, con las personas sintéticas, sin
+  Meta y sin red. Es la evidencia de `make check` y de la tarea 9.3.
+- **Real (`WHATSAPP_MODO=real`, `EnviadorMeta`):** demuestra que Meta entrega y
+  que el número autorizado recibe la respuesta. Exige app publicada, token
+  vigente, huellas autorizadas y consentimiento. Se registra en «Estado
+  verificado» con fecha y conteos, y en `docs/LISTA_DEMO.md` como ensayo
+  general; **nunca** se convierte en una prueba automática ni en requisito de
+  `make check`.
+
+El ensayo real del **19 de noviembre de 2026** está en «Estado verificado»
+(14 turnos respondidos, 3 consentimientos y 4 envíos). Ese registro no cambia el
+texto de la tarea 9.3: la casilla sigue midiendo el recorrido sintético, porque
+una prueba que depende de Meta no es reproducible ni corre en CI.
+
 ## Flujo de un mensaje
 
 1. Meta hace `POST /webhooks/whatsapp` con el cuerpo crudo firmado.
