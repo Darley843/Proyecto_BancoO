@@ -1,4 +1,4 @@
-"""Recorrido de punta a punta del canal con las personas sintéticas (tarea 7.2).
+"""Recorrido de punta a punta del canal con las personas sintéticas (tareas 7.2 y 9.3).
 
 Firma las conversaciones del simulador y las entrega al webhook real
 (``canal.webhook``) dentro del mismo proceso, con el ``TestClient`` de FastAPI:
@@ -9,7 +9,9 @@ y tarjeta) y la respuesta la registra ``EnviadorFalso``: nada sale por WhatsApp.
 A cada persona se le envía:
 
 1. «hola» y el botón **Acepto** del aviso de la Ley 1581;
-2. los turnos de su guion (``data/evaluacion/personas_sinteticas.json``);
+2. los turnos de su guion (``data/evaluacion/personas_sinteticas.json``); si
+   el diagnóstico sale rojo, Pana ofrece un asesor y la persona pulsa
+   **Contactar**;
 3. «¿Y si lo pago en 60 meses?»;
 4. «olvida mis datos»;
 5. otra vez el primer mensaje, como haría Meta al reintentar.
@@ -20,8 +22,16 @@ Y se verifica que:
 - el diagnóstico llega con texto y tarjeta, y con el semáforo esperado;
 - el rojo ofrece hablar con un asesor y los textos de inyección no sacan a la
   entrevista de su guion;
+- en el rojo, «Contactar» abre el caso del asesor (motivo ``semaforo_rojo``) y
+  el cliente recibe el aviso de que un asesor lo contactará;
 - la revocación borra la entrevista, el resultado y los casos;
 - el número no aparece en ningún archivo de la base.
+
+Además, cada persona que debe derivar a un asesor se repite con otro número
+ficticio que dice «olvida mis datos» con el caso todavía pendiente, sin pulsar
+ningún botón: la revocación debe borrar también el hilo suspendido del HITL,
+para que no quede su semáforo guardado ni le aparezca a la siguiente persona
+«Tienes un caso pendiente».
 
 El grafo de preguntas se reemplaza por una ruta D fija: la clasificación real
 del Digiturno se prueba aparte y aquí solo importa el canal. Sin
@@ -53,6 +63,7 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from langchain_core.language_models import BaseChatModel
 
+from banco_occidente_corpus.canal.almacen import ESTADOS_ABIERTOS
 from banco_occidente_corpus.canal.cola import ColaMensajes
 from banco_occidente_corpus.canal.configuracion import ConfiguracionCanal
 from banco_occidente_corpus.canal.consentimiento import MaquinaConsentimiento
@@ -61,11 +72,13 @@ from banco_occidente_corpus.canal.despachador import Despachador, RespuestaGrafo
 from banco_occidente_corpus.canal.entrevista import (
     ID_CONTACTAR,
     PREGUNTA_HITL,
+    TEXTO_CONTACTADO,
     TEXTO_NO_ENTENDI,
     TEXTO_SIN_TASA,
     EntrevistaCanal,
 )
 from banco_occidente_corpus.canal.envio import EnviadorFalso
+from banco_occidente_corpus.canal.hitl import MOTIVO_ROJO, config_hilo
 from banco_occidente_corpus.canal.identidad import calcular_usuario_id
 from banco_occidente_corpus.canal.webhook import crear_router_canal
 from banco_occidente_corpus.config import PROJECT_ROOT
@@ -117,6 +130,21 @@ CONTEOS_REVOCADOS: dict[str, str] = {
     "casos": "SELECT COUNT(*) FROM casos WHERE usuario_id = ?",
 }
 
+#: Cierre de la persona que revoca con el caso del asesor todavía pendiente.
+CIERRE_REVOCA: tuple[Turno, ...] = (Turno(tipo="texto", valor="olvida mis datos"),)
+
+#: Sufijo del id de la persona que revoca con el caso pendiente.
+SUFIJO_REVOCA = "_revoca"
+
+#: Desplazamiento del número ficticio de esa persona, para no chocar con el original.
+DESPLAZAMIENTO_REVOCA = 50_000
+
+#: Consultas del checkpoint del HITL (tablas de `SqliteSaver`) por hilo.
+CONSULTAS_HILO_HITL: tuple[str, ...] = (
+    "SELECT COUNT(*) FROM checkpoints WHERE thread_id = ?",
+    "SELECT COUNT(*) FROM writes WHERE thread_id = ?",
+)
+
 #: Lo que se espera cuando la persona no tiene semáforo de crédito.
 SIN_SEMAFORO = "ahorro"
 
@@ -158,6 +186,7 @@ class ResultadoPersona:
     comite: bool
     escenario: str
     fallas: list[str] = field(default_factory=list)
+    asesor: str = "—"
 
     @property
     def ok(self) -> bool:
@@ -241,6 +270,97 @@ def _numero_en_la_base(carpeta: Path, numero: str) -> bool:
     buscado = numero.encode("utf-8")
     return any(
         buscado in archivo.read_bytes() for archivo in carpeta.iterdir() if archivo.is_file()
+    )
+
+
+def _casos_de(ruta: Path, usuario_id: str) -> list[tuple[str, str, str]]:
+    """Devuelve motivo, semáforo y estado de los casos de la persona.
+
+    Args:
+        ruta: archivo SQLite del canal.
+        usuario_id: huella del número.
+
+    Returns:
+        Una tupla por caso; vacía si la persona no tiene casos.
+    """
+    conexion = sqlite3.connect(str(ruta))
+    try:
+        filas = conexion.execute(
+            "SELECT motivo, semaforo, estado FROM casos WHERE usuario_id = ?",
+            (usuario_id,),
+        ).fetchall()
+    finally:
+        conexion.close()
+    return [(str(motivo), str(semaforo), str(estado)) for motivo, semaforo, estado in filas]
+
+
+def _filas_hilo_hitl(ruta: Path, usuario_id: str) -> int:
+    """Cuenta las filas del checkpoint del HITL que siguen guardadas para la persona.
+
+    Args:
+        ruta: archivo SQLite del canal, donde el HITL guarda su checkpointer.
+        usuario_id: huella del número.
+
+    Returns:
+        Filas en ``checkpoints`` y ``writes`` del hilo ``wa:<huella>:hitl``; 0
+        si las tablas todavía no existen.
+    """
+    hilo = config_hilo(usuario_id)["configurable"]["thread_id"]
+    conexion = sqlite3.connect(str(ruta))
+    total = 0
+    try:
+        for consulta in CONSULTAS_HILO_HITL:
+            try:
+                total += int(conexion.execute(consulta, (hilo,)).fetchone()[0])
+            except sqlite3.OperationalError:
+                continue
+    finally:
+        conexion.close()
+    return total
+
+
+def _verificar_contacto(
+    ruta: Path,
+    usuario_id: str,
+    tramo: Sequence[tuple[str, str]],
+) -> list[str]:
+    """Verifica lo que deja «Contactar»: el caso abierto y el aviso al cliente.
+
+    Args:
+        ruta: archivo SQLite del canal.
+        usuario_id: huella del número.
+        tramo: lo que registró el enviador falso al pulsar «Contactar».
+
+    Returns:
+        Las fallas encontradas; vacía si el caso y el aviso están bien.
+    """
+    fallas: list[str] = []
+    abiertos = [
+        (motivo, semaforo)
+        for motivo, semaforo, estado in _casos_de(ruta, usuario_id)
+        if estado in ESTADOS_ABIERTOS
+    ]
+    if abiertos != [(MOTIVO_ROJO, "rojo")]:
+        fallas.append(f"«Contactar» debía abrir un caso {MOTIVO_ROJO} en rojo y dejó {abiertos}")
+    if not any(tipo == "texto" and TEXTO_CONTACTADO in valor for tipo, valor in tramo):
+        fallas.append("el cliente no recibió el aviso de que un asesor lo contactará")
+    return fallas
+
+
+def persona_que_revoca(persona: Persona) -> Persona:
+    """Copia de la persona con otro número, para revocar con el caso pendiente.
+
+    Args:
+        persona: persona que debe derivar a un asesor.
+
+    Returns:
+        La misma persona con id ``<id>_revoca`` y un número ficticio distinto.
+    """
+    return persona.model_copy(
+        update={
+            "id": f"{persona.id}{SUFIJO_REVOCA}",
+            "indice_numero": (persona.indice_numero + DESPLAZAMIENTO_REVOCA) % 100_000,
+        }
     )
 
 
@@ -339,11 +459,14 @@ def recorrer(
         raiz: carpeta alternativa de la tabla Gold de tasas, para las pruebas.
 
     Returns:
-        Un resultado por persona, en el mismo orden.
+        Un resultado por persona, en el mismo orden, seguido de uno por cada
+        persona que revoca con el caso del asesor pendiente.
     """
     ruta = carpeta / "whatsapp.sqlite"
+    revocan = [persona_que_revoca(p) for p in personas if p.esperado.deriva_asesor]
     huellas = {
-        persona.id: calcular_usuario_id(persona.numero, SAL_SIMULADA) for persona in personas
+        persona.id: calcular_usuario_id(persona.numero, SAL_SIMULADA)
+        for persona in (*personas, *revocan)
     }
     enviadores: dict[str, EnviadorFalso] = {}
 
@@ -377,6 +500,7 @@ def recorrer(
             indice_diagnostico = len(PREAMBULO) + len(persona.turnos) - 1
             indice_escenario = len(PREAMBULO) + len(persona.turnos)
             tramo_hitl: int | None = None
+            fallas_hitl: list[str] = []
             tramos: list[list[tuple[str, str]]] = []
             rechazos = 0
             for posicion, payload in enumerate(payloads):
@@ -401,6 +525,7 @@ def recorrer(
                     tramos.append(list(enviador.registro[antes:]))
                     tramo_hitl = len(tramos) - 1
                     indice_escenario += 1
+                    fallas_hitl = _verificar_contacto(ruta, usuario_id, tramos[tramo_hitl])
 
             antes = len(enviador.registro)
             enviar_a_webhook(cliente, payloads[0], SECRETO_SIMULADO, ruta=RUTA_WEBHOOK)
@@ -413,6 +538,12 @@ def recorrer(
                 indice_escenario=indice_escenario,
                 tramo_hitl=tramo_hitl,
             )
+            if persona.esperado.deriva_asesor:
+                if tramo_hitl is None:
+                    resultado.fallas.append("el rojo no ofreció el asesor con sus botones")
+                else:
+                    resultado.asesor = "contactado"
+                resultado.fallas.extend(fallas_hitl)
             if rechazos:
                 resultado.fallas.append(f"el webhook rechazó {rechazos} mensajes")
             if repetidos:
@@ -423,7 +554,78 @@ def recorrer(
             if _numero_en_la_base(carpeta, persona.numero):
                 resultado.fallas.append("el número quedó en la base")
             resultados.append(resultado)
+
+        for persona in revocan:
+            resultados.append(
+                _recorrer_revocacion(
+                    cliente,
+                    persona,
+                    huellas[persona.id],
+                    crear_enviador(huellas[persona.id], persona.numero),
+                    ruta,
+                    carpeta,
+                )
+            )
     return resultados
+
+
+def _recorrer_revocacion(
+    cliente: TestClient,
+    persona: Persona,
+    usuario_id: str,
+    enviador: EnviadorFalso,
+    ruta: Path,
+    carpeta: Path,
+) -> ResultadoPersona:
+    """Lleva al rojo hasta la oferta del asesor y revoca sin pulsar ningún botón.
+
+    Es el caso que encontró la revisión del #161: «olvida mis datos» con el caso
+    pendiente debe borrar también el hilo suspendido del HITL.
+
+    Args:
+        cliente: cliente de prueba de la app del canal.
+        persona: copia del rojo con otro número (`persona_que_revoca`).
+        usuario_id: huella de ese número.
+        enviador: enviador falso de esa persona.
+        ruta: archivo SQLite del canal.
+        carpeta: carpeta de la base, para buscar el número.
+
+    Returns:
+        El resultado, con ``asesor="revocado"`` si todo quedó limpio.
+    """
+    payloads = conversacion(persona, preambulo=PREAMBULO, cierre=CIERRE_REVOCA)
+    indice_diagnostico = len(PREAMBULO) + len(persona.turnos) - 1
+    tramos: list[list[tuple[str, str]]] = []
+    for payload in payloads:
+        antes = len(enviador.registro)
+        enviar_a_webhook(cliente, payload, SECRETO_SIMULADO, ruta=RUTA_WEBHOOK)
+        tramos.append(list(enviador.registro[antes:]))
+
+    diagnostico = tramos[indice_diagnostico]
+    texto = next((valor for tipo, valor in diagnostico if tipo == "texto"), "")
+    fallas: list[str] = []
+    for posicion, tramo in enumerate(tramos, start=1):
+        textos = [valor for tipo, valor in tramo if tipo == "texto"]
+        if len(textos) != 1:
+            fallas.append(f"el turno {posicion} recibió {len(textos)} respuestas")
+    if not _es_hitl(diagnostico):
+        fallas.append("el rojo no ofreció el asesor con sus botones")
+    if _filas_hilo_hitl(ruta, usuario_id):
+        fallas.append("«olvida mis datos» dejó guardado el hilo suspendido del HITL")
+    restantes = {tabla: n for tabla, n in _filas_de(ruta, usuario_id).items() if n}
+    if restantes:
+        fallas.append(f"la revocación dejó filas en {sorted(restantes)}")
+    if _numero_en_la_base(carpeta, persona.numero):
+        fallas.append("el número quedó en la base")
+    return ResultadoPersona(
+        persona=persona.id,
+        esperado="rojo",
+        obtenido=_semaforo_en(texto),
+        comite="comité" in texto.casefold(),
+        escenario="—",
+        fallas=fallas,
+        asesor="revocado" if not fallas else "—",
+    )
 
 
 def informe(resultados: Sequence[ResultadoPersona], *, con_clave: bool) -> str:
@@ -445,13 +647,14 @@ def informe(resultados: Sequence[ResultadoPersona], *, con_clave: bool) -> str:
             else "sin DEEPSEEK_API_KEY, amarillo y rojo llegan con el diagnóstico."
         ),
         "",
-        f"{'Persona':<22}{'Esperado':<11}{'Obtenido':<11}{'Comité':<8}{'¿Y si…?':<10}Resultado",
+        f"{'Persona':<27}{'Esperado':<11}{'Obtenido':<11}{'Comité':<8}{'¿Y si…?':<10}"
+        f"{'Asesor':<12}Resultado",
     ]
     for resultado in resultados:
         lineas.append(
-            f"{resultado.persona:<22}{resultado.esperado:<11}{resultado.obtenido:<11}"
+            f"{resultado.persona:<27}{resultado.esperado:<11}{resultado.obtenido:<11}"
             f"{'sí' if resultado.comite else 'no':<8}{resultado.escenario:<10}"
-            f"{'OK' if resultado.ok else 'FALLA'}"
+            f"{resultado.asesor:<12}{'OK' if resultado.ok else 'FALLA'}"
         )
     fallidas = [resultado for resultado in resultados if not resultado.ok]
     for resultado in fallidas:

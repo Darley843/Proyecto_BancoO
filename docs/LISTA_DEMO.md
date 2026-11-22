@@ -14,9 +14,9 @@ esta lista se escribe en el repositorio, en capturas ni en el chat del grupo.
 
 ### Código y entorno
 
-- [ ] `main` al día y con los PR de la demo fusionados: #139 (Ley 1581) y
-      #149 (entrevista por WhatsApp). El HITL con el asesor y la latencia, si
-      ya entraron.
+- [ ] `main` al día y con los PR de la demo fusionados: #139 (Ley 1581),
+      #149 (entrevista por WhatsApp) y #166 (HITL con el asesor). La latencia,
+      si ya entró.
 - [ ] En la máquina de la demo:
   ```powershell
   git switch main
@@ -163,18 +163,25 @@ curl.exe "https://<url-del-tunel>/webhooks/whatsapp?hub.mode=subscribe&hub.verif
 | 6 | «¿Me alcanza para un crédito?» | Arranca la entrevista del diagnóstico por WhatsApp |
 | 7 | Entrevista con la persona `empleada_verde` | Verde y tarjeta de Pana |
 | 8 | Entrevista con `pensionado_amarillo` | La recomendación del comité llega completa en una sola respuesta (unos 4 s) |
-| 9 | Entrevista con `independiente_rojo` | Comité y prueba de estrés; mientras no entre el HITL, la oferta de asesor es solo texto |
+| 9 | Entrevista con `independiente_rojo` | Comité y prueba de estrés; Pana ofrece un asesor con **Contactar** y **Descartar**. Se pulsa **Contactar**: llega «Listo, un asesor revisará tu caso…» |
 | 10 | «¿Y si lo pago en 60 meses?» | Tarjeta de antes y después |
 | 11 | «Olvida mis datos» | Confirmación de revocación; el siguiente `hola` vuelve a pedir el aviso |
 | 12 | Web → Ventanilla: «¿me alcanza para un crédito?» | Ticket **D** verde |
 | 13 | Web → Roba la Bóveda: las tres ideas | Defensa resistida; **Exportar resumen** descarga el JSON sin datos personales |
-| 14 | Web → Operación | Mensajes, consentimientos, casos y Roba con datos reales; p50 y p95 del canal después del calentamiento |
+| 14 | Web → Operación | Mensajes, consentimientos, casos (el del paso 9 aparece como caso nuevo) y Roba con datos reales; p50 y p95 del canal después del calentamiento |
 | 15 | Comité en pantalla: `uv run python scripts/demo_comite.py` | Posturas de Riesgo, Comercial y Auditor; costo y tiempo |
 
 Los pasos 6 a 11 usan la entrevista por WhatsApp (#149). En la web, la
 Ventanilla sigue mostrando el ticket `D` (paso 12). Las respuestas de las
 entrevistas salen de `data/evaluacion/personas_sinteticas.json`.
 Se usan **solo datos inventados**: nadie escribe sus ingresos reales.
+
+En el paso 9, el que pulsa **Contactar** es el cliente; el asesor no recibe un
+segundo WhatsApp, sino que ve el caso en la vista Operación (paso 14). Por eso
+se muestra el celular y, en la pantalla, Operación con el caso nuevo. Mientras
+el caso está suspendido, cualquier mensaje repite los dos botones: hay que
+pulsar uno antes del «¿Y si…?» del paso 10. Es un proyecto académico: el banco
+no recibe estos casos, y así se dice en la sustentación.
 
 Durante la entrevista se responde con los botones o la lista: un texto libre
 repite la pregunta. «Cancelar» la deja, «nuevo» la reinicia y una entrevista a
@@ -198,7 +205,7 @@ se usa «¿Cuál es el propósito o misión del banco?», que contesta con la p�
 | Si falla… | Qué hacer |
 |---|---|
 | El túnel se cae | Reiniciar `cloudflared`, copiar la URL nueva, actualizar el callback en Meta (Nayla o Darley) y verificar (unos 2 minutos) |
-| Meta no entrega los mensajes | Mostrar el flujo con la app web y el simulador: `make simular` firma las conversaciones de las personas, las entrega al webhook real con el enviador falso y muestra por persona el semáforo, el comité y el «¿Y si…?»; también las capturas del ensayo |
+| Meta no entrega los mensajes | Mostrar el flujo con la app web y el simulador: `make simular` firma las conversaciones de las personas, las entrega al webhook real con el enviador falso y muestra por persona el semáforo, el comité, el «¿Y si…?» y el asesor (**Contactar** en el rojo y una copia que revoca con el caso pendiente); también las capturas del ensayo |
 | `ErrorEnvio: destino no autorizado` | Falta la huella del número o cambió la sal: regenerarla, pegarla en `config/whatsapp.toml` y reiniciar la app |
 | DeepSeek falla o se alcanza el tope | Ventanilla en modo demo (`$env:SUCURSAL_DEMO = "1"` y reiniciar la app); para la Bóveda, «¿Cuál es el propósito o misión del banco?» en vez de la pregunta del año (nota de la sección 3); el comité se muestra con la corrida grabada del ensayo |
 | Ollama o el índice no responden | La Ventanilla y Roba responden 503: arrancar Ollama, revisar `data/boveda/indice.json` y, si no se recupera, usar las capturas |

@@ -1,4 +1,4 @@
-"""Pruebas del recorrido de punta a punta del simulador (tarea 7.2, sin red).
+"""Pruebas del recorrido de punta a punta del simulador (tareas 7.2 y 9.3, sin red).
 
 El recorrido firma las conversaciones de las personas sintéticas, las entrega al
 webhook real dentro del proceso y verifica lo que registra el enviador falso.
@@ -19,6 +19,8 @@ import pytest
 from langchain_core.messages import BaseMessage
 from langchain_core.runnables import RunnableLambda
 
+from banco_occidente_corpus.canal.almacen import inicializar_almacen
+from banco_occidente_corpus.simulador import recorrido as recorrido_mod
 from banco_occidente_corpus.simulador.personas import (
     Esperado,
     Persona,
@@ -27,10 +29,12 @@ from banco_occidente_corpus.simulador.personas import (
 )
 from banco_occidente_corpus.simulador.recorrido import (
     RUTA_PERSONAS,
+    SUFIJO_REVOCA,
     ResultadoPersona,
     grafo_ruta_d,
     informe,
     main,
+    persona_que_revoca,
     recorrer,
 )
 from banco_occidente_corpus.tablero.tasas import FilaTasa, escribir_tabla
@@ -135,12 +139,13 @@ def _recorrer(personas: tuple[Persona, ...], tmp_path: Path, raiz: Path) -> list
 
 
 def test_todas_las_personas_pasan_el_recorrido(tmp_path: Path, raiz_tasas: Path) -> None:
-    """Las seis personas reciben su resultado, una respuesta por turno y sin número."""
+    """Las seis personas, más el rojo que revoca, pasan sin fallas y sin número."""
     personas = cargar_personas(RUTA_PERSONAS)
+    revocan = [f"{p.id}{SUFIJO_REVOCA}" for p in personas if p.esperado.deriva_asesor]
 
     resultados = _recorrer(personas, tmp_path, raiz_tasas)
 
-    assert [resultado.persona for resultado in resultados] == [p.id for p in personas]
+    assert [resultado.persona for resultado in resultados] == [p.id for p in personas] + revocan
     assert all(resultado.ok for resultado in resultados), [
         (resultado.persona, resultado.fallas) for resultado in resultados if not resultado.ok
     ]
@@ -150,6 +155,62 @@ def test_todas_las_personas_pasan_el_recorrido(tmp_path: Path, raiz_tasas: Path)
     assert obtenidos["independiente_rojo"] == "rojo"
     assert obtenidos["joven_ahorro"] == "ahorro"
     assert not any(resultado.comite for resultado in resultados)
+    asesor = {resultado.persona: resultado.asesor for resultado in resultados}
+    assert asesor["independiente_rojo"] == "contactado"
+    assert asesor[f"independiente_rojo{SUFIJO_REVOCA}"] == "revocado"
+    assert asesor["empleada_verde"] == "—"
+
+
+def test_el_rojo_contacta_al_asesor_y_el_que_revoca_no_deja_el_hilo(
+    tmp_path: Path, raiz_tasas: Path
+) -> None:
+    """El rojo pulsa «Contactar» y abre su caso; su copia revoca sin dejar el HITL."""
+    persona = next(p for p in cargar_personas(RUTA_PERSONAS) if p.id == "independiente_rojo")
+
+    rojo, revoca = _recorrer((persona,), tmp_path, raiz_tasas)
+
+    assert rojo.ok, rojo.fallas
+    assert rojo.asesor == "contactado"
+    assert revoca.persona == f"independiente_rojo{SUFIJO_REVOCA}"
+    assert revoca.ok, revoca.fallas
+    assert revoca.asesor == "revocado"
+    assert revoca.obtenido == "rojo"
+
+
+def test_un_hilo_del_hitl_que_queda_guardado_se_reporta(
+    tmp_path: Path, raiz_tasas: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Si la revocación dejara el checkpoint del HITL, el recorrido lo marca como falla."""
+    persona = next(p for p in cargar_personas(RUTA_PERSONAS) if p.id == "independiente_rojo")
+    monkeypatch.setattr(recorrido_mod, "_filas_hilo_hitl", lambda _ruta, _usuario: 1)
+
+    _, revoca = _recorrer((persona,), tmp_path, raiz_tasas)
+
+    assert not revoca.ok
+    assert "«olvida mis datos» dejó guardado el hilo suspendido del HITL" in revoca.fallas
+
+
+def test_contactar_sin_caso_ni_aviso_se_reporta(tmp_path: Path) -> None:
+    """Sin caso abierto y sin aviso, la verificación del contacto devuelve dos fallas."""
+    ruta = tmp_path / "whatsapp.sqlite"
+    inicializar_almacen(ruta)
+
+    fallas = recorrido_mod._verificar_contacto(ruta, "u" * 64, [("texto", "otra cosa")])
+
+    assert len(fallas) == 2
+    assert "abrir un caso semaforo_rojo" in fallas[0]
+    assert "aviso" in fallas[1]
+
+
+def test_la_copia_que_revoca_tiene_otro_numero() -> None:
+    """La copia del rojo no comparte número con la persona original."""
+    persona = next(p for p in cargar_personas(RUTA_PERSONAS) if p.id == "independiente_rojo")
+
+    copia = persona_que_revoca(persona)
+
+    assert copia.id == f"independiente_rojo{SUFIJO_REVOCA}"
+    assert copia.numero != persona.numero
+    assert copia.turnos == persona.turnos
 
 
 def test_el_y_si_de_un_credito_trae_la_tarjeta(tmp_path: Path, raiz_tasas: Path) -> None:
@@ -205,6 +266,9 @@ def test_el_informe_resume_y_lista_las_fallas() -> None:
     resultados = [
         ResultadoPersona("empleada_verde", "verde", "verde", False, "tarjeta"),
         ResultadoPersona("independiente_rojo", "rojo", "amarillo", False, "tarjeta", ["x"]),
+        ResultadoPersona(
+            "pensionado_amarillo", "rojo", "rojo", False, "tarjeta", asesor="contactado"
+        ),
     ]
 
     texto = informe(resultados, con_clave=False)
@@ -212,7 +276,8 @@ def test_el_informe_resume_y_lista_las_fallas() -> None:
     assert "sin DEEPSEEK_API_KEY" in texto
     assert "empleada_verde" in texto and "OK" in texto
     assert "independiente_rojo:" in texto and "  - x" in texto
-    assert "Con fallas: 1 de 2 personas pasaron." in texto
+    assert "Asesor" in texto and "contactado" in texto
+    assert "Con fallas: 2 de 3 personas pasaron." in texto
 
 
 def test_una_persona_desconocida_termina_con_codigo_2(capsys: pytest.CaptureFixture[str]) -> None:
