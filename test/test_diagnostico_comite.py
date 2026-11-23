@@ -1326,6 +1326,48 @@ VARIANTES_POSTURAS: tuple[tuple[dict[str, Any], ...], ...] = (
         _postura("comercial", "favorable", ["Libranza y vivienda en [plazo_mas_largo]."]),
         _postura("auditor", "conforme", []),
     ),
+    (
+        _postura(
+            "riesgo",
+            "desfavorable",
+            [
+                "Este resultado no es una aprobación del crédito",
+                "El diagnóstico no constituye una aprobación",
+                "No hay aprobación todavía",
+            ],
+        ),
+        _postura(
+            "comercial",
+            "desfavorable",
+            [
+                "Esto no implica aprobación",
+                "Ninguna opción está garantizada",
+                "No garantiza la aprobación",
+            ],
+        ),
+        _postura("auditor", "conforme", []),
+    ),
+    (
+        _postura(
+            "riesgo",
+            "desfavorable",
+            [
+                "No hay aprobación garantizada",
+                "no podemos garantizar la aprobación",
+                "ni siquiera está garantizado",
+            ],
+        ),
+        _postura(
+            "comercial",
+            "desfavorable",
+            [
+                "no es una aprobación garantizada",
+                "Es una opinión del comité de crédito y no una aprobación",
+                "No garantiza la aprobación",
+            ],
+        ),
+        _postura("auditor", "conforme", []),
+    ),
 )
 
 #: Recomendaciones finales; `{aviso}` se reemplaza por el aviso del resultado.
@@ -1342,6 +1384,17 @@ NEGACIONES_QUE_ANULAN: tuple[str, ...] = (
     "no te lo aprueban",
     "no está garantizado",
     "nunca garantizamos la aprobación",
+    "Este resultado no es una aprobación del crédito",
+    "No garantiza la aprobación",
+    "El diagnóstico no constituye una aprobación",
+    "Esto no implica aprobación",
+    "No hay aprobación todavía",
+    "Ninguna opción está garantizada",
+    "No hay aprobación garantizada",
+    "no podemos garantizar la aprobación",
+    "no es una aprobación garantizada",
+    "ni siquiera está garantizado",
+    "Es una opinión del comité de crédito y no una aprobación",
 )
 
 #: Negaciones que no anulan la promesa: en otra frase, tras coma o a distancia.
@@ -1352,6 +1405,9 @@ NEGACIONES_QUE_NO_ANULAN: tuple[str, ...] = (
     "No dudes que te lo aprueban",
     "No solo te lo aprueban, sino que te lo desembolsan hoy",
     "No, te lo aprueban",
+    "No, está aprobado",
+    "Sin duda está aprobado",
+    "No hay problema, te lo aprueban",
 )
 
 #: Subconjunto que la versión original de #179 sí anulaba y ahora ya no.
@@ -1362,6 +1418,8 @@ NEGACIONES_QUE_ANTES_ANULABAN: tuple[str, ...] = (
     "No hay problema; está aprobado",
     "No dudes que te lo aprueban",
     "No solo te lo aprueban, sino que te lo desembolsan hoy",
+    "Sin duda está aprobado",
+    "No hay problema, te lo aprueban",
 )
 
 #: Tokens de negación de `_promesas` antes de los arreglos: no miraban la frase.
@@ -1587,6 +1645,15 @@ def test_auditar_texto_limita_las_palabras_entre_la_negacion_y_la_promesa() -> N
     """Con tres enlaces la negación aún anula; con cuatro ya no es inmediata."""
     assert auditar_texto("no está queda fue aprobado") == []
     assert auditar_texto("no está queda fue es aprobado") == ["Promesa de aprobación: «aprobado»"]
+
+
+def test_auditar_texto_admite_un_sustantivo_tras_ninguna_o_ninguno() -> None:
+    """«Ninguna opción está garantizada» niega; dos sustantivos ya no son inmediatos."""
+    assert auditar_texto("Ninguna opción está garantizada") == []
+    assert auditar_texto("Ninguno está garantizado") == []
+    assert auditar_texto("Ninguna opción de crédito está garantizada") == [
+        "Promesa de aprobación: «garantizada»"
+    ]
 
 
 def test_auditar_texto_revisa_cifras_contra_las_permitidas() -> None:

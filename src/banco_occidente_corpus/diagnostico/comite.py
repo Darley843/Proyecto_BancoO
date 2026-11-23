@@ -143,7 +143,7 @@ _NEGACIONES = re.compile(
 )
 #: Expresiones que introducen o atenúan la frase; nunca niegan la promesa.
 _NEGACIONES_EXCLUIDAS = re.compile(
-    r"\bno(?:\s+dudes|\s+solo|\s+sólo|\s+te\s+preocupes)\b",
+    r"\bno(?:\s+dudes|\s+solo|\s+sólo|\s+te\s+preocupes)\b|\bsin\s+duda\b",
     re.IGNORECASE,
 )
 #: Signos que cierran la frase o la cláusula: una negación no puede cruzarlos.
@@ -151,9 +151,22 @@ _CORTES_FRASE = re.compile(r"[,.:;!?\r\n]")
 #: Palabras de enlace que pueden quedar entre la negación y la promesa.
 _ENLACES = frozenset(
     {
+        # Artículos y preposiciones.
+        "un",
+        "una",
+        "unos",
+        "unas",
+        "el",
+        "la",
+        "los",
+        "las",
+        "de",
+        "del",
+        "al",
+        "a",
+        # Pronombres y formas de «ser», «estar» y «quedar».
         "te",
         "lo",
-        "la",
         "le",
         "les",
         "se",
@@ -167,8 +180,29 @@ _ENLACES = frozenset(
         "queda",
         "quedan",
         "fue",
+        # Verbos típicos del descargo.
+        "hay",
+        "garantiza",
+        "garantizan",
+        "garantizar",
+        "asegura",
+        "aseguran",
+        "implica",
+        "significa",
+        "constituye",
+        "representa",
+        "equivale",
+        # Modales.
+        "podemos",
+        "puedo",
+        "puede",
+        "pueden",
+        # Atenuante.
+        "siquiera",
     }
 )
+#: Negaciones que admiten un sustantivo antes de los enlaces.
+_NEGACIONES_CON_SUSTANTIVO = frozenset({"ninguna", "ninguno"})
 #: Máximo de palabras entre la negación y la promesa.
 _MAX_PALABRAS_ENTRE_NEGACION_Y_PROMESA = 3
 _CODIGO = re.compile(r"\[([a-z0-9_]+)\]")
@@ -1655,10 +1689,13 @@ def _negacion_inmediata(previo: str) -> bool:
     """Indica si una negación precede de inmediato a la promesa.
 
     Solo cuenta la última negación de la cláusula, y solo si entre ella y la
-    promesa hay como máximo `_MAX_PALABRAS_ENTRE_NEGACION_Y_PROMESA` palabras:
-    enlaces como «te», «lo» o «está», o una palabra que también sea promesa,
-    como «garantizamos» en «nunca garantizamos la aprobación». «No dudes»,
-    «no solo» y «no te preocupes» nunca niegan.
+    promesa hay como máximo `_MAX_PALABRAS_ENTRE_NEGACION_Y_PROMESA` palabras de
+    enlace: artículos, preposiciones, pronombres, formas de «ser» o «estar»,
+    verbos del descargo («hay», «garantiza», «implica»), modales o «siquiera»;
+    también cuenta una palabra que sea promesa, como «garantizamos» en «nunca
+    garantizamos la aprobación». Tras «ninguna» o «ninguno» se admite un
+    sustantivo antes de los enlaces («ninguna opción está garantizada»). «No
+    dudes», «no solo», «no te preocupes» y «sin duda» nunca niegan.
 
     Args:
         previo: texto de la cláusula anterior a la promesa, ya cortado por el
@@ -1674,6 +1711,9 @@ def _negacion_inmediata(previo: str) -> bool:
     if _NEGACIONES_EXCLUIDAS.match(previo, ultima.start()):
         return False
     palabras = previo[ultima.end() :].split()
+    if ultima.group(0).casefold() in _NEGACIONES_CON_SUSTANTIVO and palabras:
+        # «ninguna opción está garantizada»: el sustantivo va antes de los enlaces.
+        palabras = palabras[1:]
     if len(palabras) > _MAX_PALABRAS_ENTRE_NEGACION_Y_PROMESA:
         return False
     return all(
@@ -1689,7 +1729,7 @@ def _promesas(texto: str) -> Iterator[str]:
     cláusula, con un máximo de tres palabras de enlace entre ambas. Un «no» en
     otra frase, tras una coma o a más distancia no convierte una promesa en
     negación: «No te preocupes: te lo aprueban» y «No dudes que te lo aprueban»
-    siguen siendo promesas.
+    siguen siendo promesas, y «sin duda» tampoco niega.
 
     Args:
         texto: argumentos y evidencias de un agente.
