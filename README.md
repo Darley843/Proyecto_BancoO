@@ -55,6 +55,7 @@ flowchart LR
 | Pana y tarjetas | El personaje y la tarjeta del resultado (PNG + texto equivalente) | `pana/` | — |
 | «¿Y si…?» | Compara otro plazo o monto sin tocar el diagnóstico original | `diagnostico/escenarios.py` | [`DIAGNOSTICO.md`](./docs/DIAGNOSTICO.md) |
 | MCP | Servidor de solo lectura: `consultar_tasa`, `simular_cuota`, `buscar_en_boveda` | `mcp_servidor/` | [`MCP.md`](./docs/MCP.md) |
+| Agente pana | Veinte herramientas Pydantic sobre el Tablero, el motor, la escena y la Bóveda, con traza local y confirmación en dos pasos | `herramientas/`, `openclaw/` | [`AGENTE_OPENCLAW.md`](./docs/AGENTE_OPENCLAW.md) |
 | Roba la Bóveda | Juego de ataque: inyección, extracción del prompt, datos personales y fuera de tema | `roba/` | [`ROBA_BOVEDA.md`](./docs/ROBA_BOVEDA.md) |
 | Operación y latencia | Vista con mensajes, consentimientos, casos y p50/p95 real por flujo | `arqueo/latencia.py`, `app/web/vistas/operacion.js` | [`ARQUEO.md`](./docs/ARQUEO.md) |
 | Simulador | Personas sintéticas que recorren el canal con el enviador falso | `simulador/` | — |
