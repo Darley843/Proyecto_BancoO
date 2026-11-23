@@ -624,7 +624,9 @@ def _nodo_tablero(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal],
 
     def tablero(estado: EstadoSucursal) -> dict[str, Any]:
         consulta = estado.get("reformulada") or estado.get("pregunta", "")
-        if _es_consulta_de_tasas_generica(consulta):
+        # La intención sale del texto original: una reformulación del modelo
+        # puede alargar «Tasas» y esconder que no hay producto.
+        if _es_consulta_de_tasas_generica(estado.get("pregunta", "")):
             return {
                 "filas": [],
                 "respuesta": TEXTO_TASAS_GENERICAS,
@@ -950,12 +952,17 @@ def _es_consulta_generica(consulta: str) -> bool:
 def _es_consulta_de_tasas_generica(consulta: str) -> bool:
     """Detecta un pedido de tasas que no nombra producto ni concepto.
 
-    «Tasas» o «¿y las tarifas?» no identifican una fila del Tablero: la primera
-    fila que contenga la palabra «tasa» puede ser la tasa de mora, que no
-    responde la pregunta. En ese caso conviene preguntar por el producto.
+    «Tasas», «¿y las tarifas?» o «¿cuáles son las tasas vigentes?» no
+    identifican una fila del Tablero: la primera fila que contenga la palabra
+    «tasa» puede ser la tasa de mora, que no responde la pregunta. En ese caso
+    conviene pedir el producto antes de citar una fila.
+
+    La decisión se toma sobre la pregunta original del usuario, no sobre la
+    reformulación del modelo: una reescritura puede alargar la frase y esconder
+    que no hay producto.
 
     Args:
-        consulta: pregunta reformulada o texto original.
+        consulta: texto original de la persona.
 
     Returns:
         ``True`` si conviene pedir el producto antes de citar una fila.
@@ -963,9 +970,7 @@ def _es_consulta_de_tasas_generica(consulta: str) -> bool:
     texto = normalizar(consulta)
     if not any(re.search(rf"\b{palabra}\b", texto) for palabra in _PALABRAS_TASA):
         return False
-    if any(concepto in texto for concepto in _CONCEPTOS_CONCRETOS):
-        return False
-    return len(re.findall(r"[a-z0-9]+", texto)) <= 4
+    return not any(concepto in texto for concepto in _CONCEPTOS_CONCRETOS)
 
 
 def _puede_responder_tabla(filas: Sequence[Fila]) -> bool:

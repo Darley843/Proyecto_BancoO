@@ -22,6 +22,7 @@ from banco_occidente_corpus.sucursal.grafo import (
     MAX_TOKENS_REFORMULAR,
     TEXTO_DIAGNOSTICO,
     DependenciasGrafo,
+    _es_consulta_de_tasas_generica,
     crear_grafo,
     es_seguimiento,
     fragmento_de_tablero,
@@ -804,3 +805,32 @@ def test_tasa_de_libre_inversion_no_es_generica(tmp_path: Path) -> None:
 
     assert "20,56" in estado["respuesta"]
     assert "Dime cuál te interesa" not in estado["respuesta"]
+
+
+@pytest.mark.parametrize(
+    "pregunta",
+    [
+        "¿Cuáles son las tasas de interés vigentes del banco?",
+        "y las tarifas?",
+        "necesito saber las tasas",
+    ],
+)
+def test_pedido_de_tasas_sin_producto_es_generico(pregunta: str) -> None:
+    """Una frase larga sin producto sigue siendo genérica."""
+    assert _es_consulta_de_tasas_generica(pregunta)
+
+
+@pytest.mark.parametrize(
+    "pregunta",
+    [
+        "tasa de mora",
+        "tasa de usura",
+        "cuota de manejo",
+        "tarifas de la cuenta de ahorros",
+        "tasa de un CDT a 90 días",
+        "comisión por transferencia",
+    ],
+)
+def test_concepto_concreto_no_es_generico(pregunta: str) -> None:
+    """Un producto o concepto concreto no pide aclaración."""
+    assert not _es_consulta_de_tasas_generica(pregunta)
