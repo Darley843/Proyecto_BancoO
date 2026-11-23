@@ -14,7 +14,7 @@ llenan cuando su pieza entre a `main`; mientras tanto dicen qué va a ir ahí.
 | [2. Código, datos y app](#2-código-datos-y-app) | Yoldy | Listo |
 | [3. WhatsApp por Meta](#3-whatsapp-por-meta) | Darley | Listo con el número de prueba; ⏳ SIM nueva y modo evento |
 | [4. Túnel](#4-túnel) | Darley | Listo |
-| [5. Gateway de OpenClaw](#5-gateway-de-openclaw) | Nayla | ⏳ por completar |
+| [5. Gateway de OpenClaw](#5-gateway-de-openclaw) | Nayla | Configuración y workspace listos; ⏳ arranque, MCP y auditoría |
 | [6. Servidor MCP y herramientas](#6-servidor-mcp-y-herramientas) | Nayla | Listo el MCP de solo lectura; ⏳ las 20 herramientas |
 | [7. Pantalla de la escena](#7-pantalla-de-la-escena) | Yoldy | Listo |
 | [8. Encender todo en orden](#8-encender-todo-en-orden) | Todos | Listo; ⏳ se completa con 3, 5 y 6 |
@@ -123,20 +123,53 @@ guardar**. Si no está instalado:
 
 ## 5. Gateway de OpenClaw
 
-*Mantiene: Nayla.* **⏳ Por completar** cuando el agente de Pana esté en
-`main`. Debe quedar documentado:
+*Mantiene: Nayla.* El detalle de cada archivo está en
+[`openclaw/README.md`](../openclaw/README.md) y el contrato en el cambio
+OpenSpec `agente-openclaw`.
 
-| Tema | Qué va aquí |
+**Dónde corre.** El gateway corre dentro de **WSL**, en la distribución
+`OpenClawGateway`, con el usuario `openclaw`. Si el computador no permite la
+red espejo de WSL, el plan B es instalar el gateway directo en Windows (⏳ lo
+confirma Nayla en la tarea 1.7).
+
+| Tema | Cómo queda |
 |---|---|
-| Instalación | Versión de OpenClaw y de Node; si corre en Windows o en WSL |
-| Agente | Cómo se crea el agente de Pana (`openclaw agents`), separado de cualquier otro |
-| Configuración | `openclaw.json` versionado, sin secretos (`openclaw secrets configure`); `bind: loopback` y token |
-| Modelos | DeepSeek como principal y el modelo alternativo |
-| API HTTP | Cómo se activa `/v1/chat/completions`, cómo se autentica y cómo la huella separa la sesión de cada invitado |
-| Workspace | `SOUL.md`, `AGENTS.md`, `USER.md`, `MEMORY.md` y bitácora: qué dice cada uno |
-| Seguridad | Sandbox, `tools.deny`, `fs.workspaceOnly`; `openclaw security audit` y `openclaw doctor` en verde |
-| Memoria | Cómo se comprueba que el hilo sobrevive al reinicio del gateway |
-| Respaldo | Qué pasa si el gateway no responde: el canal contesta con el grafo actual |
+| Escucha | `127.0.0.1:18789` (`bind: loopback`): no sale a la red local ni a internet |
+| Autenticación | Token en cada petición. Hoy el token real está en la configuración del gateway en WSL, no en un almacén de secretos; al exportar la configuración al repo, `scripts\exportar_config_openclaw.ps1` lo reemplaza por `${OPENCLAW_GATEWAY_TOKEN}`. ⏳ Miércoles 25: moverlo a un almacén de secretos con `openclaw secrets configure` |
+| API | `POST /v1/chat/completions` activado (misma forma que OpenAI). El canal manda `user = "wa:<huella>"`: cada invitado tiene su hilo y el número nunca viaja |
+| Modelo | `deepseek/deepseek-flash` principal y `deepseek/deepseek-v4-pro` alternativo |
+| Agente `pana` | Perfil de herramientas `minimal` con lista `deny` (sin terminal, archivos, navegador, mensajes propios ni subagentes), `skills: []` y `thinkingDefault: "off"` (responde más rápido) |
+| Archivos | `tools.fs.workspaceOnly: true` y sin permisos elevados |
+| Canal WhatsApp del gateway | **Apagado**: WhatsApp va solo por Meta (sección 3) |
+
+**Workspace de Pana.** La fuente de verdad es el repositorio
+(`openclaw/workspace/pana/`: `SOUL.md`, `AGENTS.md`, `USER.md`, `IDENTITY.md`).
+Después de cada cambio se copia a WSL:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\sincronizar_workspace.ps1
+```
+
+El script no toca `MEMORY.md` ni la bitácora del día. Nunca se edita el
+workspace de WSL a mano.
+
+**Configuración versionada.** `openclaw/openclaw.json` es una copia sin
+secretos de la configuración real de WSL. Si la configuración cambia, se vuelve
+a exportar (el script borra tokens, claves y teléfonos, y falla si queda algo
+con pinta de clave):
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\exportar_config_openclaw.ps1
+```
+
+**⏳ Por completar (Nayla):** el comando para arrancar el gateway, cómo se
+conecta al MCP (sección 6), el token en el almacén de secretos, el resultado de
+`openclaw security audit` y la comprobación de que el hilo sobrevive a un
+reinicio.
+
+**Respaldo.** Si el gateway no responde, el canal contesta con el grafo actual.
+Para forzarlo durante la demo: `$env:OPENCLAW_ACTIVO = "0"` antes de `make app`
+(⏳ llega con la tarea 1.5).
 
 Comprobación mínima: una pregunta enviada por HTTP al gateway devuelve la
 respuesta del agente, y en la traza se ve qué herramienta eligió.
@@ -153,7 +186,8 @@ con `consultar_tasa`, `simular_cuota` y `buscar_en_boveda`. Detalle en
 uv run python -m banco_occidente_corpus.mcp_servidor
 ```
 
-**⏳ Por completar**: el MCP por HTTP en `127.0.0.1` con las **20
+**⏳ Por completar**: el servidor `sucursal-agente` por HTTP en `127.0.0.1:8765`
+(se arranca con `make agente-mcp`, tarea 1.6) con las **20
 herramientas** (tabla en el [README](../README.md#las-20-herramientas)), cómo
 se conecta al gateway (`openclaw mcp add`, `openclaw mcp tools`, `openclaw mcp
 probe`), la lista de herramientas permitidas y, si el gateway corre en WSL, la
@@ -198,7 +232,7 @@ repositorio.
 |---|---|---|
 | 1 | App y canal | `. "..\whatsapp-env.ps1"`, `$env:WHATSAPP_MODO = "real"`, `make app` |
 | 2 | Túnel | `cloudflared tunnel --url http://127.0.0.1:8000` y actualizar la URL en Meta |
-| 3 | Gateway de OpenClaw | ⏳ sección 5 |
+| 3 | Gateway de OpenClaw | `scripts\sincronizar_workspace.ps1` y arranque en WSL (⏳ sección 5) |
 | 4 | Servidor MCP | ⏳ sección 6 |
 | Edge | Pantalla | `http://127.0.0.1:8000/escena.html`, F11 |
 
