@@ -269,6 +269,20 @@ def test_fuera_de_tema_dice_que_no_tiene_informacion() -> None:
     assert "JSON.stringify({ pregunta:" in codigo
 
 
+def test_el_rechazo_del_servidor_cede_ante_la_ficha_local() -> None:
+    """Si el servidor solo rechaza, la pantalla prueba antes su ficha local."""
+    anfitrion = (ESCENA / "anfitrion.js").read_text(encoding="utf-8")
+    bloque = re.search(r"SIN_RESPUESTA_DEL_SERVIDOR = Object\.freeze\(\[(.*?)\]\)", anfitrion)
+    assert bloque is not None
+    ids = set(re.findall(r'"([a-z0-9_.]+)"', bloque.group(1)))
+    assert ids == {"pana.pregunta.rechazo.v1", "pana.pregunta.respaldo.v1"}
+    servidor = RAIZ / "src" / "banco_occidente_corpus" / "escena" / "pregunta.py"
+    if servidor.exists():
+        codigo = servidor.read_text(encoding="utf-8")
+        for id_turno in ids:
+            assert f'id="{id_turno}"' in codigo, id_turno
+
+
 def test_el_microfono_escucha_en_espanol_de_colombia_con_respaldo() -> None:
     """Un solo resultado en es-CO; sin reconocimiento se escribe la pregunta."""
     codigo = (ESCENA / "microfono.js").read_text(encoding="utf-8")
