@@ -34,6 +34,30 @@ Para escoger:
 
 La voz del navegador también es el respaldo cuando Piper falla.
 
+## La escena (`escena.html`)
+
+La escena se abre como página aparte, fuera de la Sucursal:
+http://127.0.0.1:8000/escena.html (con `make app` corriendo). Cada turno se dice
+con la voz de su personaje y sale en subtítulos. El **modo solo subtítulos**
+(tecla S) no pide audio a `/api/voz` ni usa la voz del navegador: muestra el
+texto y avanza con Espacio. Es el respaldo si falla el sonido. Ver
+[`ESCENA.md`](./ESCENA.md).
+
+## Preflight de voces (el día de la demo)
+
+En el computador de la demo, con internet y en **Microsoft Edge**:
+
+1. `make voces-prueba`: debe escribir un `.ogg` por personaje en
+   `data/modelos/voz/muestras/`. Si falla, falta `make voz-modelo`.
+2. `make app` y abrir http://127.0.0.1:8000/voces.html: «Escuchar a todos en
+   orden». Pana debe sonar con «Microsoft Gonzalo Online (Natural)» y el agente
+   del joven con «Microsoft Juan Online (Natural)». Si no aparecen (sin
+   internet), suenan con su Piper de respaldo: sirve igual.
+3. Abrir http://127.0.0.1:8000/escena.html, F11, y pasar dos o tres turnos con
+   voz. Probar la tecla S (solo subtítulos) y volver.
+
+Si nada suena, la escena se presenta en solo subtítulos.
+
 ## Quién suena cómo (`config/voz.toml`)
 
 | Personaje | Modelo | Ajuste |
