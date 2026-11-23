@@ -171,6 +171,13 @@ demo: ## Prueba el pipeline con una pagina local (sin red)
 simular: ## Recorre el canal de WhatsApp con las personas sinteticas y el enviador falso (sin red)
 	$(UV) run python -m banco_occidente_corpus.simulador
 
+# Plan B de la escena. Depende de la tarea 7.2 de Darley
+# (`escena/__main__.py`), que todavía no existe: el objetivo queda listo y no
+# se ejecuta hasta que entre esa tarea. No modifica ni reemplaza `make simular`.
+.PHONY: escena-proyectada
+escena-proyectada: ## Genera la escena de respaldo sin DeepSeek (requiere la tarea 7.2: escena/__main__.py)
+	$(UV) run python -m banco_occidente_corpus.escena --proyectado
+
 .PHONY: deliver
 deliver: gold stats pack ## Genera Gold, el indice y el ZIP del entregable
 	@echo Paquete listo en dist/

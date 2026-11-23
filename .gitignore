@@ -23,6 +23,8 @@ data/asistente/whatsapp.sqlite
 data/asistente/diagnostico.sqlite
 data/asistente/roba.sqlite
 data/asistente/latencias.sqlite
+# Escena demo: JSON proyectado y núcleo; se regeneran con 'make escena-proyectada'.
+data/escena/
 # Indice vectorial de la Boveda (Qdrant local + metadatos): se regenera con 'make indice'.
 data/boveda/
 # Explicito aunque la carpeta padre ya este ignorada.
