@@ -385,3 +385,64 @@ def _caso_desde_fila(fila: tuple[object, ...]) -> CasoAsesor:
         estado=cast(EstadoCaso, estado),
         origen="solicitud_directa" if str(motivo) == "asesor_solicitado" else "diagnostico",
     )
+
+
+def hay_mensaje_desde(ruta: Path, usuario_id: str, desde: datetime) -> bool:
+    """Indica si esa huella escribió a partir de un instante.
+
+    Es el control de la ventana de servicio de Meta: solo se puede responder con
+    texto libre a quien escribió hace menos de 24 horas.
+
+    Args:
+        ruta: archivo SQLite del canal.
+        usuario_id: huella del número, nunca el número.
+        desde: instante de corte de la ventana.
+
+    Returns:
+        ``True`` si hay al menos un mensaje de esa huella desde ``desde``.
+    """
+    with conectar(ruta) as conexion:
+        fila = conexion.execute(
+            "SELECT 1 FROM mensajes "
+            "WHERE usuario_id = ? AND datetime(recibido_en) >= datetime(?) LIMIT 1",
+            (usuario_id, desde.isoformat()),
+        ).fetchone()
+    return fila is not None
+
+
+def contar_mensajes_usuario(ruta: Path, usuario_id: str, desde: datetime) -> int:
+    """Cuenta los mensajes de una huella a partir de un instante.
+
+    Args:
+        ruta: archivo SQLite del canal.
+        usuario_id: huella del número, nunca el número.
+        desde: instante de corte.
+
+    Returns:
+        Cuántos mensajes registró esa huella desde ``desde``.
+    """
+    with conectar(ruta) as conexion:
+        fila = conexion.execute(
+            "SELECT COUNT(*) FROM mensajes "
+            "WHERE usuario_id = ? AND datetime(recibido_en) >= datetime(?)",
+            (usuario_id, desde.isoformat()),
+        ).fetchone()
+    return int(fila[0]) if fila is not None else 0
+
+
+def contar_mensajes_desde(ruta: Path, desde: datetime) -> int:
+    """Cuenta todos los mensajes del canal a partir de un instante.
+
+    Args:
+        ruta: archivo SQLite del canal.
+        desde: instante de corte; el inicio del evento.
+
+    Returns:
+        Cuántos mensajes entraron desde ``desde``, de cualquier huella.
+    """
+    with conectar(ruta) as conexion:
+        fila = conexion.execute(
+            "SELECT COUNT(*) FROM mensajes WHERE datetime(recibido_en) >= datetime(?)",
+            (desde.isoformat(),),
+        ).fetchone()
+    return int(fila[0]) if fila is not None else 0

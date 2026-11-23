@@ -165,6 +165,20 @@ class EnviadorMeta:
     intentos: int = INTENTOS
     cliente: httpx.Client | None = None
     espera: Callable[[float], None] = field(default=time.sleep)
+    #: Autorización adicional para el modo evento: responde a quien escribió
+    #: dentro de la ventana de servicio, aunque no esté en ``huellas``.
+    puede_responder: Callable[[str], bool] | None = None
+
+    def _autorizado(self) -> bool:
+        """Indica si el destino puede recibir la respuesta ahora.
+
+        Returns:
+            ``True`` si la huella está en ``huellas`` o si el enlace del evento
+            confirma que la persona escribió dentro de la ventana de servicio.
+        """
+        if self.usuario_id in self.huellas:
+            return True
+        return self.puede_responder is not None and bool(self.puede_responder(self.usuario_id))
 
     def enviar(self, respuesta: RespuestaCanal) -> str:
         """Envía la respuesta y devuelve el id que asigna Meta.
@@ -181,7 +195,7 @@ class EnviadorMeta:
             ErrorEnvio: si el destino no está autorizado, si Meta responde 4xx
                 al texto o si se agotan los reintentos de 429/5xx.
         """
-        if self.usuario_id not in self.huellas:
+        if not self._autorizado():
             raise ErrorEnvio("destino no autorizado para el modo real")
 
         propio = self.cliente is None
