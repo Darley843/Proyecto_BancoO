@@ -51,13 +51,16 @@
     <button type="button" id="escena-siguiente" class="escena__boton--secundario">Siguiente turno</button>
     <button type="button" id="escena-reiniciar" class="escena__boton--secundario">Reiniciar</button>
     <button type="button" id="escena-preguntar" class="escena__boton--secundario">Preguntas (Q)</button>
+    <button type="button" id="escena-nucleo" class="escena__boton--secundario">Núcleo (N)</button>
+    <button type="button" id="escena-ver-traza" class="escena__boton--secundario" aria-expanded="false" aria-controls="escena-traza">Trazabilidad (T)</button>
     <label class="escena__casilla" for="escena-solo-subtitulos">
       <input type="checkbox" id="escena-solo-subtitulos">
       Solo subtítulos (respaldo)
     </label>
+    <span class="escena__estado" id="escena-modo"></span>
     <span class="escena__estado" id="escena-contador"></span>
     <span class="escena__estado" id="escena-voz"></span>
-    <span class="escena__estado">Teclas: Espacio siguiente · P reproducir/pausar · S subtítulos · Q preguntas · R reiniciar</span>
+    <span class="escena__estado">Teclas: Espacio siguiente · P reproducir/pausar · S subtítulos · Q preguntas · N núcleo · T trazabilidad · R reiniciar</span>
   </div>
 
   <section class="escena__preguntas" id="escena-preguntas" aria-label="Preguntas del público" hidden>
@@ -69,5 +72,25 @@
     </form>
     <span class="escena__estado" id="escena-pregunta-estado"></span>
   </section>
+
+  <aside class="escena__traza" id="escena-traza" aria-label="Trazabilidad para quien facilita" hidden>
+    <h2>Trazabilidad (solo facilitador)</h2>
+    <table class="escena__tabla escena__tabla--traza">
+      <caption>Resumen</caption>
+      <tbody id="escena-traza-resumen"></tbody>
+    </table>
+    <dl class="escena__traza-turno">
+      <dt>Turno</dt><dd id="escena-traza-id">—</dd>
+      <dt>Origen</dt><dd id="escena-traza-origen">—</dd>
+      <dt>Escenario</dt><dd id="escena-traza-escenario">—</dd>
+      <dt>Modo</dt><dd id="escena-traza-modo">—</dd>
+    </dl>
+    <table class="escena__tabla escena__tabla--traza">
+      <caption>Fuentes de las cifras del turno</caption>
+      <tbody id="escena-traza-fuentes"></tbody>
+    </table>
+    <ul class="escena__hallazgos" id="escena-traza-hallazgos"></ul>
+    <p class="escena__estado" id="escena-traza-sellos"></p>
+  </aside>
 </body>
 </html>

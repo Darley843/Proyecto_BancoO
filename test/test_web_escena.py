@@ -302,6 +302,8 @@ def test_los_pasos_empiezan_en_presentacion_y_terminan_en_preguntas() -> None:
         "/escena/turnos-ejemplo.json",
         "/escena/anfitrion.js",
         "/escena/microfono.js",
+        "/escena/respaldo.js",
+        "/escena/traza.js",
     ],
 )
 def test_la_app_sirve_la_escena(ruta: str) -> None:
@@ -312,3 +314,56 @@ def test_la_app_sirve_la_escena(ruta: str) -> None:
     app = FastAPI()
     app.mount("/", StaticFiles(directory=WEB, html=True), name="web")
     assert TestClient(app).get(ruta).status_code == 200
+
+
+def test_la_trazabilidad_empieza_oculta_y_se_abre_con_la_t() -> None:
+    """El panel del facilitador no se ve al cargar y tiene su tecla y su botón."""
+    html = (WEB / "escena.html").read_text(encoding="utf-8")
+    assert re.search(r'<aside[^>]*id="escena-traza"[^>]*\bhidden\b', html)
+    assert 'id="escena-ver-traza"' in html
+    codigo = (ESCENA / "escena.js").read_text(encoding="utf-8")
+    assert 'tecla === "t"' in codigo
+    assert 'tecla === "n"' in codigo
+
+
+def test_el_resumen_de_la_traza_busca_las_tres_tasas_por_su_fuente() -> None:
+    """Usura, tasa del banco y del gota se reconocen por el tipo de fuente."""
+    traza = (ESCENA / "traza.js").read_text(encoding="utf-8")
+    for nombre in ("Usura", "Tasa del banco", "Tasa del gota", "Veredicto del auditor"):
+        assert f'"{nombre}"' in traza
+    assert 'c.fuente?.tipo === "usura"' in traza
+    assert 'c.fuente?.tipo === "calculo_gota"' in traza
+
+
+def test_el_respaldo_solo_usa_session_storage_y_con_try() -> None:
+    """La escena guardada vive en la pestaña y nunca rompe la página."""
+    respaldo = (ESCENA / "respaldo.js").read_text(encoding="utf-8")
+    assert "localStorage" not in respaldo
+    usos = respaldo.count("globalThis.sessionStorage")
+    assert usos >= 3
+    assert respaldo.count("try {") == 3
+    for archivo in ESCENA.glob("*.js"):
+        if archivo.name != "respaldo.js":
+            assert "sessionStorage" not in archivo.read_text(encoding="utf-8"), archivo.name
+
+
+def test_el_nucleo_deja_a_don_gota_pana_y_el_auditor() -> None:
+    """El núcleo local no incluye la negociación ni al voluntario."""
+    respaldo = (ESCENA / "respaldo.js").read_text(encoding="utf-8")
+    personajes = re.search(r"PERSONAJES_NUCLEO = Object\.freeze\(\[(.*?)\]\)", respaldo)
+    assert personajes is not None
+    assert set(re.findall(r'"([a-z_]+)"', personajes.group(1))) == {"don_gota", "pana", "auditor"}
+    codigo = (ESCENA / "escena.js").read_text(encoding="utf-8")
+    assert '"/api/escena/proyectado"' in codigo
+    assert "?modo=nucleo" in codigo
+
+
+def test_cada_funcion_de_la_escena_tiene_jsdoc() -> None:
+    """Toda función de los módulos de la escena va precedida de su comentario."""
+    for archivo in ESCENA.glob("*.js"):
+        texto = archivo.read_text(encoding="utf-8")
+        for coincidencia in re.finditer(
+            r"^(?:export )?(?:async )?function (\w+)", texto, re.MULTILINE
+        ):
+            previo = texto[: coincidencia.start()].rstrip()
+            assert previo.endswith("*/"), f"{archivo.name}: {coincidencia.group(1)}"

@@ -69,6 +69,44 @@ def test_sirve_los_archivos_de_la_app(cliente: TestClient, ruta: str) -> None:
     assert cliente.get(ruta).status_code == 200
 
 
+@pytest.mark.parametrize(
+    "ruta",
+    [
+        "/escena.html",
+        "/escena/escena.js",
+        "/escena/contrato.js",
+        "/escena/escena.css",
+        "/escena/respaldo.js",
+        "/escena/traza.js",
+    ],
+)
+def test_la_app_sirve_la_pantalla_de_la_escena(cliente: TestClient, ruta: str) -> None:
+    """La escena es una página aparte servida por la app real (tarea 6.9)."""
+    assert cliente.get(ruta).status_code == 200
+
+
+def test_la_escena_trae_sus_botones(cliente: TestClient) -> None:
+    """``escena.html`` trae los botones de quien presenta, incluido el plan B."""
+    html = cliente.get("/escena.html").text
+    for texto in (
+        "Empezar",
+        "Siguiente turno",
+        "Reiniciar",
+        "Preguntas (Q)",
+        "Núcleo (N)",
+        "Trazabilidad (T)",
+        "Solo subtítulos",
+    ):
+        assert texto in html, texto
+    assert 'aria-live="polite"' in html
+
+
+def test_la_sucursal_no_enlaza_la_escena(cliente: TestClient) -> None:
+    """La escena no entra en la SPA: ``index.html`` y ``app.js`` no la enlazan."""
+    assert "escena.html" not in cliente.get("/").text
+    assert "escena.html" not in cliente.get("/app.js").text
+
+
 def test_la_api_responde_estado(cliente: TestClient) -> None:
     """Con el PR 10 la API existe y ``/api/estado`` trae los seis campos."""
     respuesta = cliente.get("/api/estado")

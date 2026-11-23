@@ -218,6 +218,69 @@ h2 {
 .escena__form-pregunta .escena__boton--secundario { background: transparent; color: var(--texto); border: 1px solid var(--linea); }
 .escena__form-pregunta input:focus-visible, .escena__form-pregunta button:focus-visible { outline: 3px solid var(--joven); outline-offset: 2px; }
 
+/* ---------- Trazabilidad (solo facilitador, oculta por defecto) ---------- */
+.escena__traza {
+  /* Arriba a la derecha, sobre el panel de cifras: nunca tapa los subtítulos. */
+  position: fixed;
+  top: 72px;
+  right: 16px;
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 330px);
+  overflow-y: auto;
+  display: grid;
+  gap: 10px;
+  padding: 14px 16px;
+  background: var(--hundido);
+  border: 2px dashed var(--joven);
+  border-radius: 10px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, .6);
+  z-index: 10;
+}
+.escena__traza[hidden] { display: none; }
+.escena__traza caption { text-align: left; font: 500 12px var(--fuente-cifras); letter-spacing: .08em; text-transform: uppercase; color: var(--tenue); padding-bottom: 4px; }
+.escena__tabla--traza { font-size: 13px; }
+.escena__tabla--traza td { text-align: left; white-space: normal; overflow-wrap: anywhere; padding: 3px 6px; }
+.escena__traza-turno { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 0; font: 13px var(--fuente-cifras); }
+.escena__traza-turno dt { color: var(--tenue); }
+.escena__traza-turno dd { margin: 0; overflow-wrap: anywhere; }
+.escena__traza .escena__hallazgos { font-size: 13px; }
+
+/* ---------- Proyector (1920 × 1080) y portátil (1366 × 768) ---------- */
+/* Foco siempre visible, también en los botones del panel y en la casilla. */
+:where(button, input, [tabindex]):focus-visible { outline: 3px solid var(--joven); outline-offset: 2px; }
+
+@media (min-width: 1800px) and (min-height: 1000px) {
+  body.escena { font-size: 20px; }
+  .escena__avatar { width: min(100%, 190px); }
+  .escena__texto { font-size: 40px; }
+  .escena__nombre { font-size: 18px; }
+  .escena__tabla { font-size: 17px; }
+}
+
+@media (max-height: 820px) {
+  body.escena { padding: 10px; gap: 8px; }
+  .escena__barra { padding: 8px 12px; }
+  .escena__personajes { padding: 12px 16px; }
+  .escena__avatar { width: min(100%, 112px); }
+  .escena__panel { padding: 12px; gap: 8px; }
+  .escena__subtitulos { padding: 10px 18px 14px; }
+  .escena__texto { font-size: clamp(20px, 2.1vw, 28px); min-height: 2.4em; }
+  .escena__controles { gap: 6px; }
+  .escena__controles button { padding: 8px 12px; font-size: 15px; }
+  .escena__traza { top: 56px; max-height: calc(100vh - 250px); }
+}
+
+/* Más contraste si el sistema lo pide; en contraste forzado manda Windows. */
+@media (prefers-contrast: more) {
+  :root { --tenue: #c9d2e0; --linea: #5a6b88; }
+  .escena__personaje { opacity: .55; }
+}
+
+@media (forced-colors: active) {
+  .escena__personaje--habla .escena__foto { outline: 4px solid Highlight; }
+  .escena__semaforo .escena__luz { forced-color-adjust: none; }
+}
+
 @media (max-width: 900px) {
   .escena__pantalla { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto auto; }
   .escena__personajes { grid-template-columns: repeat(3, minmax(0, 1fr)); }

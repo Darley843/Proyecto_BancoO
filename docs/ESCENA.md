@@ -45,9 +45,14 @@ que hace Pana.
 
 ## De dónde salen los turnos
 
-1. `GET /api/escena/turnos` (el orquestador de la escena, cuando exista).
-2. Si no responde: `app/web/escena/turnos-ejemplo.json`, y la pantalla muestra
-   el sello «Turnos de ejemplo».
+1. `GET /api/escena/proyectado`: la escena precalculada por
+   `make escena-proyectada` (`data/escena/proyectado.json`). Lo que responde se
+   guarda en `sessionStorage` de esa pestaña.
+2. Si el servidor no responde: la última escena guardada en esa pestaña, con el
+   sello «Escena guardada (sin servidor)». Sirve si la app se cae y hay que
+   recargar la página.
+3. Si tampoco hay: `app/web/escena/turnos-ejemplo.json`, con el sello «Turnos de
+   ejemplo».
 
 Ambos devuelven una `Escena` (al menos `{"turnos": [...], "veredicto": {...}}`).
 Cada turno sigue `TurnoEscena` (`src/banco_occidente_corpus/escena/contratos.py`,
@@ -105,7 +110,42 @@ Para cambiar un retrato basta con reemplazar el `.webp` con el mismo nombre
 | Siguiente turno (Espacio o →) | pasa al siguiente sin esperar |
 | Solo subtítulos (tecla S) | **modo de respaldo**: no suena nada y avanza de a un turno por clic; las respuestas a preguntas salen solo en texto |
 | Preguntas (tecla Q) | abre o cierra el cuadro de preguntas del público |
-| Reiniciar (tecla R) | vuelve al inicio |
+| Núcleo (tecla N) | **plan B**: sigue solo con Don Gota, Pana y el auditor, sin repetir lo ya dicho, y deja la escena en pausa |
+| Trazabilidad (tecla T) | muestra u oculta el panel para quien facilita (empieza oculto) |
+| Reiniciar (tecla R) | vuelve al inicio con la escena completa y borra la escena guardada en la pestaña |
+
+## Plan B en la pantalla
+
+| Si pasa esto | Se hace esto |
+|---|---|
+| La negociación falla o hay que acortar | **Núcleo** (N). Pide `GET /api/escena/proyectado?modo=nucleo`; si no responde, usa el núcleo guardado en la pestaña y, si no hay, saca de la escena cargada los turnos de Don Gota, Pana y el auditor. La barra dice de dónde salió: «Núcleo (servidor)», «(guardado)» o «(escena)». El flujo en vivo puede pedir lo mismo con `document.dispatchEvent(new Event("escena:nucleo"))` |
+| No hay voz o el sonido falla | **Solo subtítulos** (S) y avanzar con Espacio |
+| La app se cae | `make app` otra vez y recargar: si el servidor aún no responde, la pantalla usa la escena guardada en la pestaña |
+| Nada de lo anterior | los turnos de ejemplo siguen ahí, con su sello |
+
+## Panel de trazabilidad (solo facilitador)
+
+Con la tecla **T** (o el botón «Trazabilidad») aparece arriba a la derecha, sin
+tapar los subtítulos. Empieza oculto: el público no lo ve si no se abre.
+
+- **Resumen**: usura, tasa del banco y tasa del gota, cada una con su fuente
+  (`usura`, `motor` o `gold`, `calculo_gota`), y el veredicto del auditor, que
+  aparece solo después de que el auditor habla en la escena.
+- **Turno actual**: `id`, `origen`, `escenario.codigo` y el modo (completa o
+  núcleo).
+- **Fuentes de las cifras del turno**: etiqueta, tipo y referencia (y la
+  vigencia si la trae).
+- **Hallazgos** del auditor con su gravedad y código, y los **sellos**
+  (`Escena.sellos`) cortados a 8 caracteres.
+
+## Proyector y portátil
+
+La pantalla está pensada para 1920 × 1080 (proyector) y 1366 × 768 (portátil),
+con el zoom del navegador al 100 % y en pantalla completa (F11). En pantallas
+bajas se achican los retratos y los márgenes para que nada quede fuera; en
+pantallas grandes los subtítulos crecen. El foco del teclado siempre se ve
+(borde amarillo) y los subtítulos se anuncian con `aria-live`. Si Windows tiene
+contraste alto, se respeta.
 
 El joven es la persona voluntaria: habla en persona, así que su turno solo se
 muestra en subtítulos. Las voces vienen de `app/web/voz.js` (ver
