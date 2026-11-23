@@ -9,31 +9,75 @@ make app
 # abrir http://127.0.0.1:8000/escena.html
 ```
 
+## Pana como anfitrión
+
+Antes de la escena, **Pana abre la actividad**: se presenta, presenta a cada
+agente (cada uno dice una frase con su voz) y anuncia la actividad práctica. Al
+final, el paso **Preguntas** deja que el público le pregunte por micrófono.
+Todo vive en `app/web/escena/anfitrion.js` y `app/web/escena/microfono.js`.
+
+| Parte | Cómo funciona |
+|---|---|
+| Presentación (paso 1) | Siete turnos fijos (`origen: "guion_fijo"`): Pana, Don Gota, agente del joven, agente del banco, auditor y Pana otra vez. `GET /api/escena/introduccion` puede reemplazarlos; si no responde, se usa el guion del archivo |
+| Abrir preguntas | Botón «Preguntas» o tecla **Q**. La primera vez Pana invita a preguntar y avisa que el micrófono usa el reconocimiento de voz de Microsoft Edge |
+| Micrófono | Botón «Hablar»: reconocimiento de voz del navegador en `es-CO`, una sola frase; al oírla, Pana responde. Si no hay micrófono o falla, se escribe la pregunta y se pulsa Enter |
+| Respuesta | Se muestra la pregunta («Pregunta del público») y Pana responde con voz y subtítulos |
+
+Cómo decide Pana qué responder (gana la primera regla que aplica):
+
+1. Pregunta vacía o de más de 300 caracteres, o con algo que parece un documento,
+   un celular o un correo → frase fija para repetir o para no dar datos.
+2. **Karol G o Shakira** (con o sin tildes, «karolg», «la bichota») → frase fija:
+   al profesor Jan le gustan mucho, al equipo también, pero no tienen nada que
+   ver con el proyecto.
+3. `POST /api/escena/pregunta` con `{"pregunta": "…"}` (tarea 6.13): el servidor
+   enruta a la ficha de preguntas del profesor (`docs/PRESENTADOR.md`), al
+   proyecto (BM25 sobre `README.md` y `docs/`) o al banco (Ventanilla), y
+   devuelve un turno de Pana del contrato.
+4. Si el servidor no responde: una **ficha corta de respaldo** en `anfitrion.js`
+   (menos de 40 palabras por respuesta) contesta lo más probable del proyecto
+   (gota a gota, agentes, Bóveda y Qdrant, DeepSeek, voces, WhatsApp,
+   privacidad, público, equipo, actividad); lo demás: «No tengo información
+   sobre eso…». Quien presenta ve el aviso.
+
+La pregunta del público es un dato no confiable: no se guarda y nunca cambia lo
+que hace Pana.
+
 ## De dónde salen los turnos
 
 1. `GET /api/escena/turnos` (el orquestador de la escena, cuando exista).
 2. Si no responde: `app/web/escena/turnos-ejemplo.json`, y la pantalla muestra
    el sello «Turnos de ejemplo».
 
-Ambos devuelven `{"turnos": [...]}`. Cada turno sigue el contrato del plan de
-cierre (sección 6), validado en `app/web/escena/contrato.js`:
+Ambos devuelven una `Escena` (al menos `{"turnos": [...], "veredicto": {...}}`).
+Cada turno sigue `TurnoEscena` (`src/banco_occidente_corpus/escena/contratos.py`,
+decisión 1 del cambio `demo-gota-a-gota`), validado en el navegador por
+`app/web/escena/contrato.js`:
 
 | Campo | Valores |
 |---|---|
+| `id`, `orden` | identidad y posición del turno |
 | `personaje` | `pana`, `don_gota`, `joven`, `agente_joven`, `agente_banco`, `auditor` |
-| `texto` | lo que se dice en voz y en subtítulos |
-| `cifras` | lista de `{nombre, valor, fuente}`; `fuente` es `motor`, `simulador` o `Tablero`; las tasas van como fracción (0,24 = 24 %) |
-| `escenario` | `{monto, plazo, semaforo}`; `semaforo` vacío si aún no se calcula |
-| `origen` | `guion`, `motor`, `modelo` o `reglas` |
-| `hallazgos` | objeciones del auditor (vacía si está conforme) |
+| `texto` / `subtitulo` | lo que se dice en voz / lo que se lee (si falta, se lee `texto`) |
+| `cifras` | lista de `{etiqueta, valor, valor_legible, unidad, fuente}`; `fuente` es `{tipo, referencia}` con `tipo` `config`, `gold`, `motor`, `calculo_gota`, `usura`, `guion` o `documento`. La pantalla muestra `valor_legible` y no calcula nada |
+| `escenario` | `EscenarioEscena` del motor (`codigo`, `monto`, `plazo_meses`, `semaforo`…) o `null` |
+| `origen` | `guion_fijo`, `motor`, `llm`, `reglas` o `entrada_voz` (los viejos `guion` y `modelo` se rechazan) |
+| `hallazgos` | `{codigo, turno_id, detalle, gravedad}` del auditor |
+
+El **veredicto del auditor** (`conforme`, `con observaciones`, `objeta`) llega
+aparte y se muestra como «Auditor: …» sin colores; el **semáforo del crédito**
+(`verde`, `amarillo`, `rojo`) sale del escenario y se muestra como «Semáforo del
+crédito: …». Pueden diferir: un crédito en rojo con un auditor conforme es
+posible.
 
 Un turno que no cumple el contrato no se dice: la pantalla muestra el error.
-El paso de la escena (1 a 6) se deduce de quién habla.
+El paso de la escena (2 Voluntario a 7 Veredicto) se deduce de quién habla; el
+paso 1 es la presentación y el 8 las preguntas.
 
 ## Los rostros
 
 Cada personaje sale con un **retrato en 3D** (`app/web/escena/rostros/<personaje>.webp`,
-384 × 384, menos de 20 KB cada uno) dentro de un círculo con borde de su color; el
+384 × 384, menos de 60 KB cada uno) dentro de un círculo con borde de su color; el
 que habla brilla. Los retratos se **generaron con IA** a partir de una descripción
 escrita por el equipo: son personajes inventados, no fotos de personas reales.
 
@@ -59,7 +103,8 @@ Para cambiar un retrato basta con reemplazar el `.webp` con el mismo nombre
 |---|---|
 | Empezar / Pausar (tecla P) | reproduce los turnos seguidos, cada uno con la voz de su personaje |
 | Siguiente turno (Espacio o →) | pasa al siguiente sin esperar |
-| Solo subtítulos (tecla S) | **modo de respaldo**: no suena nada y avanza de a un turno por clic |
+| Solo subtítulos (tecla S) | **modo de respaldo**: no suena nada y avanza de a un turno por clic; las respuestas a preguntas salen solo en texto |
+| Preguntas (tecla Q) | abre o cierra el cuadro de preguntas del público |
 | Reiniciar (tecla R) | vuelve al inicio |
 
 El joven es la persona voluntaria: habla en persona, así que su turno solo se
@@ -70,9 +115,10 @@ subtítulos siguen visibles.
 `turnos-ejemplo.json` es **solo un ejemplo de maquetación** (lo dice su campo
 `descripcion` y la pantalla muestra el sello «Turnos de ejemplo»). Se reemplaza
 por la salida de `make escena-proyectada` cuando exista (tarea 6.11 del cambio
-`demo-gota-a-gota`). Mientras tanto sigue el diseño: el voluntario dice el «para
-qué» con sus palabras y responde con letras monto, ingresos, gastos y cuotas; el
-horizonte es de 36 meses. Las cifras del banco salen de
-`diagnostico.motor.calcular` (un millón, empleado, tasa máxima de noviembre de
-2026) y las de Don Gota de las fórmulas del diseño (20 % mensual, renovación
-mensual sin capitalizar). `test/test_web_escena.py` comprueba ambas.
+`demo-gota-a-gota`). Mientras tanto ya sigue `TurnoEscena`: los turnos de Don
+Gota y de la comparación de Pana salen del código de `escena/gota.py` y
+`escena/comparacion.py`; las cifras del banco, de `diagnostico.motor.calcular`
+(un millón, empleado, 36 meses, tasa máxima de noviembre de 2026). Los turnos del
+voluntario y de la negociación son de ejemplo. `test/test_web_escena.py`
+comprueba las cifras y, cuando `escena/contratos.py` está en main, valida cada
+turno con Pydantic.

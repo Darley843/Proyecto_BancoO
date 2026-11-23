@@ -33,12 +33,14 @@
       </table>
       <div id="escena-caja-hallazgos" hidden>
         <h2>Auditor</h2>
-        <p class="escena__conforme" id="escena-conforme">Sin objeciones: las cifras existen y cuadran.</p>
+        <p class="escena__veredicto" id="escena-veredicto" data-veredicto=""></p>
+        <p class="escena__conforme" id="escena-conforme">Sin hallazgos: las cifras existen, tienen fuente y cuadran.</p>
         <ul class="escena__hallazgos" id="escena-hallazgos"></ul>
       </div>
     </aside>
 
     <section class="escena__subtitulos" aria-live="polite" aria-label="Subtítulos">
+      <p class="escena__pregunta" id="escena-pregunta" hidden></p>
       <div class="escena__hablante" id="escena-quien"></div>
       <p class="escena__texto" id="escena-texto">Cargando la escena…</p>
     </section>
@@ -48,13 +50,24 @@
     <button type="button" id="escena-reproducir">Empezar</button>
     <button type="button" id="escena-siguiente" class="escena__boton--secundario">Siguiente turno</button>
     <button type="button" id="escena-reiniciar" class="escena__boton--secundario">Reiniciar</button>
+    <button type="button" id="escena-preguntar" class="escena__boton--secundario">Preguntas (Q)</button>
     <label class="escena__casilla" for="escena-solo-subtitulos">
       <input type="checkbox" id="escena-solo-subtitulos">
       Solo subtítulos (respaldo)
     </label>
     <span class="escena__estado" id="escena-contador"></span>
     <span class="escena__estado" id="escena-voz"></span>
-    <span class="escena__estado">Teclas: Espacio siguiente · P reproducir/pausar · S subtítulos · R reiniciar</span>
+    <span class="escena__estado">Teclas: Espacio siguiente · P reproducir/pausar · S subtítulos · Q preguntas · R reiniciar</span>
   </div>
+
+  <section class="escena__preguntas" id="escena-preguntas" aria-label="Preguntas del público" hidden>
+    <form class="escena__form-pregunta" id="escena-form-pregunta">
+      <label for="escena-pregunta-texto">Pregunta del público</label>
+      <input type="text" id="escena-pregunta-texto" autocomplete="off" placeholder="Escribe o dicta la pregunta">
+      <button type="button" id="escena-microfono" aria-pressed="false">Hablar</button>
+      <button type="submit" id="escena-responder" class="escena__boton--secundario">Responder</button>
+    </form>
+    <span class="escena__estado" id="escena-pregunta-estado"></span>
+  </section>
 </body>
 </html>
