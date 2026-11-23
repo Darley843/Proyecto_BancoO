@@ -45,3 +45,49 @@ cierre = [
   "La plata es tuya hoy: {monto}. Empieza a pagar {cuota_diaria} al día y no hay trámite.",
   "Cierro contigo ahora: {monto} y {cuota_diaria} diarios. Sin papeleo y sin espera.",
 ]
+
+[seguro]
+# Perfil que se usa si el voluntario no confirma a los dos intentos o falla el
+# micrófono. El amarillo muestra la negociación completa: el banco dice «cabe,
+# pero ajustado» y contrapropone un plazo más largo en verde.
+por_defecto = "amarillo_negocio"
+
+# Perfiles seguros (tarea 4.5). Son ficticios: sin nombres, teléfonos, correos
+# ni documentos, y sin cifras en los textos. Las letras son las tarjetas A–F de
+# la entrevista del diagnóstico (config/diagnostico.toml): monto (A–E),
+# ingresos (A–F), gastos (A–E) y deudas, que es el rango `cuotas` (A–F). El
+# monto es el que declara el perfil y debe caer en el rango de su letra.
+# `esperado` se valida contra el motor al cargar: si no coincide, el perfil no
+# se usa en modo seguro.
+
+[[perfiles]]
+id = "verde_computador"
+personaje = "Estudiante que trabaja medio tiempo"
+proposito = "Comprar un computador para estudiar"
+monto = 4000000
+letras = { monto = "A", ingresos = "B", gastos = "A", deudas = "A" }
+esperado = "verde"
+
+[[perfiles]]
+id = "amarillo_negocio"
+personaje = "Cocinero que quiere independizarse"
+proposito = "Montar un puesto de comidas"
+monto = 28000000
+letras = { monto = "D", ingresos = "C", gastos = "B", deudas = "B" }
+esperado = "amarillo"
+
+[[perfiles]]
+id = "rojo_moto"
+personaje = "Repartidor con varias cuotas de tarjeta"
+proposito = "Comprar una moto para trabajar"
+monto = 30000000
+letras = { monto = "D", ingresos = "B", gastos = "B", deudas = "C" }
+esperado = "rojo"
+
+[[perfiles]]
+id = "extremo_letras_altas"
+personaje = "Profesional con ingresos altos y muchas deudas"
+proposito = "Remodelar el apartamento"
+monto = 60000000
+letras = { monto = "E", ingresos = "F", gastos = "E", deudas = "F" }
+esperado = "rojo"
