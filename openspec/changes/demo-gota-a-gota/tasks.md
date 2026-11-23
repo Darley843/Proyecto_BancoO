@@ -93,7 +93,7 @@
 ## 7. Integración, ensayo y demo — todos (miércoles 25 a viernes 27)
 
 - [x] 7.1 Nayla: añadir `make escena-proyectada` como objetivo aparte en `makefile`, sin modificar `make simular`; verificar con `git diff makefile` que el bloque de `simular` no cambió, que `make help` lista el objetivo y que `make escena-proyectada` corre sin DeepSeek y sin red.
-  > Nota (22 nov): objetivo listo; se verifica cuando entre la 7.2 de Darley.
+  > Nota (22 nov): el objetivo `make escena-proyectada` quedó en el `makefile` (#183); no se verifica porque la 7.2 (`escena/__main__.py`) fue reemplazada por `agente-openclaw`.
 - [x] 7.2 Darley: implementar `escena/__main__.py` con `--proyectado`, `--nucleo` y `--perfil`; verificar que escribe `data/escena/proyectado.json` y `data/escena/nucleo.json`, que imprime el resumen de turnos y veredicto y que no abre puertos.
   > Reemplazada por `agente-openclaw`: no hay CLI de escena; la operación es el gateway y el canal.
 - [ ] 7.3 Todos: ejecutar `make check` y `make escena-proyectada` en la rama integrada; verificar que la suite pasa sin `DEEPSEEK_API_KEY`, con Ollama apagado y sin red, que `data/escena/` queda ignorado y que no hay secretos ni PII en `config/escena.toml`.
