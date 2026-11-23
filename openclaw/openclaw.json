@@ -1,0 +1,187 @@
+{
+  "gateway": {
+    "mode": "local",
+    "port": 18789,
+    "bind": "loopback",
+    "auth": {
+      "mode": "token",
+      "token": "${OPENCLAW_GATEWAY_TOKEN}"
+    },
+    "reload": {
+      "mode": "hybrid"
+    },
+    "nodes": {
+      "commands": {
+        "allow": [
+          "canvas.a2ui.dump",
+          "canvas.a2ui.push",
+          "canvas.a2ui.pushJSONL",
+          "canvas.a2ui.reset",
+          "canvas.caps",
+          "canvas.eval",
+          "canvas.hide",
+          "canvas.navigate",
+          "canvas.present",
+          "canvas.snapshot",
+          "device.info",
+          "device.status",
+          "dir.fetch",
+          "dir.list",
+          "file.create",
+          "file.fetch",
+          "file.stat",
+          "file.write",
+          "fs.listDir",
+          "screen.record",
+          "screen.snapshot",
+          "stt.listen",
+          "stt.status",
+          "stt.transcribe",
+          "system.execApprovals.get",
+          "system.execApprovals.set",
+          "system.notify",
+          "system.run",
+          "system.run.prepare",
+          "system.which",
+          "terminal.upload",
+          "tts.speak",
+          "tts.status"
+        ]
+      }
+    },
+    "http": {
+      "endpoints": {
+        "chatCompletions": {
+          "enabled": true
+        }
+      }
+    }
+  },
+  "plugins": {
+    "entries": {
+      "anthropic": {
+        "config": {
+          "sessionCatalog": {
+            "enabled": false
+          }
+        }
+      },
+      "codex": {
+        "config": {
+          "sessionCatalog": {
+            "enabled": false
+          }
+        }
+      },
+      "device-pair": {
+        "config": {
+          "publicUrl": "http://127.0.0.1:18789"
+        },
+        "enabled": true
+      },
+      "whatsapp": {
+        "enabled": true
+      }
+    }
+  },
+  "meta": {
+    "migrations": {
+      "modelPolicyAllowlist": true,
+      "utilityModelSeparation": true
+    },
+    "lastTouchedVersion": "2026.11.6"
+  },
+  "agents": {
+    "defaults": {
+      "model": {
+        "primary": "deepseek/deepseek-flash",
+        "fallbacks": [
+          "deepseek/deepseek-v4-pro"
+        ]
+      },
+      "systemAgent": {
+        "agentId": "main"
+      },
+      "models": {
+        "deepseek/deepseek-v4-pro": {}
+      }
+    },
+    "ownership": "explicit",
+    "entries": {
+      "main": {
+        "identity": {
+          "name": "Xime",
+          "emoji": "🦊",
+          "theme": "familiar — a digital one, living in the terminal"
+        },
+        "workspace": "/home/openclaw/.openclaw/workspace"
+      },
+      "pana": {
+        "name": "pana",
+        "workspace": "/home/openclaw/.openclaw/workspaces/pana",
+        "agentDir": "/home/openclaw/.openclaw/agents/pana/agent",
+        "identity": {
+          "name": "pana"
+        },
+        "tools": {
+          "profile": "minimal",
+          "deny": [
+            "group:runtime",
+            "group:fs",
+            "group:sessions",
+            "browser",
+            "canvas",
+            "message",
+            "github_publish",
+            "github_read",
+            "github_search",
+            "github_identity_status",
+            "automations",
+            "gateway",
+            "openclaw",
+            "nodes",
+            "plugins",
+            "secrets",
+            "web_fetch",
+            "node_inference",
+            "file_fetch",
+            "file_write",
+            "dir_fetch",
+            "dir_list",
+            "terminal",
+            "process",
+            "dashboard",
+            "portal",
+            "theme",
+            "mobile_ui",
+            "subagents",
+            "sessions_spawn",
+            "skill_workshop",
+            "create_goal",
+            "update_goal",
+            "tts",
+            "talk_voice"
+          ]
+        },
+        "skills": [],
+        "thinkingDefault": "off"
+      }
+    }
+  },
+  "channels": {
+    "whatsapp": {
+      "enabled": false
+    }
+  },
+  "talk": {
+    "agentId": "main"
+  },
+  "tools": {
+    "fs": {
+      "workspaceOnly": true
+    },
+    "elevated": {
+      "enabled": false
+    }
+  }
+}

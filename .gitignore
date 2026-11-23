@@ -64,3 +64,11 @@ data/asistente/roba_memoria.sqlite
 
 # Voces de la escena (Piper): se descargan con `make voz-modelo`
 data/modelos/
+
+# Workspace local del agente pana (OpenClaw): memoria y bitácora nunca se
+# versionan; solo viajan las plantillas .example.
+openclaw/workspace/pana/MEMORY.md
+openclaw/workspace/pana/memory/*.md
+!openclaw/workspace/pana/memory/*.md.example
+# Estado del gateway: sesiones y credenciales locales, fuera de Git.
+openclaw/state/
