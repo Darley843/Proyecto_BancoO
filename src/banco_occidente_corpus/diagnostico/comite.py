@@ -136,7 +136,75 @@ _PROMESAS = re.compile(
     r")\b",
     re.IGNORECASE,
 )
-_NEGACIONES = ("no ", "nunca ", "ni ", "sin ", "ninguna ", "jamás ", "jamas ")
+#: Palabras que niegan una promesa cuando la preceden de forma inmediata.
+_NEGACIONES = re.compile(
+    r"\b(?:no|nunca|ni|sin|ninguna|ninguno|jamás|jamas)\b",
+    re.IGNORECASE,
+)
+#: Expresiones que introducen o atenúan la frase; nunca niegan la promesa.
+_NEGACIONES_EXCLUIDAS = re.compile(
+    r"\bno(?:\s+dudes|\s+solo|\s+sólo|\s+te\s+preocupes)\b|\bsin\s+duda\b",
+    re.IGNORECASE,
+)
+#: Signos que cierran la frase o la cláusula: una negación no puede cruzarlos.
+_CORTES_FRASE = re.compile(r"[,.:;!?\r\n]")
+#: Palabras de enlace que pueden quedar entre la negación y la promesa.
+_ENLACES = frozenset(
+    {
+        # Artículos y preposiciones.
+        "un",
+        "una",
+        "unos",
+        "unas",
+        "el",
+        "la",
+        "los",
+        "las",
+        "de",
+        "del",
+        "al",
+        "a",
+        # Pronombres y formas de «ser», «estar» y «quedar».
+        "te",
+        "lo",
+        "le",
+        "les",
+        "se",
+        "nos",
+        "me",
+        "está",
+        "están",
+        "es",
+        "son",
+        "será",
+        "queda",
+        "quedan",
+        "fue",
+        # Verbos típicos del descargo.
+        "hay",
+        "garantiza",
+        "garantizan",
+        "garantizar",
+        "asegura",
+        "aseguran",
+        "implica",
+        "significa",
+        "constituye",
+        "representa",
+        "equivale",
+        # Modales.
+        "podemos",
+        "puedo",
+        "puede",
+        "pueden",
+        # Atenuante.
+        "siquiera",
+    }
+)
+#: Negaciones que admiten un sustantivo antes de los enlaces.
+_NEGACIONES_CON_SUSTANTIVO = frozenset({"ninguna", "ninguno"})
+#: Máximo de palabras entre la negación y la promesa.
+_MAX_PALABRAS_ENTRE_NEGACION_Y_PROMESA = 3
 _CODIGO = re.compile(r"\[([a-z0-9_]+)\]")
 _FECHA_ISO = re.compile(r"\b(\d{4})-(\d{2})-(\d{2})\b")
 
@@ -1617,8 +1685,51 @@ def _sin_identificadores(texto: str) -> str:
     return _IDENTIFICADOR.sub(" ", texto.casefold())
 
 
+def _negacion_inmediata(previo: str) -> bool:
+    """Indica si una negación precede de inmediato a la promesa.
+
+    Solo cuenta la última negación de la cláusula, y solo si entre ella y la
+    promesa hay como máximo `_MAX_PALABRAS_ENTRE_NEGACION_Y_PROMESA` palabras de
+    enlace: artículos, preposiciones, pronombres, formas de «ser» o «estar»,
+    verbos del descargo («hay», «garantiza», «implica»), modales o «siquiera»;
+    también cuenta una palabra que sea promesa, como «garantizamos» en «nunca
+    garantizamos la aprobación». Tras «ninguna» o «ninguno» se admite un
+    sustantivo antes de los enlaces («ninguna opción está garantizada»). «No
+    dudes», «no solo», «no te preocupes» y «sin duda» nunca niegan.
+
+    Args:
+        previo: texto de la cláusula anterior a la promesa, ya cortado por el
+            último signo de cierre o coma.
+
+    Returns:
+        `True` si la promesa queda negada por una negación inmediata.
+    """
+    negaciones = list(_NEGACIONES.finditer(previo))
+    if not negaciones:
+        return False
+    ultima = negaciones[-1]
+    if _NEGACIONES_EXCLUIDAS.match(previo, ultima.start()):
+        return False
+    palabras = previo[ultima.end() :].split()
+    if ultima.group(0).casefold() in _NEGACIONES_CON_SUSTANTIVO and palabras:
+        # «ninguna opción está garantizada»: el sustantivo va antes de los enlaces.
+        palabras = palabras[1:]
+    if len(palabras) > _MAX_PALABRAS_ENTRE_NEGACION_Y_PROMESA:
+        return False
+    return all(
+        palabra.casefold() in _ENLACES or _PROMESAS.fullmatch(palabra) is not None
+        for palabra in palabras
+    )
+
+
 def _promesas(texto: str) -> Iterator[str]:
-    """Encuentra frases de promesa que no estén negadas.
+    """Encuentra frases de promesa que no estén negadas de forma inmediata.
+
+    Una negación solo anula la promesa si está justo antes, en la misma
+    cláusula, con un máximo de tres palabras de enlace entre ambas. Un «no» en
+    otra frase, tras una coma o a más distancia no convierte una promesa en
+    negación: «No te preocupes: te lo aprueban» y «No dudes que te lo aprueban»
+    siguen siendo promesas, y «sin duda» tampoco niega.
 
     Args:
         texto: argumentos y evidencias de un agente.
@@ -1627,8 +1738,9 @@ def _promesas(texto: str) -> Iterator[str]:
         Cada frase de promesa encontrada.
     """
     for coincidencia in _PROMESAS.finditer(texto):
-        previo = texto[max(0, coincidencia.start() - 25) : coincidencia.start()].casefold()
-        if any(negacion in previo for negacion in _NEGACIONES):
+        # Solo cuenta la negación posterior al último cierre de frase o coma.
+        previo = _CORTES_FRASE.split(texto[: coincidencia.start()])[-1]
+        if _negacion_inmediata(previo):
             continue
         yield coincidencia.group(0)
 
