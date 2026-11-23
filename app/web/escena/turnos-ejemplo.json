@@ -1,298 +1,641 @@
 {
-  "descripcion": "EJEMPLO DE MAQUETACIÓN (tarea 6.11: se reemplaza por la salida de make escena-proyectada). Voluntario inventado: 1.000.000 para un computador, ingresos A, gastos A, cuotas A, empleado, 36 meses. Las cifras del banco salen de diagnostico.motor.calcular con las tasas de noviembre de 2026 (tasa máxima); las de Don Gota, de las fórmulas de openspec/changes/demo-gota-a-gota/design.md §2 (20 % mensual, renovación mensual sin capitalizar). test/test_web_escena.py comprueba ambas.",
+  "descripcion": "EJEMPLO DE MAQUETACIÓN (tarea 6.11: se reemplaza por la salida de make escena-proyectada). Sigue el contrato TurnoEscena (escena/contratos.py). Voluntario inventado: 1.000.000 para un computador, ingresos A, gastos A, cuotas A, empleado, 36 meses. Los turnos de Don Gota y de la comparación de Pana salen de escena.gota.turnos_don_gota y escena.comparacion.turnos_pana_comparacion; las cifras del banco, de diagnostico.motor.calcular con las tasas de noviembre de 2026. Los turnos del voluntario y de la negociación son de ejemplo. test/test_web_escena.py comprueba las cifras.",
+  "modo": "proyectado",
   "turnos": [
     {
+      "id": "pana.voluntario",
+      "orden": 0,
       "personaje": "pana",
       "texto": "Necesito a alguien joven del público… fila tres, silla cinco.",
+      "subtitulo": null,
       "cifras": [],
-      "escenario": {
-        "monto": 0,
-        "plazo": 0,
-        "semaforo": ""
-      },
-      "origen": "guion",
+      "escenario": null,
+      "origen": "guion_fijo",
       "hallazgos": []
     },
     {
+      "id": "pana.proposito",
+      "orden": 1,
       "personaje": "pana",
       "texto": "Cuéntame con tus palabras: ¿para qué necesitas la plata?",
+      "subtitulo": null,
       "cifras": [],
-      "escenario": {
-        "monto": 0,
-        "plazo": 0,
-        "semaforo": ""
-      },
-      "origen": "guion",
+      "escenario": null,
+      "origen": "guion_fijo",
       "hallazgos": []
     },
     {
+      "id": "joven.proposito",
+      "orden": 2,
       "personaje": "joven",
       "texto": "Para un computador, para estudiar.",
+      "subtitulo": null,
       "cifras": [],
-      "escenario": {
-        "monto": 0,
-        "plazo": 0,
-        "semaforo": ""
-      },
-      "origen": "guion",
+      "escenario": null,
+      "origen": "entrada_voz",
       "hallazgos": []
     },
     {
+      "id": "pana.preguntas",
+      "orden": 3,
       "personaje": "pana",
       "texto": "Ahora cuatro preguntas con letras: cuánto necesitas, tus ingresos, tus gastos fijos y lo que pagas hoy en cuotas.",
+      "subtitulo": null,
       "cifras": [],
-      "escenario": {
-        "monto": 0,
-        "plazo": 0,
-        "semaforo": ""
-      },
-      "origen": "guion",
+      "escenario": null,
+      "origen": "guion_fijo",
       "hallazgos": []
     },
     {
+      "id": "joven.respuestas",
+      "orden": 4,
       "personaje": "joven",
       "texto": "Monto A: un millón. Ingresos A, gastos A y cuotas A: no tengo deudas.",
+      "subtitulo": null,
       "cifras": [],
-      "escenario": {
-        "monto": 0,
-        "plazo": 0,
-        "semaforo": ""
-      },
-      "origen": "guion",
+      "escenario": null,
+      "origen": "entrada_voz",
       "hallazgos": []
     },
     {
+      "id": "pana.confirmacion",
+      "orden": 5,
       "personaje": "pana",
       "texto": "Confirmo: un millón de pesos para un computador, ingresos de menos de dos millones, gastos fijos de menos de un millón y sin cuotas. Lo comparo a tres años.",
+      "subtitulo": null,
       "cifras": [
         {
-          "nombre": "monto",
-          "valor": 1000000,
-          "fuente": "motor"
+          "etiqueta": "monto",
+          "valor": "1000000",
+          "valor_legible": "$1.000.000",
+          "unidad": "pesos",
+          "fuente": {
+            "tipo": "motor",
+            "referencia": "diagnostico.motor#entrada.monto_credito",
+            "vigencia": null,
+            "sha256": null
+          }
         },
         {
-          "nombre": "plazo_meses",
-          "valor": 36,
-          "fuente": "motor"
+          "etiqueta": "plazo",
+          "valor": "36",
+          "valor_legible": "36 meses",
+          "unidad": "meses",
+          "fuente": {
+            "tipo": "config",
+            "referencia": "config/escena.toml#gota.meses_horizonte",
+            "vigencia": null,
+            "sha256": null
+          }
         }
       ],
       "escenario": {
-        "monto": 1000000,
-        "plazo": 36,
-        "semaforo": ""
+        "codigo": "base",
+        "descripcion": "Libre inversión, $1.000.000 a 36 meses, tasa máxima publicada",
+        "producto": "libre_inversion",
+        "monto": "1000000",
+        "plazo_meses": 36,
+        "cuota_mensual": "39801",
+        "total_pagado": "1432836",
+        "total_intereses": "432836",
+        "semaforo": "verde",
+        "razon_endeudamiento": "0.0265",
+        "margen_despues_cuota": "710199",
+        "aceptable": true,
+        "ofertable": true
       },
       "origen": "motor",
       "hallazgos": []
     },
     {
+      "id": "gota.oferta.v1",
+      "orden": 6,
       "personaje": "don_gota",
-      "texto": "Tranquilo, parcero, yo le presto ya mismo, sin papeles ni historial. Solo es el veinte por ciento al mes: cuarenta mil pesitos diarios.",
+      "texto": "Te presto $1.000.000 y me pagas $1.200.000 dentro de 30 días. Solo el 20 % al mes y sin papeles.",
+      "subtitulo": null,
       "cifras": [
         {
-          "nombre": "tasa_mensual_don_gota",
-          "valor": 0.2,
-          "fuente": "simulador"
+          "etiqueta": "monto prestado",
+          "valor": "1000000",
+          "valor_legible": "$1.000.000",
+          "unidad": "pesos",
+          "fuente": {
+            "tipo": "calculo_gota",
+            "referencia": "escena.gota#monto",
+            "vigencia": null,
+            "sha256": null
+          }
         },
         {
-          "nombre": "interes_mensual_don_gota",
-          "valor": 200000,
-          "fuente": "simulador"
+          "etiqueta": "tasa mensual",
+          "valor": "0.2",
+          "valor_legible": "20 %",
+          "unidad": "porcentaje",
+          "fuente": {
+            "tipo": "config",
+            "referencia": "config/escena.toml#gota.tasa_mensual",
+            "vigencia": null,
+            "sha256": null
+          }
         },
         {
-          "nombre": "cuota_diaria_don_gota",
-          "valor": 40000,
-          "fuente": "simulador"
+          "etiqueta": "total del ciclo",
+          "valor": "1200000",
+          "valor_legible": "$1.200.000",
+          "unidad": "pesos",
+          "fuente": {
+            "tipo": "calculo_gota",
+            "referencia": "escena.gota#total_ciclo",
+            "vigencia": null,
+            "sha256": null
+          }
+        },
+        {
+          "etiqueta": "días del ciclo",
+          "valor": "30",
+          "valor_legible": "30",
+          "unidad": "dias",
+          "fuente": {
+            "tipo": "config",
+            "referencia": "config/escena.toml#gota.dias_ciclo",
+            "vigencia": null,
+            "sha256": null
+          }
         }
       ],
-      "escenario": {
-        "monto": 1000000,
-        "plazo": 36,
-        "semaforo": ""
-      },
-      "origen": "guion",
+      "escenario": null,
+      "origen": "guion_fijo",
       "hallazgos": []
     },
     {
-      "personaje": "pana",
-      "texto": "Veinte por ciento al mes suena poquito, pero es 791,6 por ciento efectivo anual. Si renuevas cada mes durante tres años, le pagarías a Don Gota 8.200.000 pesos. Con la tasa máxima publicada del banco pagarías 1.432.836. La usura de noviembre es 28,34 por ciento, y cobrar por encima es delito: artículo 305 del Código Penal.",
+      "id": "gota.presion.v1",
+      "orden": 7,
+      "personaje": "don_gota",
+      "texto": "Paga $40.000 al día y quedas al día. Son $1.200.000 en 30 días; si no pagas, el cobro se hace difícil.",
+      "subtitulo": null,
       "cifras": [
         {
-          "nombre": "tasa_mensual_don_gota",
-          "valor": 0.2,
-          "fuente": "simulador"
+          "etiqueta": "total del ciclo",
+          "valor": "1200000",
+          "valor_legible": "$1.200.000",
+          "unidad": "pesos",
+          "fuente": {
+            "tipo": "calculo_gota",
+            "referencia": "escena.gota#total_ciclo",
+            "vigencia": null,
+            "sha256": null
+          }
         },
         {
-          "nombre": "interes_mensual_don_gota",
-          "valor": 200000,
-          "fuente": "simulador"
+          "etiqueta": "días del ciclo",
+          "valor": "30",
+          "valor_legible": "30",
+          "unidad": "dias",
+          "fuente": {
+            "tipo": "config",
+            "referencia": "config/escena.toml#gota.dias_ciclo",
+            "vigencia": null,
+            "sha256": null
+          }
         },
         {
-          "nombre": "cuota_diaria_don_gota",
-          "valor": 40000,
-          "fuente": "simulador"
+          "etiqueta": "cuota diaria",
+          "valor": "40000",
+          "valor_legible": "$40.000",
+          "unidad": "pesos",
+          "fuente": {
+            "tipo": "calculo_gota",
+            "referencia": "escena.gota#cuota_diaria",
+            "vigencia": null,
+            "sha256": null
+          }
+        }
+      ],
+      "escenario": null,
+      "origen": "guion_fijo",
+      "hallazgos": []
+    },
+    {
+      "id": "gota.renovacion.v1",
+      "orden": 8,
+      "personaje": "don_gota",
+      "texto": "Cuando quieras renuevas: solo el 20 % al mes y $40.000 diarios. Sin fila, sin papeles y sin consulta.",
+      "subtitulo": null,
+      "cifras": [
+        {
+          "etiqueta": "tasa mensual",
+          "valor": "0.2",
+          "valor_legible": "20 %",
+          "unidad": "porcentaje",
+          "fuente": {
+            "tipo": "config",
+            "referencia": "config/escena.toml#gota.tasa_mensual",
+            "vigencia": null,
+            "sha256": null
+          }
         },
         {
-          "nombre": "tea_don_gota",
-          "valor": 7.9161,
-          "fuente": "simulador"
+          "etiqueta": "cuota diaria",
+          "valor": "40000",
+          "valor_legible": "$40.000",
+          "unidad": "pesos",
+          "fuente": {
+            "tipo": "calculo_gota",
+            "referencia": "escena.gota#cuota_diaria",
+            "vigencia": null,
+            "sha256": null
+          }
+        }
+      ],
+      "escenario": null,
+      "origen": "guion_fijo",
+      "hallazgos": []
+    },
+    {
+      "id": "gota.cierre.v1",
+      "orden": 9,
+      "personaje": "don_gota",
+      "texto": "Cierro contigo ahora: $1.000.000 y $40.000 diarios. Sin papeleo y sin espera.",
+      "subtitulo": null,
+      "cifras": [
+        {
+          "etiqueta": "monto prestado",
+          "valor": "1000000",
+          "valor_legible": "$1.000.000",
+          "unidad": "pesos",
+          "fuente": {
+            "tipo": "calculo_gota",
+            "referencia": "escena.gota#monto",
+            "vigencia": null,
+            "sha256": null
+          }
         },
         {
-          "nombre": "total_don_gota",
-          "valor": 8200000,
-          "fuente": "simulador"
+          "etiqueta": "cuota diaria",
+          "valor": "40000",
+          "valor_legible": "$40.000",
+          "unidad": "pesos",
+          "fuente": {
+            "tipo": "calculo_gota",
+            "referencia": "escena.gota#cuota_diaria",
+            "vigencia": null,
+            "sha256": null
+          }
+        }
+      ],
+      "escenario": null,
+      "origen": "guion_fijo",
+      "hallazgos": []
+    },
+    {
+      "id": "pana.golpe.v1",
+      "orden": 10,
+      "personaje": "pana",
+      "texto": "Si renuevas cada mes durante tres años, con Don Gota pagarías $8.200.000 por $1.000.000; con el banco, a 36 meses, $1.432.836. Es casi 6 veces más.",
+      "subtitulo": null,
+      "cifras": [
+        {
+          "etiqueta": "total de Don Gota en el horizonte",
+          "valor": "8200000",
+          "valor_legible": "$8.200.000",
+          "unidad": "pesos",
+          "fuente": {
+            "tipo": "calculo_gota",
+            "referencia": "escena.gota#total_pagado_horizonte",
+            "vigencia": null,
+            "sha256": null
+          }
         },
         {
-          "nombre": "tea_banco",
-          "valor": 0.2817,
-          "fuente": "Tablero"
+          "etiqueta": "monto",
+          "valor": "1000000",
+          "valor_legible": "$1.000.000",
+          "unidad": "pesos",
+          "fuente": {
+            "tipo": "calculo_gota",
+            "referencia": "escena.gota#monto",
+            "vigencia": null,
+            "sha256": null
+          }
         },
         {
-          "nombre": "cuota_banco",
-          "valor": 39801,
-          "fuente": "motor"
+          "etiqueta": "plazo del horizonte",
+          "valor": "36",
+          "valor_legible": "36",
+          "unidad": "meses",
+          "fuente": {
+            "tipo": "config",
+            "referencia": "config/escena.toml#gota.meses_horizonte",
+            "vigencia": null,
+            "sha256": null
+          }
         },
         {
-          "nombre": "total_banco",
-          "valor": 1432836,
-          "fuente": "motor"
+          "etiqueta": "total del banco en el horizonte",
+          "valor": "1432836",
+          "valor_legible": "$1.432.836",
+          "unidad": "pesos",
+          "fuente": {
+            "tipo": "motor",
+            "referencia": "diagnostico.motor#total_pagado.hasta",
+            "vigencia": null,
+            "sha256": null
+          }
         },
         {
-          "nombre": "usura",
-          "valor": 0.2834,
-          "fuente": "Tablero"
+          "etiqueta": "veces el total del banco",
+          "valor": "5.72",
+          "valor_legible": "6",
+          "unidad": "veces",
+          "fuente": {
+            "tipo": "calculo_gota",
+            "referencia": "escena.comparacion#veces_total",
+            "vigencia": null,
+            "sha256": null
+          }
         }
       ],
       "escenario": {
-        "monto": 1000000,
-        "plazo": 36,
-        "semaforo": ""
+        "codigo": "comparacion",
+        "descripcion": "Mismo monto y mismo horizonte de 36 meses",
+        "producto": "libre_inversion",
+        "monto": "1000000",
+        "plazo_meses": 36,
+        "cuota_mensual": null,
+        "total_pagado": "8200000",
+        "total_intereses": "7200000",
+        "semaforo": null,
+        "razon_endeudamiento": null,
+        "margen_despues_cuota": null,
+        "aceptable": false,
+        "ofertable": false
       },
       "origen": "motor",
       "hallazgos": []
     },
     {
+      "id": "pana.tasa.v1",
+      "orden": 11,
+      "personaje": "pana",
+      "texto": "Don Gota cobra 791,61 % E.A.: 27,9 veces la usura. El banco, a su tasa máxima, cobra 28,17 % E.A.",
+      "subtitulo": null,
+      "cifras": [
+        {
+          "etiqueta": "tasa E.A. de Don Gota",
+          "valor": "7.9161",
+          "valor_legible": "791,61 % E.A.",
+          "unidad": "porcentaje_ea",
+          "fuente": {
+            "tipo": "calculo_gota",
+            "referencia": "escena.gota#tasa_ea",
+            "vigencia": null,
+            "sha256": null
+          }
+        },
+        {
+          "etiqueta": "veces la usura",
+          "valor": "27.93",
+          "valor_legible": "27,9 veces",
+          "unidad": "veces",
+          "fuente": {
+            "tipo": "calculo_gota",
+            "referencia": "escena.comparacion#veces_usura",
+            "vigencia": null,
+            "sha256": null
+          }
+        },
+        {
+          "etiqueta": "tasa E.A. máxima del banco",
+          "valor": "0.2817",
+          "valor_legible": "28,17 % E.A.",
+          "unidad": "porcentaje_ea",
+          "fuente": {
+            "tipo": "motor",
+            "referencia": "diagnostico.motor#tasa_ea.hasta",
+            "vigencia": null,
+            "sha256": null
+          }
+        }
+      ],
+      "escenario": null,
+      "origen": "motor",
+      "hallazgos": []
+    },
+    {
+      "id": "pana.ley.v1",
+      "orden": 12,
+      "personaje": "pana",
+      "texto": "Si te cobran por encima de la usura, es delito (Código Penal, artículo 305). Usura vigente: 28,34 % E.A., del 1 al 30 de noviembre de 2026.",
+      "subtitulo": null,
+      "cifras": [
+        {
+          "etiqueta": "usura vigente",
+          "valor": "0.2834",
+          "valor_legible": "28,34 % E.A.",
+          "unidad": "porcentaje_ea",
+          "fuente": {
+            "tipo": "usura",
+            "referencia": "config/tasas.toml#usura.tasa_ea",
+            "vigencia": "2026-11-01/2026-11-30",
+            "sha256": null
+          }
+        }
+      ],
+      "escenario": null,
+      "origen": "motor",
+      "hallazgos": []
+    },
+    {
+      "id": "agente_joven.propuesta",
+      "orden": 13,
       "personaje": "agente_joven",
-      "texto": "Mi cliente gana menos de dos millones y no puede quedar ahorcado con la cuota. ¿Qué le ofrecen?",
-      "cifras": [
-        {
-          "nombre": "tea_banco",
-          "valor": 0.2817,
-          "fuente": "Tablero"
-        },
-        {
-          "nombre": "cuota_banco",
-          "valor": 39801,
-          "fuente": "motor"
-        },
-        {
-          "nombre": "total_banco",
-          "valor": 1432836,
-          "fuente": "motor"
-        },
-        {
-          "nombre": "usura",
-          "valor": 0.2834,
-          "fuente": "Tablero"
-        }
-      ],
+      "texto": "Mi cliente gana menos de dos millones y no puede quedar ahorcado con la cuota. Pedimos el plazo base, sin estirarlo más.",
+      "subtitulo": null,
+      "cifras": [],
       "escenario": {
-        "monto": 1000000,
-        "plazo": 36,
-        "semaforo": ""
+        "codigo": "base",
+        "descripcion": "Libre inversión, $1.000.000 a 36 meses, tasa máxima publicada",
+        "producto": "libre_inversion",
+        "monto": "1000000",
+        "plazo_meses": 36,
+        "cuota_mensual": "39801",
+        "total_pagado": "1432836",
+        "total_intereses": "432836",
+        "semaforo": "verde",
+        "razon_endeudamiento": "0.0265",
+        "margen_despues_cuota": "710199",
+        "aceptable": true,
+        "ofertable": true
       },
-      "origen": "modelo",
+      "origen": "llm",
       "hallazgos": []
     },
     {
+      "id": "agente_banco.respuesta",
+      "orden": 14,
       "personaje": "agente_banco",
-      "texto": "Con la tasa publicada de libre inversión, a tres años, la cuota le cabe con margen.",
+      "texto": "Con la tasa publicada de libre inversión, a tres años, la cuota le cabe con margen. Aceptamos el escenario base.",
+      "subtitulo": null,
       "cifras": [
         {
-          "nombre": "tea_banco",
-          "valor": 0.2817,
-          "fuente": "Tablero"
+          "etiqueta": "cuota mensual máxima del banco",
+          "valor": "39801",
+          "valor_legible": "$39.801",
+          "unidad": "pesos",
+          "fuente": {
+            "tipo": "motor",
+            "referencia": "diagnostico.motor#cuota_mensual.hasta",
+            "vigencia": null,
+            "sha256": null
+          }
         },
         {
-          "nombre": "cuota_banco",
-          "valor": 39801,
-          "fuente": "motor"
-        },
-        {
-          "nombre": "total_banco",
-          "valor": 1432836,
-          "fuente": "motor"
-        },
-        {
-          "nombre": "usura",
-          "valor": 0.2834,
-          "fuente": "Tablero"
+          "etiqueta": "tasa E.A. máxima del banco",
+          "valor": "0.2817",
+          "valor_legible": "28,17 % E.A.",
+          "unidad": "porcentaje_ea",
+          "fuente": {
+            "tipo": "motor",
+            "referencia": "diagnostico.motor#tasa_ea.hasta",
+            "vigencia": null,
+            "sha256": null
+          }
         }
       ],
       "escenario": {
-        "monto": 1000000,
-        "plazo": 36,
-        "semaforo": "verde"
+        "codigo": "base",
+        "descripcion": "Libre inversión, $1.000.000 a 36 meses, tasa máxima publicada",
+        "producto": "libre_inversion",
+        "monto": "1000000",
+        "plazo_meses": 36,
+        "cuota_mensual": "39801",
+        "total_pagado": "1432836",
+        "total_intereses": "432836",
+        "semaforo": "verde",
+        "razon_endeudamiento": "0.0265",
+        "margen_despues_cuota": "710199",
+        "aceptable": true,
+        "ofertable": true
       },
-      "origen": "modelo",
+      "origen": "llm",
       "hallazgos": []
     },
     {
+      "id": "auditor.veredicto",
+      "orden": 15,
       "personaje": "auditor",
-      "texto": "Revisé las cifras: la cuota coincide con el motor, la tasa del banco está por debajo de la usura y la de Don Gota muy por encima. Semáforo del crédito: verde. Es una orientación, no una aprobación.",
+      "texto": "Revisé las cifras: todas existen, tienen fuente y cuadran con el motor y con el cálculo de Don Gota. Nadie prometió una aprobación. Es una orientación, no una aprobación.",
+      "subtitulo": null,
       "cifras": [
         {
-          "nombre": "tasa_mensual_don_gota",
-          "valor": 0.2,
-          "fuente": "simulador"
+          "etiqueta": "total de Don Gota en el horizonte",
+          "valor": "8200000",
+          "valor_legible": "$8.200.000",
+          "unidad": "pesos",
+          "fuente": {
+            "tipo": "calculo_gota",
+            "referencia": "escena.gota#total_pagado_horizonte",
+            "vigencia": null,
+            "sha256": null
+          }
         },
         {
-          "nombre": "interes_mensual_don_gota",
-          "valor": 200000,
-          "fuente": "simulador"
+          "etiqueta": "total del banco en el horizonte",
+          "valor": "1432836",
+          "valor_legible": "$1.432.836",
+          "unidad": "pesos",
+          "fuente": {
+            "tipo": "motor",
+            "referencia": "diagnostico.motor#total_pagado.hasta",
+            "vigencia": null,
+            "sha256": null
+          }
         },
         {
-          "nombre": "cuota_diaria_don_gota",
-          "valor": 40000,
-          "fuente": "simulador"
+          "etiqueta": "tasa E.A. de Don Gota",
+          "valor": "7.9161",
+          "valor_legible": "791,61 % E.A.",
+          "unidad": "porcentaje_ea",
+          "fuente": {
+            "tipo": "calculo_gota",
+            "referencia": "escena.gota#tasa_ea",
+            "vigencia": null,
+            "sha256": null
+          }
         },
         {
-          "nombre": "tea_don_gota",
-          "valor": 7.9161,
-          "fuente": "simulador"
+          "etiqueta": "tasa E.A. máxima del banco",
+          "valor": "0.2817",
+          "valor_legible": "28,17 % E.A.",
+          "unidad": "porcentaje_ea",
+          "fuente": {
+            "tipo": "motor",
+            "referencia": "diagnostico.motor#tasa_ea.hasta",
+            "vigencia": null,
+            "sha256": null
+          }
         },
         {
-          "nombre": "total_don_gota",
-          "valor": 8200000,
-          "fuente": "simulador"
-        },
-        {
-          "nombre": "tea_banco",
-          "valor": 0.2817,
-          "fuente": "Tablero"
-        },
-        {
-          "nombre": "cuota_banco",
-          "valor": 39801,
-          "fuente": "motor"
-        },
-        {
-          "nombre": "total_banco",
-          "valor": 1432836,
-          "fuente": "motor"
-        },
-        {
-          "nombre": "usura",
-          "valor": 0.2834,
-          "fuente": "Tablero"
+          "etiqueta": "usura vigente",
+          "valor": "0.2834",
+          "valor_legible": "28,34 % E.A.",
+          "unidad": "porcentaje_ea",
+          "fuente": {
+            "tipo": "usura",
+            "referencia": "config/tasas.toml#usura.tasa_ea",
+            "vigencia": "2026-11-01/2026-11-30",
+            "sha256": null
+          }
         }
       ],
       "escenario": {
-        "monto": 1000000,
-        "plazo": 36,
-        "semaforo": "verde"
+        "codigo": "base",
+        "descripcion": "Libre inversión, $1.000.000 a 36 meses, tasa máxima publicada",
+        "producto": "libre_inversion",
+        "monto": "1000000",
+        "plazo_meses": 36,
+        "cuota_mensual": "39801",
+        "total_pagado": "1432836",
+        "total_intereses": "432836",
+        "semaforo": "verde",
+        "razon_endeudamiento": "0.0265",
+        "margen_despues_cuota": "710199",
+        "aceptable": true,
+        "ofertable": true
       },
       "origen": "reglas",
       "hallazgos": []
     }
-  ]
+  ],
+  "veredicto": {
+    "veredicto": "conforme",
+    "hallazgos": [],
+    "turnos_revisados": [
+      "pana.voluntario",
+      "pana.proposito",
+      "joven.proposito",
+      "pana.preguntas",
+      "joven.respuestas",
+      "pana.confirmacion",
+      "gota.oferta.v1",
+      "gota.presion.v1",
+      "gota.renovacion.v1",
+      "gota.cierre.v1",
+      "pana.golpe.v1",
+      "pana.tasa.v1",
+      "pana.ley.v1",
+      "agente_joven.propuesta",
+      "agente_banco.respuesta",
+      "auditor.veredicto"
+    ],
+    "reglas": [
+      "cifra_inventada",
+      "fuente_ausente",
+      "promesa_aprobacion",
+      "recomienda_gota",
+      "semaforo_alterado",
+      "dato_personal"
+    ],
+    "alternativas": []
+  }
 }

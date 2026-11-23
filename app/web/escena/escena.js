@@ -7,22 +7,41 @@
  * el escenario, el semáforo, las cifras con su fuente y los hallazgos del
  * auditor.
  *
- * Los turnos salen de `GET /api/escena/turnos` cuando exista el orquestador; si
- * no responde, se usan los de `escena/turnos-ejemplo.json` y la pantalla lo
- * dice. Un turno que no cumple el contrato no se dice: se muestra el error.
+ * Antes de la escena, Pana presenta a los agentes y la actividad
+ * (`anfitrion.js`). Los turnos de la escena salen de `GET /api/escena/turnos`
+ * cuando exista el orquestador; si no responde, se usan los de
+ * `escena/turnos-ejemplo.json` y la pantalla lo dice. Un turno que no cumple el
+ * contrato no se dice: se muestra el error.
+ *
+ * Al final (o cuando quien presenta lo pida), el paso «Preguntas» abre el
+ * micrófono: la persona del público pregunta y Pana responde con voz y
+ * subtítulos, solo sobre el proyecto (`anfitrion.js`).
  *
  * Teclado: Espacio o → pasa al siguiente turno, P reproduce o pausa, S activa
- * el modo solo subtítulos y R vuelve al inicio.
+ * el modo solo subtítulos, Q abre o cierra las preguntas y R vuelve al inicio.
  */
 
 import { decirComo, detenerVoz } from "../voz.js";
 import {
+  APERTURA_PREGUNTAS,
+  LARGO_MAXIMO,
+  cargarIntroduccion,
+  responderPregunta,
+} from "./anfitrion.js";
+import {
   PASOS,
+  PASO_PREGUNTAS,
+  PASO_PRESENTACION,
   PERSONAJES,
+  TEXTO_VEREDICTO,
   erroresDelTurno,
-  formatearCifra,
+  erroresDelVeredicto,
+  formatearPesos,
+  grupoDeLaCifra,
   pasoDelTurno,
+  veredictoDeHallazgos,
 } from "./contrato.js";
+import { detenerMicrofono, escuchando, escuchar, hayMicrofono } from "./microfono.js";
 import { retrato } from "./rostros.js";
 
 /** Nombre visible de cada personaje (el color sale de la hoja de estilos). */
@@ -47,11 +66,17 @@ const LECTURA_MINIMA_MS = 1800;
 /** Estado de la reproducción. */
 const estado = {
   turnos: [],
+  largoIntroduccion: 0,
+  preguntas: false,
+  aperturaDicha: false,
+  pensando: false,
   indice: -1,
   paso: -1,
   reproduciendo: false,
   cifras: new Map(),
   vistos: new Set(),
+  escenario: null,
+  veredicto: null,
 };
 
 /**
@@ -115,7 +140,11 @@ function montar() {
 /**
  * Pide los turnos al orquestador o, si no responde, usa los de ejemplo.
  *
- * @returns {Promise<{turnos: object[], ejemplo: boolean}>} Turnos y si son de ejemplo.
+ * Ambas fuentes devuelven una `Escena` (o al menos `{turnos, veredicto}`); el
+ * veredicto del auditor se guarda aparte y solo se usa si es válido.
+ *
+ * @returns {Promise<{turnos: object[], veredicto: object | null, ejemplo: boolean}>}
+ *   Turnos, veredicto y si son de ejemplo.
  */
 async function cargarTurnos() {
   for (const [ruta, ejemplo] of [
@@ -127,14 +156,15 @@ async function cargarTurnos() {
       if (respuesta.ok) {
         const datos = await respuesta.json();
         if (Array.isArray(datos?.turnos)) {
-          return { turnos: datos.turnos, ejemplo };
+          const veredicto = erroresDelVeredicto(datos.veredicto).length === 0 ? datos.veredicto : null;
+          return { turnos: datos.turnos, veredicto, ejemplo };
         }
       }
     } catch {
       // Sigue con la siguiente fuente.
     }
   }
-  return { turnos: [], ejemplo: true };
+  return { turnos: [], veredicto: null, ejemplo: true };
 }
 
 /**
@@ -153,86 +183,108 @@ function mostrar(indice) {
     subtitulo.textContent = errores.join(" · ");
     return false;
   }
-  estado.paso = pasoDelTurno(turno, estado.paso);
+  estado.paso =
+    indice < estado.largoIntroduccion
+      ? PASO_PRESENTACION
+      : pasoDelTurno(turno, Math.min(estado.paso, PASO_PREGUNTAS - 1));
   estado.vistos.add(turno.personaje);
-  for (const cifra of turno.cifras) {
-    estado.cifras.set(cifra.nombre, cifra);
+  if (turno.cifras.length > 0) {
+    // El panel muestra las cifras del turno que se está diciendo; si el turno
+    // no trae cifras, quedan las anteriores (así el auditor ve la comparación).
+    estado.cifras = new Map(turno.cifras.map((cifra) => [cifra.etiqueta, cifra]));
   }
-  for (const personaje of PERSONAJES) {
-    const caja = porId(`personaje-${personaje}`);
-    caja.classList.toggle("escena__personaje--habla", personaje === turno.personaje);
-    caja.classList.toggle("escena__personaje--visto", estado.vistos.has(personaje));
+  if (turno.escenario) {
+    estado.escenario = turno.escenario;
   }
-  PASOS.forEach((_, posicion) => {
-    const paso = porId(`paso-${posicion}`);
-    paso.classList.toggle("escena__paso--activo", posicion === estado.paso);
-    paso.classList.toggle("escena__paso--hecho", posicion < estado.paso);
-  });
+  iluminar(turno.personaje);
+  marcarPasos();
+  porId("escena-pregunta").hidden = true;
   quien.replaceChildren(
     crear("span", `escena__quien escena__quien--${turno.personaje}`, FICHAS[turno.personaje].nombre),
     crear("span", "escena__origen", turno.origen),
   );
-  subtitulo.textContent = turno.texto;
+  subtitulo.textContent = turno.subtitulo || turno.texto;
   pintarPanel(turno);
   porId("escena-contador").textContent = `Turno ${indice + 1} de ${estado.turnos.length}`;
   return true;
 }
 
 /**
- * Pinta el panel de cifras: escenario, semáforo, cifras y hallazgos.
+ * Ilumina al personaje que habla y atenúa a los que aún no han hablado.
+ *
+ * @param {string} quienHabla Personaje del turno.
+ * @returns {void}
+ */
+function iluminar(quienHabla) {
+  for (const personaje of PERSONAJES) {
+    const caja = porId(`personaje-${personaje}`);
+    caja.classList.toggle("escena__personaje--habla", personaje === quienHabla);
+    caja.classList.toggle("escena__personaje--visto", estado.vistos.has(personaje));
+  }
+}
+
+/**
+ * Marca en la barra el paso actual y los ya hechos.
+ *
+ * @returns {void}
+ */
+function marcarPasos() {
+  PASOS.forEach((_, posicion) => {
+    const paso = porId(`paso-${posicion}`);
+    paso.classList.toggle("escena__paso--activo", posicion === estado.paso);
+    paso.classList.toggle("escena__paso--hecho", posicion < estado.paso);
+  });
+}
+
+/**
+ * Pinta el panel de cifras: escenario, semáforo del crédito, cifras con su
+ * fuente y, en el turno del auditor, su veredicto (sin colores).
  *
  * @param {object} turno Turno actual (ya validado).
  * @returns {void}
  */
 function pintarPanel(turno) {
-  const { monto, plazo, semaforo } = turno.escenario;
+  const escenario = estado.escenario;
   const chips = [];
-  if (monto) {
-    chips.push(formatearCifra({ nombre: "monto", valor: monto }).texto);
+  if (escenario && Number(escenario.monto) > 0) {
+    chips.push(formatearPesos(escenario.monto));
   }
-  if (plazo) {
-    chips.push(`${plazo} meses`);
+  if (escenario?.plazo_meses) {
+    chips.push(`${escenario.plazo_meses} meses`);
   }
   porId("escena-escenario").replaceChildren(
     ...(chips.length ? chips : ["Esperando al voluntario"]).map((texto) =>
       crear("span", "escena__chip", texto),
     ),
   );
-  const luz = porId("escena-semaforo");
-  luz.dataset.color = semaforo || "";
+  const semaforo = escenario?.semaforo ?? "";
+  porId("escena-semaforo").dataset.color = semaforo;
   porId("escena-semaforo-texto").textContent = semaforo
-    ? `Semáforo ${semaforo}`
+    ? `Semáforo del crédito: ${semaforo}`
     : "Semáforo sin calcular";
 
   const filas = [...estado.cifras.values()].map((cifra) => {
-    const { etiqueta, texto } = formatearCifra(cifra);
-    const fila = crear("tr", `escena__cifra escena__cifra--${grupoDe(cifra.nombre)}`);
-    fila.append(crear("th", "", etiqueta), crear("td", "", texto), crear("td", "escena__fuente", cifra.fuente));
+    const fila = crear("tr", `escena__cifra escena__cifra--${grupoDeLaCifra(cifra)}`);
+    const fuente = crear("td", "escena__fuente", cifra.fuente.tipo);
+    fuente.title = cifra.fuente.referencia;
+    fila.append(crear("th", "", cifra.etiqueta), crear("td", "", cifra.valor_legible), fuente);
     return fila;
   });
   porId("escena-cifras").replaceChildren(...filas);
   porId("escena-sin-cifras").hidden = filas.length > 0;
 
-  const hallazgos = porId("escena-hallazgos");
-  hallazgos.replaceChildren(...turno.hallazgos.map((texto) => crear("li", "", texto)));
-  porId("escena-caja-hallazgos").hidden = turno.personaje !== "auditor";
-  porId("escena-conforme").hidden = turno.hallazgos.length > 0;
-}
-
-/**
- * Agrupa una cifra para colorearla: Don Gota, banco o referencia.
- *
- * @param {string} nombre Nombre de la cifra.
- * @returns {"gota" | "banco" | "otra"} Grupo de la cifra.
- */
-function grupoDe(nombre) {
-  if (nombre.endsWith("_don_gota")) {
-    return "gota";
+  const delAuditor = turno.personaje === "auditor";
+  porId("escena-caja-hallazgos").hidden = !delAuditor;
+  if (!delAuditor) {
+    return;
   }
-  if (nombre.endsWith("_banco")) {
-    return "banco";
-  }
-  return "otra";
+  const hallazgos = estado.veredicto?.hallazgos ?? turno.hallazgos;
+  const veredicto = estado.veredicto?.veredicto ?? veredictoDeHallazgos(turno.hallazgos);
+  const etiqueta = porId("escena-veredicto");
+  etiqueta.textContent = `Auditor: ${TEXTO_VEREDICTO[veredicto]}`;
+  etiqueta.dataset.veredicto = veredicto;
+  porId("escena-hallazgos").replaceChildren(...hallazgos.map((h) => crear("li", "", h.detalle)));
+  porId("escena-conforme").hidden = hallazgos.length > 0;
 }
 
 /**
@@ -253,9 +305,15 @@ function decir(turno) {
       window.setTimeout(listo, Math.max(LECTURA_MINIMA_MS, turno.texto.length * MS_POR_LETRA));
       return;
     }
-    decirComo(turno.personaje, turno.texto, { alTerminar: listo }).then((voz) => {
-      porId("escena-voz").textContent = voz === "piper" ? "Voz: Piper" : voz === "navegador" ? "Voz: navegador" : "";
-    });
+    decirComo(turno.personaje, turno.texto, { alTerminar: listo })
+      .then((voz) => {
+        porId("escena-voz").textContent = voz === "piper" ? "Voz: Piper" : voz === "navegador" ? "Voz: navegador" : "";
+      })
+      .catch(() => {
+        // Si la voz falla, el turno ya está en subtítulos: se sigue sin esperar.
+        porId("escena-voz").textContent = "Voz: falló";
+        listo();
+      });
   });
 }
 
@@ -331,9 +389,12 @@ function siguiente() {
  */
 function reiniciar() {
   pausar();
+  cerrarPreguntas();
+  estado.aperturaDicha = false;
   estado.indice = -1;
   estado.paso = -1;
   estado.cifras.clear();
+  estado.escenario = null;
   estado.vistos.clear();
   montar();
   porId("escena-quien").replaceChildren();
@@ -368,6 +429,140 @@ function actualizarBotones() {
 }
 
 /**
+ * Abre el paso «Preguntas»: muestra el cuadro de la pregunta y, la primera vez,
+ * Pana invita al público a preguntar.
+ *
+ * @returns {void}
+ */
+function abrirPreguntas() {
+  pausar();
+  estado.preguntas = true;
+  estado.paso = PASO_PREGUNTAS;
+  marcarPasos();
+  porId("escena-preguntas").hidden = false;
+  porId("escena-preguntar").textContent = "Cerrar preguntas";
+  avisar(hayMicrofono() ? "Pulsa «Hablar» y haz la pregunta, o escríbela." : "Escribe la pregunta.");
+  if (!estado.aperturaDicha) {
+    estado.aperturaDicha = true;
+    hablarPana(APERTURA_PREGUNTAS, "");
+  }
+  porId("escena-pregunta-texto").focus();
+}
+
+/**
+ * Cierra el paso «Preguntas» y el micrófono.
+ *
+ * @returns {void}
+ */
+function cerrarPreguntas() {
+  detenerMicrofono();
+  estado.preguntas = false;
+  estado.pensando = false;
+  porId("escena-preguntas").hidden = true;
+  porId("escena-preguntar").textContent = "Preguntas (Q)";
+  porId("escena-microfono").textContent = "Hablar";
+  porId("escena-microfono").setAttribute("aria-pressed", "false");
+}
+
+/**
+ * Muestra un aviso corto para quien presenta junto al cuadro de la pregunta.
+ *
+ * @param {string} texto Aviso.
+ * @returns {void}
+ */
+function avisar(texto) {
+  porId("escena-pregunta-estado").textContent = texto;
+}
+
+/**
+ * Abre o cierra el micrófono; al oír la frase, la responde de una vez.
+ *
+ * @returns {void}
+ */
+function alternarMicrofono() {
+  const boton = porId("escena-microfono");
+  if (escuchando()) {
+    detenerMicrofono();
+    return;
+  }
+  detenerVoz();
+  const empezo = escuchar({
+    alResultado: (texto) => {
+      porId("escena-pregunta-texto").value = texto;
+      contestar(texto);
+    },
+    alError: avisar,
+    alTerminar: () => {
+      boton.textContent = "Hablar";
+      boton.setAttribute("aria-pressed", "false");
+    },
+  });
+  if (empezo) {
+    boton.textContent = "Escuchando… (parar)";
+    boton.setAttribute("aria-pressed", "true");
+    avisar("Escuchando…");
+  }
+}
+
+/**
+ * Muestra un turno de Pana fuera del guion (apertura o respuesta) y lo dice.
+ *
+ * @param {object} turno Turno de Pana (ya validado).
+ * @param {string} pregunta Pregunta del público que se muestra arriba, o "".
+ * @returns {Promise<void>} Se resuelve cuando Pana termina de hablar.
+ */
+function hablarPana(turno, pregunta) {
+  estado.vistos.add("pana");
+  iluminar("pana");
+  const caja = porId("escena-pregunta");
+  caja.hidden = !pregunta;
+  caja.textContent = pregunta ? `Pregunta del público: «${pregunta}»` : "";
+  porId("escena-quien").replaceChildren(
+    crear("span", "escena__quien escena__quien--pana", FICHAS.pana.nombre),
+    crear("span", "escena__origen", turno.origen),
+  );
+  porId("escena-texto").textContent = turno.texto;
+  return decir(turno);
+}
+
+/**
+ * Responde una pregunta del público con la voz de Pana.
+ *
+ * Mientras espera la respuesta no acepta otra pregunta; mientras Pana habla,
+ * una pregunta nueva corta la voz y se responde.
+ *
+ * @param {string} pregunta Lo que se dijo o escribió.
+ * @returns {Promise<void>} Se resuelve cuando Pana termina de responder.
+ */
+async function contestar(pregunta) {
+  const texto = String(pregunta ?? "").trim();
+  if (estado.pensando || !texto) {
+    return;
+  }
+  detenerMicrofono();
+  detenerVoz();
+  estado.pensando = true;
+  porId("escena-responder").disabled = true;
+  avisar("Pana está pensando…");
+  porId("escena-pregunta").hidden = false;
+  porId("escena-pregunta").textContent = `Pregunta del público: «${texto}»`;
+  porId("escena-texto").textContent = "Pana está pensando…";
+  let respuesta;
+  try {
+    respuesta = await responderPregunta(texto);
+  } finally {
+    estado.pensando = false;
+    porId("escena-responder").disabled = false;
+  }
+  if (!estado.preguntas) {
+    return;
+  }
+  avisar(respuesta.respaldo ? "El servidor de preguntas no respondió: contestó la ficha de respaldo." : "");
+  porId("escena-pregunta-texto").value = "";
+  await hablarPana(respuesta.turno, texto);
+}
+
+/**
  * Atiende los atajos de teclado de quien presenta.
  *
  * @param {KeyboardEvent} evento Tecla pulsada.
@@ -375,6 +570,9 @@ function actualizarBotones() {
  */
 function teclado(evento) {
   if (evento.target instanceof HTMLInputElement || evento.target instanceof HTMLButtonElement) {
+    return;
+  }
+  if (evento.ctrlKey || evento.metaKey || evento.altKey) {
     return;
   }
   const tecla = evento.key.toLowerCase();
@@ -386,6 +584,8 @@ function teclado(evento) {
   } else if (tecla === "s") {
     const casilla = porId("escena-solo-subtitulos");
     casilla.checked = !casilla.checked;
+  } else if (tecla === "q") {
+    estado.preguntas ? cerrarPreguntas() : abrirPreguntas();
   } else if (tecla === "r") {
     reiniciar();
   }
@@ -398,18 +598,31 @@ function teclado(evento) {
  */
 async function iniciar() {
   montar();
-  const { turnos, ejemplo } = await cargarTurnos();
-  estado.turnos = turnos;
+  const [introduccion, { turnos, veredicto, ejemplo }] = await Promise.all([cargarIntroduccion(), cargarTurnos()]);
+  estado.largoIntroduccion = introduccion.length;
+  estado.veredicto = veredicto;
+  estado.turnos = [...introduccion, ...turnos];
   porId("escena-sello").hidden = !ejemplo;
   reiniciar();
   if (turnos.length === 0) {
-    porId("escena-texto").textContent = "No hay turnos para mostrar.";
+    porId("escena-texto").textContent = "No hay turnos de la escena: solo la presentación.";
   }
   porId("escena-reproducir").addEventListener("click", () =>
     estado.reproduciendo ? pausar() : reproducir(),
   );
   porId("escena-siguiente").addEventListener("click", siguiente);
   porId("escena-reiniciar").addEventListener("click", reiniciar);
+  porId("escena-preguntar").addEventListener("click", () =>
+    estado.preguntas ? cerrarPreguntas() : abrirPreguntas(),
+  );
+  porId("escena-form-pregunta").addEventListener("submit", (evento) => {
+    evento.preventDefault();
+    contestar(porId("escena-pregunta-texto").value);
+  });
+  porId("escena-pregunta-texto").maxLength = LARGO_MAXIMO;
+  const microfono = porId("escena-microfono");
+  microfono.hidden = !hayMicrofono();
+  microfono.addEventListener("click", alternarMicrofono);
   document.addEventListener("keydown", teclado);
 }
 

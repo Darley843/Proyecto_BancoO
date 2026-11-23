@@ -175,6 +175,10 @@ h2 {
 .escena__cifra--banco th { border-left: 3px solid var(--pana); }
 .escena__cifra--otra th { border-left: 3px solid var(--linea); }
 
+/* Veredicto del auditor: etiqueta sin colores del semáforo (no se confunde con él). */
+.escena__veredicto { margin: 0; font: 700 16px var(--fuente-cifras); letter-spacing: .04em; color: var(--texto); padding: 6px 10px; border: 1px dashed var(--auditor); border-radius: 6px; }
+.escena__veredicto[data-veredicto="objeta"] { border-style: solid; border-width: 2px; }
+
 .escena__hallazgos { margin: 0; padding-left: 18px; color: var(--auditor); font-size: 15px; }
 
 /* ---------- Subtítulos ---------- */
@@ -200,6 +204,19 @@ h2 {
 .escena__casilla { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; cursor: pointer; }
 .escena__casilla input { width: 18px; height: 18px; accent-color: var(--pana); }
 .escena__estado { font: 13px var(--fuente-cifras); color: var(--tenue); }
+
+/* ---------- Preguntas del público ---------- */
+.escena__pregunta { margin: 0 0 8px; font-size: clamp(16px, 1.6vw, 22px); color: var(--joven); font-style: italic; }
+.escena__preguntas { display: grid; gap: 6px; padding: 12px 16px; border: 1px solid var(--pana); border-radius: 10px; background: var(--tablero); }
+.escena__preguntas[hidden] { display: none; }
+.escena__form-pregunta { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.escena__form-pregunta label { font: 500 13px var(--fuente-cifras); letter-spacing: .08em; text-transform: uppercase; color: var(--pana); }
+.escena__form-pregunta input { flex: 1 1 280px; min-width: 0; font: 18px var(--fuente); color: var(--texto); background: var(--hundido); border: 1px solid var(--linea); border-radius: 8px; padding: 10px 12px; }
+.escena__form-pregunta button { font: 700 16px var(--fuente); color: var(--sala); background: var(--pana); border: 0; border-radius: 8px; padding: 10px 16px; cursor: pointer; }
+.escena__form-pregunta button[aria-pressed="true"] { background: var(--rojo); }
+.escena__form-pregunta button:disabled { opacity: .4; cursor: default; }
+.escena__form-pregunta .escena__boton--secundario { background: transparent; color: var(--texto); border: 1px solid var(--linea); }
+.escena__form-pregunta input:focus-visible, .escena__form-pregunta button:focus-visible { outline: 3px solid var(--joven); outline-offset: 2px; }
 
 @media (max-width: 900px) {
   .escena__pantalla { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto auto; }
