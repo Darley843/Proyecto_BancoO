@@ -184,7 +184,7 @@ def test_los_turnos_de_pana_citan_el_articulo_305_y_el_supuesto(
     assert all(turno.origen == "motor" for turno in turnos)
     assert all(turno.personaje == "pana" for turno in turnos)
     assert all(len(turno.texto.split()) <= 40 for turno in turnos)
-    assert "casi 6 veces más" in turnos[0].texto
+    assert "casi 6 veces lo que pagarías con el banco" in turnos[0].texto
     assert "renuevas cada mes durante tres años" in turnos[0].texto
     assert SUPUESTO_RENOVACION not in turnos[2].texto
     assert "27,9 veces" in turnos[1].texto
@@ -197,6 +197,35 @@ def test_los_turnos_de_pana_citan_el_articulo_305_y_el_supuesto(
     veces = next(cifra for cifra in turnos[0].cifras if cifra.unidad == "veces")
     assert veces.valor == Decimal("5.72")
     assert veces.valor_legible == "6"
+
+
+def test_el_ratio_del_total_redondea_sin_mentir(
+    raiz_tasas: Path, config_usura: ConfiguracionTasas
+) -> None:
+    """«Casi» solo cuando redondea hacia arriba y «más de» cuando hacia abajo."""
+    comparacion = comparar_gota_banco(
+        _prestamo(),
+        _entrada(),
+        raiz=raiz_tasas,
+        config_tasas=config_usura,
+        hoy=FECHA_CONSULTA,
+    )
+
+    def golpe(veces: str) -> str:
+        """Devuelve el texto del turno del golpe para un ratio dado.
+
+        Args:
+            veces: ratio del total que se quiere citar.
+
+        Returns:
+            El texto del primer turno de Pana.
+        """
+        ajustada = comparacion.model_copy(update={"veces_total": Decimal(veces)})
+        return turnos_pana_comparacion(ajustada)[0].texto
+
+    assert "casi 6 veces lo que pagarías con el banco" in golpe("5.72")
+    assert "más de 6 veces lo que pagarías con el banco" in golpe("6.30")
+    assert "Es 6 veces lo que pagarías con el banco" in golpe("6.00")
 
 
 def test_ninguna_cifra_del_turno_queda_sin_fuente(

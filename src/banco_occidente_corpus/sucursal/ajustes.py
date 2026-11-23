@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import tomllib
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,8 @@ RUTA_CONFIG_SUCURSAL: Path = PROJECT_ROOT / "config" / "sucursal.toml"
 TOPE_POR_DEFECTO: float = 0.20
 #: TTL por defecto de la caché de respuestas, en segundos.
 TTL_POR_DEFECTO: int = 3600
+#: Valores de `SUCURSAL_DEMO` que activan el modo demo.
+VALORES_DEMO: frozenset[str] = frozenset({"1", "true", "si", "sí"})
 
 
 @dataclass(frozen=True, slots=True)
@@ -60,9 +63,26 @@ def cargar_configuracion_sucursal(ruta: Path | None = None) -> ConfiguracionSucu
     )
 
 
+def leer_modo_demo(valores: Mapping[str, str]) -> bool:
+    """Indica si `SUCURSAL_DEMO` está activo en un mapa de variables.
+
+    Es la lectura única de la bandera: `modo_demo` la aplica al entorno del
+    proceso y la escena la aplica al entorno que recibe, para que las dos
+    piezas acepten exactamente los mismos valores.
+
+    Args:
+        valores: variables de entorno donde se busca `SUCURSAL_DEMO`.
+
+    Returns:
+        `True` si la bandera trae uno de `VALORES_DEMO`, sin distinguir
+        mayúsculas ni espacios.
+    """
+    return valores.get("SUCURSAL_DEMO", "").strip().casefold() in VALORES_DEMO
+
+
 def modo_demo() -> bool:
     """Indica si `SUCURSAL_DEMO` activa el modo sin modelo."""
-    return os.getenv("SUCURSAL_DEMO", "").strip().casefold() in {"1", "true", "si", "sí"}
+    return leer_modo_demo(os.environ)
 
 
 def tope_efectivo(configuracion: ConfiguracionSucursal) -> float:
