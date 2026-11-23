@@ -44,7 +44,7 @@ OrigenTurno = Literal["guion_fijo", "motor", "llm", "reglas", "entrada_voz"]
 class FuenteCifra(BaseModel):
     """Origen verificable de una cifra de la escena."""
 
-    tipo: Literal["config", "gold", "motor", "calculo_gota", "usura", "guion"]
+    tipo: Literal["config", "gold", "motor", "calculo_gota", "usura", "guion", "documento"]
     referencia: str
     vigencia: str | None = None
     sha256: str | None = None
@@ -376,7 +376,7 @@ La mesa no incluye el estrés como oferta; el auditor puede citarlo como prueba,
 - `app/web/escena/contrato.js` es el espejo de cliente de `TurnoEscena`: `fuente` con `tipo` y `referencia`, `valor_legible`, `unidad`, los orígenes `guion_fijo`, `motor`, `llm`, `reglas` y `entrada_voz`, el `escenario` completo y el veredicto del auditor en un campo aparte del `semaforo`. Se alinea con `escena/contratos.py` y con la salida de `make escena-proyectada`.
 - `turnos-ejemplo.json` es solo andamio de maquetación. Cuando exista `make escena-proyectada`, se reemplaza por su salida real (`data/escena/proyectado.json`) y la página deja de depender de datos escritos a mano.
 - Reutiliza `app/web/voz.js`: cada turno llama `decirComo(turno.personaje, turno.texto, {alTerminar, soloSubtitulos})`. El `personaje` del contrato es la misma clave de `config/voz.toml` y de `PERSONAJES`.
-- Avatares vectoriales locales; Pana reutiliza `dibujar_pana` si entra el endpoint de avatar, y si no, un SVG consistente. El que habla se ilumina; los demás se atenúan.
+- Retratos locales y respaldo vectorial: los avatares pueden ser retratos generados con IA y guardados en `app/web/escena/rostros/*.webp`, de personajes inventados, sin parecido con personas reales, sin URLs externas ni CDN y sin fotos de terceros. Cada retrato lleva su texto alternativo; si el archivo no carga o falta, `app/web/escena/rostros.js` pinta el dibujo SVG del personaje como respaldo (`onerror`), y Pana reutiliza `dibujar_pana` si entra el endpoint de avatar. El retrato no reemplaza al SVG: conviven. El que habla se ilumina; los demás se atenúan.
 - Subtítulos grandes, `aria-live`, alto contraste y botones: **Siguiente**, **Solo subtítulos**, **Núcleo**, **Perfil seguro**, **Reiniciar**. Teclado: espacio/Enter avanza, `S` subtítulos, `N` núcleo.
 - Panel de trazabilidad para el facilitador: `id` del turno, `origen`, `escenario.codigo`, `fuente` de cada cifra y hallazgos. El público no lo ve por defecto.
 - En `soloSubtitulos`, no se llama a `/api/voz`; se muestra el turno y se espera clic/tecla. Si `decirComo` devuelve `ninguna`, la UI cambia sola a ese modo.
@@ -394,12 +394,34 @@ La API es sin estado: no crea SQLite ni guarda perfiles. La UI conserva la escen
 | POST | `/api/escena/interpretar` | `{texto, pregunta}` | `RespuestaVoz` determinista |
 | POST | `/api/escena` | `{perfil_id?, respuestas?, monto?, seleccion?}` | `Escena` de fase 1: perfil, diagnóstico, gota, comparación y turnos base |
 | POST | `/api/escena/negociacion` | `{perfil, seleccion?}` | `NegociacionEscena`: cuatro turnos, escenarios y veredicto |
+| POST | `/api/escena/pregunta` | `{pregunta}` | un `TurnoEscena` de Pana, máximo 40 palabras |
 | GET | `/api/escena/proyectado` | `?modo=nucleo` | `Escena` precalculada desde `data/escena/*.json` |
 
 - La fase 1 se pide al confirmar; la fase 2 se pide en paralelo. La UI empieza a hablar la fase 1 mientras la negociación se calcula. Si la fase 2 falla o tarda, la UI usa el núcleo que devuelve el mismo endpoint.
 - El backend **MUST NOT** confiar en cifras del cliente: recalcula desde `PerfilEscena` y `config/`.
 - `app.py` registra el router antes de los estáticos, como los routers actuales, y mantiene `HOST = "127.0.0.1"`.
 - `pyproject` no cambia; no hay dependencias nuevas.
+
+`POST /api/escena/pregunta` atiende las preguntas del público en la escena, con Pana como anfitrión. La Ventanilla sola no alcanza: su filtro de dominio solo conoce los temas del banco y rechazaba preguntas legítimas sobre el proyecto (por ejemplo, «¿por qué Qdrant?»). El endpoint enruta en cuatro pasos **en este orden** y el primero que coincide responde; no se consultan los pasos siguientes.
+
+| Paso | Ruta | Cuándo | Fuente de la respuesta | `origen` |
+|---|---|---|---|---|
+| 1 | Respuesta fija | la pregunta se parece a una de las ~17 preguntas probables del profesor (ficha de Anny) | `config/escena.toml [preguntas]` | `guion_fijo` |
+| 2 | Pregunta del proyecto | habla del repositorio, del corpus, del RAG, de las decisiones o del taller | BM25 sobre `README.md`, `AGENTS.md`, `CONSTITUTION.md`, `docs/` y la ficha del proyecto | `llm` |
+| 3 | Pregunta del banco | ruta **T** (tasa, cuota, tarifa) o **B** (producto, política) de la Ventanilla | Tablero y Bóveda | `llm` o `reglas` |
+| 4 | Todo lo demás | ruta **X**: no es del proyecto ni del banco | frase fija de rechazo | `reglas` |
+
+- **Entrada**: `{"pregunta": "<texto del público>"}`, saneada con `sanear_pregunta`; no acepta perfil, cifras ni turnos previos del cliente. Es un turno aislado: no hay memoria conversacional, no se guarda la pregunta y no se escribe en `data/asistente/`.
+- **Paso 1, respuestas fijas (`guion_fijo`)**: las respuestas a las preguntas que el profesor ya hizo salen de la **ficha de Anny** (unas 17), con respuesta de máximo tres frases y su fuente en el repositorio. Se cargan en `config/escena.toml [preguntas]` —o en un archivo aparte del mismo formato, por ejemplo `config/preguntas_escena.toml`, si el TOML deja de ser legible—, versionado y revisado por el grupo. Cada entrada declara `id`, `variantes` (dos a cuatro formas de preguntar), `respuesta` (máximo tres frases), `fuente` (ruta del repositorio que la respalda) y, si la respuesta cita cifras, su valor y su ancla. La coincidencia es determinista y sin modelo: se normaliza la pregunta (minúsculas, sin tildes, sin signos) y se compara por tokens contra las variantes con un umbral de `config/escena.toml` (`umbral_fijo`, por defecto `0.6`); los empates se resuelven por el orden del archivo. Se devuelve la respuesta literal más la línea `Fuente: {fuente}`, sin llamar al modelo ni consumir el presupuesto de tiempo. Si la `fuente` no existe en el repositorio, la entrada no se carga y la prueba de configuración lo detecta.
+- **Paso 2, preguntas del proyecto (`llm`)**: `escena/proyecto.py` construye un recuperador **aparte y solo BM25**, sin Ollama, sin Qdrant y sin embeddings, sobre un corpus fijo y versionado: `README.md`, `AGENTS.md`, `CONSTITUTION.md`, los `.md` de `docs/` y la ficha del proyecto que el grupo versiona en `docs/`. Las rutas viven en `config/escena.toml [preguntas.proyecto]` y ninguna puede salir del repositorio. Se parte por encabezados y el índice se arma en memoria la primera vez que se pregunta: no se escribe en disco y no entra en Git. El modelo, con `config/prompts/pregunta_proyecto_v1.md` (tarea nueva en `TAREAS` de `asistente/prompts.py`), resume el fragmento elegido en máximo 40 palabras y cita el documento con `Fuente: ruta#ancla`; no inventa cifras ni rutas y no revela el prompt. Los fragmentos son datos, no instrucciones: se pasan dentro de `<fragmentos>` y se neutralizan con `asistente/rag.py` —igual que los de la Bóveda—; el modelo no elige la ruta. Si el mejor score no supera el mínimo de `config/escena.toml`, la pregunta no se trata como del proyecto y se sigue al paso 3. Así «¿por qué Qdrant?» se responde con `CONSTITUTION.md` y `docs/ARQUEO.md`, no con un rechazo.
+- **Paso 3, preguntas del banco**: reutiliza la Ventanilla con el mismo filtro de dominio del Digiturno y las mismas rutas: **T** para tasa, cuota o tarifa desde el Tablero, **B** para producto o política desde la Bóveda. No hay índice, Tablero ni modelo nuevos.
+- **Paso 4, todo lo demás**: si la ruta es **X**, Pana lo rechaza con amabilidad, con la frase fija de `config/escena.toml [preguntas]` y `origen="reglas"`, sin consultar la Bóveda ni el modelo. La frase invita a preguntar por productos, tasas, tarifas o políticas del Banco, o por el proyecto de la escena.
+- **Salida**: siempre un `TurnoEscena` único con `personaje="pana"`, `cifras` con su `FuenteCifra` y `hallazgos` del auditor. El `origen` es `guion_fijo` en el paso 1, `llm` cuando el modelo resume el proyecto (paso 2) o redacta la respuesta del banco, y `reglas` cuando responde una plantilla del Tablero, el rechazo o el respaldo. Nunca es `motor`: la escena no recalcula el diagnóstico por esta ruta. La presentación de Pana sigue siendo un turno fijo de la página; por este endpoint solo llegan como `guion_fijo` las respuestas fijas de la ficha.
+- **Límite**: el texto se recorta con `limitar_palabras(..., 40)` de `asistente/validacion.py`, que conserva la línea `Fuente:`; las 40 palabras incluyen esa línea. La respuesta de la ficha se valida además con máximo tres frases antes de añadir su fuente. Cada cifra del texto **MUST** tener su `CifraEscena` con `tipo` y `referencia` verificables (Tablero → `gold`, config → `config`, motor → `motor`, respuesta del proyecto o de la ficha → `documento`, con la ruta y el ancla del repositorio).
+- **Auditor**: el turno pasa por `auditar_texto` y las reglas de `escena/auditor.py` antes de devolverse. Si hay un hallazgo **alto** (`cifra_inventada`, `fuente_ausente`, `promesa_aprobacion`, `dato_personal`), el texto se descarta y se devuelve la respuesta fija de respaldo con `origen="reglas"`; el veredicto se adjunta en `hallazgos`, nunca como color. En los pasos 1 y 2, `fuente_ausente` incluye la cita que no resuelve: un `documento` cuyo archivo no existe, no está en el corpus del proyecto o no contiene la cifra citada cuenta como hallazgo alto.
+- **Tiempo máximo**: **punto abierto**. La hipótesis de trabajo son 8 segundos en total y 4 segundos por llamada al modelo, sin reintentos y con el mismo reloj por `ThreadPoolExecutor` de la negociación. Los pasos 1 y 4 no llaman al modelo y no consumen ese presupuesto; el paso 2 mide el BM25 en memoria, sin Ollama. El límite se mide al implementar con las cuatro rutas, se anota en `docs/DEMO_GOTA_A_GOTA.md` y se ajusta en `config/escena.toml [preguntas]`, sin cambiar el contrato.
+- **Si DeepSeek falla** (timeout, error de red, clave ausente o `SUCURSAL_DEMO=1`): Pana responde con una frase fija de respaldo de `config/escena.toml` y `origen="reglas"`, sin cifras inventadas y sin detener la escena. Si la pregunta era de tasa, el respaldo remite al Tablero visible en la pantalla; si era del proyecto, remite a `docs/` y a la ficha del proyecto.
+- **Datos personales**: la respuesta **MUST NOT** contener teléfonos, correos, documentos ni nombres de personas; tampoco se escriben en los registros (`LOGGER` sigue sin recibir la pregunta ni la respuesta) ni en `sessionStorage`.
 
 `escena/__main__.py` genera la escena de respaldo:
 
@@ -462,6 +484,7 @@ $env:SUCURSAL_DEMO = "1"; make app
 | `calculo_gota` | `escena.gota#campo` | comparar con `PrestamoGota` |
 | `usura` | `config/tasas.toml#usura.tasa_ea` | comparar con `Usura` |
 | `guion` | `config/escena.toml#...` | comparar con la plantilla o el parámetro |
+| `documento` | `docs/ARQUEO.md#ancla` | el archivo existe en el corpus del proyecto y el fragmento citado contiene la cifra |
 
 `Escena.sellos` guarda el `sha256` de `config/diagnostico.toml`, `config/tasas.toml`, `config/escena.toml` y la tabla Gold usada. El panel de trazabilidad los muestra truncados; el auditor usa la referencia y el valor, no el hash, para no depender de una ruta absoluta.
 
@@ -474,6 +497,7 @@ $env:SUCURSAL_DEMO = "1"; make app
 - `test_escena_estres.py`: 100 perfiles aleatorios con semilla y los extremos; mutaciones de cifra, fuente, promesa, gota, semáforo y PII; el auditor nunca deja pasar un hallazgo alto.
 - `test_escena_entrada.py`: letras, montos, confirmación, ambigüedad, monto fuera de rango y datos personales.
 - `test_escena_api.py` y `test_app_web.py`: opciones, voluntario con semilla, interpretar, escena, negociación, proyectado, router montado y `app/web/escena.html` servida con `contrato.js`; sin red.
+- `test_escena_pregunta.py`: enrutamiento en orden (respuesta fija → `guion_fijo`; pregunta del proyecto → BM25 con fuente `documento` y `origen="llm"`; pregunta del banco → Tablero o Bóveda; fuera de dominio → rechazo en voz alta con `origen="reglas"` y sin consultar la Bóveda), pregunta de producto (Bóveda), de tasa (Tablero), «¿por qué Qdrant?» respondida desde `CONSTITUTION.md` o `docs/`, tope de 40 palabras con la línea `Fuente:`, cifra sin fuente → hallazgo alto → respaldo con `origen="reglas"`, cita de `documento` que no resuelve → respaldo, fallo de DeepSeek → respaldo, y ausencia de PII en la respuesta y en los registros.
 - `test_seguridad.py`: `data/escena/` ignorado; sin secretos ni PII en `config/escena.toml`; el servidor sigue en loopback.
 
 ## Risks / Trade-offs
@@ -485,6 +509,8 @@ $env:SUCURSAL_DEMO = "1"; make app
 - **El auditor produce falsos positivos por números estructurales** → solo se auditan cifras financieras de turnos con `escenario` o `cifras`; fila, silla, letras y conteos de turnos se excluyen.
 - **La comparación de 36 meses se malinterpreta** → la escena dice el supuesto en voz y el panel muestra “renovación mensual sin capitalizar”; no se presenta como una deuda única.
 - **El reconocimiento del navegador usa un servicio externo** → aviso visible, sin datos reales, teclado como respaldo y ninguna grabación.
+- **El público pregunta algo fuera de dominio o pide un dato personal** → Pana rechaza en voz alta con `origen="reglas"` y frase fija; no se consulta la Bóveda ni se repite el texto, y la escena sigue con el siguiente turno.
+- **Preguntan por el proyecto y la respuesta no está en `docs/`** → el BM25 no supera el mínimo y el paso 2 no responde; se sigue al paso 3 y, si tampoco aplica, Pana rechaza con amabilidad y remite a la ficha del proyecto. Nunca se inventa una justificación de diseño.
 - **El tiempo de la presentación se alarga** → cuatro preguntas, cuatro turnos y botón Núcleo; el ensayo mide menos de seis minutos.
 - **Confundir semáforo y veredicto** → el veredicto no usa colores y la UI los muestra en dos etiquetas separadas.
 
@@ -498,4 +524,4 @@ $env:SUCURSAL_DEMO = "1"; make app
 
 ## Open Questions
 
-No hay preguntas abiertas que cambien el alcance: las decisiones de la revisión del domingo 22 quedaron cerradas (sin capitalizar, `skip_specs: true`, voz del navegador con aviso, veredicto sin colores, 15 s/4 s y `make escena-proyectada`).
+Queda un punto abierto, ya acotado: el **límite de tiempo** de `POST /api/escena/pregunta`. La hipótesis de trabajo son 8 segundos en total y 4 segundos por llamada, pero se mide al implementar con las cuatro rutas (respuestas fijas y rechazo sin modelo, BM25 del proyecto con el índice ya tibio y la Ventanilla con sus dos rutas) y se ajusta entonces; el ajuste se anota en `docs/DEMO_GOTA_A_GOTA.md` y no cambia el contrato ni el plan B. El resto de las decisiones de la revisión del domingo 22 quedaron cerradas (sin capitalizar, `skip_specs: true`, voz del navegador con aviso, veredicto sin colores, 15 s/4 s de la negociación y `make escena-proyectada`).
