@@ -1,0 +1,216 @@
+/*
+ * Sucursal 1965 · pantalla de la escena «Pana vs. el gota a gota».
+ * Pensada para proyector: fondo oscuro fijo, letra grande y alto contraste.
+ * Un solo aspecto a propósito (no cambia con el modo claro del sistema).
+ */
+:root {
+  --sala: #0e1420;
+  --tablero: #161f2f;
+  --hundido: #0b111c;
+  --linea: #2a3750;
+  --texto: #eef2f8;
+  --tenue: #9aa7bd;
+  --pana: #3fc1a5;
+  --don_gota: #e0604a;
+  --joven: #f2b84b;
+  --agente_joven: #7aa7ff;
+  --agente_banco: #c39bff;
+  --auditor: #d3dbe8;
+  --verde: #3ccf7a;
+  --amarillo: #f2c94c;
+  --rojo: #ef5a5a;
+  --fuente: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+  --fuente-cifras: ui-monospace, "Cascadia Mono", Consolas, monospace;
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+
+html, body { margin: 0; background: var(--sala); color: var(--texto); }
+
+body.escena {
+  font: 18px/1.45 var(--fuente);
+  min-height: 100vh;
+  display: grid;
+  grid-template-rows: 1fr auto;
+  gap: 12px;
+  padding: 16px;
+}
+
+h2 {
+  margin: 0;
+  font: 500 13px var(--fuente-cifras);
+  letter-spacing: .1em;
+  text-transform: uppercase;
+  color: var(--tenue);
+}
+
+/* ---------- Pantalla ---------- */
+.escena__pantalla {
+  background: var(--tablero);
+  border: 1px solid var(--linea);
+  border-radius: 14px;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(260px, 26%);
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  min-height: 0;
+}
+
+.escena__barra {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--linea);
+}
+
+.escena__pasos { display: flex; flex-wrap: wrap; gap: 6px; }
+
+.escena__paso {
+  font: 13px var(--fuente-cifras);
+  color: var(--tenue);
+  padding: 4px 10px;
+  border: 1px solid var(--linea);
+  border-radius: 999px;
+}
+
+.escena__paso--hecho { color: var(--texto); }
+.escena__paso--activo { color: var(--sala); background: var(--texto); border-color: var(--texto); }
+
+.escena__sello {
+  font: 12px var(--fuente-cifras);
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: var(--sala);
+  background: var(--joven);
+  padding: 4px 10px;
+  border-radius: 3px;
+}
+
+/* ---------- Personajes ---------- */
+.escena__personajes {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  align-items: center;
+  gap: 10px;
+  padding: 24px;
+  min-width: 0;
+}
+
+.escena__personaje {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  opacity: .3;
+  transition: opacity .25s, transform .25s;
+}
+
+.escena__personaje--visto { opacity: .6; }
+.escena__personaje--habla { opacity: 1; transform: translateY(-8px); }
+
+.escena__avatar { width: min(100%, 150px); aspect-ratio: 1; }
+
+.escena__personaje--pana { color: var(--pana); }
+.escena__personaje--don_gota { color: var(--don_gota); }
+.escena__personaje--joven { color: var(--joven); }
+.escena__personaje--agente_joven { color: var(--agente_joven); }
+.escena__personaje--agente_banco { color: var(--agente_banco); }
+.escena__personaje--auditor { color: var(--auditor); }
+.escena__figura { fill: currentColor; }
+
+.escena__nombre { font-weight: 700; font-size: 15px; text-align: center; color: var(--texto); }
+
+/* Retrato en 3D: círculo con borde del color del personaje; brilla al hablar. */
+.escena__foto { display: block; border-radius: 50%; object-fit: cover; border: 4px solid currentColor; background: var(--hundido); }
+.escena__personaje--habla .escena__foto { box-shadow: 0 0 0 3px var(--sala), 0 0 28px currentColor; }
+
+/* La boca se mueve mientras el personaje habla (el voluntario no tiene voz). */
+.escena__boca { transform-box: fill-box; transform-origin: center top; }
+.escena__personaje--habla:not(.escena__personaje--mudo) .escena__boca { animation: escena-boca .28s ease-in-out infinite alternate; }
+@keyframes escena-boca { from { transform: scaleY(1); } to { transform: scaleY(.45); } }
+
+.escena__ondas { height: 16px; display: flex; gap: 3px; align-items: end; visibility: hidden; }
+.escena__personaje--habla .escena__ondas { visibility: visible; }
+.escena__ondas i { width: 4px; height: 4px; background: currentColor; border-radius: 2px; animation: escena-onda .9s ease-in-out infinite; }
+.escena__ondas i:nth-child(2) { animation-delay: .15s; }
+.escena__ondas i:nth-child(3) { animation-delay: .3s; }
+.escena__ondas i:nth-child(4) { animation-delay: .45s; }
+.escena__personaje--mudo .escena__ondas i { animation: none; }
+
+@keyframes escena-onda { 0%, 100% { height: 4px; } 50% { height: 16px; } }
+
+/* ---------- Panel de cifras ---------- */
+.escena__panel {
+  grid-row: 2 / 4;
+  grid-column: 2;
+  border-left: 1px solid var(--linea);
+  padding: 16px;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  overflow-y: auto;
+  min-width: 0;
+}
+
+.escena__chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.escena__chip { font: 14px var(--fuente-cifras); padding: 3px 8px; border: 1px solid var(--linea); border-radius: 4px; background: var(--hundido); }
+
+.escena__semaforo { display: flex; align-items: center; gap: 6px; padding: 10px 12px; border-radius: 8px; background: var(--hundido); font-size: 16px; }
+.escena__luz { width: 18px; height: 18px; border-radius: 50%; background: #2a3344; }
+.escena__semaforo[data-color="rojo"] .escena__luz--rojo { background: var(--rojo); box-shadow: 0 0 10px var(--rojo); }
+.escena__semaforo[data-color="amarillo"] .escena__luz--amarillo { background: var(--amarillo); box-shadow: 0 0 10px var(--amarillo); }
+.escena__semaforo[data-color="verde"] .escena__luz--verde { background: var(--verde); box-shadow: 0 0 10px var(--verde); }
+#escena-semaforo-texto { margin-left: 6px; }
+
+.escena__vacio, .escena__conforme { margin: 0; color: var(--tenue); font-size: 15px; }
+
+.escena__tabla { width: 100%; border-collapse: collapse; font-size: 15px; }
+.escena__tabla th { text-align: left; font-weight: 400; color: var(--tenue); padding: 4px 6px 4px 8px; }
+.escena__tabla td { text-align: right; font-family: var(--fuente-cifras); font-variant-numeric: tabular-nums; padding: 4px 0; white-space: nowrap; }
+.escena__tabla .escena__fuente { font-size: 11px; color: var(--tenue); padding-left: 8px; }
+.escena__cifra--gota th { border-left: 3px solid var(--don_gota); }
+.escena__cifra--banco th { border-left: 3px solid var(--pana); }
+.escena__cifra--otra th { border-left: 3px solid var(--linea); }
+
+.escena__hallazgos { margin: 0; padding-left: 18px; color: var(--auditor); font-size: 15px; }
+
+/* ---------- Subtítulos ---------- */
+.escena__subtitulos { grid-column: 1; padding: 16px 24px 20px; border-top: 1px solid var(--linea); background: var(--hundido); min-width: 0; }
+.escena__hablante { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-height: 1.4em; }
+.escena__quien { font-weight: 800; font-size: 18px; }
+.escena__quien--pana { color: var(--pana); }
+.escena__quien--don_gota { color: var(--don_gota); }
+.escena__quien--joven { color: var(--joven); }
+.escena__quien--agente_joven { color: var(--agente_joven); }
+.escena__quien--agente_banco { color: var(--agente_banco); }
+.escena__quien--auditor { color: var(--auditor); }
+.escena__origen { font: 500 11px var(--fuente-cifras); letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border: 1px solid var(--linea); border-radius: 3px; color: var(--tenue); }
+.escena__error { color: var(--rojo); font-weight: 800; }
+.escena__texto { margin: 8px 0 0; font-size: clamp(20px, 2.4vw, 34px); line-height: 1.3; min-height: 2.6em; }
+
+/* ---------- Controles ---------- */
+.escena__controles { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+.escena__controles button { font: 700 16px var(--fuente); color: var(--sala); background: var(--texto); border: 0; border-radius: 8px; padding: 10px 16px; cursor: pointer; }
+.escena__controles button:disabled { opacity: .4; cursor: default; }
+.escena__controles .escena__boton--secundario { background: transparent; color: var(--texto); border: 1px solid var(--linea); }
+.escena__controles button:focus-visible, .escena__casilla input:focus-visible { outline: 3px solid var(--joven); outline-offset: 2px; }
+.escena__casilla { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; cursor: pointer; }
+.escena__casilla input { width: 18px; height: 18px; accent-color: var(--pana); }
+.escena__estado { font: 13px var(--fuente-cifras); color: var(--tenue); }
+
+@media (max-width: 900px) {
+  .escena__pantalla { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto auto; }
+  .escena__personajes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .escena__panel { grid-row: auto; grid-column: 1; border-left: 0; border-top: 1px solid var(--linea); }
+  .escena__subtitulos { grid-row: 3; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .escena__ondas i { animation: none; height: 10px; }
+  .escena__boca { animation: none !important; }
+  .escena__personaje--habla .escena__foto { box-shadow: none; }
+  .escena__personaje { transition: none; }
+}
