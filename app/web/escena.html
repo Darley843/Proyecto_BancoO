@@ -51,6 +51,7 @@
     <button type="button" id="escena-siguiente" class="escena__boton--secundario">Siguiente turno</button>
     <button type="button" id="escena-reiniciar" class="escena__boton--secundario">Reiniciar</button>
     <button type="button" id="escena-preguntar" class="escena__boton--secundario">Preguntas (Q)</button>
+    <button type="button" id="escena-captura-abrir" class="escena__boton--secundario" aria-expanded="false" aria-controls="escena-captura">Entrada del voluntario (V)</button>
     <button type="button" id="escena-nucleo" class="escena__boton--secundario">Núcleo (N)</button>
     <button type="button" id="escena-ver-traza" class="escena__boton--secundario" aria-expanded="false" aria-controls="escena-traza">Trazabilidad (T)</button>
     <label class="escena__casilla" for="escena-solo-subtitulos">
@@ -62,6 +63,32 @@
     <span class="escena__estado" id="escena-voz"></span>
     <span class="escena__estado">Teclas: Espacio siguiente · P reproducir/pausar · S subtítulos · Q preguntas · N núcleo · T trazabilidad · R reiniciar</span>
   </div>
+
+  <section class="escena__captura" id="escena-captura" aria-label="Entrada del voluntario" hidden>
+    <h2>Entrada del voluntario</h2>
+    <p class="escena__aviso" id="captura-aviso">
+      El reconocimiento de voz del navegador puede usar un servicio externo.
+      Puedes escribir o usar las tarjetas A–F.
+    </p>
+    <div class="escena__captura-fila">
+      <button type="button" id="captura-voluntario">Elegir fila y silla</button>
+      <output id="captura-seleccion" aria-live="polite"></output>
+    </div>
+    <div id="captura-pregunta"></div>
+    <p class="escena__estado" id="captura-estado" aria-live="polite"></p>
+    <div class="escena__captura-fila">
+      <button type="button" id="captura-microfono" aria-pressed="false">Hablar</button>
+      <button type="button" id="captura-enviar" class="escena__boton--secundario">Enviar</button>
+      <button type="button" id="captura-seguro" class="escena__boton--secundario">Perfil seguro</button>
+    </div>
+    <div id="captura-confirmacion" hidden>
+      <p id="captura-resumen"></p>
+      <div class="escena__captura-fila">
+        <button type="button" id="captura-si">Sí, confirmo</button>
+        <button type="button" id="captura-no" class="escena__boton--secundario">No, cambiar</button>
+      </div>
+    </div>
+  </section>
 
   <section class="escena__preguntas" id="escena-preguntas" aria-label="Preguntas del público" hidden>
     <form class="escena__form-pregunta" id="escena-form-pregunta">

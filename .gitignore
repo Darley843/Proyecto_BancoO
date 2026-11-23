@@ -62,3 +62,6 @@ data/asistente/roba_memoria.sqlite
 
 # Voces de la escena (Piper): se descargan con `make voz-modelo`
 data/modelos/
+
+# Escena gota a gota: JSON generados por `make escena-proyectada`
+data/escena/
