@@ -99,9 +99,26 @@ class _AnalisisCitas:
     avisos: tuple[str, ...]
 
 
-def _neutralizar(texto: str) -> str:
-    """Convierte las etiquetas de fragmentos en texto que no cierra el bloque."""
+def neutralizar(texto: str) -> str:
+    """Convierte las etiquetas de fragmentos en texto que no cierra el bloque.
+
+    Es la misma neutralización que usa el RAG de la Bóveda, expuesta para que
+    otros módulos que arman ``<fragmentos>`` —como la respuesta del proyecto de
+    la escena— no la dupliquen. No cambia el texto si no trae etiquetas.
+
+    Args:
+        texto: texto de un fragmento recuperado.
+
+    Returns:
+        El texto con ``<fragmentos>`` y ``</fragmentos>`` sustituidos por
+        guillemets, de modo que un fragmento no pueda cerrar el bloque.
+    """
     return _ETIQUETA_FRAGMENTOS.sub(lambda match: f"‹{match.group('cierre')}fragmentos›", texto)
+
+
+def _neutralizar(texto: str) -> str:
+    """Alias privado de :func:`neutralizar` para el código existente."""
+    return neutralizar(texto)
 
 
 def sanear_instrucciones(texto: str) -> str:
