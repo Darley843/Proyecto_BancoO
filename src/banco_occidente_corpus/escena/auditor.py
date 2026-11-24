@@ -14,7 +14,8 @@ Reglas de gravedad alta (cualquiera da `objeta`):
   tipo de fuente, o su texto legible no corresponde a su valor. En la
   negociación, una cifra del motor debe existir en la mesa precalculada.
 - `promesa_aprobacion`: «aprobado», «garantizado», «te lo apruebo» y
-  similares, salvo negados dentro de la misma oración («no está aprobado»).
+  similares, salvo negados de forma inmediata en la misma cláusula («no está
+  aprobado»). «Sin duda» y «no solo» no niegan.
 - `recomienda_gota`: Pana, los agentes o el auditor recomiendan el gota a
   gota. Don Gota está exento porque es quien lo ofrece; sus cifras sí se
   auditan.
@@ -26,9 +27,10 @@ Observaciones de gravedad media (sin altas, dan `con_observaciones`):
 `sin_negociacion`, `sin_acuerdo`, `tasa_no_disponible`,
 `usura_sin_certificar` y `vigencia_vencida`.
 
-La comprobación de cifras reutiliza `diagnostico.comite.auditar_texto`, la
-misma base del auditor del comité. Las promesas usan la lista del comité con
-una negación que no cruza oraciones, y los datos personales, `detectar_pii`.
+Las cifras y las promesas reutilizan `diagnostico.comite.auditar_texto`, la
+misma base del auditor del comité; la escena suma sus frases propias («te lo
+apruebo», «ya es tuyo») y la recomendación del gota a gota con la misma
+negación (`negada_antes`). Los datos personales usan `detectar_pii`.
 `auditar_negociacion` tiene la firma que espera el orquestador de la
 negociación (`auditor(turnos, mesa, acuerdo)`), y `crear_auditor_negociacion`
 arma esa misma función con las alertas de la comparación.
@@ -42,7 +44,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Literal
 
 from ..asistente.validacion import cifras_duras, detectar_pii
-from ..diagnostico.comite import auditar_texto
+from ..diagnostico.comite import auditar_texto, negada_antes
 from .contratos import (
     CifraEscena,
     EscenarioEscena,
@@ -123,31 +125,23 @@ _REFERENCIA_POR_TIPO: dict[str, re.Pattern[str]] = {
     "calculo_gota": re.compile(r"^escena\.[a-z_]+#[\w.]+$"),
     "usura": re.compile(r"^config/tasas\.toml#usura\.[\w.]+$"),
     "gold": re.compile(r"^data/gold/[\w./-]+(?:#[\w.-]+)?$"),
-    "documento": re.compile(r"^docs/[\w./-]+\.md#[\w.-]+$"),
+    # README, AGENTS y CONSTITUTION de la raíz o un .md de docs/, con ancla y sin «..».
+    "documento": re.compile(
+        r"^(?!.*\.\.)(?:(?:README|AGENTS|CONSTITUTION)\.md|docs/[\w./-]+\.md)#[\w.-]+$"
+    ),
     "guion": re.compile(r"^(?:config/escena\.toml|docs/[\w./-]+\.md)#[\w.-]+$"),
 }
-#: Promesas de aprobación: la lista del comité más las de la escena («te lo
-#: apruebo»). La escena no usa la revisión de promesas de `auditar_texto`
-#: porque su negación mira 25 caracteres hacia atrás aunque crucen una frase:
-#: «sin papeles. Queda garantizado» se daría por negada.
+#: Promesas propias de la escena que la lista del comité no trae. Las del comité
+#: («aprobado», «garantizado», «te lo aprueban»…) las revisa `auditar_texto`.
 _PROMESAS_ESCENA = re.compile(
-    r"\b("
-    r"aprobad[oa]s?|aprobaci[oó]n|aprobamos|preaprobad[oa]|"
-    r"garantizad[oa]s?|garantizamos|"
-    r"te lo dan|te la dan|te lo aprueban|te la aprueban|"
-    r"sin problema|seguro que|definitiv[oa]|"
-    r"te\s+l[oa]\s+apruebo|se\s+l[oa]\s+apruebo|apruebo|ya\s+es\s+tuy[oa]"
-    r")\b",
+    r"\b(?:te\s+l[oa]\s+apruebo|se\s+l[oa]\s+apruebo|apruebo|ya\s+es\s+tuy[oa])\b",
     re.IGNORECASE,
 )
-#: Negaciones que, justo antes de una frase y dentro de la misma oración, la desactivan.
-_NEGACIONES = ("no ", "nunca ", "ni ", "sin ", "ninguna ", "jamás ", "jamas ", "evita ")
-#: Signos que cierran una oración: una negación anterior a ellos no cuenta.
-_FIN_DE_ORACION = ".!?;:¿¡\n"
 #: Recomendar el gota a gota: un verbo de recomendación seguido del gota.
 _RECOMIENDA_GOTA = re.compile(
     r"\b(?:te\s+)?(?:recomiendo|conviene|elige|escoge|acepta|ac[eé]ptale|toma|usa|"
-    r"ve\s+con|vete\s+con|anda\s+con|qu[eé]date\s+con|p[ií]dele\s+a|mejor\s+con|"
+    r"ve\s+con|vete\s+con|anda\s+con|[aá]ndate\s+con|qu[eé]date\s+con|p[ií]dele\s+a|"
+    r"(?:ve|vete|anda|[aá]ndate|vaya|v[aá]yase)\s+(?:a\s+)?donde|mejor\s+con|"
     r"mejor)\s+(?:(?:el|al|a|la\s+oferta\s+de|lo\s+de)\s+)?"
     r"(?:pr[eé]stamo\s+(?:de\s+|del\s+)?)?(?:gota\s+a\s+gota|don\s+gota)\b",
     re.IGNORECASE,
@@ -167,6 +161,8 @@ _NUMERO = re.compile(r"\d+(?:[.,]\d+)?")
 _MARCA_PII = "__dato_personal__"
 #: Prefijo con el que `auditar_texto` reporta una cifra no respaldada.
 _PREFIJO_CIFRA = "Cifra no presente en la entrada: "
+#: Prefijo con el que `auditar_texto` reporta una promesa de aprobación.
+_PREFIJO_PROMESA = "Promesa de aprobación: "
 
 
 def auditar_turno(
@@ -191,10 +187,15 @@ def auditar_turno(
     for texto in auditar_texto(
         turno.texto,
         cifras_permitidas=permitidas,
-        revisar_promesas=False,
+        revisar_promesas=True,
         mensaje_pii=_MARCA_PII,
     ):
-        if texto.startswith(_PREFIJO_CIFRA):
+        if texto.startswith(_PREFIJO_PROMESA):
+            frase = texto.removeprefix(_PREFIJO_PROMESA).strip("«»")
+            hallazgos.append(
+                _hallazgo("promesa_aprobacion", turno.id, f"Promete una aprobación: «{frase}».")
+            )
+        elif texto.startswith(_PREFIJO_CIFRA):
             cifra = texto.removeprefix(_PREFIJO_CIFRA)
             hallazgos.append(
                 _hallazgo(
@@ -604,7 +605,10 @@ def _valores_mesa(mesa: Sequence[EscenarioEscena]) -> set[Decimal]:
 
 
 def _promesas_escena(texto: str) -> list[str]:
-    """Promesas propias de la escena que no estén negadas.
+    """Promesas propias de la escena («te lo apruebo», «ya es tuyo») que no estén negadas.
+
+    La negación es la del comité (`negada_antes`): «no te lo apruebo» no cuenta,
+    pero «sin duda te lo apruebo» sí.
 
     Args:
         texto: texto del turno.
@@ -615,7 +619,7 @@ def _promesas_escena(texto: str) -> list[str]:
     return [
         coincidencia.group(0)
         for coincidencia in _PROMESAS_ESCENA.finditer(texto)
-        if not _negada(texto, coincidencia.start())
+        if not negada_antes(texto, coincidencia.start())
     ]
 
 
@@ -631,26 +635,8 @@ def _recomendaciones_gota(texto: str) -> list[str]:
     return [
         coincidencia.group(0)
         for coincidencia in _RECOMIENDA_GOTA.finditer(texto)
-        if not _negada(texto, coincidencia.start())
+        if not negada_antes(texto, coincidencia.start())
     ]
-
-
-def _negada(texto: str, inicio: int) -> bool:
-    """Indica si una frase tiene una negación justo antes.
-
-    Args:
-        texto: texto completo.
-        inicio: posición donde empieza la frase.
-
-    Returns:
-        `True` si en los 25 caracteres previos, dentro de la misma oración, hay
-        una negación.
-    """
-    previo = texto[max(0, inicio - 25) : inicio].casefold()
-    corte = max(previo.rfind(signo) for signo in _FIN_DE_ORACION)
-    if corte >= 0:
-        previo = previo[corte + 1 :]
-    return any(negacion in f" {previo}" for negacion in _NEGACIONES)
 
 
 def _motivo_semaforo(turno: TurnoEscena) -> str:
@@ -677,7 +663,7 @@ def _motivo_semaforo(turno: TurnoEscena) -> str:
         turno.personaje == "agente_banco"
         and escenario.semaforo == "rojo"
         and (afirma := _AFIRMA_QUE_CABE.search(turno.texto)) is not None
-        and not _negada(turno.texto, afirma.start())
+        and not negada_antes(turno.texto, afirma.start())
     ):
         frase = afirma.group(0)
         return f"El banco dice «{frase}» de «{escenario.codigo}», pero el motor lo dejó en rojo."

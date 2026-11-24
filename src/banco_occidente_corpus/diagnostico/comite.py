@@ -1738,11 +1738,29 @@ def _promesas(texto: str) -> Iterator[str]:
         Cada frase de promesa encontrada.
     """
     for coincidencia in _PROMESAS.finditer(texto):
-        # Solo cuenta la negación posterior al último cierre de frase o coma.
-        previo = _CORTES_FRASE.split(texto[: coincidencia.start()])[-1]
-        if _negacion_inmediata(previo):
+        if negada_antes(texto, coincidencia.start()):
             continue
         yield coincidencia.group(0)
+
+
+def negada_antes(texto: str, inicio: int) -> bool:
+    """Indica si la frase que empieza en `inicio` queda negada de forma inmediata.
+
+    Es la misma regla de las promesas de `auditar_texto`: solo cuenta la
+    negación posterior al último cierre de frase o coma, con como máximo tres
+    palabras de enlace antes de la frase, y «no dudes», «no solo», «no te
+    preocupes» y «sin duda» nunca niegan. El auditor de la escena la usa para
+    sus frases propias («te lo apruebo», recomendar el gota a gota), así las
+    dos reglas niegan igual.
+
+    Args:
+        texto: texto completo.
+        inicio: posición donde empieza la frase.
+
+    Returns:
+        `True` si la frase queda negada.
+    """
+    return _negacion_inmediata(_CORTES_FRASE.split(texto[:inicio])[-1])
 
 
 def _buscar_postura(posturas: Sequence[PosturaAgente], rol: str) -> PosturaAgente | None:

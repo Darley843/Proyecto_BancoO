@@ -12,7 +12,6 @@ from collections.abc import Callable
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
 
 import pytest
 from pydantic import ValidationError
@@ -51,6 +50,7 @@ from banco_occidente_corpus.escena.gota import (
     cargar_config_gota,
     turnos_don_gota,
 )
+from banco_occidente_corpus.escena.negociacion import negociar
 from banco_occidente_corpus.tablero.tasas import (
     ConfiguracionTasas,
     FilaTasa,
@@ -418,6 +418,33 @@ def test_la_negacion_vale_solo_dentro_de_la_misma_oracion(texto: str, dispara: b
     assert bool(hallazgos & {"promesa_aprobacion", "recomienda_gota"}) is dispara
 
 
+@pytest.mark.parametrize(
+    ("texto", "regla", "dispara"),
+    [
+        ("Sin duda está aprobado.", "promesa_aprobacion", True),
+        ("No solo está aprobado, también es barato.", "promesa_aprobacion", True),
+        ("No te preocupes: te lo aprueban.", "promesa_aprobacion", True),
+        ("Sin duda te lo apruebo.", "promesa_aprobacion", True),
+        ("Ya es tuyo.", "promesa_aprobacion", True),
+        ("No te lo apruebo yo: decide el banco.", "promesa_aprobacion", False),
+        ("Este resultado no es una aprobación.", "promesa_aprobacion", False),
+        ("Ninguna opción está garantizada.", "promesa_aprobacion", False),
+        ("Ve donde el gota a gota, es más rápido.", "recomienda_gota", True),
+        ("Ándate donde Don Gota.", "recomienda_gota", True),
+        ("Vete a donde el gota a gota.", "recomienda_gota", True),
+        ("No vaya donde el gota a gota.", "recomienda_gota", False),
+        ("No, te recomiendo el gota a gota.", "recomienda_gota", True),
+    ],
+)
+def test_la_escena_niega_igual_que_el_comite(texto: str, regla: str, dispara: bool) -> None:
+    """«Sin duda» y «no solo» no niegan; la negación vale en la misma cláusula, sin cruzar comas."""
+    turno = TurnoEscena(
+        id="pana.prueba.v1", orden=1, personaje="pana", texto=texto, origen="reglas"
+    )
+
+    assert (regla in _codigos(auditar_turno(turno))) is dispara
+
+
 # --- Observaciones medias ----------------------------------------------------
 
 
@@ -570,15 +597,6 @@ def test_un_cierre_conforme_recuerda_que_decide_un_asesor() -> None:
 # --- Integración con la negociación (#178) -----------------------------------
 
 
-def _negociacion() -> Any:
-    """Importa la negociación o salta la prueba si todavía no está en la rama.
-
-    Returns:
-        El módulo `escena.negociacion`.
-    """
-    return pytest.importorskip("banco_occidente_corpus.escena.negociacion")
-
-
 @pytest.mark.parametrize(
     ("perfil", "veredicto", "con_alternativas"),
     [
@@ -595,9 +613,7 @@ def test_el_auditor_inyectado_revisa_la_negociacion_real(
     raiz_tasas: Path,
 ) -> None:
     """La negociación determinista pasa el auditor sin falsos positivos."""
-    negociacion = _negociacion()
-
-    resultado = negociacion.negociar(
+    resultado = negociar(
         perfil,
         auditor=crear_auditor_negociacion(),
         entorno={"SUCURSAL_DEMO": "1"},
@@ -610,3 +626,38 @@ def test_el_auditor_inyectado_revisa_la_negociacion_real(
     assert not any(hallazgo.gravedad == "alta" for hallazgo in final.hallazgos)
     assert bool(final.alternativas) is con_alternativas
     assert final.turnos_revisados == tuple(turno.id for turno in resultado.negociacion.turnos)
+
+
+# --- Fuentes de documento ----------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("referencia", "valida"),
+    [
+        ("README.md#arquitectura", True),
+        ("AGENTS.md#reglas", True),
+        ("CONSTITUTION.md#base-de-datos-vectorial", True),
+        ("docs/ARQUEO.md#metricas", True),
+        ("docs/CONSTITUTION-curso-TAAML.md#rubrica", True),
+        ("CONSTITUTION.md", False),
+        ("SECRETOS.md#clave", False),
+        ("src/README.md#arquitectura", False),
+        ("data/noticias/README.md#fuentes", False),
+        ("docs/../config/secretos.md#clave", False),
+    ],
+)
+def test_las_fuentes_de_documento_aceptan_los_archivos_de_la_raiz(
+    referencia: str, valida: bool
+) -> None:
+    """README, AGENTS y CONSTITUTION de la raíz citan como documento; otras rutas no."""
+    config = cargar_config_gota()
+    prestamo = calcular_prestamo_gota(Decimal(1_000_000), config=config)
+    oferta = turnos_don_gota(prestamo, config=config)[0]
+    cifra = oferta.cifras[0].model_copy(
+        update={"fuente": FuenteCifra(tipo="documento", referencia=referencia)}
+    )
+    turno = oferta.model_copy(update={"cifras": (cifra, *oferta.cifras[1:])})
+
+    codigos = {hallazgo.codigo for hallazgo in auditar_turno(turno)}
+
+    assert ("fuente_ausente" not in codigos) is valida

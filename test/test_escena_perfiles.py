@@ -10,7 +10,6 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
-from typing import Any
 
 import pytest
 
@@ -21,6 +20,7 @@ from banco_occidente_corpus.escena.gota import (
     cargar_config_gota,
     turnos_don_gota,
 )
+from banco_occidente_corpus.escena.negociacion import negociar
 from banco_occidente_corpus.escena.perfiles import (
     PREGUNTAS,
     RUTA_CONFIG,
@@ -289,24 +289,14 @@ def test_el_modo_seguro_pasa_por_el_auditor(
         assert bool(veredicto.alternativas) is (seguro.obtenido == "rojo")
 
 
-def _negociacion() -> Any:
-    """Importa la negociación o salta la prueba si todavía no está en la rama.
-
-    Returns:
-        El módulo `escena.negociacion`.
-    """
-    return pytest.importorskip("banco_occidente_corpus.escena.negociacion")
-
-
 def test_los_perfiles_seguros_negocian_como_el_diseno(raiz_tasas: Path) -> None:
     """Verde recomienda, amarillo pasa a verde, rojo cierra sin acuerdo y el auditor no objeta."""
-    negociacion = _negociacion()
     seguros = {
         seguro.id: seguro for seguro in perfiles_seguros(hoy=FECHA_CONSULTA, raiz=raiz_tasas)
     }
 
     resultados = {
-        ident: negociacion.negociar(
+        ident: negociar(
             seguro.perfil,
             auditor=crear_auditor_negociacion(semaforo=seguro.obtenido),
             entorno={"SUCURSAL_DEMO": "1"},
