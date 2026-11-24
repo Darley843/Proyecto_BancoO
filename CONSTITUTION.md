@@ -241,6 +241,7 @@ ProyectoAvance1/
 │   │   ├── hitl.py       # interrupt(), botones Contactar/Descartar y caso
 │   │   ├── cola.py       # un trabajador procesa fuera del webhook
 │   │   ├── despachador.py # identidad, consentimiento y respuesta
+│   │   ├── evento.py     # ventana y cuotas del modo evento
 │   │   ├── envio.py      # cliente de Meta: timeout, User-Agent y From
 │   │   └── almacen.py    # mensajes, consentimientos y casos en SQLite
 │   ├── diagnostico/      # DIAGNÓSTICO: entrevista guiada y motor
@@ -280,6 +281,7 @@ ProyectoAvance1/
 │   └── web/              # APP: HTML/CSS/JS de la Sucursal 1965 (make app)
 ├── docs/ESTANDAR.md      # trazabilidad regla de la clase → implementación
 ├── docs/OPERACION_WHATSAPP.md # canal: arranque, túnel, callback y modos
+├── docs/DESPLIEGUE_WHATSAPP.md # canal: Meta, túnel, webhook y modo evento paso a paso
 ├── docs/DIAGNOSTICO.md   # entrevista, cálculo, semáforo y comité
 ├── docs/MCP.md           # servidor MCP de solo lectura
 ├── docs/ROBA_BOVEDA.md   # juego y marcador seguro

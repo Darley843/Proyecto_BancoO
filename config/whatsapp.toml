@@ -26,3 +26,18 @@ huellas = [
   "0000000000000000000000000000000000000000000000000000000000000004",
   "0000000000000000000000000000000000000000000000000000000000000005",
 ]
+
+[evento]
+# Modo evento: abre el canal a números que no están en [autorizados] durante una
+# ventana, con consentimiento previo, cuota por persona y tope global.
+# Se enciende con activo = true o con WHATSAPP_EVENTO=1 (el entorno manda).
+# Las fechas llevan zona horaria; sin zona se interpretan como UTC.
+# La ventana es la del ensayo del sábado 28 de noviembre de 2026.
+activo = false
+desde = "2026-11-28T08:00:00-05:00"
+hasta = "2026-11-28T20:00:00-05:00"
+# Mensajes admitidos por persona en una hora y en todo el evento.
+max_por_hora = 30
+max_por_usuario = 40
+# Mensajes admitidos en el evento completo, de todas las personas.
+max_total = 300
