@@ -68,6 +68,44 @@ from .perfil import (
 HISTORIAL_MAX_TOKENS = 1200
 #: Filas que la plantilla del Tablero puede listar sin volverse una tabla enorme.
 MAX_FILAS_TABLERO = 10
+
+#: Palabras que piden una tasa sin nombrar producto.
+_PALABRAS_TASA: tuple[str, ...] = ("tasa", "tasas", "tarifa", "tarifas", "interes", "intereses")
+
+#: Productos y conceptos que sí identifican una fila concreta del Tablero.
+_CONCEPTOS_CONCRETOS: tuple[str, ...] = (
+    "libre inversion",
+    "cdt",
+    "vivienda",
+    "vehiculo",
+    "cartera",
+    "libranza",
+    "tarjeta",
+    "credito",
+    "ahorro",
+    "cuenta",
+    "consumo",
+    "rotativo",
+    "hipotecario",
+    "empresarial",
+    "pyme",
+    "nomina",
+    "mora",
+    "usura",
+    "comision",
+    "recargo",
+    "4x1000",
+    "gravamen",
+    "cuota de manejo",
+)
+
+#: Respuesta a un pedido de tasas que no nombra producto ni concepto.
+TEXTO_TASAS_GENERICAS = (
+    "Puedo darte la tasa vigente de un producto concreto. Dime cuál te interesa: "
+    "libre inversión, CDT, vivienda, vehículo nuevo, vehículo usado, compra de cartera, "
+    "libranza o tarjeta de crédito.\n\n"
+    "Por ejemplo: «tasa de libre inversión»."
+)
 #: Filas que se piden a la herramienta. Una más que el tope de la plantilla
 #: permite distinguir «justo el máximo» de «demasiadas y ambigua».
 FILAS_PARA_DECIDIR = MAX_FILAS_TABLERO + 1
@@ -586,6 +624,16 @@ def _nodo_tablero(dependencias: DependenciasGrafo) -> Callable[[EstadoSucursal],
 
     def tablero(estado: EstadoSucursal) -> dict[str, Any]:
         consulta = estado.get("reformulada") or estado.get("pregunta", "")
+        # La intención sale del texto original: una reformulación del modelo
+        # puede alargar «Tasas» y esconder que no hay producto.
+        if _es_consulta_de_tasas_generica(estado.get("pregunta", "")):
+            return {
+                "filas": [],
+                "respuesta": TEXTO_TASAS_GENERICAS,
+                "fuentes": [],
+                "uso": {"uso_modelo": False, "costo_usd": 0.0},
+                "avisos": ["tasas_genericas"],
+            }
         filas = _invocar_herramienta(herramienta, consulta)
         guardadas = [fila.como_dict() for fila in filas]
         if filas and _es_consulta_generica(consulta):
@@ -899,6 +947,30 @@ def _es_consulta_generica(consulta: str) -> bool:
     if any(producto in texto for producto in _PRODUCTOS_TARJETA):
         return False
     return any(palabra in texto for palabra in ("cuota", "manejo", "cuesta", "vale"))
+
+
+def _es_consulta_de_tasas_generica(consulta: str) -> bool:
+    """Detecta un pedido de tasas que no nombra producto ni concepto.
+
+    «Tasas», «¿y las tarifas?» o «¿cuáles son las tasas vigentes?» no
+    identifican una fila del Tablero: la primera fila que contenga la palabra
+    «tasa» puede ser la tasa de mora, que no responde la pregunta. En ese caso
+    conviene pedir el producto antes de citar una fila.
+
+    La decisión se toma sobre la pregunta original del usuario, no sobre la
+    reformulación del modelo: una reescritura puede alargar la frase y esconder
+    que no hay producto.
+
+    Args:
+        consulta: texto original de la persona.
+
+    Returns:
+        ``True`` si conviene pedir el producto antes de citar una fila.
+    """
+    texto = normalizar(consulta)
+    if not any(re.search(rf"\b{palabra}\b", texto) for palabra in _PALABRAS_TASA):
+        return False
+    return not any(concepto in texto for concepto in _CONCEPTOS_CONCRETOS)
 
 
 def _puede_responder_tabla(filas: Sequence[Fila]) -> bool:
