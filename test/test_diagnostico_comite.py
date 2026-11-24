@@ -13,7 +13,7 @@ import inspect
 import json
 import re
 import threading
-from collections.abc import Mapping, Sequence
+from collections.abc import Iterator, Mapping, Sequence
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -1326,6 +1326,48 @@ VARIANTES_POSTURAS: tuple[tuple[dict[str, Any], ...], ...] = (
         _postura("comercial", "favorable", ["Libranza y vivienda en [plazo_mas_largo]."]),
         _postura("auditor", "conforme", []),
     ),
+    (
+        _postura(
+            "riesgo",
+            "desfavorable",
+            [
+                "Este resultado no es una aprobación del crédito",
+                "El diagnóstico no constituye una aprobación",
+                "No hay aprobación todavía",
+            ],
+        ),
+        _postura(
+            "comercial",
+            "desfavorable",
+            [
+                "Esto no implica aprobación",
+                "Ninguna opción está garantizada",
+                "No garantiza la aprobación",
+            ],
+        ),
+        _postura("auditor", "conforme", []),
+    ),
+    (
+        _postura(
+            "riesgo",
+            "desfavorable",
+            [
+                "No hay aprobación garantizada",
+                "no podemos garantizar la aprobación",
+                "ni siquiera está garantizado",
+            ],
+        ),
+        _postura(
+            "comercial",
+            "desfavorable",
+            [
+                "no es una aprobación garantizada",
+                "Es una opinión del comité de crédito y no una aprobación",
+                "No garantiza la aprobación",
+            ],
+        ),
+        _postura("auditor", "conforme", []),
+    ),
 )
 
 #: Recomendaciones finales; `{aviso}` se reemplaza por el aviso del resultado.
@@ -1337,6 +1379,73 @@ VARIANTES_RECOMENDACION: tuple[str | None, ...] = (
     "no_apto: no conviene.\n" + TEXTO_CON_PII,
 )
 
+#: Negaciones que sí anulan la promesa: inmediatamente antes, con enlaces.
+NEGACIONES_QUE_ANULAN: tuple[str, ...] = (
+    "no te lo aprueban",
+    "no está garantizado",
+    "nunca garantizamos la aprobación",
+    "Este resultado no es una aprobación del crédito",
+    "No garantiza la aprobación",
+    "El diagnóstico no constituye una aprobación",
+    "Esto no implica aprobación",
+    "No hay aprobación todavía",
+    "Ninguna opción está garantizada",
+    "No hay aprobación garantizada",
+    "no podemos garantizar la aprobación",
+    "no es una aprobación garantizada",
+    "ni siquiera está garantizado",
+    "Es una opinión del comité de crédito y no una aprobación",
+)
+
+#: Negaciones que no anulan la promesa: en otra frase, tras coma o a distancia.
+NEGACIONES_QUE_NO_ANULAN: tuple[str, ...] = (
+    "No te preocupes: te lo aprueban",
+    "Sin papeles. Queda garantizado",
+    "No hay problema; está aprobado",
+    "No dudes que te lo aprueban",
+    "No solo te lo aprueban, sino que te lo desembolsan hoy",
+    "No, te lo aprueban",
+    "No, está aprobado",
+    "Sin duda está aprobado",
+    "No hay problema, te lo aprueban",
+)
+
+#: Subconjunto que la versión original de #179 sí anulaba y ahora ya no.
+#: «No, te lo aprueban» queda fuera: el token antiguo era «no » y no cruzaba la coma.
+NEGACIONES_QUE_ANTES_ANULABAN: tuple[str, ...] = (
+    "No te preocupes: te lo aprueban",
+    "Sin papeles. Queda garantizado",
+    "No hay problema; está aprobado",
+    "No dudes que te lo aprueban",
+    "No solo te lo aprueban, sino que te lo desembolsan hoy",
+    "Sin duda está aprobado",
+    "No hay problema, te lo aprueban",
+)
+
+#: Tokens de negación de `_promesas` antes de los arreglos: no miraban la frase.
+_NEGACIONES_VERSION_ANTERIOR = ("no ", "nunca ", "ni ", "sin ", "ninguna ", "jamás ", "jamas ")
+
+
+def _promesas_version_anterior(texto: str) -> Iterator[str]:
+    """Copia de `_promesas` anterior a los arreglos de negación.
+
+    La versión anterior anulaba la promesa si cualquier negación aparecía en
+    los 25 caracteres previos, aunque estuviera en otra frase, tras una coma o
+    sin preceder de inmediato a la promesa. Se conserva como referencia de la
+    prueba de equivalencia de la tarea 4.1.
+
+    Args:
+        texto: argumentos y evidencias de un agente.
+
+    Yields:
+        Cada frase de promesa que la versión anterior consideraba sin negar.
+    """
+    for coincidencia in comite_mod._PROMESAS.finditer(texto):
+        previo = texto[max(0, coincidencia.start() - 25) : coincidencia.start()].casefold()
+        if any(negacion in previo for negacion in _NEGACIONES_VERSION_ANTERIOR):
+            continue
+        yield coincidencia.group(0)
+
 
 def _auditar_original(
     posturas: Sequence[PosturaAgente],
@@ -1347,9 +1456,10 @@ def _auditar_original(
 ) -> list[str]:
     """Copia de `auditar` tal como estaba antes de extraer `auditar_texto`.
 
-    Es la referencia de la prueba de equivalencia de la tarea 4.1. Si algún día
-    se cambia el comportamiento de `auditar` a propósito, esta copia se
-    actualiza en el mismo PR.
+    Es la referencia de la prueba de equivalencia de la tarea 4.1, con la
+    negación de `_promesas_version_anterior`: la del #179, que cruzaba de frase.
+    Si algún día se cambia el comportamiento de `auditar` a propósito, esta
+    copia y su prueba se actualizan en el mismo PR.
 
     Args:
         posturas: opiniones de los tres agentes.
@@ -1371,7 +1481,7 @@ def _auditar_original(
         for cifra in sorted(cifras_duras(texto)):
             if cifra not in permitidas:
                 hallazgos.append(f"Cifra no presente en la entrada: {cifra}")
-        for frase in comite_mod._promesas(texto):
+        for frase in _promesas_version_anterior(texto):
             hallazgos.append(f"Promesa de aprobación: «{frase}»")
         for codigo in comite_mod._CODIGO.findall(texto.casefold()):
             if codigo not in CODIGOS_ESCENARIO:
@@ -1419,7 +1529,14 @@ def _auditar_original(
 def test_auditar_da_los_mismos_hallazgos_que_antes(
     ident: str, variante: int, recomendacion: str | None, raiz_tasas: Path
 ) -> None:
-    """Extraer `auditar_texto` no cambia ningún hallazgo ni su orden (4.1)."""
+    """Extraer `auditar_texto` no cambia los hallazgos salvo la regla de negación (4.1).
+
+    Los cambios intencionales frente a la versión anterior son las negaciones
+    que no preceden de inmediato a la promesa: en otra frase, tras una coma, a
+    más de tres palabras o con «no dudes», «no solo» o «no te preocupes» (ver
+    `test_auditar_difiere_de_la_version_anterior_solo_en_negaciones_que_no_la_preceden`).
+    Estas variantes no traen esos casos, así que la equivalencia es exacta.
+    """
     entrada, resultado = _diagnostico(ident, raiz_tasas)
     escenarios = construir_escenarios(entrada, resultado, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
     posturas = [PosturaAgente.model_validate(p) for p in VARIANTES_POSTURAS[variante]]
@@ -1429,6 +1546,43 @@ def test_auditar_da_los_mismos_hallazgos_que_antes(
     anterior = _auditar_original(posturas, resultado, escenarios, recomendacion=final)
 
     assert nuevo == anterior
+
+
+@pytest.mark.parametrize("texto", NEGACIONES_QUE_ANTES_ANULABAN)
+def test_auditar_difiere_de_la_version_anterior_solo_en_negaciones_que_no_la_preceden(
+    texto: str, raiz_tasas: Path
+) -> None:
+    """El cambio es intencional: antes la promesa se perdía por un «no» no inmediato."""
+    entrada, resultado = _diagnostico("independiente_rojo", raiz_tasas)
+    escenarios = construir_escenarios(entrada, resultado, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
+    posturas = [
+        PosturaAgente.model_validate(_postura("riesgo", "desfavorable", [texto])),
+        PosturaAgente.model_validate(_postura("comercial", "desfavorable", ["No alcanza."])),
+        PosturaAgente.model_validate(_postura("auditor", "conforme", ["Sin hallazgos."])),
+    ]
+
+    nuevo = auditar(posturas, resultado, escenarios)
+    anterior = _auditar_original(posturas, resultado, escenarios)
+
+    assert not any("Promesa de aprobación" in hallazgo for hallazgo in anterior)
+    assert any("Promesa de aprobación" in hallazgo for hallazgo in nuevo)
+
+
+def test_la_negacion_tras_coma_ya_se_marcaba_en_la_version_original(raiz_tasas: Path) -> None:
+    """«No, te lo aprueban» ya era promesa en #179: «no » no cruzaba la coma."""
+    entrada, resultado = _diagnostico("independiente_rojo", raiz_tasas)
+    escenarios = construir_escenarios(entrada, resultado, hoy=FECHA_CONSULTA, raiz=raiz_tasas)
+    posturas = [
+        PosturaAgente.model_validate(_postura("riesgo", "desfavorable", ["No, te lo aprueban"])),
+        PosturaAgente.model_validate(_postura("comercial", "desfavorable", ["No alcanza."])),
+        PosturaAgente.model_validate(_postura("auditor", "conforme", ["Sin hallazgos."])),
+    ]
+
+    nuevo = auditar(posturas, resultado, escenarios)
+    anterior = _auditar_original(posturas, resultado, escenarios)
+
+    assert any("Promesa de aprobación" in hallazgo for hallazgo in anterior)
+    assert any("Promesa de aprobación" in hallazgo for hallazgo in nuevo)
 
 
 def test_las_variantes_de_equivalencia_ejercitan_cada_comprobacion(raiz_tasas: Path) -> None:
@@ -1470,6 +1624,36 @@ def test_auditar_texto_sin_referencias_solo_revisa_promesas_y_pii() -> None:
 def test_auditar_texto_no_marca_una_promesa_negada() -> None:
     """«No está aprobado» no es una promesa."""
     assert auditar_texto("Todavía no está aprobado: lo decide el banco.") == []
+
+
+@pytest.mark.parametrize("texto", NEGACIONES_QUE_ANULAN)
+def test_auditar_texto_no_marca_una_negacion_inmediata_en_la_misma_frase(texto: str) -> None:
+    """La negación inmediata, con enlaces permitidos, sigue anulando la promesa."""
+    assert auditar_texto(texto) == []
+
+
+@pytest.mark.parametrize("texto", NEGACIONES_QUE_NO_ANULAN)
+def test_auditar_texto_marca_una_promesa_si_la_negacion_no_la_precede(texto: str) -> None:
+    """En otra frase, tras coma o con «no dudes»/«no solo», la promesa sí se marca."""
+    hallazgos = auditar_texto(texto)
+
+    assert hallazgos
+    assert all(hallazgo.startswith("Promesa de aprobación") for hallazgo in hallazgos)
+
+
+def test_auditar_texto_limita_las_palabras_entre_la_negacion_y_la_promesa() -> None:
+    """Con tres enlaces la negación aún anula; con cuatro ya no es inmediata."""
+    assert auditar_texto("no está queda fue aprobado") == []
+    assert auditar_texto("no está queda fue es aprobado") == ["Promesa de aprobación: «aprobado»"]
+
+
+def test_auditar_texto_admite_un_sustantivo_tras_ninguna_o_ninguno() -> None:
+    """«Ninguna opción está garantizada» niega; dos sustantivos ya no son inmediatos."""
+    assert auditar_texto("Ninguna opción está garantizada") == []
+    assert auditar_texto("Ninguno está garantizado") == []
+    assert auditar_texto("Ninguna opción de crédito está garantizada") == [
+        "Promesa de aprobación: «garantizada»"
+    ]
 
 
 def test_auditar_texto_revisa_cifras_contra_las_permitidas() -> None:

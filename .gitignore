@@ -23,6 +23,8 @@ data/asistente/whatsapp.sqlite
 data/asistente/diagnostico.sqlite
 data/asistente/roba.sqlite
 data/asistente/latencias.sqlite
+# Escena demo: JSON proyectado y núcleo; se regeneran con 'make escena-proyectada'.
+data/escena/
 # Indice vectorial de la Boveda (Qdrant local + metadatos): se regenera con 'make indice'.
 data/boveda/
 # Explicito aunque la carpeta padre ya este ignorada.
@@ -65,3 +67,10 @@ data/modelos/
 
 # Escena gota a gota: JSON generados por `make escena-proyectada`
 data/escena/
+# Workspace local del agente pana (OpenClaw): memoria y bitácora nunca se
+# versionan; solo viajan las plantillas .example.
+openclaw/workspace/pana/MEMORY.md
+openclaw/workspace/pana/memory/*.md
+!openclaw/workspace/pana/memory/*.md.example
+# Estado del gateway: sesiones y credenciales locales, fuera de Git.
+openclaw/state/

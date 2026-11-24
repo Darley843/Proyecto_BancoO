@@ -115,3 +115,23 @@ sillas = 6
 # Texto del aviso del micrófono: el reconocimiento del navegador puede usar un
 # servicio externo. No se graba audio; solo se usa el texto reconocido.
 aviso_microfono = "El reconocimiento de voz del navegador puede usar un servicio externo. Puedes escribir o usar las tarjetas A–F."
+[preguntas]
+# Preguntas del público a Pana. La ficha de respuestas fijas se carga en
+# `[[preguntas.fijas]]` en la tarea 6.14; aquí quedan los límites y las frases
+# que no pueden inventarse. El tiempo total es un punto abierto del diseño: se
+# mide con las cuatro rutas y se ajusta aquí sin cambiar el contrato.
+umbral_fijo = 0.6
+puntaje_minimo = 0.9
+max_palabras = 40
+tiempo_total_segundos = 8
+tiempo_llamada_segundos = 4
+max_fragmentos = 3
+rechazo = "No tengo información sobre eso; puedo contarles del proyecto o de los productos del banco."
+respaldo = "No puedo responder eso ahora mismo; el proyecto está documentado en docs/ y los productos y tasas del banco, en el Tablero."
+pii = "Por seguridad no proceso datos personales en este espacio (Ley 1581 de 2012). Puedo contarles del proyecto o de los productos del banco."
+
+[preguntas.proyecto]
+# Corpus del paso 2, relativo a la raíz del repositorio. El recuperador solo
+# indexa README.md, AGENTS.md, CONSTITUTION.md y los .md de docs/; una ruta
+# fuera de esas raíces se ignora aunque esté listada.
+rutas = ["README.md", "AGENTS.md", "CONSTITUTION.md", "docs"]

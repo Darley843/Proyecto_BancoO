@@ -28,6 +28,7 @@ TAREAS: tuple[str, ...] = (
     "comite_auditor",
     "negociacion_joven",
     "negociacion_banco",
+    "pregunta_proyecto",
 )
 
 #: Version por defecto cuando no se pasa ``--version``.
