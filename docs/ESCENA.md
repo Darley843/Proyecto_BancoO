@@ -39,6 +39,9 @@ Cómo decide Pana qué responder (gana la primera regla que aplica):
    (gota a gota, agentes, Bóveda y Qdrant, DeepSeek, voces, WhatsApp,
    privacidad, público, equipo, actividad); lo demás: «No tengo información
    sobre eso…». Quien presenta ve el aviso.
+   Si el servidor responde pero solo con su rechazo o su respaldo fijo
+   (`pana.pregunta.rechazo.v1`, `pana.pregunta.respaldo.v1`) y la ficha corta
+   sí tiene la respuesta, gana la ficha.
 
 La pregunta del público es un dato no confiable: no se guarda y nunca cambia lo
 que hace Pana.
