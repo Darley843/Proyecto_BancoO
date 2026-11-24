@@ -75,8 +75,8 @@ En el agente, el resto lo decide el modelo con las reglas de `AGENTS.md`.
 | 3.1 Gateway de OpenClaw | Nayla | ⏳ `openclaw/openclaw.json`, loopback y token, modelo alternativo |
 | 3.2 WhatsApp en producción | Darley | ⏳ SIM real en Meta, modo evento y prueba desde tres teléfonos |
 | 3.3 Workspace | Nayla | ⏳ `openclaw/workspace/pana/` y la bitácora |
-| 3.4 Skill o MCP | Nayla | ⏳ `make agente-mcp`, `openclaw mcp tools` con las 20 |
-| 4.1 Código y pruebas | Todos | `make check` en verde: 2522 pruebas en la rama del #200 (sin red, sin DeepSeek y sin Ollama) |
+| 3.4 Skill o MCP | Nayla | ⏳ servidor `sucursal-agente` en `127.0.0.1:8765` (tarea 1.6) y `openclaw mcp tools` con las 20 |
+| 4.1 Código y pruebas | Todos | `make check` en verde: 2534 pruebas en main (sin red, sin DeepSeek y sin Ollama) |
 | 4.2 Seguridad (gateway) | Nayla | ⏳ `openclaw security audit` sin hallazgos altos, sandbox, `tools.deny`, `fs.workspaceOnly` |
 | 4.3 Documentación | Yoldy | README, `docs/DESPLIEGUE.md` (#191), `docs/DIAGRAMAS.md` (#192), LICENSE MIT (#194) |
 | 5.1 y 5.2 Pitch y discusión técnica | Todos | ⏳ Guion del pitch de 7 minutos y reparto de la discusión |
