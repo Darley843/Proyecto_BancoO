@@ -22,6 +22,7 @@ from banco_occidente_corpus.sucursal.grafo import (
     MAX_TOKENS_REFORMULAR,
     TEXTO_DIAGNOSTICO,
     DependenciasGrafo,
+    _es_consulta_de_tasas_generica,
     crear_grafo,
     es_seguimiento,
     fragmento_de_tablero,
@@ -754,3 +755,82 @@ def test_diagnostico_va_a_su_nodo_sin_modelo(tmp_path: Path) -> None:
     assert estado["avisos"] == ["diagnostico"]
     assert estado["uso"]["uso_modelo"] is False
     assert modelo.llamadas == []
+
+
+def test_tasas_sin_producto_pide_el_producto(tmp_path: Path) -> None:
+    """«Tasas» a secas no cita una fila del tarifario: pregunta cuál producto."""
+    modelo = ModeloEspia([])
+    grafo, dependencias = deps(
+        tmp_path,
+        modelo=modelo,
+        filas=[fila("Tasa de mora", valor="360")],
+    )
+
+    estado = responder_turno(grafo, dependencias, "Tasas", "t1")
+
+    assert estado["turno"]["letra"] == "T"
+    assert "libre inversión" in estado["respuesta"]
+    assert "360" not in estado["respuesta"]
+    assert estado["fuentes"] == []
+    assert estado["uso"] == {"uso_modelo": False, "costo_usd": 0.0}
+    assert modelo.llamadas == []
+
+
+def test_tasa_de_mora_si_responde_la_fila(tmp_path: Path) -> None:
+    """Un concepto concreto sigue respondiendo con la fila del Tablero."""
+    modelo = ModeloEspia([])
+    grafo, dependencias = deps(
+        tmp_path,
+        modelo=modelo,
+        filas=[fila("Tasa de mora", valor="360")],
+    )
+
+    estado = responder_turno(grafo, dependencias, "¿Cuál es la tasa de mora?", "t1")
+
+    assert "360" in estado["respuesta"]
+    assert "libre inversión" not in estado["respuesta"]
+    assert modelo.llamadas == []
+
+
+def test_tasa_de_libre_inversion_no_es_generica(tmp_path: Path) -> None:
+    """Nombrar el producto evita la pregunta de vuelta."""
+    modelo = ModeloEspia([])
+    grafo, dependencias = deps(
+        tmp_path,
+        modelo=modelo,
+        filas=[fila("Libre inversión 20,56 % E.A.", valor="20,56 %")],
+    )
+
+    estado = responder_turno(grafo, dependencias, "tasa de libre inversión", "t1")
+
+    assert "20,56" in estado["respuesta"]
+    assert "Dime cuál te interesa" not in estado["respuesta"]
+
+
+@pytest.mark.parametrize(
+    "pregunta",
+    [
+        "¿Cuáles son las tasas de interés vigentes del banco?",
+        "y las tarifas?",
+        "necesito saber las tasas",
+    ],
+)
+def test_pedido_de_tasas_sin_producto_es_generico(pregunta: str) -> None:
+    """Una frase larga sin producto sigue siendo genérica."""
+    assert _es_consulta_de_tasas_generica(pregunta)
+
+
+@pytest.mark.parametrize(
+    "pregunta",
+    [
+        "tasa de mora",
+        "tasa de usura",
+        "cuota de manejo",
+        "tarifas de la cuenta de ahorros",
+        "tasa de un CDT a 90 días",
+        "comisión por transferencia",
+    ],
+)
+def test_concepto_concreto_no_es_generico(pregunta: str) -> None:
+    """Un producto o concepto concreto no pide aclaración."""
+    assert not _es_consulta_de_tasas_generica(pregunta)
