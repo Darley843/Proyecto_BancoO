@@ -288,6 +288,62 @@ h2 {
   .escena__subtitulos { grid-row: 3; }
 }
 
+/* ---------- Captura del voluntario (tarjetas A–F, monto y confirmación) ---------- */
+.escena__captura {
+  position: fixed;
+  inset: 5vh 6vw auto;
+  z-index: 20;
+  max-height: 88vh;
+  overflow: auto;
+  padding: 20px 24px;
+  background: var(--tablero);
+  border: 1px solid var(--linea);
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
+}
+.escena__captura[hidden] { display: none; }
+.escena__captura h2 { margin-bottom: 8px; }
+.escena__aviso { margin: 0 0 12px; color: var(--joven); font-size: 14px; }
+.escena__captura-fila { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 10px 0; }
+.escena__captura-fila output { color: var(--pana); font-weight: 600; }
+.escena__captura-pregunta { font-size: 20px; font-weight: 600; margin: 12px 0 8px; }
+.escena__tarjetas { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 8px; }
+.escena__tarjeta {
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px solid var(--linea);
+  background: var(--hundido);
+  color: var(--texto);
+  font: 15px/1.35 var(--fuente);
+  cursor: pointer;
+}
+.escena__tarjeta:hover { border-color: var(--pana); }
+.escena__tarjeta--elegida { border-color: var(--pana); box-shadow: inset 0 0 0 1px var(--pana); background: #14283a; }
+.escena__captura-campo { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-top: 12px; }
+.escena__captura-campo label { color: var(--tenue); font-size: 14px; }
+.escena__captura-campo input {
+  flex: 1 1 220px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--linea);
+  background: var(--hundido);
+  color: var(--texto);
+  font: 16px var(--fuente);
+}
+.escena__captura button {
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--linea);
+  background: var(--hundido);
+  color: var(--texto);
+  font: 15px var(--fuente);
+  cursor: pointer;
+}
+.escena__captura button[aria-pressed="true"] { border-color: var(--joven); color: var(--joven); }
+.escena__captura [data-error="si"] { color: var(--rojo); }
+.escena__captura #captura-resumen { font-size: 16px; line-height: 1.5; }
+
 @media (prefers-reduced-motion: reduce) {
   .escena__ondas i { animation: none; height: 10px; }
   .escena__boca { animation: none !important; }

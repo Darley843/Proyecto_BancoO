@@ -35,6 +35,7 @@ import {
   cargarIntroduccion,
   responderPregunta,
 } from "./anfitrion.js";
+import { montarCaptura } from "./captura.js";
 import {
   PASOS,
   PASO_PREGUNTAS,
@@ -790,6 +791,8 @@ function teclado(evento) {
     casilla.checked = !casilla.checked;
   } else if (tecla === "q") {
     estado.preguntas ? cerrarPreguntas() : abrirPreguntas();
+  } else if (tecla === "v") {
+    document.dispatchEvent(new CustomEvent("escena:captura"));
   } else if (tecla === "n") {
     cambiarANucleo();
   } else if (tecla === "t") {
@@ -797,6 +800,33 @@ function teclado(evento) {
   } else if (tecla === "r") {
     reiniciar();
   }
+}
+
+/**
+ * Carga la escena que acaba de confirmar el voluntario y la reproduce.
+ *
+ * La captura (`captura.js`) pide `POST /api/escena` y avisa con
+ * `escena:lista`; aquí se reemplazan los turnos, se guarda la escena en la
+ * pestaña y se empieza desde la presentación.
+ *
+ * @param {object} datos Escena de fase 1 que devolvió el servidor.
+ * @returns {void}
+ */
+function cargarEscenaViva(datos) {
+  if (!datos || !Array.isArray(datos.turnos) || datos.turnos.length === 0) {
+    return;
+  }
+  const escena = normalizarEscena(datos);
+  estado.original = escena.turnos;
+  estado.veredictoOriginal = escena.veredicto;
+  estado.veredicto = escena.veredicto;
+  estado.sellos = escena.sellos;
+  estado.modo = "completa";
+  estado.turnos = [...estado.introduccion, ...escena.turnos];
+  guardarEscena(CLAVE_COMPLETA, escena);
+  porId("escena-sello").hidden = true;
+  prepararInicio();
+  reproducir();
 }
 
 /**
@@ -843,6 +873,8 @@ async function iniciar() {
   const microfono = porId("escena-microfono");
   microfono.hidden = !hayMicrofono();
   microfono.addEventListener("click", alternarMicrofono);
+  montarCaptura();
+  document.addEventListener("escena:lista", (evento) => cargarEscenaViva(evento.detail));
   document.addEventListener("keydown", teclado);
 }
 

@@ -264,3 +264,17 @@ def test_crear_app_purga_los_datos_vencidos_del_canal(
     assert purgas == ["casos", "entrevista"]
     assert creadas["maquina"][0]["retencion_dias"] == canal.retencion_dias
     assert creadas["entrevista"][0]["ttl_minutos"] == canal.entrevista_ttl_minutos
+
+
+def test_la_api_de_la_escena_esta_montada(cliente: TestClient) -> None:
+    """El router de la escena responde antes de los estaticos."""
+    respuesta = cliente.get("/api/escena/opciones")
+    assert respuesta.status_code == 200
+    assert len(respuesta.json()["preguntas"]) == 4
+
+
+def test_la_pantalla_de_la_escena_se_sirve_aparte(cliente: TestClient) -> None:
+    """La escena abre como pagina aparte, sin pasar por la SPA."""
+    respuesta = cliente.get("/escena.html")
+    assert respuesta.status_code == 200
+    assert "Pana vs. el gota a gota" in respuesta.text
