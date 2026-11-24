@@ -81,6 +81,13 @@
       },
       "whatsapp": {
         "enabled": true
+      },
+      "memory-core": {
+        "config": {
+          "dreaming": {
+            "enabled": false
+          }
+        }
       }
     }
   },
@@ -125,9 +132,6 @@
         },
         "tools": {
           "profile": "minimal",
-          "alsoAllow": [
-            "bundle-mcp"
-          ],
           "deny": [
             "group:runtime",
             "group:fs",
@@ -164,6 +168,9 @@
             "update_goal",
             "tts",
             "talk_voice"
+          ],
+          "alsoAllow": [
+            "bundle-mcp"
           ]
         },
         "skills": [],
@@ -173,6 +180,17 @@
   },
   "channels": {
     "whatsapp": {
+      "enabled": false
+    }
+  },
+  "talk": {
+    "agentId": "main"
+  },
+  "tools": {
+    "fs": {
+      "workspaceOnly": true
+    },
+    "elevated": {
       "enabled": false
     }
   },
@@ -209,17 +227,6 @@
           ]
         }
       }
-    }
-  },
-  "talk": {
-    "agentId": "main"
-  },
-  "tools": {
-    "fs": {
-      "workspaceOnly": true
-    },
-    "elevated": {
-      "enabled": false
     }
   }
 }
