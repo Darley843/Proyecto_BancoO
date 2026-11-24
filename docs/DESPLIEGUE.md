@@ -223,6 +223,14 @@ make app
 Si el servidor no responde, la pantalla usa la última escena guardada en la
 pestaña y, si no hay, los turnos de ejemplo, con un sello que lo dice.
 
+**Qué funciona hoy y qué falta:**
+
+| Pieza | Estado |
+|---|---|
+| Escena proyectada (`GET /api/escena/proyectado` y `make escena-proyectada`) | Lista desde #188. Sin ella, la pantalla muestra los turnos de ejemplo con su sello |
+| Preguntas del público (tecla Q) | Responden con la ficha local de Pana. ⏳ Falta el endpoint `POST /api/escena/pregunta` |
+| Turnos en vivo publicados por el agente de OpenClaw | ⏳ Llegan con la integración del miércoles 25 (OpenClaw publica cada turno y la pantalla lo muestra) |
+
 ## 8. Encender todo en orden
 
 El sábado 28 a las 7:30 a. m. Cada ventana de PowerShell desde la raíz del
