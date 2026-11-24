@@ -1,0 +1,452 @@
+{
+  "confiabilidad": 0.9541,
+  "fallos": 9,
+  "fallos_en_otra_seccion": 5,
+  "fragmentos": 869,
+  "grupos": [
+    {
+      "fragmentos": 279,
+      "grupo": "oferta",
+      "pureza": 0.7631
+    },
+    {
+      "fragmentos": 214,
+      "grupo": "otros",
+      "pureza": 0.535
+    },
+    {
+      "fragmentos": 180,
+      "grupo": "identidad",
+      "pureza": 0.805
+    },
+    {
+      "fragmentos": 63,
+      "grupo": "atencion",
+      "pureza": 0.3857
+    },
+    {
+      "fragmentos": 60,
+      "grupo": "legal",
+      "pureza": 0.8033
+    },
+    {
+      "fragmentos": 60,
+      "grupo": "presencia",
+      "pureza": 0.3917
+    },
+    {
+      "fragmentos": 13,
+      "grupo": "datos",
+      "pureza": 0.2231
+    }
+  ],
+  "parametros": {
+    "configuracion_arqueo": "0.6/0.4",
+    "inicio": "pca",
+    "metodo": "t-SNE",
+    "metrica": "coseno",
+    "perplejidad": 30.0,
+    "semilla": 1965,
+    "top": 5,
+    "vecinos": 10
+  },
+  "preguntas": [
+    {
+      "acierto": false,
+      "grupo_esperado": "identidad",
+      "grupo_vecino": "identidad",
+      "id": 2,
+      "posicion": null,
+      "puesto_esperado": 16,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+    },
+    {
+      "acierto": false,
+      "grupo_esperado": "atencion",
+      "grupo_vecino": "otros",
+      "id": 3,
+      "posicion": null,
+      "puesto_esperado": 9,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/documents/d/guest/guia-de-uso-black-2026"
+    },
+    {
+      "acierto": false,
+      "grupo_esperado": "atencion",
+      "grupo_vecino": "identidad",
+      "id": 4,
+      "posicion": null,
+      "puesto_esperado": 12,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/quienes-somos/defensor-consumidor-financiero"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "identidad",
+      "grupo_vecino": "identidad",
+      "id": 5,
+      "posicion": 1,
+      "puesto_esperado": 1,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/quienes-somos/defensor-consumidor-financiero"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "identidad",
+      "grupo_vecino": "identidad",
+      "id": 6,
+      "posicion": 1,
+      "puesto_esperado": 1,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "identidad",
+      "grupo_vecino": "identidad",
+      "id": 7,
+      "posicion": 1,
+      "puesto_esperado": 1,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "identidad",
+      "grupo_vecino": "identidad",
+      "id": 8,
+      "posicion": 1,
+      "puesto_esperado": 1,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/quienes-somos/filiales"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "presencia",
+      "grupo_vecino": "presencia",
+      "id": 9,
+      "posicion": 1,
+      "puesto_esperado": 1,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas"
+    },
+    {
+      "acierto": false,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "otros",
+      "id": 10,
+      "posicion": null,
+      "puesto_esperado": 56,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/educacion-financiera"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "atencion",
+      "grupo_vecino": "atencion",
+      "id": 11,
+      "posicion": 1,
+      "puesto_esperado": 1,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/ayuda/preguntas-frecuentes"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "otros",
+      "grupo_vecino": "oferta",
+      "id": 12,
+      "posicion": 1,
+      "puesto_esperado": 4,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/cuenta-de-nomina"
+    },
+    {
+      "acierto": false,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "otros",
+      "id": 13,
+      "posicion": null,
+      "puesto_esperado": 12,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/documents/d/guest/guia-de-uso-black-2026"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "oferta",
+      "id": 15,
+      "posicion": 5,
+      "puesto_esperado": 5,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/creditos/mejora-vivienda"
+    },
+    {
+      "acierto": false,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "oferta",
+      "id": 16,
+      "posicion": null,
+      "puesto_esperado": 6,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "atencion",
+      "grupo_vecino": "oferta",
+      "id": 17,
+      "posicion": 2,
+      "puesto_esperado": 2,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/google-pay-tarjeta-debito"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "atencion",
+      "grupo_vecino": "atencion",
+      "id": 18,
+      "posicion": 2,
+      "puesto_esperado": 1,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/canales-digitales/banca-movil"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "datos",
+      "grupo_vecino": "identidad",
+      "id": 19,
+      "posicion": 2,
+      "puesto_esperado": 2,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/quienes-somos/nuestro-banco"
+    },
+    {
+      "acierto": false,
+      "grupo_esperado": "presencia",
+      "grupo_vecino": "presencia",
+      "id": 20,
+      "posicion": null,
+      "puesto_esperado": 102,
+      "ruta": "B",
+      "tipo": "alcance",
+      "url_vecina": "https://www.bancodeoccidente.com.co/quienes-somos/informacion-inversionistas"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "oferta",
+      "id": 21,
+      "posicion": 1,
+      "puesto_esperado": 1,
+      "ruta": "T",
+      "tipo": "tabla",
+      "url_vecina": "https://www.bancodeoccidente.com.co/asistencias-en-viajes-nacionales"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "oferta",
+      "id": 22,
+      "posicion": 5,
+      "puesto_esperado": 5,
+      "ruta": "T",
+      "tipo": "tabla",
+      "url_vecina": "https://www.bancodeoccidente.com.co/seguros/viaje-assist-card"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "oferta",
+      "id": 23,
+      "posicion": 1,
+      "puesto_esperado": 1,
+      "ruta": "T",
+      "tipo": "tabla",
+      "url_vecina": "https://www.bancodeoccidente.com.co/tarjetas-credito/asistencias-tarjetas-de-credito"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "oferta",
+      "id": 24,
+      "posicion": 1,
+      "puesto_esperado": 1,
+      "ruta": "T",
+      "tipo": "tabla",
+      "url_vecina": "https://www.bancodeoccidente.com.co/seguros/libranza/cuota-protegida"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "oferta",
+      "id": 25,
+      "posicion": 1,
+      "puesto_esperado": 1,
+      "ruta": "T",
+      "tipo": "tabla",
+      "url_vecina": "https://www.bancodeoccidente.com.co/seguros/libranza/cuota-protegida"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "oferta",
+      "id": 26,
+      "posicion": 1,
+      "puesto_esperado": 1,
+      "ruta": "T",
+      "tipo": "tabla",
+      "url_vecina": "https://www.bancodeoccidente.com.co/asistencia-vehicular"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "oferta",
+      "id": 27,
+      "posicion": 1,
+      "puesto_esperado": 1,
+      "ruta": "T",
+      "tipo": "tabla",
+      "url_vecina": "https://www.bancodeoccidente.com.co/tarjetas-credito/promociones"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "oferta",
+      "id": 28,
+      "posicion": 1,
+      "puesto_esperado": 1,
+      "ruta": "T",
+      "tipo": "tabla",
+      "url_vecina": "https://www.bancodeoccidente.com.co/proyectos-de-vivienda"
+    },
+    {
+      "acierto": false,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "otros",
+      "id": 29,
+      "posicion": null,
+      "puesto_esperado": 11,
+      "ruta": "B",
+      "tipo": "seguimiento",
+      "url_vecina": "https://www.bancodeoccidente.com.co/documents/d/guest/guia-de-uso-black-2026"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "oferta",
+      "id": 30,
+      "posicion": 3,
+      "puesto_esperado": 3,
+      "ruta": "B",
+      "tipo": "seguimiento",
+      "url_vecina": "https://www.bancodeoccidente.com.co/creditos/remodelacion-ampliacion"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "oferta",
+      "id": 31,
+      "posicion": 3,
+      "puesto_esperado": 1,
+      "ruta": "B",
+      "tipo": "seguimiento",
+      "url_vecina": "https://www.bancodeoccidente.com.co/creditos/motos"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "oferta",
+      "id": 32,
+      "posicion": 4,
+      "puesto_esperado": 4,
+      "ruta": "T",
+      "tipo": "seguimiento",
+      "url_vecina": "https://www.bancodeoccidente.com.co/seguros/vehiculos-cuota-protegida"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "identidad",
+      "grupo_vecino": "identidad",
+      "id": 33,
+      "posicion": 1,
+      "puesto_esperado": 1,
+      "ruta": "B",
+      "tipo": "seguimiento",
+      "url_vecina": "https://www.bancodeoccidente.com.co/quienes-somos/defensor-consumidor-financiero"
+    },
+    {
+      "acierto": false,
+      "grupo_esperado": "oferta",
+      "grupo_vecino": "oferta",
+      "id": 34,
+      "posicion": null,
+      "puesto_esperado": 7,
+      "ruta": "T",
+      "tipo": "seguimiento",
+      "url_vecina": "https://www.bancodeoccidente.com.co/asistencia-de-viajes-internacionales"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "otros",
+      "grupo_vecino": "otros",
+      "id": 41,
+      "posicion": 5,
+      "puesto_esperado": 5,
+      "ruta": "T",
+      "tipo": "tabla",
+      "url_vecina": "https://www.bancodeoccidente.com.co/documents/d/guest/guia-de-uso-black-2026"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "otros",
+      "grupo_vecino": "oferta",
+      "id": 42,
+      "posicion": 1,
+      "puesto_esperado": 3,
+      "ruta": "T",
+      "tipo": "tabla",
+      "url_vecina": "https://www.bancodeoccidente.com.co/tarjetas-credito/mastercard-visa-gold"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "otros",
+      "grupo_vecino": "otros",
+      "id": 43,
+      "posicion": 1,
+      "puesto_esperado": 1,
+      "ruta": "T",
+      "tipo": "tabla",
+      "url_vecina": "https://www.bancodeoccidente.com.co/documents/d/guest/tarifas-persona-1"
+    },
+    {
+      "acierto": true,
+      "grupo_esperado": "otros",
+      "grupo_vecino": "otros",
+      "id": 44,
+      "posicion": 1,
+      "puesto_esperado": 1,
+      "ruta": "T",
+      "tipo": "tabla",
+      "url_vecina": "https://www.bancodeoccidente.com.co/documents/d/guest/tarifas-persona-1"
+    }
+  ],
+  "pureza_global": 0.6573
+}

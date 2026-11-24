@@ -270,12 +270,20 @@ export async function cargarIntroduccion() {
 }
 
 /**
+ * Turnos del servidor que no responden la pregunta: el rechazo fijo y el
+ * respaldo (`escena/pregunta.py`). Con ellos se prueba antes la ficha local.
+ */
+export const SIN_RESPUESTA_DEL_SERVIDOR = Object.freeze(["pana.pregunta.rechazo.v1", "pana.pregunta.respaldo.v1"]);
+
+/**
  * Responde una pregunta del público.
  *
  * Orden: reglas fijas → servidor (`POST /api/escena/pregunta`) → ficha de
  * respaldo → «No tengo información sobre eso». El servidor debe devolver un
  * turno del contrato hablado por Pana (puede traer además `tema`); si no
- * responde, `respaldo` queda en `true`.
+ * responde, `respaldo` queda en `true`. Si el servidor contesta con su rechazo
+ * o su respaldo fijo (`SIN_RESPUESTA_DEL_SERVIDOR`) y la ficha local sí tiene
+ * la respuesta, gana la ficha: es mejor que «No tengo información».
  *
  * @param {string} pregunta Pregunta del público.
  * @returns {Promise<{tema: string, turno: object, respaldo: boolean}>} Respuesta.
@@ -296,7 +304,10 @@ export async function responderPregunta(pregunta) {
       const datos = await respuesta.json();
       const turno = datos?.turno ?? datos;
       if (erroresDelTurno(turno).length === 0 && turno.personaje === "pana") {
-        return { tema: String(datos?.tema ?? "proyecto"), turno, respaldo: false };
+        const ficha = SIN_RESPUESTA_DEL_SERVIDOR.includes(turno.id) ? respuestaDeLaFicha(pregunta) : null;
+        return ficha
+          ? { ...ficha, respaldo: false }
+          : { tema: String(datos?.tema ?? "proyecto"), turno, respaldo: false };
       }
     }
   } catch {
