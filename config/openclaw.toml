@@ -1,0 +1,17 @@
+# Gateway local de OpenClaw y servidor MCP del agente `pana`.
+# Sin secretos: el token vive solo en la variable de entorno
+# OPENCLAW_GATEWAY_TOKEN. Ver docs/AGENTE_OPENCLAW.md.
+
+[gateway]
+base_url = "http://127.0.0.1:18789"
+modelo = "openclaw:pana"
+prefijo_usuario = "wa:"
+timeout_segundos = 8.0
+reintentos = 0
+fallback_forzado = false
+
+[mcp]
+# El servidor del agente escucha solo en loopback: nunca en 0.0.0.0.
+host = "127.0.0.1"
+puerto = 8765
+ruta = "/mcp"

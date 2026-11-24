@@ -102,6 +102,7 @@ ni se copia a WSL: si la configuración real cambia, se vuelve a exportar.
 | `agents.defaults` | Valores por defecto de todos los agentes: modelo principal y alternativo. |
 | `agents.entries` | Los agentes declarados: `main` (la terminal) y `pana` (la escena). |
 | `channels.whatsapp` | Canal de WhatsApp del gateway: apagado. |
+| `mcp` | Servidor MCP local `sucursal` con las veinte herramientas y su lista cerrada `toolFilter`. |
 | `talk` | Qué agente atiende la voz. |
 | `tools` | Límites globales de herramientas: sistema de archivos y permisos elevados. |
 
@@ -167,6 +168,31 @@ Es el agente de la escena. Además de `workspace` (lo que sincroniza
 - `talk.agentId: "main"`: la voz la atiende el agente de la terminal.
 - `tools.fs.workspaceOnly: true`: el acceso a archivos no sale del workspace.
   `tools.elevated.enabled: false`: sin permisos elevados.
+
+### MCP del agente `pana`
+
+La copia versionada añade un servidor MCP local con las veinte herramientas del
+agente (ver [`docs/AGENTE_OPENCLAW.md`](../docs/AGENTE_OPENCLAW.md)):
+
+```json
+"mcp": {
+  "servers": {
+    "sucursal": {
+      "url": "http://127.0.0.1:8765/mcp",
+      "transport": "streamable-http",
+      "enabled": true,
+      "toolFilter": {"include": ["consultar_tasa", "…las veinte…"]}
+    }
+  }
+}
+```
+
+Además, `agents.entries.pana.tools.alsoAllow` incluye `bundle-mcp`: el perfil
+`minimal` no expone los servidores MCP por sí solo. El servidor se levanta con
+`make agente-mcp` en el host de Windows y escucha solo en `127.0.0.1:8765`; el
+gateway lo alcanza desde WSL con la red espejo. Si el bloque no está en el
+`openclaw.json` real de WSL, `openclaw mcp probe sucursal` no verá las
+herramientas: replica el bloque allí y vuelve a exportar la copia redactada.
 
 ### Cómo se exporta
 
