@@ -45,9 +45,10 @@ oficiales. El auditor bloquea cualquier frase que suene a aprobación.
 
 ### ¿Qué limitaciones tiene el proyecto?
 
-Es una demo académica: no aprueba créditos, el número de WhatsApp es de prueba,
-no recibe audios ni pagos y las tasas valen solo para su vigencia (noviembre de
-2026). Fuente: `docs/OPERACION_WHATSAPP.md` («Limitaciones conocidas»).
+Es una demo académica: no aprueba créditos, el número propio del canal solo
+atiende a todo el público durante la ventana del modo evento, con cuota por
+persona; no recibe audios ni pagos, y las tasas valen solo para noviembre de
+2026. Fuente: `docs/DESPLIEGUE_WHATSAPP.md` («modo evento»).
 
 ### ¿Qué harían con más tiempo?
 
@@ -98,7 +99,8 @@ nombres, números ni montos de invitados. Fuente: `openclaw/README.md`.
 
 DeepSeek V4.1 Flash (`deepseek-flash`), con DeepSeek V4 Pro como respaldo. Es
 rápido y barato: 44 preguntas de evaluación costaron 0,0157 USD. Las cifras no
-las inventa el modelo: salen de código. Fuente: `docs/RESULTADOS_FASE2.md`.
+las inventa el modelo: salen de código. Fuente: `openclaw/openclaw.json`
+(`agents.defaults`) y `docs/RESULTADOS_FASE2.md`.
 
 ### ¿Cuánto cuesta cada conversación?
 
@@ -193,7 +195,8 @@ seguridad. Yoldy: documentación, diagramas y pantalla de la escena.
 ### ¿Cuántas pruebas tiene el proyecto?
 
 Más de 2.500 pruebas automáticas, que corren con `make check` sin internet,
-sin DeepSeek y sin Ollama. Fuente: `CONSTITUTION.md`.
+sin DeepSeek y sin Ollama. Para la cifra exacta del día se corre `make check`
+(el 24 de noviembre de 2026 eran 2.561).
 
 ### ¿Qué licencia tiene el proyecto?
 
