@@ -359,7 +359,7 @@ las teclas están en [`ESCENA.md`](./ESCENA.md).
 | Escena completa | Todo funciona | Agente, DeepSeek y voces de Edge o de Piper |
 | Núcleo | La negociación falla o supera 15 s | Tecla **N**: Don Gota → Pana → auditor, sin repetir lo ya dicho |
 | Solo subtítulos | Falla la voz o el audio | Tecla **S**; se avanza con clic, espacio o Enter y el público lee las cifras |
-| Perfil seguro | El invitado no completa su perfil por WhatsApp | Se usa un perfil ficticio preparado (`config/escena.toml`); el auditor se ejecuta igual |
+| Perfil seguro | El voluntario no responde, no completa su perfil o falla el micrófono de la entrada por voz (tecla **V**) | Se usa un perfil ficticio preparado (`config/escena.toml`); el auditor se ejecuta igual |
 | Escena proyectada | Falla la API o el plan B no se recupera | `GET /api/escena/proyectado` lee `data/escena/proyectado.json`; si la app se cayó, `make app` otra vez y recargar |
 | Simulador o escena proyectada | Último recurso, todo en vivo | `make simular` o la escena proyectada; **sin video** |
 
