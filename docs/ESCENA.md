@@ -33,7 +33,13 @@ Cómo decide Pana qué responder (gana la primera regla que aplica):
 3. `POST /api/escena/pregunta` con `{"pregunta": "…"}` (tarea 6.13): el servidor
    enruta a la ficha de preguntas del profesor (`docs/PRESENTADOR.md`), al
    proyecto (BM25 sobre `README.md` y `docs/`) o al banco (Ventanilla), y
-   devuelve un turno de Pana del contrato.
+   devuelve `{"tema": "…", "turno": {…}}` con un turno de Pana del contrato
+   (`escena/respondedor.py`). La audiencia la fija el servidor (`publico`): un
+   campo de más en la petición es un 422. En la pantalla la Ventanilla no
+   responde: las preguntas de tasas y productos reciben el rechazo y se
+   contestan por WhatsApp. Sin `DEEPSEEK_API_KEY` o con `SUCURSAL_DEMO`, las
+   respuestas fijas funcionan igual y las del proyecto usan la frase de
+   respaldo.
 4. Si el servidor no responde: una **ficha corta de respaldo** en `anfitrion.js`
    (menos de 40 palabras por respuesta) contesta lo más probable del proyecto
    (gota a gota, agentes, Bóveda y Qdrant, DeepSeek, voces, WhatsApp,
