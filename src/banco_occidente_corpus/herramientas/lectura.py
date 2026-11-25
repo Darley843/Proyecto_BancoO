@@ -15,9 +15,10 @@ from decimal import Decimal
 from pydantic import BaseModel, ValidationError
 
 from ..asistente.validacion import cifras_duras
-from ..canal.contratos import ResultadoDiagnostico
+from ..canal.contratos import EntradaDiagnostico, ResultadoDiagnostico
 from ..diagnostico.comite import auditar_texto, construir_escenarios
 from ..diagnostico.escenarios import CambioEscenario, comparar_resultado
+from ..diagnostico.motor import calcular, entrada_desde_respuestas
 from ..escena.auditor import ETIQUETA_VEREDICTO, veredicto_desde_hallazgos
 from ..escena.comparacion import alertas_comparacion
 from ..escena.comparacion import comparar_gota_banco as _comparar_gota_banco
@@ -34,8 +35,9 @@ from ..mcp_servidor.servidor import simular_cuota as _simular_cuota
 from ..pana.desde_diagnostico import tarjeta_y_texto
 from ..sucursal.ajustes import leer_modo_demo
 from ..tablero.tasas import cargar_config_tasas, clave_producto
-from .comun import como_json, diagnostico_de, error, mensaje_de_validacion, ok
+from .comun import como_json, error, mensaje_de_validacion, ok
 from .esquemas import (
+    LIMITES_MONTO,
     AuditarRespuestaEntrada,
     BuscarEnDocumentosEntrada,
     CalcularPrestamoGotaEntrada,
@@ -48,6 +50,7 @@ from .esquemas import (
     ConvocarComiteEntrada,
     DiagnosticarCapacidadEntrada,
     GenerarFichaOpcionEntrada,
+    MontoExactoEntrada,
     NegociarOpcionEntrada,
     PreguntaProyecto,
     ResponderSobreProyectoEntrada,
@@ -72,12 +75,14 @@ TOPE_FRACCION: float = 100.0
 def _diagnostico(
     herramienta: str,
     respuestas: list[str],
+    monto: int | None = None,
 ) -> ResultadoDiagnostico | SalidaHerramienta:
     """Calcula el diagnóstico o devuelve el error con el catálogo de la entrevista.
 
     Args:
         herramienta: nombre del catálogo, para el sobre de error.
         respuestas: ids canónicos de la entrevista.
+        monto: monto exacto del invitado para reemplazar el valor del rango.
 
     Returns:
         El resultado del motor o el sobre de error con los valores válidos.
@@ -86,11 +91,71 @@ def _diagnostico(
     if fallo is not None:
         return fallo
     try:
-        return diagnostico_de(respuestas)
+        entrada = entrada_desde_respuestas(respuestas)
+        if monto is not None:
+            ajustada = _monto_exacto(herramienta, entrada, monto)
+            if isinstance(ajustada, SalidaHerramienta):
+                return ajustada
+            entrada = ajustada
+        return calcular(entrada)
     except ValidationError as exc:
         return error_de_respuestas(herramienta, mensaje_de_validacion(exc))
     except ValueError as exc:
         return error_de_respuestas(herramienta, str(exc))
+
+
+def _monto_exacto(
+    herramienta: str,
+    entrada: EntradaDiagnostico,
+    monto: int,
+) -> EntradaDiagnostico | SalidaHerramienta:
+    """Reemplaza el valor del rango por el monto exacto, si cabe en sus límites.
+
+    Args:
+        herramienta: nombre del catálogo, para el sobre de error.
+        entrada: entrada del diagnóstico con el valor de cálculo del rango.
+        monto: monto exacto que dijo el invitado, en pesos.
+
+    Returns:
+        La entrada con el monto exacto, o el error `entrada_invalida` con los
+        límites del rango elegido.
+    """
+    ident = next(
+        (valor for valor in entrada.rango_usado.values() if valor.startswith("monto.")),
+        None,
+    )
+    if ident is None:
+        return error(
+            herramienta,
+            "entrada_invalida",
+            "El producto no lleva monto de crédito; no se puede aplicar un monto exacto.",
+        )
+    limites = LIMITES_MONTO.get(ident)
+    if limites is None:
+        return error(
+            herramienta,
+            "entrada_invalida",
+            f"El rango {ident} no declara límites de monto.",
+        )
+    desde, hasta = limites
+    if not desde <= monto <= hasta:
+        salida = error(
+            herramienta,
+            "entrada_invalida",
+            (
+                f"El monto {monto} no cabe en el rango {ident}: desde "
+                f"{formatear_pesos(Decimal(desde))} hasta {formatear_pesos(Decimal(hasta))}."
+            ),
+        )
+        salida.datos.update(
+            {
+                "monto": monto,
+                "rango": ident,
+                "limites": {"desde": desde, "hasta": hasta},
+            }
+        )
+        return salida
+    return entrada.model_copy(update={"monto_credito": Decimal(monto)})
 
 
 def _tasa_efectiva(valor: float, unidad: str | None) -> tuple[float, str]:
@@ -372,7 +437,10 @@ def comparar_gota_banco(monto: int, respuestas: RespuestasEntrevista) -> SalidaH
     )
 
 
-def negociar_opcion(respuestas: RespuestasEntrevista) -> SalidaHerramienta:
+def negociar_opcion(
+    respuestas: RespuestasEntrevista,
+    monto: MontoExactoEntrada = None,
+) -> SalidaHerramienta:
     """Negocia la opción del joven y del banco sobre la mesa precalculada.
 
     La negociación usa siempre las respuestas del invitado. El modo demo no lo
@@ -382,6 +450,11 @@ def negociar_opcion(respuestas: RespuestasEntrevista) -> SalidaHerramienta:
     Args:
         respuestas: ids canónicos de la entrevista que arman la mesa, como en
             `diagnosticar_capacidad`.
+        monto: monto exacto que dijo el invitado. Si se pasa, debe ser el mismo
+            que se usó en `calcular_prestamo_gota`; reemplaza el valor de
+            cálculo del rango solo si cae dentro de sus límites y, si no, la
+            herramienta devuelve `entrada_invalida` con los límites. Sin este
+            campo se usa el valor del rango.
 
     Returns:
         Los turnos, el acuerdo o `None`, el veredicto y el registro de validaciones.
@@ -389,8 +462,8 @@ def negociar_opcion(respuestas: RespuestasEntrevista) -> SalidaHerramienta:
     fallo = respuestas_o_error("negociar_opcion", respuestas)
     if fallo is not None:
         return fallo
-    entrada = NegociarOpcionEntrada(respuestas=respuestas)
-    diagnostico = _diagnostico("negociar_opcion", entrada.respuestas)
+    entrada = NegociarOpcionEntrada(respuestas=respuestas, monto=monto)
+    diagnostico = _diagnostico("negociar_opcion", entrada.respuestas, monto=entrada.monto)
     if isinstance(diagnostico, SalidaHerramienta):
         return diagnostico
     resultado = negociar(diagnostico.entrada, entorno=_entorno_negociacion())
@@ -422,12 +495,20 @@ def _entorno_negociacion() -> Mapping[str, str]:
     return os.environ
 
 
-def generar_ficha_opcion(respuestas: RespuestasEntrevista) -> SalidaHerramienta:
+def generar_ficha_opcion(
+    respuestas: RespuestasEntrevista,
+    monto: MontoExactoEntrada = None,
+) -> SalidaHerramienta:
     """Genera la ficha textual de la opción recomendada, sin datos personales.
 
     Args:
         respuestas: ids canónicos de la entrevista, como en
             `diagnosticar_capacidad`.
+        monto: monto exacto que dijo el invitado. Si se pasa, debe ser el mismo
+            que se usó en `calcular_prestamo_gota`; reemplaza el valor de
+            cálculo del rango solo si cae dentro de sus límites y, si no, la
+            herramienta devuelve `entrada_invalida` con los límites. Sin este
+            campo se usa el valor del rango.
 
     Returns:
         El texto equivalente de la tarjeta de Pana y las cifras de la opción.
@@ -435,8 +516,8 @@ def generar_ficha_opcion(respuestas: RespuestasEntrevista) -> SalidaHerramienta:
     fallo = respuestas_o_error("generar_ficha_opcion", respuestas)
     if fallo is not None:
         return fallo
-    entrada = GenerarFichaOpcionEntrada(respuestas=respuestas)
-    resultado = _diagnostico("generar_ficha_opcion", entrada.respuestas)
+    entrada = GenerarFichaOpcionEntrada(respuestas=respuestas, monto=monto)
+    resultado = _diagnostico("generar_ficha_opcion", entrada.respuestas, monto=entrada.monto)
     if isinstance(resultado, SalidaHerramienta):
         return resultado
     imagen, texto = tarjeta_y_texto(resultado)

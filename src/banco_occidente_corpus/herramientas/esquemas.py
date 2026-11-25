@@ -9,12 +9,14 @@ con una sola forma y el agente nunca recibe una traza de Python.
 
 from __future__ import annotations
 
+import tomllib
 from collections.abc import Sequence
 from typing import Annotated, Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, StringConstraints
 
 from ..diagnostico.calculo import PRODUCTOS_DIAGNOSTICO, VINCULACIONES
+from ..diagnostico.motor import RUTA_CONFIG as RUTA_DIAGNOSTICO
 from ..diagnostico.motor import cargar_config
 
 #: Huella HMAC de 64 caracteres hexadecimales; nunca un número de teléfono.
@@ -89,6 +91,38 @@ IDS_ENTREVISTA: frozenset[str] = frozenset(
 IDS_ORDENADOS: tuple[str, ...] = tuple(
     ident for ids in CATALOGO_ENTREVISTA.values() for ident in ids
 )
+
+
+def limites_de_monto() -> dict[str, tuple[int, int]]:
+    """Lee los extremos en pesos de cada opción de monto de la entrevista.
+
+    Los extremos salen de `config/diagnostico.toml`: `desde` y `hasta` de cada
+    opción, y la frontera de `[limites]` cuando el rango es abierto («hasta
+    $5 millones», «más de $50 millones»). Son los límites que respeta el monto
+    exacto que puede traer `negociar_opcion` y `generar_ficha_opcion`.
+
+    Returns:
+        Los límites `(desde, hasta)` de cada id `monto.*`, en pesos.
+    """
+    with RUTA_DIAGNOSTICO.open("rb") as fh:
+        datos = tomllib.load(fh)
+    limites = datos.get("limites", {})
+    minimo = int(limites.get("monto_minimo", 500_000))
+    maximo = int(limites.get("monto_maximo", 2_000_000_000))
+    extremos: dict[str, tuple[int, int]] = {}
+    for rango in datos.get("rango", []):
+        for opcion in rango.get("opcion", []):
+            ident = str(opcion.get("id", ""))
+            if not ident.startswith("monto."):
+                continue
+            desde = int(opcion.get("desde", minimo))
+            hasta = int(opcion.get("hasta", maximo))
+            extremos[ident] = (desde, hasta)
+    return extremos
+
+
+#: Límites `(desde, hasta)` de cada opción de monto, en pesos.
+LIMITES_MONTO: dict[str, tuple[int, int]] = limites_de_monto()
 
 
 def respuestas_invalidas(respuestas: Sequence[str]) -> list[str]:
@@ -245,6 +279,19 @@ PreguntaProyecto = Annotated[
     StringConstraints(min_length=3, max_length=300),
     Field(description=DESCRIPCION_PREGUNTA_PROYECTO),
 ]
+#: Descripción del monto exacto que dijo el invitado.
+DESCRIPCION_MONTO_EXACTO: str = (
+    "Monto exacto en pesos que dijo el invitado. Si lo dio, pasa aquí el mismo "
+    "valor que usaste en `calcular_prestamo_gota`: reemplaza el valor de cálculo "
+    "del rango solo si cae dentro de sus límites; si no, devuelve "
+    "`entrada_invalida` con los límites. Sin este campo se usa el valor del rango "
+    "(por ejemplo 4.000.000 para monto.HASTA_5M)."
+)
+#: Monto exacto opcional del invitado, validado contra el rango elegido.
+MontoExactoEntrada = Annotated[
+    int | None,
+    Field(ge=1, le=1_000_000_000_000, description=DESCRIPCION_MONTO_EXACTO),
+]
 
 
 class ErrorHerramienta(BaseModel):
@@ -392,12 +439,14 @@ class NegociarOpcionEntrada(BaseModel):
     """Entrada de `negociar_opcion`.
 
     El modo demo no es una entrada: lo decide el servidor al leer
-    ``SUCURSAL_DEMO``. La negociación usa siempre las respuestas del invitado.
+    ``SUCURSAL_DEMO``. La negociación usa siempre las respuestas del invitado y,
+    si dio un monto exacto, la mesa se arma sobre ese monto.
     """
 
     model_config = ConfigDict(extra="forbid")
 
     respuestas: RespuestasEntrevista
+    monto: MontoExactoEntrada = None
 
 
 class GenerarFichaOpcionEntrada(BaseModel):
@@ -406,6 +455,7 @@ class GenerarFichaOpcionEntrada(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     respuestas: RespuestasEntrevista
+    monto: MontoExactoEntrada = None
 
 
 class ResponderSobreProyectoEntrada(BaseModel):

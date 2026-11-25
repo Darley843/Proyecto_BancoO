@@ -33,6 +33,12 @@ RESPUESTAS = [
     "plazo.36",
 ]
 
+RESPUESTAS_HASTA_5M = [
+    *RESPUESTAS[:5],
+    "monto.HASTA_5M",
+    "plazo.36",
+]
+
 CON_RESPUESTAS = (
     "diagnosticar_capacidad",
     "comparar_escenario",
@@ -155,6 +161,65 @@ def test_verificar_usura_acepta_tasas_sobre_cien_por_ciento() -> None:
     assert "fracción" in esquema["tasa_ea"]["description"]
     assert "exclusiveMaximum" not in esquema["tasa_ea"]
     assert esquema["unidad"]["anyOf"][0]["enum"] == ["fraccion", "porcentaje"]
+
+
+def test_negociar_opcion_usa_el_monto_exacto_del_invitado(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con `monto`, la mesa se arma sobre el monto exacto y no sobre el rango."""
+    monkeypatch.setenv("SUCURSAL_DEMO", "1")
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+
+    por_rango = lectura.negociar_opcion(RESPUESTAS_HASTA_5M)
+    exacto = lectura.negociar_opcion(RESPUESTAS_HASTA_5M, monto=2_000_000)
+    assert por_rango.ok and exacto.ok
+
+    def base(salida: Any) -> Decimal:
+        escenario = next(e for e in salida.datos["escenarios"] if e["codigo"] == "base")
+        return Decimal(str(escenario["monto"]))
+
+    assert base(por_rango) == Decimal("4000000")
+    assert base(exacto) == Decimal("2000000")
+
+    herramienta = catalogo.por_nombre("negociar_opcion")
+    assert herramienta is not None
+    monto = herramienta.entrada.model_json_schema()["properties"]["monto"]
+    assert "calcular_prestamo_gota" in monto["description"]
+    assert "límites" in monto["description"]
+
+
+def test_monto_fuera_del_rango_devuelve_entrada_invalida_con_los_limites(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Un monto que no cabe en el rango elegido no se usa y explica los límites."""
+    monkeypatch.setenv("SUCURSAL_DEMO", "1")
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+
+    negociacion = lectura.negociar_opcion(RESPUESTAS_HASTA_5M, monto=6_000_000)
+    assert not negociacion.ok
+    assert negociacion.error is not None
+    assert negociacion.error.codigo == "entrada_invalida"
+    assert negociacion.datos["rango"] == "monto.HASTA_5M"
+    assert negociacion.datos["limites"] == {"desde": 500_000, "hasta": 5_000_000}
+
+    ficha = lectura.generar_ficha_opcion(RESPUESTAS_HASTA_5M, monto=6_000_000)
+    assert not ficha.ok
+    assert ficha.error is not None
+    assert ficha.error.codigo == "entrada_invalida"
+    assert ficha.datos["limites"] == {"desde": 500_000, "hasta": 5_000_000}
+
+
+def test_generar_ficha_opcion_usa_el_monto_exacto_del_invitado() -> None:
+    """La ficha con `monto` muestra el monto exacto y una cuota menor."""
+    por_rango = lectura.generar_ficha_opcion(RESPUESTAS_HASTA_5M)
+    exacto = lectura.generar_ficha_opcion(RESPUESTAS_HASTA_5M, monto=2_000_000)
+    assert por_rango.ok and exacto.ok
+    assert "$4 millones" in str(por_rango.datos["texto"])
+    assert "$2 millones" in str(exacto.datos["texto"])
+
+    cuota_rango = Decimal(str(por_rango.datos["cuota_mensual"]["hasta"]))
+    cuota_exacta = Decimal(str(exacto.datos["cuota_mensual"]["hasta"]))
+    assert cuota_exacta < cuota_rango
 
 
 def test_responder_sobre_proyecto_declara_su_alcance() -> None:
