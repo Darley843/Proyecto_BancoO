@@ -285,6 +285,28 @@ no pasan por el ejecutor de comandos, sino por `alsoAllow: ["bundle-mcp"]` y el
 servidor `sucursal`. Se probó con `consultar_tasa` en una sesión nueva del
 gateway y respondió con la tasa del Tablero.
 
+### Defensa en profundidad: los comandos del gateway no se disparan
+
+Los comandos de OpenClaw tienen dos capas de cierre, para que un invitado no
+pueda cambiar la sesión de Pana desde el canal:
+
+1. **El despachador del canal no los reenvía (#213).**
+   `Despachador._texto_del_motor` descarta el turno hacia OpenClaw cuando el
+   texto, ya recortado, empieza por `/`; ese mensaje sigue en el grafo, que
+   aplica la política del proyecto
+   (`test_comando_con_barra_no_va_al_gateway`).
+2. **El gateway ya no interpreta comandos en los mensajes.** El bloque
+   `commands` de `openclaw.json` apaga `text`, `restart`, `config`, `mcp`,
+   `plugins`, `debug` y `bash`: un mensaje que empiece por `/` se trata como
+   texto normal y no cambia la sesión. `/restart`, que estaba activo por
+   defecto, también queda apagado.
+
+La evidencia se toma con `make probar-openclaw`, que llama al cliente directo
+(`scripts/probar_openclaw.py`) sin pasar por el despachador y por tanto sí envía
+el texto al gateway. Antes, `/reasoning on` se aplicaba a la sesión; ahora
+`/think high` llega como texto normal, el gateway no lo aplica y la sesión
+conserva `thinkingDefault: "off"`.
+
 ### Advertencias que quedan
 
 | Advertencia | Justificación |

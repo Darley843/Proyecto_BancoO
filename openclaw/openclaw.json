@@ -236,5 +236,14 @@
         }
       }
     }
+  },
+  "commands": {
+    "text": false,
+    "restart": false,
+    "config": false,
+    "mcp": false,
+    "plugins": false,
+    "debug": false,
+    "bash": false
   }
 }

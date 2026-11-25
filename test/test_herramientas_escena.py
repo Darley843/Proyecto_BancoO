@@ -359,7 +359,7 @@ def test_comparar_gota_banco_declara_el_producto_en_su_descripcion() -> None:
 
 
 def test_agents_de_pana_declara_el_alcance_y_cabe_en_el_presupuesto() -> None:
-    """AGENTS.md excluye esas dos herramientas, exige copiar cifras y sigue bajo 4.000."""
+    """AGENTS.md acota el alcance, las cifras, los archivos y la elección; cabe en 4.000."""
     texto = Path("openclaw/workspace/pana/AGENTS.md").read_text(encoding="utf-8")
     frase = (
         "Durante la entrevista y la escena no uso responder_sobre_proyecto ni buscar_en_documentos"
@@ -370,7 +370,15 @@ def test_agents_de_pana_declara_el_alcance_y_cabe_en_el_presupuesto() -> None:
     assert "Antes de enviar cualquier mensaje con cifras, lo reviso con" in texto
     assert "`auditar_respuesta`" in texto
     assert "`cifras_permitidas`" in texto
+    assert "Nunca digo que envío una imagen, un archivo o un enlace" in texto
+    assert "solo respondo con texto" in texto
     compacto = " ".join(texto.split())
     assert "con las opciones exactas del esquema, con sus letras; no invento rangos" in compacto
     assert "En la escena el producto es libre inversión" in compacto
+    assert (
+        "Tras `negociar_opcion` presento siempre las dos opciones "
+        "(cuota más baja y menos total pagado) con sus cifras"
+    ) in compacto
+    assert "aunque la persona ya haya dicho su preferencia" in compacto
+    assert "y le pido que elija" in compacto
     assert len(texto) < 4000
