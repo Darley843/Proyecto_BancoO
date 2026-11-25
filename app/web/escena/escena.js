@@ -36,6 +36,7 @@ import {
   responderPregunta,
 } from "./anfitrion.js";
 import { montarCaptura } from "./captura.js";
+import { montarHerramientas } from "./herramientas.js";
 import {
   PASOS,
   PASO_PREGUNTAS,
@@ -797,6 +798,8 @@ function teclado(evento) {
     cambiarANucleo();
   } else if (tecla === "t") {
     alternarTraza();
+  } else if (tecla === "h") {
+    document.dispatchEvent(new CustomEvent("escena:herramientas"));
   } else if (tecla === "r") {
     reiniciar();
   }
@@ -874,6 +877,7 @@ async function iniciar() {
   microfono.hidden = !hayMicrofono();
   microfono.addEventListener("click", alternarMicrofono);
   montarCaptura();
+  montarHerramientas();
   document.addEventListener("escena:lista", (evento) => cargarEscenaViva(evento.detail));
   document.addEventListener("keydown", teclado);
 }
