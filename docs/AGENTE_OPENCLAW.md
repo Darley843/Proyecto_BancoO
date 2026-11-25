@@ -51,7 +51,11 @@ cambio: es el motor del agente detrás del despachador.
 Cada herramienta declara un modelo `Pydantic` de entrada (`extra="forbid"`) y
 devuelve el sobre común `SalidaHerramienta` (`ok`, `datos`, `error`, `traza_id`).
 El catálogo completo se imprime con `make herramientas` y sus esquemas con
-`make herramientas JSON=1`.
+`make herramientas JSON=1`. La ficha de las veinte —entrada, salida, fuente,
+confirmación, módulo delegado y cuándo no usarla—, las herramientas del gateway
+que Pana tiene bloqueadas y la evidencia de control de la alucinación viven en
+[`docs/HERRAMIENTAS.md`](./HERRAMIENTAS.md), que se regenera con
+`make herramientas-doc`.
 
 | # | Herramienta | Dueña | Reutiliza |
 |---|---|---|---|

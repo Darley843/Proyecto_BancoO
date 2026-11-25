@@ -61,6 +61,12 @@ Cómo desplegar todo, paso a paso: [`docs/DESPLIEGUE.md`](./docs/DESPLIEGUE.md).
 
 ### Las 20 herramientas
 
+El detalle de cada herramienta —entrada Pydantic, salida, fuente de las cifras,
+confirmación, módulo en el que delega y cuándo **no** usarla— está en
+[`docs/HERRAMIENTAS.md`](./docs/HERRAMIENTAS.md), que se regenera con
+`make herramientas-doc`. Ahí también está el control de la alucinación probado
+contra el gateway real y las herramientas del gateway que Pana tiene bloqueadas.
+
 | # | Herramienta | Qué hace | Sale de | Responsable | Confirmación |
 |---|---|---|---|---|---|
 | 1 | `consultar_tasa` | Rango de tasas con vigencia y fuente | Tablero de tasas | Nayla | — |
