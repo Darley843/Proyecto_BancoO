@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+import pytest
+
 from banco_occidente_corpus.herramientas import lectura
 
 RESPUESTAS = [
@@ -61,9 +63,13 @@ def test_comparar_escenario_no_modifica_el_original() -> None:
     assert comparacion["thread_escenario"].endswith(":esc")
 
 
-def test_negociar_opcion_en_modo_demo_es_determinista() -> None:
+def test_negociar_opcion_sin_modelo_es_determinista(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Sin modelo, la mesa se recorre con reglas y termina en máximo 4 turnos."""
-    salida = lectura.negociar_opcion(RESPUESTAS, modo_demo=True)
+    monkeypatch.setenv("SUCURSAL_DEMO", "1")
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    salida = lectura.negociar_opcion(RESPUESTAS)
     assert salida.ok
     assert 1 <= len(salida.datos["turnos"]) <= 4
     assert salida.datos["veredicto"]["veredicto"] in {

@@ -9,9 +9,13 @@ con una sola forma y el agente nunca recibe una traza de Python.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from typing import Annotated, Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, StringConstraints
+
+from ..diagnostico.calculo import PRODUCTOS_DIAGNOSTICO, VINCULACIONES
+from ..diagnostico.motor import cargar_config
 
 #: Huella HMAC de 64 caracteres hexadecimales; nunca un número de teléfono.
 HashUsuario = Annotated[
@@ -30,6 +34,217 @@ CampoEscenarioHerramienta = Literal[
 MAXIMO_RESPUESTAS: int = 12
 #: Tope de fragmentos que puede pedir una búsqueda.
 MAXIMO_FRAGMENTOS: int = 5
+#: Bloques de la entrevista que siempre se responden.
+BLOQUES_OBLIGATORIOS: tuple[str, ...] = (
+    "objetivo",
+    "vinculacion",
+    "ingresos",
+    "gastos",
+    "cuotas",
+)
+#: Bloques del crédito; el ahorro no los lleva.
+BLOQUES_CREDITO: tuple[str, ...] = ("monto", "plazo")
+#: Bloque que solo aparece en la compra de cartera.
+BLOQUE_COMPRA_CARTERA: str = "cuota_trasladar"
+#: Respuestas que forman una entrevista de crédito completa y válida.
+EJEMPLO_RESPUESTAS: tuple[str, ...] = (
+    "objetivo.libre_inversion",
+    "vinculacion.empleado",
+    "ingresos.DE_3M_A_5M",
+    "gastos.DE_1M_A_2M",
+    "cuotas.NINGUNA",
+    "monto.DE_5M_A_10M",
+    "plazo.36",
+)
+
+
+def catalogo_entrevista() -> dict[str, tuple[str, ...]]:
+    """Agrupa los ids canónicos de la entrevista por bloque.
+
+    Los pasos fijos (`objetivo` y `vinculacion`) salen de
+    `diagnostico.calculo`; los rangos y sus ids, de `config/diagnostico.toml`
+    a través de `diagnostico.motor`. Así el esquema de las herramientas y el
+    motor no pueden divergir.
+
+    Returns:
+        Los ids de cada bloque en el orden del TOML, con los pasos fijos primero.
+    """
+    ajustes = cargar_config()
+    bloques: dict[str, list[str]] = {
+        "objetivo": [f"objetivo.{producto}" for producto in sorted(PRODUCTOS_DIAGNOSTICO)],
+        "vinculacion": [f"vinculacion.{forma}" for forma in sorted(VINCULACIONES)],
+    }
+    for ident, clave in ajustes.claves.items():
+        bloques.setdefault(clave, []).append(ident)
+    return {clave: tuple(ids) for clave, ids in bloques.items()}
+
+
+#: Ids de la entrevista agrupados por bloque, en el orden del catálogo.
+CATALOGO_ENTREVISTA: dict[str, tuple[str, ...]] = catalogo_entrevista()
+#: Todos los ids canónicos, para validar una respuesta en un paso.
+IDS_ENTREVISTA: frozenset[str] = frozenset(
+    ident for ids in CATALOGO_ENTREVISTA.values() for ident in ids
+)
+#: Ids canónicos en orden estable, para el enum del esquema.
+IDS_ORDENADOS: tuple[str, ...] = tuple(
+    ident for ids in CATALOGO_ENTREVISTA.values() for ident in ids
+)
+
+
+def respuestas_invalidas(respuestas: Sequence[str]) -> list[str]:
+    """Devuelve las respuestas que no son ids canónicos de la entrevista.
+
+    Args:
+        respuestas: ids elegidos por el modelo o por la entrevista.
+
+    Returns:
+        Los valores que no existen en `CATALOGO_ENTREVISTA`, en su orden.
+    """
+    return [respuesta for respuesta in respuestas if respuesta not in IDS_ENTREVISTA]
+
+
+def respuestas_o_error(
+    herramienta: str,
+    respuestas: Sequence[str],
+) -> SalidaHerramienta | None:
+    """Revisa la forma de la entrevista y devuelve el error si no sirve.
+
+    Args:
+        herramienta: nombre del catálogo, para el sobre de error.
+        respuestas: ids canónicos recibidos.
+
+    Returns:
+        El error con los campos y valores válidos, o `None` si la forma es válida.
+    """
+    if not respuestas:
+        return error_de_respuestas(
+            herramienta,
+            "No llegó ninguna respuesta: faltan los bloques de la entrevista.",
+        )
+    if len(respuestas) > MAXIMO_RESPUESTAS:
+        return error_de_respuestas(
+            herramienta,
+            f"Llegaron {len(respuestas)} respuestas; el máximo es {MAXIMO_RESPUESTAS}.",
+        )
+    invalidas = respuestas_invalidas(respuestas)
+    if invalidas:
+        return error_de_respuestas(
+            herramienta,
+            "Hay ids que no existen en la entrevista: " + ", ".join(invalidas),
+            no_reconocidas=invalidas,
+        )
+    return None
+
+
+def error_de_respuestas(
+    herramienta: str,
+    motivo: str,
+    no_reconocidas: Sequence[str] = (),
+) -> SalidaHerramienta:
+    """Arma el error de una entrevista inválida con el catálogo para corregir.
+
+    El mensaje del error es corto, pero `datos` lleva los bloques, los valores
+    válidos y un ejemplo completo para que el modelo corrija en un solo intento.
+
+    Args:
+        herramienta: nombre del catálogo.
+        motivo: explicación breve de por qué la entrevista no es válida.
+        no_reconocidas: ids recibidos que no existen en la entrevista.
+
+    Returns:
+        El sobre común con `ok=False` y el catálogo de la entrevista.
+    """
+    datos: dict[str, Any] = {
+        "campos": list(CATALOGO_ENTREVISTA),
+        "obligatorios": list(BLOQUES_OBLIGATORIOS),
+        "del_credito": list(BLOQUES_CREDITO),
+        "solo_compra_cartera": BLOQUE_COMPRA_CARTERA,
+        "valores_validos": {clave: list(ids) for clave, ids in CATALOGO_ENTREVISTA.items()},
+        "ejemplo": list(EJEMPLO_RESPUESTAS),
+        "motivo": motivo[:300],
+    }
+    if no_reconocidas:
+        datos["no_reconocidas"] = list(no_reconocidas)[:MAXIMO_RESPUESTAS]
+    return SalidaHerramienta(
+        ok=False,
+        herramienta=herramienta,
+        datos=datos,
+        error=ErrorHerramienta(
+            codigo="entrada_invalida",
+            mensaje=(
+                "La entrevista no es válida: revisa datos['valores_validos'] y envía "
+                "un id bloque.valor por bloque."
+            ),
+        ),
+    )
+
+
+def _descripcion_entrevista() -> str:
+    """Escribe la descripción de `respuestas` con los bloques y sus ids.
+
+    Returns:
+        El texto que ve el modelo en el esquema de entrada.
+    """
+    bloques = "; ".join(f"{clave} ({', '.join(ids)})" for clave, ids in CATALOGO_ENTREVISTA.items())
+    return (
+        "Ids canónicos de la entrevista del diagnóstico, con la forma bloque.valor. "
+        "Obligatorios: objetivo, vinculacion, ingresos, gastos y cuotas. En crédito "
+        "se suman monto y plazo; el ahorro no lleva monto ni plazo. cuota_trasladar "
+        "solo aplica a compra de cartera. Envía cada bloque una vez. Valores "
+        f"válidos: {bloques}."
+    )
+
+
+#: Descripción compartida por todas las herramientas que reciben `respuestas`.
+DESCRIPCION_RESPUESTAS: str = _descripcion_entrevista()
+#: Un id canónico de la entrevista, con el enum de todos los valores válidos.
+IdEntrevista = Annotated[
+    str,
+    StringConstraints(min_length=3, max_length=60),
+    Field(
+        description="Un id canónico, por ejemplo monto.DE_5M_A_10M.",
+        json_schema_extra={"enum": list(IDS_ORDENADOS)},
+    ),
+]
+#: Lista de respuestas de la entrevista con su catálogo y un ejemplo completo.
+RespuestasEntrevista = Annotated[
+    list[IdEntrevista],
+    Field(
+        description=DESCRIPCION_RESPUESTAS,
+        json_schema_extra={"examples": [list(EJEMPLO_RESPUESTAS)]},
+    ),
+]
+#: Unidad de una tasa E.A.: fracción (0,2834) o porcentaje (28,34).
+UnidadTasa = Literal["fraccion", "porcentaje"]
+#: Descripción de la tasa que acepta la verificación de usura.
+DESCRIPCION_TASA_USURA: str = (
+    "Tasa efectiva anual (E.A.). Si omites `unidad`, se lee como fracción hasta "
+    "100 (0,2834 = 28,34 % E.A.; 7,9161 = 791,61 % E.A. del gota a gota) y como "
+    "porcentaje por encima de 100 (791,61 = 791,61 % E.A.). Declara `unidad` para "
+    "que no haya ambigüedad. No hay tope: el gota a gota supera el 100 %."
+)
+#: Tasa E.A. positiva y finita, sin tope de usura.
+TasaEfectivaAnual = Annotated[FiniteFloat, Field(gt=0, description=DESCRIPCION_TASA_USURA)]
+#: Descripción de la unidad de la tasa.
+DESCRIPCION_UNIDAD_TASA: str = (
+    "`fraccion` para 0,2834 = 28,34 %; `porcentaje` para 28,34 o 791,61. Si se "
+    "omite, se infiere como fracción hasta 100 y como porcentaje por encima de 100."
+)
+#: Unidad opcional de la tasa E.A.
+UnidadTasaEntrada = Annotated[UnidadTasa | None, Field(description=DESCRIPCION_UNIDAD_TASA)]
+#: Alcance de la pregunta que responde `responder_sobre_proyecto`.
+DESCRIPCION_PREGUNTA_PROYECTO: str = (
+    "Pregunta sobre el proyecto: equipo, arquitectura, tecnología, corpus, RAG o "
+    "decisiones de ingeniería. Solo sirve para eso; no para preguntas de crédito, "
+    "tasas, cuotas, requisitos de productos ni el diagnóstico. Para esas usa el "
+    "Tablero, la Bóveda o las herramientas del diagnóstico."
+)
+#: Pregunta del proyecto con su alcance declarado en el esquema.
+PreguntaProyecto = Annotated[
+    str,
+    StringConstraints(min_length=3, max_length=300),
+    Field(description=DESCRIPCION_PREGUNTA_PROYECTO),
+]
 
 
 class ErrorHerramienta(BaseModel):
@@ -113,18 +328,13 @@ class VerificarUsuraEntrada(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    tasa_ea: float = Field(
-        gt=0,
-        lt=1,
-        description=(
-            "Tasa efectiva anual como fracción, igual que el Tablero: 0,2834 es 28,34 % E.A."
-        ),
-    )
+    tasa_ea: TasaEfectivaAnual
     producto: str | None = Field(
         default=None,
         max_length=80,
         description="Producto al que se aplicaría la tasa; vivienda, ahorro y CDT están exceptuados.",
     )
+    unidad: UnidadTasaEntrada = None
 
 
 class DiagnosticarCapacidadEntrada(BaseModel):
@@ -132,15 +342,7 @@ class DiagnosticarCapacidadEntrada(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    respuestas: list[str] = Field(
-        min_length=1,
-        max_length=MAXIMO_RESPUESTAS,
-        description=(
-            "Ids de la entrevista, por ejemplo objetivo.libre_inversion, "
-            "vinculacion.empleado, ingresos.rango_3, gastos.rango_2, "
-            "cuotas.rango_1, monto.rango_2 y plazo.rango_2."
-        ),
-    )
+    respuestas: RespuestasEntrevista
 
 
 class CompararEscenarioEntrada(BaseModel):
@@ -148,11 +350,7 @@ class CompararEscenarioEntrada(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    respuestas: list[str] = Field(
-        min_length=1,
-        max_length=MAXIMO_RESPUESTAS,
-        description="Ids de la entrevista que sostienen el diagnóstico original.",
-    )
+    respuestas: RespuestasEntrevista
     campo: CampoEscenarioHerramienta = Field(description="Insumo que cambia el escenario.")
     valor: float = Field(gt=0, le=1_000_000_000_000, description="Valor nuevo del insumo.")
 
@@ -162,11 +360,7 @@ class ConvocarComiteEntrada(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    respuestas: list[str] = Field(
-        min_length=1,
-        max_length=MAXIMO_RESPUESTAS,
-        description="Ids de la entrevista; el comité solo se convoca en amarillo o rojo con cuota.",
-    )
+    respuestas: RespuestasEntrevista
 
 
 class CalcularPrestamoGotaEntrada(BaseModel):
@@ -191,27 +385,19 @@ class CompararGotaBancoEntrada(BaseModel):
         le=1_000_000_000_000,
         description="Mismo monto para el gota a gota y para el banco.",
     )
-    respuestas: list[str] = Field(
-        min_length=1,
-        max_length=MAXIMO_RESPUESTAS,
-        description="Ids de la entrevista con ingresos, gastos, deudas, monto y plazo.",
-    )
+    respuestas: RespuestasEntrevista
 
 
 class NegociarOpcionEntrada(BaseModel):
-    """Entrada de `negociar_opcion`."""
+    """Entrada de `negociar_opcion`.
+
+    El modo demo no es una entrada: lo decide el servidor al leer
+    ``SUCURSAL_DEMO``. La negociación usa siempre las respuestas del invitado.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
-    respuestas: list[str] = Field(
-        min_length=1,
-        max_length=MAXIMO_RESPUESTAS,
-        description="Ids de la entrevista que arman la mesa del agente del joven y del banco.",
-    )
-    modo_demo: bool = Field(
-        default=False,
-        description="Fuerza la política determinista, sin modelo, para ensayos sin red.",
-    )
+    respuestas: RespuestasEntrevista
 
 
 class GenerarFichaOpcionEntrada(BaseModel):
@@ -219,11 +405,7 @@ class GenerarFichaOpcionEntrada(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    respuestas: list[str] = Field(
-        min_length=1,
-        max_length=MAXIMO_RESPUESTAS,
-        description="Ids de la entrevista que producen la opción y su ficha.",
-    )
+    respuestas: RespuestasEntrevista
 
 
 class ResponderSobreProyectoEntrada(BaseModel):
@@ -231,11 +413,7 @@ class ResponderSobreProyectoEntrada(BaseModel):
 
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
-    pregunta: str = Field(
-        min_length=3,
-        max_length=300,
-        description="Pregunta sobre el proyecto, el corpus, el RAG, las decisiones o la escena.",
-    )
+    pregunta: PreguntaProyecto
     k: int = Field(default=3, ge=1, le=MAXIMO_FRAGMENTOS, description="Fragmentos a devolver.")
 
 
@@ -295,11 +473,7 @@ class GenerarTarjetaPanaEntrada(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    respuestas: list[str] = Field(
-        min_length=1,
-        max_length=MAXIMO_RESPUESTAS,
-        description="Ids de la entrevista que producen la tarjeta.",
-    )
+    respuestas: RespuestasEntrevista
     incluir_imagen: bool = Field(
         default=False,
         description="Si se incluye el PNG en base64 además del texto equivalente.",

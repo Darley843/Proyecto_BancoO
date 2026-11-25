@@ -16,18 +16,23 @@ from dataclasses import dataclass
 from pathlib import Path
 from uuid import uuid4
 
+from pydantic import ValidationError
+
 from ..canal.almacen import RUTA_ALMACEN, abrir_caso, listar_casos
 from ..canal.consentimiento import ESTADO_ACEPTADO, MaquinaConsentimiento
 from ..pana.desde_diagnostico import tarjeta_y_texto
 from ..sucursal.perfil import borrar_perfil_en
-from .comun import como_json, diagnostico_de, error, ok
+from .comun import como_json, diagnostico_de, error, mensaje_de_validacion, ok
 from .esquemas import (
     ConsultarCasoEntrada,
     GenerarTarjetaPanaEntrada,
     OlvidarMisDatosEntrada,
     RegistrarConsentimientoEntrada,
+    RespuestasEntrevista,
     SalidaHerramienta,
     SolicitarAsesorEntrada,
+    error_de_respuestas,
+    respuestas_o_error,
 )
 
 #: Ruta del store de perfil de la Sucursal; se puede mover con una variable.
@@ -257,20 +262,29 @@ def consultar_caso(usuario_id: str) -> SalidaHerramienta:
 
 
 def generar_tarjeta_pana(
-    respuestas: list[str],
+    respuestas: RespuestasEntrevista,
     incluir_imagen: bool = False,
 ) -> SalidaHerramienta:
     """Genera la tarjeta de Pana con su texto equivalente.
 
     Args:
-        respuestas: ids canónicos de la entrevista.
+        respuestas: ids canónicos de la entrevista, como en
+            `diagnosticar_capacidad`; el esquema trae los valores válidos.
         incluir_imagen: si se incluye el PNG en base64.
 
     Returns:
         El texto equivalente y, si se pidió, la imagen en base64.
     """
     entrada = GenerarTarjetaPanaEntrada(respuestas=respuestas, incluir_imagen=incluir_imagen)
-    resultado = diagnostico_de(entrada.respuestas)
+    fallo = respuestas_o_error("generar_tarjeta_pana", entrada.respuestas)
+    if fallo is not None:
+        return fallo
+    try:
+        resultado = diagnostico_de(entrada.respuestas)
+    except ValidationError as exc:
+        return error_de_respuestas("generar_tarjeta_pana", mensaje_de_validacion(exc))
+    except ValueError as exc:
+        return error_de_respuestas("generar_tarjeta_pana", str(exc))
     imagen, texto = tarjeta_y_texto(resultado)
     datos: dict[str, object] = {"texto": texto, "png_bytes": len(imagen)}
     if entrada.incluir_imagen:
