@@ -1,9 +1,9 @@
 # Preguntas frecuentes sobre Sucursal 1965
 
-Respuestas cortas a lo que suele preguntar un jurado o un invitado. Pana las usa
-para responder sobre el proyecto: cada título es la pregunta como se haría en
-voz alta y cada respuesta dice de dónde sale la cifra. Si una cifra cambia, se
-actualiza aquí y en el documento que se cita.
+Respuestas cortas a lo que suele preguntar un jurado o un invitado. Es la
+versión escrita de lo que Pana debe poder responder sobre el proyecto: cada
+título es la pregunta como se haría en voz alta y cada respuesta dice de dónde
+sale la cifra. Si una cifra cambia, se actualiza aquí y en el documento que se cita.
 
 ## El proyecto
 
@@ -188,8 +188,9 @@ las instrucciones. Fuente: `docs/INYECCION.md` y `docs/ROBA_BOVEDA.md`.
 
 ### ¿Qué hizo cada integrante del equipo?
 
-Nayla: OpenClaw, el workspace de Pana y la escena. Darley: el canal de
-WhatsApp con Meta, el modo evento y el servidor MCP. Anny: RAG, evaluación y
+Nayla: las tasas, el motor del diagnóstico, el comité, el agente en OpenClaw
+y, en la escena, Don Gota y la negociación. Darley: el canal de WhatsApp con
+Meta, el asesor y el modo evento. Anny: la Bóveda, su evaluación y la
 seguridad. Yoldy: documentación, diagramas y pantalla de la escena.
 
 ### ¿Cuántas pruebas tiene el proyecto?
