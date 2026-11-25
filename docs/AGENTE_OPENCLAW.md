@@ -14,6 +14,7 @@ arranca y cómo se demuestra cada pieza. El cambio OpenSpec vive en
 | Configuración redactada del gateway | `openclaw/openclaw.json` | Versionada, sin secretos |
 | Servidor MCP con veinte herramientas | `src/banco_occidente_corpus/herramientas/` | Implementado y probado |
 | Entrada del servidor | `python -m banco_occidente_corpus.mcp_servidor.agente` | `make agente-mcp` |
+| Cliente del gateway y respaldo al grafo | `src/banco_occidente_corpus/canal/openclaw.py` | Implementado y probado (25-nov) |
 | Traza local de herramientas | `data/asistente/trazas/herramientas.jsonl` | `make traza` |
 | Gateway, token y auditoría | WSL + `OPENCLAW_GATEWAY_TOKEN` | Pendiente de la operación en el equipo de la demo |
 
@@ -139,6 +140,30 @@ Dos detalles de OpenClaw que importan:
    repositorio se actualiza con `scripts/exportar_config_openclaw.ps1` después
    de replicar este bloque allí.
 
+### 4.1 Cliente del canal y respaldo
+
+`canal/openclaw.py` es el único punto que habla con
+`http://127.0.0.1:18789/v1/chat/completions`:
+
+- Solo se activa con `OPENCLAW_ACTIVO=1` y `OPENCLAW_GATEWAY_TOKEN`. Sin token,
+  con `fallback_forzado = true` o sin `site.contact`, el despachador responde
+  con el grafo; no hay token por defecto.
+- El cuerpo lleva `model = openclaw:pana`, `user = wa:<huella>` y **un solo**
+  mensaje. No viajan el número, el historial, el perfil ni los fragmentos.
+- Usa `httpx` con `timeout` de `gateway.timeout_segundos` (45 s de techo, 3 s
+  para conectar), el User-Agent y el header `From` de `config/site.toml`; el
+  host debe ser loopback, no hay reintentos y nunca se usa `verify=False`.
+- Ante timeout, error de red, `5xx`, `401`, cuerpo inválido o contenido vacío,
+  devuelve `None` y el despachador llama al grafo. El invitado recibe **una**
+  respuesta: la del gateway o la del respaldo, nunca las dos.
+- El orden del turno no cambia: autorización, consentimiento, entrevista,
+  escenario y HITL corren antes del motor. Los textos que empiezan por `/` no
+  se reenvían (el gateway tiene sus propios comandos) y los que traen PII se
+  quedan en el grafo, que aplica la política completa.
+- La tabla `mensajes` guarda `motor` (`openclaw`, `grafo` o `canal`) para que la
+  operación sepa quién respondió. Una base anterior recibe la columna al
+  arrancar, sin perder datos.
+
 ## 5. Traza visible
 
 Cada llamada deja una línea JSON en `data/asistente/trazas/herramientas.jsonl`
@@ -158,6 +183,9 @@ Cada llamada deja una línea JSON en `data/asistente/trazas/herramientas.jsonl`
 - `make traza` imprime hora, herramienta, estado, latencia y argumentos no
   sensibles. La traza se borra con la carpeta `data/asistente/` o al cerrar el
   evento.
+- La trazabilidad del turno vive en `mensajes.motor`, no en la traza de
+  herramientas: `openclaw` si respondió el gateway, `grafo` si respondió el
+  respaldo y `canal` si fue una respuesta determinista del canal.
 
 ## 6. Seguridad
 
@@ -192,9 +220,13 @@ uv run pytest test/test_mcp_agente.py test/test_herramientas_lectura.py \
 | `test_herramientas_lectura.py` | Tasa, usura, gota, diagnóstico, escenario, negociación, ficha, proyecto, tarifas, Digiturno y auditor |
 | `test_herramientas_estado.py` | Consentimiento, borrado y asesor en dos pasos, caso aislado por huella y tarjeta |
 | `test_herramientas_traza.py` | Traza, error de validación estable, firma conservada y redacción de textos |
+| `test_canal_openclaw.py` | Cuerpo sin historial, `user = wa:<huella>`, sin número, timeout, error de red, `5xx`, cuerpo inválido, sin token y sin reintentos |
+| `test_canal_despachador.py` | OpenClaw primero, respaldo al grafo, una sola respuesta, comandos `/` y PII fuera del gateway, y `motor` en la traza |
 
 Todas corren sin red, sin `DEEPSEEK_API_KEY` y con Ollama apagado. La prueba de
 `buscar_en_documentos` usa un doble del recuperador para no depender del índice.
+El cliente del gateway usa `httpx.MockTransport`: no necesita el gateway
+encendido ni `OPENCLAW_GATEWAY_TOKEN`.
 
 ## 8. Pendientes de la operación
 
@@ -204,6 +236,7 @@ Todas corren sin red, sin `DEEPSEEK_API_KEY` y con Ollama apagado. La prueba de
    veinte.
 3. `openclaw security audit` sin hallazgos altos antes de la etiqueta
    `entrega-final`.
-4. Recorrido real por WhatsApp con un invitado: consentimiento, turno con al
-   menos una herramienta, respuesta y borrado; latencia p95 por debajo de 8 s.
+4. Recorrido real por WhatsApp con un invitado y `OPENCLAW_ACTIVO=1`:
+   consentimiento, turno con al menos una herramienta, respuesta y borrado;
+   latencia p95 por debajo de 8 s y respaldo probado apagando el gateway.
 5. Borrar `MEMORY.md`, la bitácora y las trazas al terminar el evento.
