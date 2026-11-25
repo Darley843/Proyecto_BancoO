@@ -68,8 +68,8 @@ banco nació en Cali en 1965.
 
 | Quién | Sucursal 1965 y agente | Escena «Pana vs. el gota a gota» |
 |---|---|---|
-| Nayla | Tasas 2026, motor del diagnóstico, comité y entrevista por WhatsApp; agente en OpenClaw y los módulos de 11 herramientas | Don Gota, comparación con el motor y negociación |
-| Darley | Canal de WhatsApp con Meta, HITL, modo evento y servidor MCP de las 20 herramientas | Entrada por voz, voluntario (tecla V) y API de la escena |
+| Nayla | Tasas 2026, motor del diagnóstico, comité y entrevista por WhatsApp; agente en OpenClaw (gateway, workspace, seguridad y conexión del MCP) | Don Gota, comparación con el motor y negociación |
+| Darley | Canal de WhatsApp con Meta, HITL, modo evento y servidor MCP con las 20 herramientas | Entrada por voz, voluntario (tecla V) y API de la escena |
 | Anny | Bóveda: evaluación (Arqueo y t-SNE), seguridad, Roba la Bóveda y cuatro herramientas del agente | Auditor y plan B |
 | Yoldy | Frontend, Tablero, mapa y operación/latencia; documentación y diagramas | Pantalla, voces, retratos y Pana anfitrión |
 
