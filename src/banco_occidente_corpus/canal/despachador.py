@@ -10,10 +10,12 @@ Es la pieza que convierte un mensaje de WhatsApp en una respuesta:
    diagnóstico y envía la tarjeta.
 5. Si hay un diagnóstico de las últimas 24 horas y el texto es un «¿Y si…?»
    («¿y si lo pago en 60 meses?»), responde con la tarjeta de antes y después.
-6. Si no, entrega la pregunta al grafo de la Sucursal con
-   ``thread_id = wa:<usuario_id>``. Cuando el grafo devuelve la ruta D, arranca
-   la entrevista en lugar de la invitación.
-7. Envía la respuesta con el enviador configurado (falso o Meta).
+6. Si no, intenta el motor de OpenClaw con el mensaje nuevo y la huella. Un
+   fallo (timeout, error de red, ``5xx``, cuerpo inválido) cae al grafo de la
+   Sucursal con ``thread_id = wa:<usuario_id>``. Cuando el grafo devuelve la
+   ruta D, arranca la entrevista en lugar de la invitación.
+7. Envía la respuesta con el enviador configurado (falso o Meta) y registra el
+   motor que respondió (``openclaw``, ``grafo`` o ``canal``).
 
 Durante el modo evento el alcance es el mismo: el desconocido que acepta el
 consentimiento entra a la entrevista del diagnóstico y al comité, con cuota por
@@ -33,6 +35,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+from ..asistente.validacion import detectar_pii
 from ..sucursal.perfil import huella_perfil
 from .almacen import (
     actualizar_mensaje,
@@ -69,6 +72,15 @@ TEXTO_CUOTA_USUARIO = (
 TEXTO_EVENTO_CERRADO = (
     "La demostración en vivo ya cerró. Gracias por participar de la Sucursal 1965."
 )
+
+#: Motores que se registran en la trazabilidad de cada mensaje.
+MOTOR_OPENCLAW: str = "openclaw"
+MOTOR_GRAFO: str = "grafo"
+MOTOR_CANAL: str = "canal"
+
+#: Firma del motor: recibe el texto nuevo y la huella, y devuelve el texto o
+#: ``None`` cuando hay que usar el grafo.
+Motor = Callable[[str, str], str | None]
 
 
 def _instante(momento: datetime | None = None) -> datetime:
@@ -130,6 +142,7 @@ class Despachador:
     cola: ColaMensajes
     crear_enviador: Callable[[str, str], Enviador]
     responder: Callable[[str, str, str], RespuestaGrafo | str]
+    motor: Motor | None = None
     entrevista: EntrevistaCanal | None = None
 
     def recibir(self, mensaje: MensajeEntrante) -> None:
@@ -171,7 +184,11 @@ class Despachador:
             if not self.config.permite(usuario_id, ahora):
                 self._enviar_texto(mensaje, usuario_id, AVISO_NO_AUTORIZADO)
                 actualizar_mensaje(
-                    self.ruta_almacen, mensaje.id_mensaje, "ignorado", procesado=True
+                    self.ruta_almacen,
+                    mensaje.id_mensaje,
+                    "ignorado",
+                    procesado=True,
+                    motor=MOTOR_CANAL,
                 )
                 return
 
@@ -179,7 +196,11 @@ class Despachador:
             if cierre is not None:
                 self._enviar_texto(mensaje, usuario_id, cierre)
                 actualizar_mensaje(
-                    self.ruta_almacen, mensaje.id_mensaje, "ignorado", procesado=True
+                    self.ruta_almacen,
+                    mensaje.id_mensaje,
+                    "ignorado",
+                    procesado=True,
+                    motor=MOTOR_CANAL,
                 )
                 return
 
@@ -193,14 +214,21 @@ class Despachador:
                 respuesta = self._turno_entrevista(mensaje, usuario_id)
             if respuesta is None and self.entrevista is not None:
                 respuesta = self.entrevista.escenario(mensaje, usuario_id)
+            motor_usado: str | None = None
             if respuesta is None:
-                resultado = _respuesta_del_grafo(
-                    self.responder(
-                        mensaje.texto,
-                        f"wa:{usuario_id}",
-                        huella_perfil(usuario_id),
+                texto_motor = self._texto_del_motor(mensaje.texto, usuario_id)
+                if texto_motor is not None:
+                    resultado = RespuestaGrafo(texto=texto_motor)
+                    motor_usado = MOTOR_OPENCLAW
+                else:
+                    resultado = _respuesta_del_grafo(
+                        self.responder(
+                            mensaje.texto,
+                            f"wa:{usuario_id}",
+                            huella_perfil(usuario_id),
+                        )
                     )
-                )
+                    motor_usado = MOTOR_GRAFO
                 if resultado.es_diagnostico and self.entrevista is not None:
                     respuesta = self.entrevista.iniciar(usuario_id, mensaje.id_mensaje)
                 else:
@@ -211,7 +239,13 @@ class Despachador:
                     )
 
             self.crear_enviador(usuario_id, mensaje.remitente).enviar(respuesta)
-            actualizar_mensaje(self.ruta_almacen, mensaje.id_mensaje, "respondido", procesado=True)
+            actualizar_mensaje(
+                self.ruta_almacen,
+                mensaje.id_mensaje,
+                "respondido",
+                procesado=True,
+                motor=motor_usado or MOTOR_CANAL,
+            )
         except Exception:
             logger.exception("fallo al procesar un mensaje del canal")
             actualizar_mensaje(self.ruta_almacen, mensaje.id_mensaje, "error", procesado=True)
@@ -219,6 +253,39 @@ class Despachador:
                 self._enviar_texto(mensaje, usuario_id, TEXTO_ERROR)
             except Exception:
                 logger.warning("tampoco se pudo enviar el aviso de error")
+
+    def _texto_del_motor(self, texto: str, usuario_id: str) -> str | None:
+        """Devuelve el texto del motor OpenClaw o ``None`` para usar el grafo.
+
+        No se reenvían los comandos que empiezan por ``/``: el gateway tiene
+        sus propios comandos y el invitado no debe dispararlos. Un texto con
+        PII tampoco sale al gateway; el grafo aplica la política completa. Un
+        fallo del motor no se propaga: el turno cae al grafo y el invitado
+        recibe una sola respuesta.
+
+        Args:
+            texto: mensaje nuevo del invitado.
+            usuario_id: huella HMAC del número.
+
+        Returns:
+            El texto del agente, o ``None`` si el turno sigue en el grafo.
+        """
+        if self.motor is None:
+            return None
+        limpio = texto.strip()
+        if not limpio or limpio.startswith("/"):
+            return None
+        if detectar_pii(limpio) is not None:
+            return None
+        try:
+            respuesta = self.motor(limpio, usuario_id)
+        except Exception as error:
+            logger.warning("el motor OpenClaw falló (%s); se usa el grafo", type(error).__name__)
+            return None
+        if not isinstance(respuesta, str):
+            return None
+        recortado = respuesta.strip()
+        return recortado[:4096] or None
 
     def _motivo_cierre(self, usuario_id: str, ahora: datetime) -> str | None:
         """Devuelve el texto que explica por qué no se atiende, o ``None``.

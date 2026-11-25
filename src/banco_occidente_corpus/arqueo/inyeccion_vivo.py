@@ -87,7 +87,8 @@ VARIABLE_DEL_GATEWAY = "OPENCLAW_GATEWAY_TOKEN"
 BASE_URL_DEFECTO = "http://127.0.0.1:18789"
 MODELO_DEFECTO = "openclaw:pana"
 #: Tiempo máximo de la evaluación. Es propio y no el `timeout_segundos` del canal
-#: (8 s): una respuesta de Pana con herramientas tarda unos 9 s.
+#: (45 s de techo): una respuesta de Pana con herramientas tarda unos 9 s y un
+#: ataque adversarial puede encadenar varias.
 TIMEOUT_EVALUACION = 60.0
 #: Prefijo de las sesiones de evaluación (las de WhatsApp usan `wa:`).
 PREFIJO_SESION = "eval"

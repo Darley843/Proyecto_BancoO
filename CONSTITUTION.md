@@ -133,6 +133,15 @@ descarga masiva de PDF, transcripción de vídeo.
 > son scraping del sitio del banco, así que no pasan por `net.py` ni les aplican
 > `robots.txt`/1,5 s; el token vive solo en `WHATSAPP_ACCESS_TOKEN` y el
 > proyecto no lee `.env`.
+>
+> **Gateway local de OpenClaw:** las llamadas del canal al gateway
+> (`http://127.0.0.1:18789/v1/chat/completions`, desde `canal/openclaw.py`)
+> usan `httpx` con `timeout` explícito de `gateway.timeout_segundos` (45 s de
+> techo, 3 s para conectar), el User-Agent y el header `From` de
+> `config/site.toml`, sin reintentos y sin `verify=False`. El destino es loopback y no es scraping del sitio del banco,
+> así que no pasan por `net.py` ni les aplican `robots.txt`/1,5 s. El token vive
+> solo en `OPENCLAW_GATEWAY_TOKEN`; sin token o con `OPENCLAW_ACTIVO=0` el canal
+> responde con el grafo y el proyecto no lee `.env`.
 
 > **Voces de la escena (Piper):** `make voz-modelo` baja los modelos de voz del
 > repositorio público `huggingface.co/rhasspy/piper-voices` desde
@@ -778,6 +787,7 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 | 2026-11-17 | Digiturno: cuarta letra `D` (diagnóstico) con reglas deterministas en `[digiturno]` antes de la cortesía; el nodo `diagnostico` responde una invitación fija al diagnóstico guiado, sin recuperador, Tablero ni modelo, y la API, la Ventanilla y el Arqueo aceptan la letra (PR #134) | Revisa la decisión del 2026-11-13 de no añadir letras: la intención de diagnóstico no es una búsqueda en la Bóveda ni en el Tablero ni un rechazo, y por motivo quedaba contada como `B` o caía en `X` cuando el modelo la juzgaba fuera de alcance (rechazo indebido en el filtro de dominio). El diagnóstico guiado sigue fuera del grafo, como dice `openspec/changes/corresponsal-whatsapp/design.md`: el nodo solo invita y el canal conduce la entrevista |
 | 2026-11-17 | Digiturno: una duda que el modelo no responde se reintenta una vez y, si sigue sin respuesta, va a `X` (`rechazo:modelo_sin_respuesta`); `tasa` e `intereses` proponen `T`; una pregunta válida con una instrucción incrustada para cambiar o revelar las reglas va a `X` completa (PR #134) | Reemplaza el respaldo a `B` del 2026-11-04: aceptar por defecto era un fallo abierto (fail-open) que dejaba pasar fuera de dominio cuando DeepSeek no respondía. Medido con `arqueo/filtro_digiturno.py` sobre los 114 casos de `data/evaluacion/filtro_dominio.jsonl` (3 corridas con DeepSeek): fuga 0 de 50 antes y después, rechazo indebido de 5 a 1–3 de 50 y frontera de 10 a 14 de 14 (`filtro_dominio_informe_antes.md` y `_despues.md`). El costo del cierre es que una caída del modelo rechaza una pregunta válida, que el cliente puede repetir |
 | 2026-11-21 | Voces de la escena con Piper (`piper-tts`, GPL-3.0) local; la descarga de modelos en `voz/descarga.py` es la segunda excepción de red fuera de `net.py`, con las mismas reglas que la de Meta | Voz sin internet ni costo y distinta por personaje; la descarga cumple `timeout`, User-Agent y `From`; el código sigue MIT y quien distribuya el conjunto con `piper-tts` cumple la GPL-3.0 |
+| 2026-11-25 | Cliente del gateway OpenClaw en `canal/openclaw.py`: 45 s de techo (3 s de conexión), sin reintentos, solo el mensaje nuevo y respaldo al grafo; `/` y PII no salen al gateway | El contrato del agente exige una sola respuesta y no migrar hilos. Un techo de 45 s cubre el turno con herramientas (unos 9 s medidos) y acota la cola de un trabajador; sin token o con `OPENCLAW_ACTIVO=0` el canal sigue en el grafo. El mensaje se registra con `motor` y la base anterior se migra al arrancar |
 | 2026-11-24 | La corrida de inyección contra el gateway local de OpenClaw (`arqueo/inyeccion_vivo.py`) es la tercera excepción de red fuera de `net.py`, con las mismas reglas que Meta y Piper | `net.py` es un cliente `GET` para el sitio del banco, con pausa de 1,5 s y reintentos; la evaluación hace `POST` a un servicio en `127.0.0.1`, sin reintentos (un reintento repetiría el ataque) y con un tiempo propio de 60 s, porque una respuesta con herramientas tarda unos 9 s. Cumple `timeout`, User-Agent y `From`, rechaza hosts que no sean loopback y el token vive solo en `OPENCLAW_GATEWAY_TOKEN` |
 
 ## 12. Configuración local (no trackear)

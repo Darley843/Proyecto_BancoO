@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS mensajes (
     usuario_id TEXT NOT NULL,
     estado TEXT NOT NULL,
     recibido_en TEXT NOT NULL,
-    procesado_en TEXT
+    procesado_en TEXT,
+    motor TEXT
 );
 
 CREATE TABLE IF NOT EXISTS consentimientos (
@@ -109,6 +110,9 @@ def inicializar_almacen(ruta: Path = RUTA_ALMACEN) -> None:
     """
     with conectar(ruta) as conexion:
         conexion.executescript(ESQUEMA)
+        columnas = {fila[1] for fila in conexion.execute("PRAGMA table_info(mensajes)")}
+        if "motor" not in columnas:
+            conexion.execute("ALTER TABLE mensajes ADD COLUMN motor TEXT")
 
 
 def registrar_mensaje(
@@ -145,6 +149,7 @@ def actualizar_mensaje(
     estado: str,
     *,
     procesado: bool = False,
+    motor: str | None = None,
 ) -> None:
     """Cambia el estado de un mensaje ya registrado.
 
@@ -153,13 +158,15 @@ def actualizar_mensaje(
         id_mensaje: id de Meta.
         estado: ``procesando``, ``respondido``, ``error`` o ``ignorado``.
         procesado: si se marca la hora de procesamiento.
+        motor: motor que respondió (``openclaw``, ``grafo`` o ``canal``); se
+            conserva el valor anterior si llega ``None``.
     """
     procesado_en = datetime.now(UTC).isoformat() if procesado else None
     with conectar(ruta) as conexion:
         conexion.execute(
-            "UPDATE mensajes SET estado = ?, procesado_en = COALESCE(?, procesado_en) "
-            "WHERE id_mensaje = ?",
-            (estado, procesado_en, id_mensaje),
+            "UPDATE mensajes SET estado = ?, procesado_en = COALESCE(?, procesado_en), "
+            "motor = COALESCE(?, motor) WHERE id_mensaje = ?",
+            (estado, procesado_en, motor, id_mensaje),
         )
 
 

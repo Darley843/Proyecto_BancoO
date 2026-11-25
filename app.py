@@ -45,6 +45,7 @@ from banco_occidente_corpus.canal.envio import (
     EnviadorMeta,
     ErrorEnvio,
 )
+from banco_occidente_corpus.canal.openclaw import ClienteOpenClaw, cliente_desde_entorno
 from banco_occidente_corpus.canal.webhook import crear_router_canal
 from banco_occidente_corpus.config import Config, load_config
 from banco_occidente_corpus.escena.api import crear_router_escena
@@ -134,8 +135,13 @@ def crear_app(
         voces_disponibles = modelos_disponibles(config_voz, configuracion.paths.root)
     cola = ColaMensajes()
     despachador: Despachador | None = None
+    motor_openclaw: ClienteOpenClaw | None = None
 
     if sal:
+        motor_openclaw = cliente_desde_entorno(
+            user_agent=configuracion.site.user_agent,
+            remitente=configuracion.site.contact,
+        )
         maquina = MaquinaConsentimiento(
             ruta_canal,
             version=canal.version_aviso,
@@ -221,6 +227,7 @@ def crear_app(
             cola=cola,
             crear_enviador=fabrica_enviador,
             responder=responder,
+            motor=motor_openclaw.responder if motor_openclaw is not None else None,
             entrevista=entrevista,
         )
 
@@ -235,6 +242,8 @@ def crear_app(
         finally:
             if despachador is not None:
                 cola.detener()
+            if motor_openclaw is not None:
+                motor_openclaw.cerrar()
             cerrar_transmisiones()
 
     app = FastAPI(
