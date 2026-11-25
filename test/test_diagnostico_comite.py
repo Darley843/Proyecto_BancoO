@@ -1422,6 +1422,21 @@ NEGACIONES_QUE_ANTES_ANULABAN: tuple[str, ...] = (
     "No hay problema, te lo aprueban",
 )
 
+#: Verbos de afirmación negados con «que»: niegan toda la cláusula, aunque haya
+#: más de tres palabras entre la negación y la promesa.
+NEGACIONES_DE_AFIRMACION: tuple[str, ...] = (
+    "No puedo decir que todos los créditos están aprobados",
+    "No te puedo asegurar que tu crédito está aprobado",
+    "Nunca voy a prometerte que te lo aprueban",
+)
+
+#: Un corte cierra la negación; y «dudar» no es un verbo de afirmación.
+AFIRMACIONES_TRAS_LA_NEGACION: tuple[str, ...] = (
+    "No te voy a mentir: está aprobado",
+    "No puedo decirte que no, ya está aprobado",
+    "No dudes que te lo aprueban",
+)
+
 #: Tokens de negación de `_promesas` antes de los arreglos: no miraban la frase.
 _NEGACIONES_VERSION_ANTERIOR = ("no ", "nunca ", "ni ", "sin ", "ninguna ", "jamás ", "jamas ")
 
@@ -1645,6 +1660,23 @@ def test_auditar_texto_limita_las_palabras_entre_la_negacion_y_la_promesa() -> N
     """Con tres enlaces la negación aún anula; con cuatro ya no es inmediata."""
     assert auditar_texto("no está queda fue aprobado") == []
     assert auditar_texto("no está queda fue es aprobado") == ["Promesa de aprobación: «aprobado»"]
+
+
+@pytest.mark.parametrize("texto", NEGACIONES_DE_AFIRMACION)
+def test_auditar_texto_no_marca_una_promesa_tras_un_verbo_de_afirmacion_negado(
+    texto: str,
+) -> None:
+    """«No puedo decir que…» niega la cláusula aunque haya más de tres enlaces."""
+    assert auditar_texto(texto) == []
+
+
+@pytest.mark.parametrize("texto", AFIRMACIONES_TRAS_LA_NEGACION)
+def test_auditar_texto_marca_la_promesa_si_un_corte_o_otro_verbo_la_despega(texto: str) -> None:
+    """Un corte cierra la negación, y «dudar» no es un verbo de afirmación."""
+    hallazgos = auditar_texto(texto)
+
+    assert hallazgos
+    assert all(hallazgo.startswith("Promesa de aprobación") for hallazgo in hallazgos)
 
 
 def test_auditar_texto_admite_un_sustantivo_tras_ninguna_o_ninguno() -> None:
