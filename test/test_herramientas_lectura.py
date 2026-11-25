@@ -47,8 +47,8 @@ def test_calcular_prestamo_gota_no_usa_modelo() -> None:
 
 
 def test_diagnosticar_capacidad_devuelve_el_resultado_del_motor() -> None:
-    """El diagnóstico se arma con las respuestas de la entrevista."""
-    salida = lectura.diagnosticar_capacidad(RESPUESTAS)
+    """El diagnóstico se arma con las respuestas y el monto exacto del invitado."""
+    salida = lectura.diagnosticar_capacidad(RESPUESTAS, monto=7_500_000)
     assert salida.ok
     resultado = salida.datos["resultado"]
     assert resultado["entrada"]["producto"] == "libre_inversion"

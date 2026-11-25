@@ -101,6 +101,16 @@ PREGUNTAS_FIJAS: dict[str, str] = {
     "objetivo": "¿Qué quieres hacer?",
     "vinculacion": "¿Cómo generas tus ingresos?",
 }
+#: Orden de los bloques fijos de la entrevista del canal.
+ORDEN_BLOQUES_FIJOS: tuple[str, ...] = (
+    "objetivo",
+    "vinculacion",
+    "ingresos",
+    "gastos",
+    "cuotas",
+)
+#: Pregunta del monto exacto, que va después del bloque de monto.
+PREGUNTA_MONTO_EXACTO: str = "¿Cuál es el monto exacto que necesitas, en pesos?"
 
 
 def _formulario_entrevista() -> tuple[
@@ -108,12 +118,14 @@ def _formulario_entrevista() -> tuple[
     dict[str, str],
     dict[str, str],
     int,
+    dict[str, tuple[str, ...]],
 ]:
     """Lee del TOML las opciones, las preguntas, los productos y el monto mínimo.
 
     Returns:
         Las opciones por bloque, las preguntas por bloque, el nombre legible de
-        cada producto y el monto mínimo de la entrevista, en pesos.
+        cada producto, el monto mínimo de la entrevista, en pesos, y los
+        productos a los que aplica cada bloque.
     """
     with RUTA_DIAGNOSTICO.open("rb") as fh:
         datos = tomllib.load(fh)
@@ -123,14 +135,24 @@ def _formulario_entrevista() -> tuple[
     minimo = int(dict(datos.get("limites", {})).get("monto_minimo", 500_000))
     opciones: dict[str, list[dict[str, Any]]] = {}
     preguntas: dict[str, str] = {}
+    aplica: dict[str, tuple[str, ...]] = {}
     for rango in datos.get("rango", []):
         clave = str(rango["clave"])
         preguntas[clave] = str(rango.get("pregunta", "")).strip()
         opciones[clave] = [dict(opcion) for opcion in rango.get("opcion", [])]
-    return opciones, preguntas, productos, minimo
+        aplica[clave] = tuple(str(producto) for producto in rango.get("aplica_a", []))
+    return opciones, preguntas, productos, minimo, aplica
 
 
-_OPCIONES_TOML, _PREGUNTAS_TOML, _PRODUCTOS_TOML, _MONTO_MINIMO = _formulario_entrevista()
+_OPCIONES_TOML, _PREGUNTAS_TOML, _PRODUCTOS_TOML, _MONTO_MINIMO, _APLICA_TOML = (
+    _formulario_entrevista()
+)
+#: Valor de cálculo de cada opción de la entrevista, en unidades de su bloque.
+VALORES_ENTREVISTA: dict[str, int] = {
+    str(opcion["id"]): int(opcion.get("valor", 0))
+    for opciones in _OPCIONES_TOML.values()
+    for opcion in opciones
+}
 #: Pregunta de cada bloque de la entrevista, en el orden del TOML.
 PREGUNTAS_ENTREVISTA: dict[str, str] = {**PREGUNTAS_FIJAS, **_PREGUNTAS_TOML}
 
@@ -269,6 +291,116 @@ def limites_de_monto() -> dict[str, tuple[int, int]]:
 LIMITES_MONTO: dict[str, tuple[int, int]] = limites_de_monto()
 
 
+def bloque_aplicable(prefijo: str, producto: str) -> str | None:
+    """Devuelve el bloque del TOML que aplica al producto para un prefijo.
+
+    Args:
+        prefijo: `monto` o `plazo`.
+        producto: clave del producto elegido en el objetivo.
+
+    Returns:
+        La clave del bloque (`monto`, `monto_vehiculo`, `plazo_vivienda`, …) o
+        `None` si el producto no tiene ese bloque.
+    """
+    for clave, productos in _APLICA_TOML.items():
+        if (clave == prefijo or clave.startswith(f"{prefijo}_")) and producto in productos:
+            return clave
+    return None
+
+
+def _pregunta_de_bloque(clave: str) -> dict[str, Any]:
+    """Arma el paso `faltan_datos` de un bloque con sus letras y etiquetas.
+
+    Args:
+        clave: bloque de `BLOQUES_ENTREVISTA`.
+
+    Returns:
+        El estado, la pregunta y las opciones exactas que Pana debe copiar.
+    """
+    bloque = BLOQUES_ENTREVISTA[clave]
+    return {
+        "estado": "faltan_datos",
+        "bloque": clave,
+        "pregunta": bloque["pregunta"],
+        "opciones": bloque["opciones"],
+        "mensaje": (
+            "Copia esta pregunta y sus opciones tal cual, una sola pregunta por "
+            "mensaje; no cambies textos ni rangos."
+        ),
+    }
+
+
+def _pregunta_de_monto_exacto(ident: str) -> dict[str, Any]:
+    """Arma el paso `faltan_datos` del monto exacto, después del bloque de monto.
+
+    Args:
+        ident: id `monto.*` elegido en la entrevista.
+
+    Returns:
+        La pregunta aparte, con los límites del rango y su valor de cálculo como
+        respaldo si el invitado no da una cifra exacta.
+    """
+    desde, hasta = LIMITES_MONTO[ident]
+    return {
+        "estado": "faltan_datos",
+        "bloque": "monto_exacto",
+        "campo": "monto",
+        "pregunta": PREGUNTA_MONTO_EXACTO,
+        "opciones": [],
+        "rango": ident,
+        "etiqueta": ETIQUETAS_ENTREVISTA.get(ident, ident),
+        "limites": {"desde": desde, "hasta": hasta},
+        "valor_del_rango": VALORES_ENTREVISTA.get(ident),
+        "mensaje": (
+            "Pregunta el monto exacto en un mensaje aparte y pásalo en `monto`, "
+            "con la misma validación de límites del rango. Si no lo da, usa "
+            "`valor_del_rango`; no inventes otra cifra."
+        ),
+    }
+
+
+def pregunta_pendiente(
+    respuestas: Sequence[str],
+    monto: int | None = None,
+) -> dict[str, Any] | None:
+    """Devuelve la siguiente pregunta de la entrevista del canal, o `None`.
+
+    El orden es el de la entrevista del canal: objetivo, vinculación, ingresos,
+    gastos y cuotas; después `cuota_trasladar` solo en compra de cartera, el
+    bloque de monto, la pregunta del monto exacto y el plazo. El ahorro no lleva
+    monto ni plazo.
+
+    Args:
+        respuestas: ids canónicos que ya eligió el invitado.
+        monto: monto exacto que dijo el invitado, si ya lo dio.
+
+    Returns:
+        El paso `faltan_datos` con la pregunta y sus opciones, o `None` si la
+        entrevista está completa.
+    """
+    elegidos: dict[str, str] = {}
+    for ident in respuestas:
+        elegidos[ident.split(".", 1)[0]] = ident
+    for clave in ORDEN_BLOQUES_FIJOS:
+        if clave not in elegidos:
+            return _pregunta_de_bloque(clave)
+    producto = elegidos["objetivo"].split(".", 1)[1]
+    if producto == "ahorro":
+        return None
+    if producto == "compra_cartera" and "cuota_trasladar" not in elegidos:
+        return _pregunta_de_bloque("cuota_trasladar")
+    if "monto" not in elegidos:
+        clave = bloque_aplicable("monto", producto)
+        return _pregunta_de_bloque(clave) if clave is not None else None
+    if monto is None:
+        return _pregunta_de_monto_exacto(elegidos["monto"])
+    if "plazo" not in elegidos:
+        clave = bloque_aplicable("plazo", producto)
+        if clave is not None:
+            return _pregunta_de_bloque(clave)
+    return None
+
+
 def respuestas_invalidas(respuestas: Sequence[str]) -> list[str]:
     """Devuelve las respuestas que no son ids canónicos de la entrevista.
 
@@ -284,17 +416,21 @@ def respuestas_invalidas(respuestas: Sequence[str]) -> list[str]:
 def respuestas_o_error(
     herramienta: str,
     respuestas: Sequence[str],
+    *,
+    parcial: bool = False,
 ) -> SalidaHerramienta | None:
     """Revisa la forma de la entrevista y devuelve el error si no sirve.
 
     Args:
         herramienta: nombre del catálogo, para el sobre de error.
         respuestas: ids canónicos recibidos.
+        parcial: acepta una entrevista incompleta o vacía; lo usa
+            `diagnosticar_capacidad`, que conduce la entrevista.
 
     Returns:
         El error con los campos y valores válidos, o `None` si la forma es válida.
     """
-    if not respuestas:
+    if not respuestas and not parcial:
         return error_de_respuestas(
             herramienta,
             "No llegó ninguna respuesta: faltan los bloques de la entrevista.",
@@ -444,11 +580,14 @@ PreguntaProyecto = Annotated[
 ]
 #: Descripción del monto exacto que dijo el invitado.
 DESCRIPCION_MONTO_EXACTO: str = (
-    "Monto exacto en pesos que dijo el invitado. Si lo dio, pasa aquí el mismo "
-    "valor que usaste en `calcular_prestamo_gota`: reemplaza el valor de cálculo "
-    "del rango solo si cae dentro de sus límites; si no, devuelve "
-    "`entrada_invalida` con los límites. Sin este campo se usa el valor del rango "
-    "(por ejemplo 4.000.000 para monto.HASTA_5M)."
+    "Monto exacto en pesos que dijo el invitado; es el mismo valor que usaste en "
+    "`calcular_prestamo_gota` y se pasa igual a todas las herramientas del "
+    "recorrido (`diagnosticar_capacidad`, `comparar_escenario`, "
+    "`convocar_comite`, `generar_tarjeta_pana`, `negociar_opcion` y "
+    "`generar_ficha_opcion`). Reemplaza el valor de cálculo del rango solo si cae "
+    "dentro de sus límites; si no, devuelve `entrada_invalida` con los límites. "
+    "Sin este campo se usa el valor del rango (por ejemplo 4.000.000 para "
+    "monto.HASTA_5M), salvo en `diagnosticar_capacidad`, que lo pide aparte."
 )
 #: Monto exacto opcional del invitado, validado contra el rango elegido.
 MontoExactoEntrada = Annotated[
@@ -548,11 +687,17 @@ class VerificarUsuraEntrada(BaseModel):
 
 
 class DiagnosticarCapacidadEntrada(BaseModel):
-    """Entrada de `diagnosticar_capacidad`."""
+    """Entrada de `diagnosticar_capacidad`.
+
+    Acepta respuestas parciales: con `faltan_datos` devuelve la siguiente
+    pregunta de la entrevista del canal y, después del bloque de monto, pide el
+    monto exacto en un paso aparte.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     respuestas: RespuestasEntrevista
+    monto: MontoExactoEntrada = None
 
 
 class CompararEscenarioEntrada(BaseModel):
@@ -561,6 +706,7 @@ class CompararEscenarioEntrada(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     respuestas: RespuestasEntrevista
+    monto: MontoExactoEntrada = None
     campo: CampoEscenarioHerramienta = Field(description="Insumo que cambia el escenario.")
     valor: float = Field(gt=0, le=1_000_000_000_000, description="Valor nuevo del insumo.")
 
@@ -571,6 +717,7 @@ class ConvocarComiteEntrada(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     respuestas: RespuestasEntrevista
+    monto: MontoExactoEntrada = None
 
 
 class CalcularPrestamoGotaEntrada(BaseModel):
@@ -692,6 +839,7 @@ class GenerarTarjetaPanaEntrada(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     respuestas: RespuestasEntrevista
+    monto: MontoExactoEntrada = None
     incluir_imagen: bool = Field(
         default=False,
         description="Si se incluye el PNG en base64 además del texto equivalente.",

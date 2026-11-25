@@ -26,6 +26,7 @@ from .comun import como_json, diagnostico_de, error, mensaje_de_validacion, ok
 from .esquemas import (
     ConsultarCasoEntrada,
     GenerarTarjetaPanaEntrada,
+    MontoExactoEntrada,
     OlvidarMisDatosEntrada,
     RegistrarConsentimientoEntrada,
     RespuestasEntrevista,
@@ -263,6 +264,7 @@ def consultar_caso(usuario_id: str) -> SalidaHerramienta:
 
 def generar_tarjeta_pana(
     respuestas: RespuestasEntrevista,
+    monto: MontoExactoEntrada = None,
     incluir_imagen: bool = False,
 ) -> SalidaHerramienta:
     """Genera la tarjeta de Pana con su texto equivalente.
@@ -270,21 +272,33 @@ def generar_tarjeta_pana(
     Args:
         respuestas: ids canónicos de la entrevista, como en
             `diagnosticar_capacidad`; el esquema trae los valores válidos.
+        monto: monto exacto que dijo el invitado; se usa igual que en
+            `diagnosticar_capacidad`.
         incluir_imagen: si se incluye el PNG en base64.
 
     Returns:
         El texto equivalente y, si se pidió, la imagen en base64.
     """
-    entrada = GenerarTarjetaPanaEntrada(respuestas=respuestas, incluir_imagen=incluir_imagen)
+    entrada = GenerarTarjetaPanaEntrada(
+        respuestas=respuestas,
+        monto=monto,
+        incluir_imagen=incluir_imagen,
+    )
     fallo = respuestas_o_error("generar_tarjeta_pana", entrada.respuestas)
     if fallo is not None:
         return fallo
     try:
-        resultado = diagnostico_de(entrada.respuestas)
+        resultado = diagnostico_de(
+            entrada.respuestas,
+            entrada.monto,
+            herramienta="generar_tarjeta_pana",
+        )
     except ValidationError as exc:
         return error_de_respuestas("generar_tarjeta_pana", mensaje_de_validacion(exc))
     except ValueError as exc:
         return error_de_respuestas("generar_tarjeta_pana", str(exc))
+    if isinstance(resultado, SalidaHerramienta):
+        return resultado
     imagen, texto = tarjeta_y_texto(resultado)
     datos: dict[str, object] = {"texto": texto, "png_bytes": len(imagen)}
     if entrada.incluir_imagen:

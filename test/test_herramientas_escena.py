@@ -17,6 +17,7 @@ from pydantic import ValidationError
 
 from banco_occidente_corpus.herramientas import catalogo, estado, lectura
 from banco_occidente_corpus.herramientas.esquemas import (
+    BLOQUES_ENTREVISTA,
     CATALOGO_ENTREVISTA,
     NegociarOpcionEntrada,
     VerificarUsuraEntrada,
@@ -147,15 +148,66 @@ def test_error_de_entrevista_trae_campos_y_valores_validos() -> None:
     incompleta = lectura.diagnosticar_capacidad(
         ["objetivo.libre_inversion", "vinculacion.empleado"]
     )
-    assert not incompleta.ok
-    assert incompleta.datos["valores_validos"]["cuotas"]
-    assert "monto.DE_5M_A_10M" in incompleta.datos["valores_validos"]["monto"]
+    assert incompleta.ok
+    assert incompleta.datos["estado"] == "faltan_datos"
+    assert incompleta.datos["bloque"] == "ingresos"
+    assert incompleta.datos["opciones"] == BLOQUES_ENTREVISTA["ingresos"]["opciones"]
 
     tarjeta = estado.generar_tarjeta_pana(["monto.rango_2"])
     assert not tarjeta.ok
     assert tarjeta.error is not None
     assert tarjeta.error.codigo == "entrada_invalida"
     assert tarjeta.datos["valores_validos"]["plazo"]
+
+
+def test_entrevista_la_conduce_diagnosticar_capacidad() -> None:
+    """Sin respuestas, la herramienta devuelve la primera pregunta y sus opciones."""
+    salida = lectura.diagnosticar_capacidad([])
+    assert salida.ok
+    assert salida.error is None
+    assert salida.datos["estado"] == "faltan_datos"
+    assert salida.datos["bloque"] == "objetivo"
+    assert salida.datos["pregunta"] == BLOQUES_ENTREVISTA["objetivo"]["pregunta"]
+    assert salida.datos["opciones"] == BLOQUES_ENTREVISTA["objetivo"]["opciones"]
+    assert salida.datos["opciones"][0]["letra"] == "A"
+    assert salida.datos["opciones"][0]["id"].startswith("objetivo.")
+
+
+def test_entrevista_pide_el_monto_exacto_despues_del_rango() -> None:
+    """Con el bloque de monto respondido y sin `monto`, pide el monto exacto."""
+    salida = lectura.diagnosticar_capacidad(RESPUESTAS_HASTA_5M)
+    assert salida.ok
+    assert salida.datos["estado"] == "faltan_datos"
+    assert salida.datos["bloque"] == "monto_exacto"
+    assert salida.datos["campo"] == "monto"
+    assert salida.datos["rango"] == "monto.HASTA_5M"
+    assert salida.datos["etiqueta"] == "Entre $500 mil y $5 millones"
+    assert salida.datos["limites"] == {"desde": 500_000, "hasta": 5_000_000}
+    assert salida.datos["opciones"] == []
+
+
+def test_diagnostico_usa_el_monto_exacto_en_todo_el_recorrido() -> None:
+    """Con todas las respuestas y monto=2.000.000, el motor calcula sobre 2 M."""
+    salida = lectura.diagnosticar_capacidad(RESPUESTAS_HASTA_5M, monto=2_000_000)
+    assert salida.ok
+    entrada = salida.datos["resultado"]["entrada"]
+    assert Decimal(str(entrada["monto_credito"])) == Decimal("2000000")
+    assert entrada["rango_usado"]["monto"] == "monto.HASTA_5M"
+
+    escenario = lectura.comparar_escenario(
+        RESPUESTAS_HASTA_5M,
+        "plazo_meses",
+        60,
+        monto=2_000_000,
+    )
+    assert escenario.ok
+    assert Decimal(str(escenario.datos["escenario"]["entrada"]["monto_credito"])) == Decimal(
+        "2000000"
+    )
+
+    tarjeta = estado.generar_tarjeta_pana(RESPUESTAS_HASTA_5M, monto=2_000_000)
+    assert tarjeta.ok
+    assert "$2 millones" in str(tarjeta.datos["texto"])
 
 
 def test_negociar_opcion_usa_las_respuestas_y_no_acepta_modo_demo(

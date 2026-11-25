@@ -15,7 +15,7 @@ from decimal import Decimal
 from pydantic import BaseModel, ValidationError
 
 from ..asistente.validacion import cifras_duras
-from ..canal.contratos import EntradaDiagnostico, ResultadoDiagnostico
+from ..canal.contratos import ResultadoDiagnostico
 from ..cifras_legibles import (
     anotar,
     cifra,
@@ -45,9 +45,8 @@ from ..mcp_servidor.servidor import simular_cuota as _simular_cuota
 from ..pana.desde_diagnostico import tarjeta_y_texto
 from ..sucursal.ajustes import leer_modo_demo
 from ..tablero.tasas import cargar_config_tasas, clave_producto
-from .comun import como_json, error, mensaje_de_validacion, ok
+from .comun import aplicar_monto_exacto, como_json, error, mensaje_de_validacion, ok
 from .esquemas import (
-    LIMITES_MONTO,
     AuditarRespuestaEntrada,
     BuscarEnDocumentosEntrada,
     CalcularPrestamoGotaEntrada,
@@ -71,6 +70,7 @@ from .esquemas import (
     UnidadTasaEntrada,
     VerificarUsuraEntrada,
     error_de_respuestas,
+    pregunta_pendiente,
     respuestas_o_error,
 )
 
@@ -103,7 +103,7 @@ def _diagnostico(
     try:
         entrada = entrada_desde_respuestas(respuestas)
         if monto is not None:
-            ajustada = _monto_exacto(herramienta, entrada, monto)
+            ajustada = aplicar_monto_exacto(herramienta, entrada, monto)
             if isinstance(ajustada, SalidaHerramienta):
                 return ajustada
             entrada = ajustada
@@ -112,60 +112,6 @@ def _diagnostico(
         return error_de_respuestas(herramienta, mensaje_de_validacion(exc))
     except ValueError as exc:
         return error_de_respuestas(herramienta, str(exc))
-
-
-def _monto_exacto(
-    herramienta: str,
-    entrada: EntradaDiagnostico,
-    monto: int,
-) -> EntradaDiagnostico | SalidaHerramienta:
-    """Reemplaza el valor del rango por el monto exacto, si cabe en sus límites.
-
-    Args:
-        herramienta: nombre del catálogo, para el sobre de error.
-        entrada: entrada del diagnóstico con el valor de cálculo del rango.
-        monto: monto exacto que dijo el invitado, en pesos.
-
-    Returns:
-        La entrada con el monto exacto, o el error `entrada_invalida` con los
-        límites del rango elegido.
-    """
-    ident = next(
-        (valor for valor in entrada.rango_usado.values() if valor.startswith("monto.")),
-        None,
-    )
-    if ident is None:
-        return error(
-            herramienta,
-            "entrada_invalida",
-            "El producto no lleva monto de crédito; no se puede aplicar un monto exacto.",
-        )
-    limites = LIMITES_MONTO.get(ident)
-    if limites is None:
-        return error(
-            herramienta,
-            "entrada_invalida",
-            f"El rango {ident} no declara límites de monto.",
-        )
-    desde, hasta = limites
-    if not desde <= monto <= hasta:
-        salida = error(
-            herramienta,
-            "entrada_invalida",
-            (
-                f"El monto {monto} no cabe en el rango {ident}: desde "
-                f"{formatear_pesos(Decimal(desde))} hasta {formatear_pesos(Decimal(hasta))}."
-            ),
-        )
-        salida.datos.update(
-            {
-                "monto": monto,
-                "rango": ident,
-                "limites": {"desde": desde, "hasta": hasta},
-            }
-        )
-        return salida
-    return entrada.model_copy(update={"monto_credito": Decimal(monto)})
 
 
 def _tasa_efectiva(valor: float, unidad: str | None) -> tuple[float, str]:
@@ -325,25 +271,37 @@ def verificar_usura(
     return ok("verificar_usura", datos)
 
 
-def diagnosticar_capacidad(respuestas: RespuestasEntrevista) -> SalidaHerramienta:
-    """Calcula el diagnóstico completo a partir de las respuestas de la entrevista.
+def diagnosticar_capacidad(
+    respuestas: RespuestasEntrevista,
+    monto: MontoExactoEntrada = None,
+) -> SalidaHerramienta:
+    """Conduce la entrevista y calcula el diagnóstico completo.
+
+    Con respuestas parciales no falla: devuelve `faltan_datos` con la siguiente
+    pregunta de la entrevista del canal y sus opciones exactas. Después del
+    bloque de monto pide el monto exacto en un paso aparte; cuando llega, lo usa
+    si cae dentro de los límites del rango.
 
     Args:
         respuestas: ids canónicos de la entrevista en la forma bloque.valor:
             objetivo.* y vinculacion.* (uno de cada lista), ingresos.*,
             gastos.* y cuotas.* (obligatorios), monto.* y plazo.* (en crédito) y
-            cuota_trasladar.* (solo en compra de cartera). El esquema del campo
-            trae todas las opciones. Si falta un bloque, el error devuelve el
-            catálogo en `datos["valores_validos"]` para corregir en un intento.
+            cuota_trasladar.* (solo en compra de cartera). Puede venir vacía o
+            incompleta: la herramienta indica qué preguntar.
+        monto: monto exacto que dijo el invitado, en pesos.
 
     Returns:
-        El resultado determinista con cuota, semáforo, alertas y trazabilidad.
+        El paso `faltan_datos` con la pregunta y sus opciones, o el resultado
+        determinista con cuota, semáforo, alertas y trazabilidad.
     """
-    fallo = respuestas_o_error("diagnosticar_capacidad", respuestas)
+    fallo = respuestas_o_error("diagnosticar_capacidad", respuestas, parcial=True)
     if fallo is not None:
         return fallo
-    entrada = DiagnosticarCapacidadEntrada(respuestas=respuestas)
-    resultado = _diagnostico("diagnosticar_capacidad", entrada.respuestas)
+    entrada = DiagnosticarCapacidadEntrada(respuestas=respuestas, monto=monto)
+    pendiente = pregunta_pendiente(entrada.respuestas, entrada.monto)
+    if pendiente is not None:
+        return ok("diagnosticar_capacidad", pendiente)
+    resultado = _diagnostico("diagnosticar_capacidad", entrada.respuestas, monto=entrada.monto)
     if isinstance(resultado, SalidaHerramienta):
         return resultado
     return ok("diagnosticar_capacidad", {"resultado": como_json(resultado)})
@@ -353,6 +311,7 @@ def comparar_escenario(
     respuestas: RespuestasEntrevista,
     campo: CampoEscenarioHerramienta,
     valor: float,
+    monto: MontoExactoEntrada = None,
 ) -> SalidaHerramienta:
     """Compara un «¿Y si…?» contra el diagnóstico original, sin el grafo.
 
@@ -362,6 +321,8 @@ def comparar_escenario(
         campo: insumo que cambia (`monto_credito`, `plazo_meses`, `ingreso_mensual`,
             `gastos_mensuales` o `cuotas_deudas`).
         valor: valor nuevo del insumo.
+        monto: monto exacto que dijo el invitado; se usa igual que en
+            `diagnosticar_capacidad`.
 
     Returns:
         El escenario calculado y la comparación con su tendencia.
@@ -369,8 +330,13 @@ def comparar_escenario(
     fallo = respuestas_o_error("comparar_escenario", respuestas)
     if fallo is not None:
         return fallo
-    entrada = CompararEscenarioEntrada(respuestas=respuestas, campo=campo, valor=valor)
-    resultado = _diagnostico("comparar_escenario", entrada.respuestas)
+    entrada = CompararEscenarioEntrada(
+        respuestas=respuestas,
+        monto=monto,
+        campo=campo,
+        valor=valor,
+    )
+    resultado = _diagnostico("comparar_escenario", entrada.respuestas, monto=entrada.monto)
     if isinstance(resultado, SalidaHerramienta):
         return resultado
     cambio = CambioEscenario(campo=entrada.campo, valor=Decimal(str(entrada.valor)))
@@ -384,7 +350,10 @@ def comparar_escenario(
     )
 
 
-def convocar_comite(respuestas: RespuestasEntrevista) -> SalidaHerramienta:
+def convocar_comite(
+    respuestas: RespuestasEntrevista,
+    monto: MontoExactoEntrada = None,
+) -> SalidaHerramienta:
     """Convoca el comité de crédito cuando el diagnóstico es amarillo o rojo.
 
     El comité usa el modelo de DeepSeek del proyecto. Sin `DEEPSEEK_API_KEY` la
@@ -394,6 +363,8 @@ def convocar_comite(respuestas: RespuestasEntrevista) -> SalidaHerramienta:
     Args:
         respuestas: ids canónicos de la entrevista, como en
             `diagnosticar_capacidad`.
+        monto: monto exacto que dijo el invitado; se usa igual que en
+            `diagnosticar_capacidad`.
 
     Returns:
         La deliberación con posturas, recomendación y hallazgos, o el motivo por
@@ -402,8 +373,8 @@ def convocar_comite(respuestas: RespuestasEntrevista) -> SalidaHerramienta:
     fallo = respuestas_o_error("convocar_comite", respuestas)
     if fallo is not None:
         return fallo
-    entrada = ConvocarComiteEntrada(respuestas=respuestas)
-    resultado = _diagnostico("convocar_comite", entrada.respuestas)
+    entrada = ConvocarComiteEntrada(respuestas=respuestas, monto=monto)
+    resultado = _diagnostico("convocar_comite", entrada.respuestas, monto=entrada.monto)
     if isinstance(resultado, SalidaHerramienta):
         return resultado
     if resultado.semaforo not in {"amarillo", "rojo"} or resultado.cuota_mensual is None:
