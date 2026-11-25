@@ -57,6 +57,7 @@ make tablero     # tarifario + tablas de Gold -> data/estructurados/tablero.csv
 make app         # Sucursal 1965: FastAPI + app web en 127.0.0.1:8000
 make agente-mcp  # servidor MCP del agente pana con las 20 tools en 127.0.0.1:8765
 make herramientas # catálogo de las 20 tools y sus esquemas Pydantic (JSON=1)
+make probar-openclaw # cliente de OpenClaw contra el gateway (token en el entorno)
 make traza       # últimas llamadas a las tools, sin datos personales
 make simular     # canal completo con las personas sintéticas y el enviador falso (sin red)
 make arqueo      # data/evaluacion/arqueo.json y docs/ARQUEO.md (sin DeepSeek)
@@ -179,6 +180,7 @@ rol declarados, con consentimiento.
 | `.../canal/entrevista.py` | Entrevista del diagnóstico por WhatsApp y tarjeta |
 | `.../canal/hitl.py` | `interrupt()`, botones Contactar/Descartar y caso de asesor |
 | `.../canal/envio.py` | Cliente de Meta: `timeout`, User-Agent y `From` |
+| `.../canal/openclaw.py` | Cliente del gateway OpenClaw: 45 s de techo, sin reintentos, UA, `From` y respaldo al grafo |
 | `.../canal/almacen.py` | Mensajes, consentimientos y casos en SQLite |
 | `.../diagnostico/motor.py` | Contratos del canal → cálculo → `ResultadoDiagnostico` |
 | `.../diagnostico/calculo.py` | Tasa mensual y cuota francesa |
@@ -228,6 +230,7 @@ REJECT if:
   La regla anterior cubre el sitio del banco y las fuentes del corpus; las llamadas a la API del modelo desde `asistente/` van por el cliente de LangChain, con `timeout`, sin claves en el código y sin leer `.env`.
   Las llamadas a Ollama desde `boveda/` van por `langchain-ollama` con `timeout` explícito (`embeddings.timeout_segundos`); no aplican `robots.txt`, `From` ni 1,5 s porque el destino es local y no es scraping, pero el `timeout` sí es obligatorio.
   Las llamadas del canal de WhatsApp a la API de Meta (`graph.facebook.com`, desde `canal/envio.py`) van con `timeout` explícito, el User-Agent del proyecto y el header `From`; no aplican `robots.txt` ni la pausa de 1,5 s porque no son scraping del sitio del banco, pero el `timeout` sí es obligatorio y nunca se usa `verify=False`.
+  Las llamadas del canal al gateway local de OpenClaw (`canal/openclaw.py`, solo `127.0.0.1`, `localhost` o `::1`) van con `httpx`, `timeout` explícito de `gateway.timeout_segundos` (45 s de techo y 3 s para conectar), el User-Agent de `config/site.toml` y el header `From` con `site.contact`; no aplican `robots.txt` ni la pausa de 1,5 s porque es un `POST` a un servicio local y no scraping, no reintenta (un reintento repetiría el turno) y nunca se usa `verify=False`.
   La descarga de los modelos de voz de Piper (`make voz-modelo`, desde `voz/descarga.py`, al repositorio público `huggingface.co/rhasspy/piper-voices`) va con `httpx`, `timeout` explícito, el User-Agent del proyecto y el header `From`; no aplican `robots.txt` ni la pausa de 1,5 s porque no es scraping del sitio del banco, y nunca se usa `verify=False`.
   La corrida de inyección contra el gateway local de OpenClaw (`arqueo/inyeccion_vivo.py`, solo `127.0.0.1` o `localhost`) va con `httpx`, `timeout` explícito, el User-Agent de `config/site.toml` y el header `From` con `site.contact` (sin contacto no arranca); no aplican `robots.txt` ni la pausa de 1,5 s porque es un `POST` a un servicio local y no scraping, no reintenta (un reintento repetiría el ataque) y nunca se usa `verify=False`.
   El User-Agent de navegador de `config/site.toml` es una decisión del grupo documentada en `CONSTITUTION.md` §10 (el WAF responde 403 a todo User-Agent que se declare bot): **no** es motivo de REJECT ni cuenta como evasión, siempre que se envíe el header `From`, se respete `robots.txt` y el ritmo de 1,5 s, y ante un 403 el pipeline se detenga sin reintentar con otro cliente.

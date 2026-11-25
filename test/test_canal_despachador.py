@@ -7,6 +7,8 @@ al modelo.
 
 from __future__ import annotations
 
+import sqlite3
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
@@ -44,6 +46,19 @@ class EnviadorEspia:
 
 
 @dataclass
+class FakeOpenClaw:
+    """Doble del motor OpenClaw: guarda el turno y devuelve un texto fijo."""
+
+    respuesta: str | None = "respuesta de openclaw"
+    llamadas: list[tuple[str, str]] = field(default_factory=list)
+
+    def __call__(self, texto: str, usuario_id: str) -> str | None:
+        """Registra el turno y devuelve la respuesta configurada."""
+        self.llamadas.append((texto, usuario_id))
+        return self.respuesta
+
+
+@dataclass
 class BancoDePrueba:
     """Piezas construidas para un caso del despachador."""
 
@@ -68,8 +83,13 @@ def _mensaje(
     )
 
 
-def _banco(tmp_path: Path, *, autorizado: bool = True) -> BancoDePrueba:
-    """Arma el despachador con enviador y grafo de doble."""
+def _banco(
+    tmp_path: Path,
+    *,
+    autorizado: bool = True,
+    motor: Callable[[str, str], str | None] | None = None,
+) -> BancoDePrueba:
+    """Arma el despachador con enviador, grafo y motor de doble."""
     ruta = tmp_path / "whatsapp.sqlite"
     usuario_id = calcular_usuario_id(NUMERO, SAL)
     enviadas: list[RespuestaCanal] = []
@@ -89,6 +109,7 @@ def _banco(tmp_path: Path, *, autorizado: bool = True) -> BancoDePrueba:
         cola=ColaMensajes(),
         crear_enviador=lambda _usuario, _destino: espia,
         responder=responder,
+        motor=motor,
     )
     return BancoDePrueba(
         despachador=despachador,
@@ -231,3 +252,137 @@ def test_dos_usuarios_no_comparten_hilo_ni_perfil(tmp_path: Path) -> None:
     ]
     assert llamadas[0][1] != llamadas[1][1]
     assert llamadas[0][2] != llamadas[1][2]
+
+
+def _motor_de(ruta: Path, id_mensaje: str) -> str | None:
+    """Lee el motor que quedó registrado para un mensaje."""
+    with sqlite3.connect(str(ruta)) as conexion:
+        fila = conexion.execute(
+            "SELECT motor FROM mensajes WHERE id_mensaje = ?", (id_mensaje,)
+        ).fetchone()
+    return None if fila is None else str(fila[0])
+
+
+def test_openclaw_responde_una_sola_vez_y_no_llama_al_grafo(tmp_path: Path) -> None:
+    """Un texto válido del gateway se envía una vez y el grafo no participa."""
+    motor = FakeOpenClaw()
+
+    banco = _banco(tmp_path, motor=motor)
+    banco.maquina.aceptar(banco.usuario_id, AHORA)
+    mensaje = _mensaje("¿cuál es la cuota de manejo?")
+
+    banco.despachador.recibir(mensaje)
+    banco.despachador.procesar(mensaje)
+
+    assert motor.llamadas == [("¿cuál es la cuota de manejo?", banco.usuario_id)]
+    assert banco.llamadas == []
+    assert [respuesta.texto for respuesta in banco.enviadas] == ["respuesta de openclaw"]
+    assert _motor_de(banco.ruta, mensaje.id_mensaje) == "openclaw"
+
+
+def test_si_openclaw_no_responde_responde_el_grafo(tmp_path: Path) -> None:
+    """Un ``None`` del gateway cae al grafo y deja el motor en la traza."""
+    banco = _banco(tmp_path, motor=lambda _texto, _huella: None)
+    banco.maquina.aceptar(banco.usuario_id, AHORA)
+    mensaje = _mensaje("¿cuál es la cuota de manejo?")
+
+    banco.despachador.recibir(mensaje)
+    banco.despachador.procesar(mensaje)
+
+    assert len(banco.llamadas) == 1
+    assert [respuesta.texto for respuesta in banco.enviadas] == ["respuesta del grafo"]
+    assert _motor_de(banco.ruta, mensaje.id_mensaje) == "grafo"
+
+
+def test_un_motor_que_falla_no_rompe_el_turno(tmp_path: Path) -> None:
+    """Una excepción del gateway se trata como fallo y responde el grafo."""
+
+    def motor(_texto: str, _usuario_id: str) -> str:
+        """Doble que simula una caída del cliente."""
+        raise RuntimeError("gateway caído")
+
+    banco = _banco(tmp_path, motor=motor)
+    banco.maquina.aceptar(banco.usuario_id, AHORA)
+    mensaje = _mensaje("hola")
+
+    banco.despachador.recibir(mensaje)
+    banco.despachador.procesar(mensaje)
+
+    assert len(banco.llamadas) == 1
+    assert [respuesta.texto for respuesta in banco.enviadas] == ["respuesta del grafo"]
+    assert _motor_de(banco.ruta, mensaje.id_mensaje) == "grafo"
+
+
+def test_comando_con_barra_no_va_al_gateway(tmp_path: Path) -> None:
+    """Un texto que empieza por ``/`` no dispara los comandos de OpenClaw."""
+    llamadas_motor: list[str] = []
+
+    def motor(texto: str, _usuario_id: str) -> str:
+        """Doble que no debería recibir el comando."""
+        llamadas_motor.append(texto)
+        return "respuesta de openclaw"
+
+    banco = _banco(tmp_path, motor=motor)
+    banco.maquina.aceptar(banco.usuario_id, AHORA)
+    mensaje = _mensaje("/reset")
+
+    banco.despachador.recibir(mensaje)
+    banco.despachador.procesar(mensaje)
+
+    assert llamadas_motor == []
+    assert len(banco.llamadas) == 1
+    assert _motor_de(banco.ruta, mensaje.id_mensaje) == "grafo"
+
+
+def test_pii_no_va_al_gateway(tmp_path: Path) -> None:
+    """Un teléfono dictado se queda en el grafo, que aplica la política de PII."""
+    llamadas_motor: list[str] = []
+
+    def motor(texto: str, _usuario_id: str) -> str:
+        """Doble que no debería recibir PII."""
+        llamadas_motor.append(texto)
+        return "respuesta de openclaw"
+
+    banco = _banco(tmp_path, motor=motor)
+    banco.maquina.aceptar(banco.usuario_id, AHORA)
+    mensaje = _mensaje("mi teléfono es 3001234567")
+
+    banco.despachador.recibir(mensaje)
+    banco.despachador.procesar(mensaje)
+
+    assert llamadas_motor == []
+    assert len(banco.llamadas) == 1
+    assert _motor_de(banco.ruta, mensaje.id_mensaje) == "grafo"
+
+
+def test_sin_consentimiento_no_llama_al_motor(tmp_path: Path) -> None:
+    """El aviso de la Ley 1581 sale antes de cualquier motor."""
+    llamadas_motor: list[str] = []
+
+    def motor(texto: str, _usuario_id: str) -> str:
+        """Doble que no debería recibir el primer mensaje."""
+        llamadas_motor.append(texto)
+        return "respuesta de openclaw"
+
+    banco = _banco(tmp_path, motor=motor)
+    mensaje = _mensaje("hola")
+
+    banco.despachador.recibir(mensaje)
+    banco.despachador.procesar(mensaje)
+
+    assert llamadas_motor == []
+    assert banco.enviadas[0].tipo == "botones"
+    assert _motor_de(banco.ruta, mensaje.id_mensaje) == "canal"
+
+
+def test_un_motor_con_texto_vacio_cae_al_grafo(tmp_path: Path) -> None:
+    """Un texto en blanco se trata como fallo, no como respuesta vacía."""
+    banco = _banco(tmp_path, motor=lambda _texto, _huella: "   ")
+    banco.maquina.aceptar(banco.usuario_id, AHORA)
+    mensaje = _mensaje("hola")
+
+    banco.despachador.recibir(mensaje)
+    banco.despachador.procesar(mensaje)
+
+    assert [respuesta.texto for respuesta in banco.enviadas] == ["respuesta del grafo"]
+    assert _motor_de(banco.ruta, mensaje.id_mensaje) == "grafo"

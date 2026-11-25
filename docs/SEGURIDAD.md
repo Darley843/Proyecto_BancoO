@@ -532,6 +532,50 @@ lo arranque: es su propósito. La protección es de alcance y de escritura, no d
 confidencialidad. Un cliente MCP malicioso puede seguir haciendo muchas
 consultas; el límite de tiempo y `k` acota cada una, pero no hay cuota global.
 
+### 3.11 Cliente del gateway OpenClaw
+
+**Qué puede pasar.** El canal entrega el texto del invitado a un gateway local
+que, a su vez, puede llamar herramientas y al modelo. Los riesgos son: enviar el
+número o el historial, mandar PII al gateway, dejar que un texto con `/` dispare
+comandos propios del gateway, enviar dos respuestas al invitado si el gateway
+tarda y el respaldo también contesta, filtrar el token en un log o apuntar el
+cliente a un host público.
+
+**Mitigación.**
+
+- `canal/openclaw.py` manda **solo el mensaje nuevo** con `user = wa:<huella>`.
+  No viajan el número, el historial, el perfil ni los fragmentos.
+- El token se lee de `OPENCLAW_GATEWAY_TOKEN`; no hay valor por defecto y nunca
+  se registra en logs. `config/openclaw.toml` no contiene secretos.
+- La base debe ser loopback (`127.0.0.1`, `localhost` o `::1`); otra base se
+  rechaza al cargar la configuración. El cliente no usa proxies del entorno.
+- `httpx` con `timeout` de 45 s de techo y 3 s para conectar, User-Agent y
+  header `From` de `config/site.toml`; sin reintentos y sin `verify=False`. Un
+  reintento repetiría el turno.
+- Ante timeout, error de red, `5xx`, `401`, cuerpo inválido o contenido vacío,
+  el cliente devuelve `None` y responde el grafo. El despachador envía **una**
+  respuesta y registra `motor` (`openclaw`, `grafo` o `canal`).
+- Los textos que empiezan por `/` no se reenvían: son comandos del gateway y el
+  invitado no debe dispararlos. Los textos con PII tampoco salen; el grafo
+  aplica la política completa. Consentimiento, entrevista y HITL corren antes
+  del motor.
+- El modo evento no cambia el alcance: el invitado que acepta la Ley 1581 usa el
+  mismo flujo y las mismas compuertas.
+
+**Verificación.**
+`test/test_canal_openclaw.py` (cuerpo sin historial, `user = wa:<huella>`, sin
+número, timeout, error de red, `5xx`, cuerpo inválido, sin token, sin reintentos
+y host no loopback) y `test/test_canal_despachador.py` (OpenClaw primero,
+respaldo, una sola respuesta, `/` y PII fuera del gateway, y `motor` en la
+traza). `test/test_seguridad.py::test_ningun_cliente_http_desactiva_la_verificacion_tls`
+vigila lo segundo en todo `src/`.
+
+**Residual.** El gateway y el agente son procesos locales fuera de este
+repositorio: pueden registrar el texto que reciben según su propia
+configuración. El token protege el endpoint, no audita al agente. Si el gateway
+se cuelga, la cola de un trabajador espera el techo de 45 s antes de caer al
+grafo; `OPENCLAW_ACTIVO=0` o `fallback_forzado = true` lo sacan del camino.
+
 ## 4. Por qué no usamos `.env` ni `python-dotenv`
 
 El ejemplo de la clase usa `python-dotenv` y un archivo `.env`; este proyecto
