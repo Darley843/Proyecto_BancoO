@@ -28,6 +28,71 @@ les cabe. Pana les responde con las tasas que publica el banco, les hace un
 diagnóstico por rangos y les muestra con un semáforo si el crédito es sano. Es
 una **orientación, no una aprobación**: la decisión final la toma el banco.
 
+### Arquitectura de la entrega final
+
+```mermaid
+flowchart LR
+    I["Invitado<br/>su WhatsApp"] --> M["Meta<br/>WhatsApp Cloud API"]
+    M -->|"webhook firmado<br/>por el túnel"| C["Canal · FastAPI<br/>firma · consentimiento<br/>huella del número"]
+    C -->|"texto + huella"| O["OpenClaw<br/>agente Pana<br/>workspace y memoria"]
+    O -->|"elige herramientas"| P["Servidor MCP<br/>20 herramientas"]
+    P --> D["Diagnóstico · comité<br/>Don Gota · negociación"]
+    P --> B["Bóveda (Qdrant)<br/>Tablero de tasas"]
+    P --> A["Auditor<br/>consentimiento · asesor"]
+    C -.->|"si OpenClaw no responde"| G["Grafo actual<br/>LangGraph"]
+    O --> C
+    C -->|"respuesta y ficha"| M
+    O -->|"turnos"| E["Pantalla de la escena<br/>voces y subtítulos"]
+```
+
+1. El invitado le escribe a Pana por WhatsApp. Meta entrega el mensaje al
+   **canal** (FastAPI), que verifica la firma, pide el consentimiento de la Ley
+   1581 y convierte el número en una **huella**: el número nunca sale del canal.
+2. El canal le pasa el texto y la huella al **agente de Pana en OpenClaw**, por
+   su API HTTP en `127.0.0.1` con token.
+3. El agente decide con su workspace (identidad, reglas y límites) y usa las
+   **herramientas del servidor MCP**, cada una con esquema Pydantic.
+4. La respuesta vuelve por Meta. La pantalla muestra la escena en vivo y, al
+   final, el invitado recibe la ficha de su opción: simulación orientativa,
+   nunca «aprobado».
+5. Si OpenClaw no responde, el canal contesta con el grafo actual.
+
+Cómo desplegar todo, paso a paso: [`docs/DESPLIEGUE.md`](./docs/DESPLIEGUE.md).
+
+### Las 20 herramientas
+
+| # | Herramienta | Qué hace | Sale de | Responsable | Confirmación |
+|---|---|---|---|---|---|
+| 1 | `consultar_tasa` | Rango de tasas con vigencia y fuente | Tablero de tasas | Nayla | — |
+| 2 | `simular_cuota` | Cuota orientativa de un crédito | Motor del diagnóstico | Nayla | — |
+| 3 | `verificar_usura` | Compara una tasa con la usura vigente | `config/tasas.toml` | Nayla | — |
+| 4 | `diagnosticar_capacidad` | Semáforo de capacidad de pago | Motor del diagnóstico | Nayla | — |
+| 5 | `comparar_escenario` | «¿Y si…?» con otro plazo o monto | `diagnostico/escenarios.py` | Nayla | — |
+| 6 | `convocar_comite` | Riesgo, comercial y auditor | `diagnostico/comite.py` | Nayla | — |
+| 7 | `calcular_prestamo_gota` | Lo que cobra Don Gota | `escena/gota.py` | Nayla | — |
+| 8 | `comparar_gota_banco` | Gota a gota frente al banco y la usura | `escena/comparacion.py` | Nayla | — |
+| 9 | `negociar_opcion` | Negociación entre los dos agentes | `escena/negociacion.py` | Nayla | — |
+| 10 | `generar_ficha_opcion` | Ficha de la opción para WhatsApp | Nueva | Nayla | — |
+| 11 | `responder_sobre_proyecto` | Preguntas del público sobre el proyecto | `escena/pregunta.py` | Nayla | — |
+| 12 | `registrar_consentimiento` | Aviso y aceptación de la Ley 1581 | `canal/consentimiento.py` | Darley | — |
+| 13 | `olvidar_mis_datos` | Borra los datos de la persona | Revocación | Darley | **Sí** |
+| 14 | `solicitar_asesor` | Abre un caso con un asesor humano | HITL | Darley | **Sí** |
+| 15 | `consultar_caso` | Estado del caso con el asesor | HITL | Darley | — |
+| 16 | `generar_tarjeta_pana` | Tarjeta del resultado (PNG + texto) | `pana/` | Darley | — |
+| 17 | `buscar_en_documentos` | Respuesta con documento y fragmento citados | Bóveda | Anny | — |
+| 18 | `consultar_tarifas` | Tarifas y comisiones | Tablero | Anny | — |
+| 19 | `clasificar_pregunta` | Digiturno y filtro de dominio | `sucursal/digiturno.py` | Anny | — |
+| 20 | `auditar_respuesta` | Cifras con fuente, sin promesas ni datos personales | Auditor | Anny | — |
+
+Hoy el servidor MCP de `main` expone `consultar_tasa`, `simular_cuota` y
+`buscar_en_boveda` ([`docs/MCP.md`](./docs/MCP.md)); las demás se suman sobre
+los módulos que ya existen.
+
+### Dentro del canal
+
+El canal ya hace el recorrido completo sin OpenClaw; es el respaldo y la base
+de las herramientas:
+
 ```mermaid
 flowchart LR
     WA["WhatsApp<br/>número de prueba"] -->|"firma X-Hub-Signature-256"| WH["Webhook<br/>dedupe + cola"]
@@ -73,7 +138,8 @@ Para conectar el número de prueba de Meta, sigue la sección
 
 ### La presentación: «Pana vs. el gota a gota»
 
-La presentación final no es una sustentación con diapositivas: **los agentes se
+La sustentación final (sábado 28 de noviembre de 2026) no usa diapositivas:
+invitados de empresas le escriben a Pana desde su teléfono y **los agentes se
 presentan solos**, en vivo, con voz y subtítulos. Una persona del público inventa
 un personaje y responde cuatro preguntas; **Don Gota** le ofrece plata al 20 %
 mensual; Pana compara en tasa efectiva anual con la usura como referencia; el

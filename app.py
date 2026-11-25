@@ -30,7 +30,10 @@ from fastapi.staticfiles import StaticFiles
 
 from banco_occidente_corpus.arqueo.latencia import con_latencia, ruta_por_defecto
 from banco_occidente_corpus.boveda.mapa import ServicioMapa
-from banco_occidente_corpus.canal.almacen import marcar_procesando_como_error
+from banco_occidente_corpus.canal.almacen import (
+    hay_mensaje_desde,
+    marcar_procesando_como_error,
+)
 from banco_occidente_corpus.canal.cola import ColaMensajes
 from banco_occidente_corpus.canal.configuracion import cargar_configuracion_canal
 from banco_occidente_corpus.canal.consentimiento import MaquinaConsentimiento
@@ -44,6 +47,7 @@ from banco_occidente_corpus.canal.envio import (
 )
 from banco_occidente_corpus.canal.webhook import crear_router_canal
 from banco_occidente_corpus.config import Config, load_config
+from banco_occidente_corpus.escena.api import crear_router_escena
 from banco_occidente_corpus.sucursal.ajustes import (
     ConfiguracionSucursal,
     cargar_configuracion_sucursal,
@@ -147,6 +151,21 @@ def crear_app(
         maquina.purgar_casos_vencidos()
         entrevista.purgar_vencidos()
 
+        def puede_responder(usuario_id: str) -> bool:
+            """Autoriza la respuesta del evento dentro de la ventana de Meta.
+
+            Args:
+                usuario_id: huella HMAC del destinatario.
+
+            Returns:
+                ``True`` solo si el modo evento sigue vigente y esa huella
+                escribió dentro de la ventana de servicio.
+            """
+            if not canal.evento.vigente():
+                return False
+            limite = canal.evento.limite_respuesta()
+            return hay_mensaje_desde(ruta_canal, usuario_id, limite)
+
         def fabrica_enviador(usuario_id: str, destino: str) -> Enviador:
             """Devuelve el enviador falso o el cliente real de Meta."""
             if canal.modo != "real":
@@ -164,6 +183,7 @@ def crear_app(
                 remitente=configuracion.site.contact,
                 huellas=canal.huellas,
                 version_api=canal.version_api,
+                puede_responder=puede_responder,
             )
 
         piezas_canal: list[PiezasGrafo] = []
@@ -236,6 +256,7 @@ def crear_app(
         crear_router_voz(voces, voces_disponibles, None if voz else config_voz.personajes)
     )
     app.include_router(crear_router_canal(despachador.recibir if despachador is not None else None))
+    app.include_router(crear_router_escena())
 
     @app.get("/health", response_model=SaludRespuesta, tags=["salud"])
     def salud(response: Response) -> SaludRespuesta:

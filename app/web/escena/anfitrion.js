@@ -55,12 +55,12 @@ export const INTRODUCCION = Object.freeze(
   [
     turnoSimple(
       "pana",
-      "¡Hola a todos! Soy Pana, el asistente del Banco de Occidente para jóvenes que van a pedir su primer crédito. Hoy no hay diapositivas: vamos a hacer una actividad práctica, en vivo, aquí en la clase.",
+      "¡Hola a todos! Soy Pana, un agente de inteligencia artificial que acompaña a jóvenes que van a pedir su primer crédito. Hoy no hay diapositivas: vamos a hacer una actividad práctica, en vivo, y ustedes participan desde su celular.",
       "guion_fijo",
     ),
     turnoSimple(
       "pana",
-      "Les presento a mi equipo. Todos somos agentes de inteligencia artificial, menos el villano, que es un guion.",
+      "Muchos jóvenes terminan en el gota a gota: presta rápido, pero cobra cerca de 791 % efectivo anual, casi 28 veces la usura. Les presento a mi equipo: todos somos agentes de inteligencia artificial, menos el villano, que es un guion.",
       "guion_fijo",
     ),
     turnoSimple(
@@ -85,7 +85,7 @@ export const INTRODUCCION = Object.freeze(
     ),
     turnoSimple(
       "pana",
-      "La protagonista de hoy es una persona del público, con datos inventados. Al final pueden hacerme preguntas sobre el proyecto.",
+      "Los protagonistas son ustedes: elegiré a un voluntario y los demás pueden escribirme por WhatsApp, siempre con datos inventados. Uso las tasas que publica el Banco de Occidente, pero soy un proyecto académico. Al final, háganme preguntas.",
       "guion_fijo",
     ),
   ].map((turno, orden) => Object.freeze({ ...turno, id: `anfitrion.presentacion.${orden + 1}`, orden })),
@@ -107,7 +107,7 @@ export const RESPUESTAS = Object.freeze({
   datos_personales:
     "Prefiero no recibir datos personales aquí. Pregúntame sin números de documento, teléfonos ni correos.",
   artistas:
-    "Sé que al profesor Jan le gustan mucho Karol G y Shakira, ¡y a nosotros también! Pero eso no tiene nada que ver con nuestro proyecto. Si quiere, le cuento cómo funciona Pana.",
+    "Sé que al profesor Jan le gustan mucho Karol G y Shakira, ¡y a nosotros también! Pero eso no tiene nada que ver con nuestro proyecto. Si quieren, les cuento cómo funciona Pana.",
   fuera_de_tema:
     "No tengo información sobre eso. Puedo contarles sobre el proyecto, la tecnología que usamos, las decisiones del equipo, la actividad de hoy o los productos del banco.",
 });
@@ -167,7 +167,7 @@ const FICHA = Object.freeze([
   {
     claves: ["actividad", "ejercicio", "voluntario", "escena"],
     texto:
-      "Una persona del público pide un crédito inventado, Don Gota le ofrece plata rápida, yo comparo con el banco, los agentes negocian y el auditor revisa las cifras.",
+      "Un voluntario del público pide un crédito inventado, Don Gota le ofrece plata rápida, yo comparo con el banco, los agentes negocian y el auditor revisa las cifras.",
   },
 ]);
 
@@ -270,12 +270,20 @@ export async function cargarIntroduccion() {
 }
 
 /**
+ * Turnos del servidor que no responden la pregunta: el rechazo fijo y el
+ * respaldo (`escena/pregunta.py`). Con ellos se prueba antes la ficha local.
+ */
+export const SIN_RESPUESTA_DEL_SERVIDOR = Object.freeze(["pana.pregunta.rechazo.v1", "pana.pregunta.respaldo.v1"]);
+
+/**
  * Responde una pregunta del público.
  *
  * Orden: reglas fijas → servidor (`POST /api/escena/pregunta`) → ficha de
  * respaldo → «No tengo información sobre eso». El servidor debe devolver un
  * turno del contrato hablado por Pana (puede traer además `tema`); si no
- * responde, `respaldo` queda en `true`.
+ * responde, `respaldo` queda en `true`. Si el servidor contesta con su rechazo
+ * o su respaldo fijo (`SIN_RESPUESTA_DEL_SERVIDOR`) y la ficha local sí tiene
+ * la respuesta, gana la ficha: es mejor que «No tengo información».
  *
  * @param {string} pregunta Pregunta del público.
  * @returns {Promise<{tema: string, turno: object, respaldo: boolean}>} Respuesta.
@@ -296,7 +304,10 @@ export async function responderPregunta(pregunta) {
       const datos = await respuesta.json();
       const turno = datos?.turno ?? datos;
       if (erroresDelTurno(turno).length === 0 && turno.personaje === "pana") {
-        return { tema: String(datos?.tema ?? "proyecto"), turno, respaldo: false };
+        const ficha = SIN_RESPUESTA_DEL_SERVIDOR.includes(turno.id) ? respuestaDeLaFicha(pregunta) : null;
+        return ficha
+          ? { ...ficha, respaldo: false }
+          : { tema: String(datos?.tema ?? "proyecto"), turno, respaldo: false };
       }
     }
   } catch {

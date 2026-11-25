@@ -113,6 +113,7 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | Pieza | Entrada | Contrato | Pruebas |
 |---|---|---|---|
 | Canal de WhatsApp | `canal/webhook.py` → `canal/cola.py` → `canal/despachador.py` → `canal/envio.py` | `docs/OPERACION_WHATSAPP.md` | `test/test_canal_*.py` |
+| Modo evento | `canal/evento.py` + `[evento]` de `config/whatsapp.toml` | `docs/DESPLIEGUE_WHATSAPP.md` | `test/test_canal_evento.py` |
 | Diagnóstico guiado | `canal/entrevista.py` + `diagnostico/motor.py` | `docs/DIAGNOSTICO.md` | `test/test_diagnostico_*.py`, `test/test_canal_entrevista.py` |
 | Comité de crédito | `diagnostico/comite.py` | `docs/COMITE.md` | `test/test_diagnostico_comite.py` |
 | MCP de solo lectura | `uv run python -m banco_occidente_corpus.mcp_servidor` | `docs/MCP.md` | `test/test_mcp_servidor.py` |
@@ -228,6 +229,7 @@ REJECT if:
   Las llamadas a Ollama desde `boveda/` van por `langchain-ollama` con `timeout` explícito (`embeddings.timeout_segundos`); no aplican `robots.txt`, `From` ni 1,5 s porque el destino es local y no es scraping, pero el `timeout` sí es obligatorio.
   Las llamadas del canal de WhatsApp a la API de Meta (`graph.facebook.com`, desde `canal/envio.py`) van con `timeout` explícito, el User-Agent del proyecto y el header `From`; no aplican `robots.txt` ni la pausa de 1,5 s porque no son scraping del sitio del banco, pero el `timeout` sí es obligatorio y nunca se usa `verify=False`.
   La descarga de los modelos de voz de Piper (`make voz-modelo`, desde `voz/descarga.py`, al repositorio público `huggingface.co/rhasspy/piper-voices`) va con `httpx`, `timeout` explícito, el User-Agent del proyecto y el header `From`; no aplican `robots.txt` ni la pausa de 1,5 s porque no es scraping del sitio del banco, y nunca se usa `verify=False`.
+  La corrida de inyección contra el gateway local de OpenClaw (`arqueo/inyeccion_vivo.py`, solo `127.0.0.1` o `localhost`) va con `httpx`, `timeout` explícito, el User-Agent de `config/site.toml` y el header `From` con `site.contact` (sin contacto no arranca); no aplican `robots.txt` ni la pausa de 1,5 s porque es un `POST` a un servicio local y no scraping, no reintenta (un reintento repetiría el ataque) y nunca se usa `verify=False`.
   El User-Agent de navegador de `config/site.toml` es una decisión del grupo documentada en `CONSTITUTION.md` §10 (el WAF responde 403 a todo User-Agent que se declare bot): **no** es motivo de REJECT ni cuenta como evasión, siempre que se envíe el header `From`, se respete `robots.txt` y el ritmo de 1,5 s, y ante un 403 el pipeline se detenga sin reintentar con otro cliente.
 - Se descarga una URL sin consultar antes `robots.txt` o se baja el ritmo de cortesía de 1,5 s entre peticiones (decisión del proyecto; `robots.txt` no declara `Crawl-delay`).
 - Se captura una página con login, formulario, simulador o datos personales (Ley 1581 de 2012).

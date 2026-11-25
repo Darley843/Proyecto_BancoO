@@ -65,6 +65,8 @@ data/asistente/roba_memoria.sqlite
 # Voces de la escena (Piper): se descargan con `make voz-modelo`
 data/modelos/
 
+# Escena gota a gota: JSON generados por `make escena-proyectada`
+data/escena/
 # Workspace local del agente pana (OpenClaw): memoria y bitácora nunca se
 # versionan; solo viajan las plantillas .example.
 openclaw/workspace/pana/MEMORY.md

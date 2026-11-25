@@ -49,6 +49,8 @@ RUTAS_IGNORADAS: tuple[str, ...] = (
     "data/asistente/memoria_evaluacion_v2.sqlite",
     "data/asistente/gasto_evaluacion_v2.sqlite",
     "data/asistente/perfil.sqlite",
+    "data/escena/proyectado.json",
+    "data/escena/nucleo.json",
 )
 
 #: Patrones de claves de API que no deben aparecer en archivos versionados.
@@ -279,7 +281,7 @@ def test_indice_y_sqlite_fuera_de_git() -> None:
     prohibidos = [
         ruta
         for ruta in versionados
-        if ruta.startswith(("data/boveda/", "data/asistente/"))
+        if ruta.startswith(("data/boveda/", "data/asistente/", "data/escena/"))
         or ruta.endswith((".sqlite", ".sqlite3"))
     ]
 

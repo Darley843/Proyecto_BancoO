@@ -15,9 +15,14 @@ Es la pieza que convierte un mensaje de WhatsApp en una respuesta:
    la entrevista en lugar de la invitación.
 7. Envía la respuesta con el enviador configurado (falso o Meta).
 
+Durante el modo evento el alcance es el mismo: el desconocido que acepta el
+consentimiento entra a la entrevista del diagnóstico y al comité, con cuota por
+persona y tope global; solo cambian la puerta de entrada y los contadores.
+
 El número y el texto nunca se registran en logs; el estado del mensaje vive en
 ``data/asistente/whatsapp.sqlite``. Las pruebas viven en
-``test/test_canal_despachador.py`` y ``test/test_canal_entrevista.py``.
+``test/test_canal_despachador.py`` y ``test/test_canal_entrevista.py``; las del
+evento, en ``test/test_canal_evento.py``.
 """
 
 from __future__ import annotations
@@ -25,10 +30,16 @@ from __future__ import annotations
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from ..sucursal.perfil import huella_perfil
-from .almacen import actualizar_mensaje, registrar_mensaje
+from .almacen import (
+    actualizar_mensaje,
+    contar_mensajes_desde,
+    contar_mensajes_usuario,
+    registrar_mensaje,
+)
 from .cola import ColaMensajes
 from .configuracion import ConfiguracionCanal
 from .consentimiento import MaquinaConsentimiento
@@ -47,6 +58,32 @@ AVISO_NO_AUTORIZADO = (
 
 #: Respuesta fija si el grafo falla, para no dejar al usuario sin contestación.
 TEXTO_ERROR = "No pude procesar tu mensaje en este momento. Inténtalo de nuevo en unos minutos."
+
+#: Respuesta cuando la persona agotó su cuota del evento.
+TEXTO_CUOTA_USUARIO = (
+    "Llegaste al límite de mensajes de esta demostración. "
+    "Si necesitas más, acércate al equipo de la Sucursal 1965."
+)
+
+#: Respuesta cuando se agotó el tope global del evento.
+TEXTO_EVENTO_CERRADO = (
+    "La demostración en vivo ya cerró. Gracias por participar de la Sucursal 1965."
+)
+
+
+def _instante(momento: datetime | None = None) -> datetime:
+    """Normaliza un instante a UTC para comparar con la configuración.
+
+    Args:
+        momento: instante a normalizar; por defecto, ahora.
+
+    Returns:
+        El instante en UTC; una fecha sin zona se asume UTC.
+    """
+    instante = momento or datetime.now(UTC)
+    if instante.tzinfo is None:
+        return instante.replace(tzinfo=UTC)
+    return instante.astimezone(UTC)
 
 
 @dataclass(frozen=True, slots=True)
@@ -115,11 +152,13 @@ class Despachador:
         if not self.cola.encolar(mensaje):
             actualizar_mensaje(self.ruta_almacen, mensaje.id_mensaje, "error")
 
-    def procesar(self, mensaje: MensajeEntrante) -> None:
+    def procesar(self, mensaje: MensajeEntrante, momento: datetime | None = None) -> None:
         """Procesa un mensaje ya encolado.
 
         Args:
             mensaje: mensaje normalizado del webhook.
+            momento: instante de referencia para la ventana del evento y las
+                cuotas; por defecto, ahora. Las pruebas lo fijan.
         """
         usuario_id = self._usuario_id(mensaje)
         if usuario_id is None:
@@ -127,14 +166,26 @@ class Despachador:
             return
 
         actualizar_mensaje(self.ruta_almacen, mensaje.id_mensaje, "procesando")
+        ahora = _instante(momento)
         try:
-            if usuario_id not in self.config.huellas:
+            if not self.config.permite(usuario_id, ahora):
                 self._enviar_texto(mensaje, usuario_id, AVISO_NO_AUTORIZADO)
                 actualizar_mensaje(
                     self.ruta_almacen, mensaje.id_mensaje, "ignorado", procesado=True
                 )
                 return
 
+            cierre = self._motivo_cierre(usuario_id, ahora)
+            if cierre is not None:
+                self._enviar_texto(mensaje, usuario_id, cierre)
+                actualizar_mensaje(
+                    self.ruta_almacen, mensaje.id_mensaje, "ignorado", procesado=True
+                )
+                return
+
+            # El evento no recorta el alcance: quien vino por la ventana recorre
+            # el mismo diagnóstico que un número de la lista, con el
+            # consentimiento primero y las cuotas ya verificadas arriba.
             respuesta = self.maquina.decidir(mensaje, usuario_id)
             if respuesta is None and self.entrevista is not None:
                 respuesta = self.entrevista.reanudar(mensaje, usuario_id)
@@ -168,6 +219,37 @@ class Despachador:
                 self._enviar_texto(mensaje, usuario_id, TEXTO_ERROR)
             except Exception:
                 logger.warning("tampoco se pudo enviar el aviso de error")
+
+    def _motivo_cierre(self, usuario_id: str, ahora: datetime) -> str | None:
+        """Devuelve el texto que explica por qué no se atiende, o ``None``.
+
+        Solo aplica a los números que entran por el modo evento: la lista de
+        ``[autorizados]`` no tiene cuota. El tope global cuenta todos los
+        mensajes desde que empezó el evento; el tope por persona cuenta la última
+        hora y el total.
+
+        Args:
+            usuario_id: huella del número.
+            ahora: instante del mensaje que se está procesando.
+
+        Returns:
+            El aviso de cuota, el aviso de cierre, o ``None`` si puede seguir.
+        """
+        if not self.config.es_evento(usuario_id, ahora):
+            return None
+        evento = self.config.evento
+        inicio = evento.inicio(ahora)
+        if contar_mensajes_desde(self.ruta_almacen, inicio) > evento.max_total:
+            return TEXTO_EVENTO_CERRADO
+        if contar_mensajes_usuario(self.ruta_almacen, usuario_id, ahora - timedelta(hours=1)) > (
+            evento.max_por_hora
+        ):
+            return TEXTO_CUOTA_USUARIO
+        if contar_mensajes_usuario(self.ruta_almacen, usuario_id, inicio) > (
+            evento.max_por_usuario
+        ):
+            return TEXTO_CUOTA_USUARIO
+        return None
 
     def _turno_entrevista(self, mensaje: MensajeEntrante, usuario_id: str) -> RespuestaCanal | None:
         """Resuelve el turno si hay una entrevista del diagnóstico activa.

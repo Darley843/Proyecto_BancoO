@@ -7,6 +7,9 @@ probar la recepción y la respuesta a mensajes reales.
 Todo lo que se pega en Meta y todo lo que se ejecuta en PowerShell está marcado.
 Los secretos van **solo** en la sesión: el proyecto no lee `.env`.
 
+> Para el despliegue completo con número propio, túnel, webhook y modo evento,
+> ver [`DESPLIEGUE_WHATSAPP.md`](./DESPLIEGUE_WHATSAPP.md).
+
 ## Alcance y estado
 
 El canal vive en `src/banco_occidente_corpus/canal/` y reutiliza el grafo de la
@@ -28,6 +31,28 @@ que el usuario lo reciba hay que usar `WHATSAPP_MODO=real`.
 El **19 de noviembre de 2026** el circuito completo quedó verificado con un
 mensaje real: 14 turnos respondidos, 3 consentimientos aceptados y 4 envíos
 registrados en `data/asistente/whatsapp.sqlite`.
+
+### Modo evento
+
+La lista `[autorizados]` solo atiende a los números de prueba. El **modo evento**
+abre el canal a cualquier número **durante una ventana**, sin saltarse la ley: el
+primer mensaje recibe el aviso de la Ley 1581 y sin «Acepto» no se procesa nada.
+
+| Control | Clave | Efecto |
+|---|---|---|
+| Ventana | `[evento] desde` / `hasta` | Fuera de la ventana vuelve la lista cerrada |
+| Cuota por persona | `max_por_hora`, `max_por_usuario` | Aviso de cuota al excederse (30/hora y 40 en total) |
+| Tope global | `max_total` | Cierra el evento completo (300 mensajes) |
+| Interruptor | `activo` o `WHATSAPP_EVENTO=1` | El entorno manda sobre el TOML |
+| Alcance | — | El mismo de la lista: entrevista, tarjeta y comité tras aceptar |
+
+El envío real sigue exigiendo autorización: huella en `[autorizados]` o, en
+evento, un mensaje entrante de esa huella dentro de la ventana de servicio de 24
+horas que exige Meta. Así el bot nunca inicia una conversación.
+
+El paso a paso de Meta, túnel, webhook y apagado está en
+[`DESPLIEGUE_WHATSAPP.md`](./DESPLIEGUE_WHATSAPP.md); las pruebas viven en
+`test/test_canal_evento.py`.
 
 ## Puesta en marcha desde cero
 
