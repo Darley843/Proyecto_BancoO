@@ -393,11 +393,26 @@ herramientas, el WhatsApp de los invitados ni la seguridad.
 - [ ] Apagar el **modo evento** con `$env:WHATSAPP_EVENTO = "0"` y reiniciar
       `make app`: el canal vuelve a la lista cerrada y deja de responder a
       desconocidos.
-- [ ] ⏳ Borrar los datos de los invitados. Al apagar el evento los
-      consentimientos aceptados **se conservan**, pero el diseño de
-      `agente-openclaw` (decisión 9) pide borrar perfiles, memorias y
-      bitácoras al cerrar y dejar solo métricas agregadas. Darley confirma el
-      comando antes del jueves.
+- [ ] Borrar los datos de los invitados de OpenClaw al terminar. El script
+      corre en modo de prueba por defecto y solo borra con `CONFIRMAR=1`: se
+      corre el **viernes 27, después de los dos ensayos**, y el **sábado 28,
+      después de la sustentación**:
+      ```powershell
+      make limpiar-evento                 # solo muestra qué borraría
+      make limpiar-evento CONFIRMAR=1     # borra de verdad
+      ```
+      Lista y borra las sesiones del agente `pana`, olvida sus memorias
+      derivadas (detiene el gateway un momento y lo vuelve a levantar), borra
+      `MEMORY.md`, la bitácora y `DREAMS.md` del workspace, y borra
+      `data/asistente/trazas/herramientas.jsonl` y
+      `data/evaluacion/inyeccion.json`. No toca los archivos versionados
+      (`SOUL`, `AGENTS`, `USER`, `IDENTITY`) ni los `.example`, no imprime el
+      token ni el contenido de las sesiones y no borra la sesión principal
+      `agent:pana:main`, que OpenClaw protege. Queda una nota con lo que no se
+      puede purgar y por qué.
+      Al apagar el evento los consentimientos aceptados **se conservan**. Los
+      perfiles, consentimientos y casos del canal de WhatsApp son de Darley y
+      se borran aparte: el script no los toca.
 - [ ] Ctrl + C en el túnel y quitar la URL del webhook en Meta.
 - [ ] Apagar el gateway, el MCP y la app.
 - [ ] Quitar las trazas si se encendieron:

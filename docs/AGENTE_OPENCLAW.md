@@ -257,3 +257,55 @@ encendido ni `OPENCLAW_GATEWAY_TOKEN`.
    consentimiento, turno con al menos una herramienta, respuesta y borrado;
    latencia p95 por debajo de 8 s y respaldo probado apagando el gateway.
 5. Borrar `MEMORY.md`, la bitácora y las trazas al terminar el evento.
+
+## 9. Limpieza al terminar el evento
+
+La decisión 9 del design pide borrar perfiles, memorias y bitácoras al cerrar
+el evento y dejar solo métricas agregadas. Para la parte de OpenClaw y del
+computador de la demo, el contrato es
+[`scripts/limpiar_evento.ps1`](../scripts/limpiar_evento.ps1), que se ejecuta
+en modo de prueba con `make limpiar-evento` y borra de verdad solo con
+`make limpiar-evento CONFIRMAR=1`. Se corre el viernes después de los ensayos
+y el sábado después de la sustentación
+([`LISTA_DEMO.md`](./LISTA_DEMO.md), sección 7).
+
+Qué hace, en orden:
+
+1. Lista las sesiones con
+   `openclaw sessions list --agent pana --limit all --json` y las borra en
+   lotes de 25 con `openclaw sessions delete <claves...> --agent pana --yes`.
+   La sesión principal `agent:pana:main` no se toca: OpenClaw la protege y el
+   comando falla si se intenta.
+2. Olvida las memorias derivadas con
+   `openclaw memory forget --agent pana --session <clave>`, en lotes de 20.
+   Se eligió `--session` por clave y no `--since` porque borra exactamente lo
+   derivado de las sesiones que se acaban de eliminar, sin arrastrar memorias
+   de otras sesiones del mismo agente.
+3. `memory forget` es **offline-only**: exige propiedad exclusiva del estado.
+   Por eso, solo con `-Confirmar`, el script detiene el gateway
+   (`openclaw daemon stop`), ejecuta el olvido, limpia el índice derivado con
+   `openclaw memory reset --agent pana --yes` y vuelve a arrancar el gateway
+   (`openclaw daemon start`) en un bloque `finally`, aunque algo falle. En modo
+   de prueba no detiene nada: solo informa qué olvidaría.
+4. Borra `MEMORY.md`, `DREAMS.md` y todo el contenido de
+   `memory\` del workspace de WSL, incluidos `dreaming\` y
+   `.dreams\session-corpus\`. Nunca toca los `.example` ni los archivos
+   versionados `SOUL.md`, `AGENTS.md`, `USER.md` e `IDENTITY.md`.
+5. Borra en Windows `data/asistente/trazas/herramientas.jsonl` y
+   `data/evaluacion/inyeccion.json` si existen.
+
+**Archivos archivados.** `openclaw sessions delete` archiva el transcript
+dentro de la base SQLite del agente (`openclaw-agent.sqlite`, tablas
+`session_transcript_archives` y `session_transcript_cold_archives`); por diseño,
+esos archivos retenidos pueden seguir siendo elegibles para la búsqueda de
+memoria. `memory forget` borra las memorias y los artefactos derivados de las
+sesiones indicadas, y `memory reset` limpia el índice derivado y la caché de
+embeddings. OpenClaw 2026.11.6 no expone un comando que purgue el blob
+archivado del transcript. Ese blob queda local, dentro de WSL, y no sale del
+equipo; si de verdad hay que purgarlo, el procedimiento manual (no lo hace el
+script) es detener el gateway, respaldar `openclaw-agent.sqlite`, borrar las
+filas de esas dos tablas por `session_id` y volver a arrancar el gateway.
+
+**Canal de WhatsApp.** El script no toca perfiles, consentimientos ni casos
+del canal: son de Darley y se borran aparte. Al apagar el evento los
+consentimientos aceptados se conservan hasta ese borrado.
