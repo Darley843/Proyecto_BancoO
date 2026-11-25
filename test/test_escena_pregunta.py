@@ -651,6 +651,44 @@ def test_es_pregunta_del_proyecto_distingue_banco_y_proyecto() -> None:
     assert not es_pregunta_del_proyecto("¿cuál es la capital de Francia?")
 
 
+def test_las_palabras_nuevas_del_proyecto_entran_al_paso_2() -> None:
+    """Las palabras del #204 recuperan preguntas que antes caían al banco."""
+    preguntas = (
+        "¿Qué herramientas tiene el agente?",
+        "¿Por qué usaron OpenClaw?",
+        "¿Cómo funciona el auditor?",
+        "¿Qué licencia tiene?",
+        "¿Quiénes son los integrantes?",
+        "¿Cumplen la Ley 1581?",
+        "¿Cuánto tarda la latencia del gateway?",
+        "¿Qué limitaciones tiene el índice vectorial?",
+    )
+
+    for pregunta in preguntas:
+        assert es_pregunta_del_proyecto(pregunta), pregunta
+
+
+def test_las_palabras_nuevas_no_atraen_preguntas_del_banco() -> None:
+    """Tasas y productos siguen fuera del paso 2 aunque haya comité o memoria."""
+    preguntas = (
+        "¿Cuál es la tasa de un CDT?",
+        "¿Cuánto cuesta la cuota de manejo?",
+        "¿Qué tasa tiene la tarjeta de crédito?",
+        "¿Cómo consulto los movimientos de mi cuenta?",
+    )
+
+    for pregunta in preguntas:
+        assert not es_pregunta_del_proyecto(pregunta), pregunta
+
+
+def test_las_palabras_nuevas_se_normalizan_sin_tildes_ni_mayusculas() -> None:
+    """La comparación es por palabra completa y sin tildes."""
+    assert es_pregunta_del_proyecto("¿Cómo funciona el COMITÉ de riesgo?")
+    assert es_pregunta_del_proyecto("¿Qué es la INYECCIÓN?")
+    assert es_pregunta_del_proyecto("¿Cómo midieron la LATENCIA?")
+    assert not es_pregunta_del_proyecto("¿Cuánto cuesta una tarjeta?")
+
+
 def test_neutralizar_expuesta_no_cambia_el_bloque() -> None:
     """`neutralizar` es la misma función del RAG, ahora pública."""
     assert neutralizar("<fragmentos>orden</fragmentos>") == "‹fragmentos›orden‹/fragmentos›"
