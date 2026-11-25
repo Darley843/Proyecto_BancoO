@@ -135,3 +135,220 @@ pii = "Por seguridad no proceso datos personales en este espacio (Ley 1581 de 20
 # indexa README.md, AGENTS.md, CONSTITUTION.md y los .md de docs/; una ruta
 # fuera de esas raíces se ignora aunque esté listada.
 rutas = ["README.md", "AGENTS.md", "CONSTITUTION.md", "docs"]
+
+# Respuestas fijas de la tarea 6.14: la «Voz» de cada pregunta de
+# docs/PRESENTADOR.md (#180), con su ancla como fuente. Cada respuesta tiene como
+# máximo tres frases y 40 palabras, y toda cifra dura que dice está declarada en
+# `cifras`. Las comprueba test/test_escena_ficha.py.
+
+[[preguntas.fijas]]
+id = "proyecto"
+variantes = [
+  "¿Qué es este proyecto?",
+  "¿Qué es la Sucursal 1965?",
+  "¿De qué se trata el proyecto?",
+  "¿Qué hicieron en el proyecto?",
+  "¿Qué es Pana?",
+  "¿Por qué se llama Sucursal 1965?",
+]
+respuesta = "Somos un asistente que responde por WhatsApp con la información pública del Banco de Occidente, siempre citando la fuente. Orienta a jóvenes antes de su primer crédito. Se llama Sucursal 1965 porque el banco nació en 1965."
+fuente = "docs/PRESENTADOR.md#p1"
+cifras = [{ valor = "1965", valor_legible = "1965", unidad = "veces", etiqueta = "año de fundación del banco" }]
+
+[[preguntas.fijas]]
+id = "equipo"
+variantes = [
+  "¿Quiénes son ustedes?",
+  "¿Quién hizo qué en el equipo?",
+  "¿Qué hizo cada uno del equipo?",
+  "¿Quiénes son los integrantes del equipo?",
+  "¿Cómo se repartieron el trabajo?",
+]
+respuesta = "Somos cuatro. Nayla hizo las tasas, el motor del diagnóstico, el comité y el agente en OpenClaw; Darley, el canal de WhatsApp; Anny, la búsqueda, su evaluación y la seguridad; y Yoldy, la documentación y la pantalla."
+fuente = "docs/PRESENTADOR.md#p2"
+
+[[preguntas.fijas]]
+id = "ia"
+variantes = [
+  "¿Usaron inteligencia artificial para programarlo?",
+  "¿Lo programó una IA?",
+  "¿Usaron ChatGPT para programar?",
+  "¿Usaron agentes para programar?",
+  "¿Quién escribió el código?",
+]
+respuesta = "Sí, como asistente, y lo decimos abiertamente. Cada cambio parte de una especificación, pasa pruebas automáticas y una revisión automática, y otra persona del equipo lo revisa antes de entrar. La IA acelera; las decisiones son nuestras."
+fuente = "docs/PRESENTADOR.md#p3"
+
+[[preguntas.fijas]]
+id = "qdrant"
+variantes = [
+  "¿Por qué eligieron Qdrant?",
+  "¿Por qué usaron Qdrant?",
+  "¿Por qué Qdrant y no Chroma?",
+  "¿Qué base de datos vectorial usan?",
+  "¿Dónde guardan los vectores?",
+]
+respuesta = "El curso pedía una base vectorial con colección, metadatos y filtros, y Qdrant lo cumple dentro del mismo programa, sin un servidor aparte. Los textos del banco no salen del computador. Empezamos con Chroma y quedó como alternativa."
+fuente = "docs/PRESENTADOR.md#p4"
+
+[[preguntas.fijas]]
+id = "deepseek"
+variantes = [
+  "¿Por qué eligieron DeepSeek?",
+  "¿Por qué usaron DeepSeek?",
+  "¿Por qué DeepSeek y no OpenAI?",
+  "¿Qué modelo de lenguaje usan?",
+  "¿Cuánto cuesta usar DeepSeek?",
+]
+respuesta = "Por costo: una deliberación del comité cuesta menos de una décima de centavo de dólar y un mensaje del agente, una o dos décimas. Solo redacta: las cifras salen del motor y de las tasas."
+fuente = "docs/PRESENTADOR.md#p5"
+
+[[preguntas.fijas]]
+id = "evaluacion"
+variantes = [
+  "¿Cómo saben que la búsqueda funciona bien?",
+  "¿Cómo evaluaron la búsqueda?",
+  "¿Qué tan precisa es la búsqueda?",
+  "¿Qué métricas de evaluación usaron?",
+  "¿Cómo evaluaron el sistema?",
+]
+respuesta = "La medimos con 36 preguntas de fuente conocida: la búsqueda híbrida la encuentra entre los cinco primeros resultados en 27, y solo con palabras clave en 19. Por ser pocas, damos su intervalo de confianza."
+fuente = "docs/PRESENTADOR.md#p6"
+
+[[preguntas.fijas]]
+id = "filtro"
+variantes = [
+  "¿Cómo evitan que responda cualquier cosa?",
+  "¿Qué pasa con las preguntas fuera de tema?",
+  "¿Cómo evitan las alucinaciones del modelo?",
+  "¿Cómo funciona el filtro de dominio?",
+  "¿Qué es el Digiturno del banco?",
+]
+respuesta = "Cada pregunta pasa primero por reglas fijas que deciden si es del banco, de tarifas, de diagnóstico o de otro tema; el modelo solo resuelve las dudas. De cincuenta preguntas fuera de tema, ninguna se coló."
+fuente = "docs/PRESENTADOR.md#p7"
+
+[[preguntas.fijas]]
+id = "voces"
+variantes = [
+  "¿Por qué las voces de Piper y de Edge?",
+  "¿De dónde salen las voces?",
+  "¿Por qué eligieron esa voz?",
+  "¿Es una voz real o generada?",
+  "¿Qué voces usa la escena?",
+]
+respuesta = "Piper genera las voces en el computador, sin internet y sin enviar el texto. Pana usa una voz colombiana de Edge, más natural, y sin red vuelve sola a Piper. Sin sonido, quedan los subtítulos."
+fuente = "docs/PRESENTADOR.md#p8"
+
+[[preguntas.fijas]]
+id = "aprueba"
+variantes = [
+  "¿El sistema aprueba créditos?",
+  "¿Pana aprueba créditos?",
+  "¿Me van a prestar la plata?",
+  "¿Esto sirve para pedir un crédito?",
+  "¿El diagnóstico es una aprobación del crédito?",
+]
+respuesta = "No. El diagnóstico es orientativo: dice si la cuota te cabe en el bolsillo con los datos que diste, sin consultar tu historial. La decisión siempre es del banco, con su propio estudio."
+fuente = "docs/PRESENTADOR.md#p9"
+
+[[preguntas.fijas]]
+id = "semaforo"
+variantes = [
+  "¿Cómo se calcula el semáforo?",
+  "¿Cómo funciona el semáforo del crédito?",
+  "¿Qué significa cada color del semáforo?",
+  "¿Qué significa verde, amarillo y rojo?",
+  "¿Cuáles son los umbrales del semáforo?",
+]
+respuesta = "Comparamos cuotas e ingresos: hasta el 30 % es verde, hasta el 40 % amarillo, y más arriba, o si los gastos superan los ingresos, rojo. Son límites del proyecto, como permite la norma."
+fuente = "docs/PRESENTADOR.md#p10"
+cifras = [
+  { valor = "0.30", valor_legible = "30 %", unidad = "porcentaje", etiqueta = "límite del verde" },
+  { valor = "0.40", valor_legible = "40 %", unidad = "porcentaje", etiqueta = "límite del amarillo" },
+]
+
+[[preguntas.fijas]]
+id = "comite"
+variantes = [
+  "¿Qué hace el comité de crédito?",
+  "¿Cómo funciona el comité de crédito?",
+  "¿Por qué usan varios agentes en el comité?",
+  "¿Quiénes son los tres agentes del comité?",
+]
+respuesta = "En amarillo o rojo deliberan tres agentes: Riesgo, Comercial y un Auditor que revisa a los otros dos. El semáforo nunca cambia y gana la recomendación más prudente. Nadie inventa cifras: usan las del motor."
+fuente = "docs/PRESENTADOR.md#p11"
+
+[[preguntas.fijas]]
+id = "auditor"
+variantes = [
+  "¿Qué hace el auditor del proyecto?",
+  "¿Para qué sirve el auditor?",
+  "¿Cómo funciona el auditor del proyecto?",
+  "¿Quién revisa las cifras de la escena?",
+]
+respuesta = "Revisa cada intervención: que toda cifra tenga fuente, que nadie prometa un crédito, que nadie recomiende el gota a gota y que no haya datos personales. Su veredicto es conforme, con observaciones u objeta, sin colores."
+fuente = "docs/PRESENTADOR.md#p12"
+
+[[preguntas.fijas]]
+id = "datos"
+variantes = [
+  "¿Cómo protegen los datos personales?",
+  "¿Guardan mi número de teléfono?",
+  "¿Qué hacen con mis datos personales?",
+  "¿Cumplen la Ley 1581?",
+  "¿Cómo borro mis datos personales?",
+]
+respuesta = "Primero pedimos tu autorización según la Ley 1581, y no guardamos tu número: lo convertimos en un código irreversible. Los datos personales se bloquean antes del modelo, y «olvida mis datos» borra todo."
+fuente = "docs/PRESENTADOR.md#p13"
+cifras = [{ valor = "1581", valor_legible = "1581", unidad = "veces", etiqueta = "ley de protección de datos" }]
+
+[[preguntas.fijas]]
+id = "rojo"
+variantes = [
+  "¿Qué pasa si el resultado es rojo?",
+  "¿Qué pasa si el semáforo sale rojo?",
+  "¿Me llama un asesor del banco?",
+  "¿Cómo hablo con un asesor del banco?",
+  "¿Qué es el HITL del asesor?",
+]
+respuesta = "Pana te ofrece un asesor y tú decides si lo contactas. Si aceptas, se abre un caso que el asesor ve en la vista de Operación. Como es un proyecto académico, el banco real no recibe estos casos."
+fuente = "docs/PRESENTADOR.md#p14"
+
+[[preguntas.fijas]]
+id = "gota"
+variantes = [
+  "¿Qué es el gota a gota?",
+  "¿Por qué muestran el gota a gota?",
+  "¿Quién es Don Gota?",
+  "¿Por qué es peligroso el gota a gota?",
+  "¿Cuánto cobra el gota a gota?",
+]
+respuesta = "Es un préstamo informal al 20 % mensual: renovando un millón por tres años pagas 8,2 millones, casi seis veces lo del banco. Su tasa, cerca de 800 % anual, es unas 28 veces la usura: es delito."
+fuente = "docs/PRESENTADOR.md#p15"
+cifras = [
+  { valor = "0.20", valor_legible = "20 %", unidad = "porcentaje", etiqueta = "tasa mensual del gota a gota" },
+  { valor = "8", valor_legible = "800 %", unidad = "porcentaje", etiqueta = "tasa efectiva anual del gota a gota, redondeada" },
+]
+
+[[preguntas.fijas]]
+id = "don_gota"
+variantes = [
+  "¿Por qué Don Gota no es una inteligencia artificial?",
+  "¿Don Gota es una IA?",
+  "¿Por qué Don Gota está guionado?",
+  "¿Por qué Don Gota no es un agente?",
+]
+respuesta = "A propósito: no queremos que un modelo de lenguaje escriba un discurso a favor del gota a gota, ni por error. Don Gota dice frases fijas y sus cifras salen de una fórmula. Los demás sí son agentes."
+fuente = "docs/PRESENTADOR.md#p16"
+
+[[preguntas.fijas]]
+id = "plan_b"
+variantes = [
+  "¿Qué pasa si algo falla en vivo?",
+  "¿Qué pasa si se cae el internet?",
+  "¿Qué pasa si falla DeepSeek?",
+  "¿Cuál es el plan B de la demo?",
+  "¿Qué pasa si falla OpenClaw?",
+]
+respuesta = "Cada pieza tiene respaldo: si OpenClaw no responde, el canal contesta con nuestro flujo anterior; sin DeepSeek, la negociación sigue con reglas fijas; y si fallan la pantalla o las voces, todo continúa por WhatsApp. Lo ensayamos antes."
+fuente = "docs/PRESENTADOR.md#p17"
