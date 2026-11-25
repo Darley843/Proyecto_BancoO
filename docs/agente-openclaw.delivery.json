@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "0d90af8d-ab8c-4cb4-be97-a1c04c43df80",
+  "status": "current",
+  "command": "deliver",
+  "type": "sequence",
+  "input": "docs/agente-openclaw.json",
+  "output": "docs/agente-openclaw.html",
+  "specification": {
+    "sha256": "34e058964650f6fb5d978d29a849bed05119588e844b1ca361f9de8b13b9bd84",
+    "bytes": 6056
+  },
+  "artifact": {
+    "sha256": "3bb7f6011bd0f04348c8af8acb4f09e6ed94c12d3e66619a4d2f1f34a0b33681",
+    "bytes": 844879
+  }
+}

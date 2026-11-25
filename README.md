@@ -278,6 +278,13 @@ fuente `docs/canal.json`. Y la entrevista del diagnóstico, del aviso de la Ley
 1581 al semáforo y la tarjeta, vive en
 [`docs/diagnostico.html`](./docs/diagnostico.html), con `docs/diagnostico.json`.
 
+El turno con el agente de la entrega final - **Meta → webhook → despachador →
+gateway de OpenClaw → MCP `sucursal` → Meta**, con el respaldo al grafo - vive
+en [`docs/agente-openclaw.html`](./docs/agente-openclaw.html), y dónde corre
+cada pieza (Windows, WSL y servicios externos) en
+[`docs/despliegue-openclaw.html`](./docs/despliegue-openclaw.html). Sus fuentes
+son `docs/agente-openclaw.json` y `docs/despliegue-openclaw.json`.
+
 ```bash
 # una vez: instala Archify v3.2.0 en el commit auditado (Node >= 18).
 # No uses `skills@latest`: actualizar exige repetir la auditoría
@@ -300,6 +307,10 @@ node ~/.agents/skills/archify/bin/archify.mjs finalize sequence \
   docs/canal.json docs/canal.html --repo-root . --quality showcase --json
 node ~/.agents/skills/archify/bin/archify.mjs finalize workflow \
   docs/diagnostico.json docs/diagnostico.html --repo-root . --quality showcase --json
+node ~/.agents/skills/archify/bin/archify.mjs finalize sequence \
+  docs/agente-openclaw.json docs/agente-openclaw.html --repo-root . --quality showcase --json
+node ~/.agents/skills/archify/bin/archify.mjs finalize architecture \
+  docs/despliegue-openclaw.json docs/despliegue-openclaw.html --repo-root . --quality showcase --json
 ```
 
 En PowerShell, la instalación equivalente es la que se probó en Windows:
@@ -320,7 +331,8 @@ La skill instalada debe tener 206 archivos, como en la auditoría.
 En PowerShell el CLI queda en `$HOME\.agents\skills\archify\bin\archify.mjs`. La
 corrida deja los recibos `docs/arquitectura.finalize*.json`,
 `docs/arquitectura.browser-check.json` y los equivalentes `docs/datos.*.json`,
-`docs/canal.*.json` y `docs/diagnostico.*.json`; si algún gate falla, se corrige
+`docs/canal.*.json`, `docs/diagnostico.*.json`, `docs/agente-openclaw.*.json` y
+`docs/despliegue-openclaw.*.json`; si algún gate falla, se corrige
 el JSON y se repite el comando completo.
 
 ## Requisitos e instalación

@@ -1,0 +1,274 @@
+{
+  "schema_version": 1,
+  "diagram_type": "sequence",
+  "meta": {
+    "title": "Sucursal 1965: un turno con el agente OpenClaw",
+    "locale": "es",
+    "output": "docs/agente-openclaw.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Darley843/Proyecto_BancoO",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "63f26ad3c1899df859d7e3b1e692c49958d7f1a1"
+    }
+  },
+  "participants": [
+    {
+      "id": "invitado",
+      "type": "external",
+      "label": "Invitado",
+      "sublabel": "WhatsApp",
+      "sources": [
+        {
+          "path": "src/banco_occidente_corpus/canal/entrada.py",
+          "line": 1
+        }
+      ]
+    },
+    {
+      "id": "meta",
+      "type": "external",
+      "label": "Meta",
+      "sublabel": "Cloud API",
+      "sources": [
+        {
+          "path": "src/banco_occidente_corpus/canal/envio.py",
+          "line": 153
+        }
+      ]
+    },
+    {
+      "id": "webhook",
+      "type": "backend",
+      "label": "Webhook",
+      "sublabel": "firma + cola",
+      "sources": [
+        {
+          "path": "src/banco_occidente_corpus/canal/webhook.py",
+          "line": 78
+        }
+      ]
+    },
+    {
+      "id": "despachador",
+      "type": "backend",
+      "label": "Despachador",
+      "sublabel": "consentimiento y motor",
+      "sources": [
+        {
+          "path": "src/banco_occidente_corpus/canal/despachador.py",
+          "line": 168
+        }
+      ]
+    },
+    {
+      "id": "gateway",
+      "type": "backend",
+      "label": "Gateway OpenClaw",
+      "sublabel": "WSL :18789",
+      "sources": [
+        {
+          "path": "src/banco_occidente_corpus/canal/openclaw.py",
+          "line": 160
+        }
+      ]
+    },
+    {
+      "id": "mcp",
+      "type": "backend",
+      "label": "MCP sucursal",
+      "sublabel": "loopback :8765",
+      "sources": [
+        {
+          "path": "src/banco_occidente_corpus/herramientas/servidor.py",
+          "line": 68
+        }
+      ]
+    },
+    {
+      "id": "grafo",
+      "type": "backend",
+      "label": "Grafo",
+      "sublabel": "respaldo LangGraph",
+      "sources": [
+        {
+          "path": "src/banco_occidente_corpus/sucursal/grafo.py",
+          "line": 246
+        }
+      ]
+    }
+  ],
+  "segments": [
+    {
+      "from": 158,
+      "to": 240,
+      "label": "1. Entrada"
+    },
+    {
+      "from": 244,
+      "to": 532,
+      "label": "2. Agente"
+    },
+    {
+      "from": 536,
+      "to": 642,
+      "label": "3. Respuesta"
+    }
+  ],
+  "messages": [
+    {
+      "id": "invitado-meta",
+      "from": "invitado",
+      "to": "meta",
+      "y": 170,
+      "label": "mensaje",
+      "variant": "emphasis"
+    },
+    {
+      "id": "meta-webhook",
+      "from": "meta",
+      "to": "webhook",
+      "y": 198,
+      "label": "POST firmado",
+      "variant": "emphasis",
+      "note": "Firma validada antes de encolar"
+    },
+    {
+      "id": "webhook-despachador",
+      "from": "webhook",
+      "to": "despachador",
+      "y": 250,
+      "label": "encola",
+      "variant": "dashed",
+      "note": "200 inmediato; sigue en cola"
+    },
+    {
+      "id": "despachador-gateway",
+      "from": "despachador",
+      "to": "gateway",
+      "y": 312,
+      "label": "POST /v1/chat/completions",
+      "variant": "security",
+      "note": "user = wa:<huella>, sin número"
+    },
+    {
+      "id": "gateway-mcp",
+      "from": "gateway",
+      "to": "mcp",
+      "y": 360,
+      "label": "tools/call",
+      "variant": "emphasis",
+      "note": "Solo las 20 de toolFilter"
+    },
+    {
+      "id": "mcp-gateway",
+      "from": "mcp",
+      "to": "gateway",
+      "y": 408,
+      "label": "sobre ok / error",
+      "variant": "return",
+      "note": "Queda en la traza (tecla H)"
+    },
+    {
+      "id": "gateway-despachador",
+      "from": "gateway",
+      "to": "despachador",
+      "y": 456,
+      "label": "texto de Pana",
+      "variant": "return"
+    },
+    {
+      "id": "despachador-grafo",
+      "from": "despachador",
+      "to": "grafo",
+      "y": 498,
+      "label": "timeout o fallo: respaldo",
+      "variant": "dashed",
+      "note": "motor=grafo, sin cortar el turno"
+    },
+    {
+      "id": "despachador-meta",
+      "from": "despachador",
+      "to": "meta",
+      "y": 572,
+      "label": "EnviadorMeta",
+      "variant": "emphasis"
+    },
+    {
+      "id": "meta-invitado",
+      "from": "meta",
+      "to": "invitado",
+      "y": 612,
+      "label": "texto + tarjeta",
+      "variant": "return"
+    }
+  ],
+  "activations": [
+    {
+      "participant": "meta",
+      "from": 165,
+      "to": 618,
+      "type": "external"
+    },
+    {
+      "participant": "webhook",
+      "from": 192,
+      "to": 256,
+      "type": "backend"
+    },
+    {
+      "participant": "despachador",
+      "from": 244,
+      "to": 578,
+      "type": "backend"
+    },
+    {
+      "participant": "gateway",
+      "from": 306,
+      "to": 462,
+      "type": "backend"
+    },
+    {
+      "participant": "mcp",
+      "from": 354,
+      "to": 414,
+      "type": "backend"
+    },
+    {
+      "participant": "grafo",
+      "from": 492,
+      "to": 532,
+      "type": "backend"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Compuertas antes del agente",
+      "items": [
+        "La firma, la deduplicación y la cola no cambian",
+        "Sin «Acepto» de la Ley 1581 no se llama al gateway",
+        "Los comandos con «/» no se reenvían al gateway"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Datos personales",
+      "items": [
+        "El gateway recibe la huella HMAC wa:<huella>, nunca el número",
+        "La traza pública de herramientas no lleva argumentos",
+        "Token del gateway por entorno, sin valor por defecto"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Respaldo",
+      "items": [
+        "Sin reintentos: un reintento duplicaría el turno",
+        "Timeout, error de red, 5xx o cuerpo vacío pasan al grafo",
+        "Cada turno registra qué motor respondió: openclaw, grafo o canal"
+      ]
+    }
+  ]
+}

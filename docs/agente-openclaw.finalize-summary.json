@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "sequence",
+  "quality": "showcase",
+  "specification": {
+    "path": "docs/agente-openclaw.json",
+    "sha256": "34e058964650f6fb5d978d29a849bed05119588e844b1ca361f9de8b13b9bd84",
+    "bytes": 6056
+  },
+  "artifact": {
+    "path": "docs/agente-openclaw.html",
+    "sha256": "3bb7f6011bd0f04348c8af8acb4f09e6ed94c12d3e66619a4d2f1f34a0b33681",
+    "bytes": 844879
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "docs/agente-openclaw.finalize.json",
+    "summaryReceipt": "docs/agente-openclaw.finalize-summary.json",
+    "browserCheckReceipt": "docs/agente-openclaw.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3069,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  }
+}

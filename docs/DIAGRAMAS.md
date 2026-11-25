@@ -62,8 +62,12 @@ sequenceDiagram
   internet. El túnel solo publica el webhook del canal.
 - Si OpenClaw falla, el invitado igual recibe respuesta: la da el grafo de
   LangGraph que ya funcionaba (digiturno, Bóveda, entrevista, tarjeta).
-- ⏳ Puerto, modelo y archivos del workspace: los completa Nayla en
-  [`DESPLIEGUE.md`](./DESPLIEGUE.md#5-gateway-de-openclaw).
+- Puerto, modelo y archivos del workspace: [`DESPLIEGUE.md`](./DESPLIEGUE.md#5-gateway-de-openclaw).
+- Versión interactiva (Archify), con el recorrido completo de un turno y el
+  respaldo: [`agente-openclaw.html`](./agente-openclaw.html). Dónde corre cada
+  pieza (Windows, WSL y servicios externos):
+  [`despliegue-openclaw.html`](./despliegue-openclaw.html). Ver la sección
+  [Versiones interactivas](#versiones-interactivas-archify).
 
 ## 3. MCP y herramientas
 
@@ -172,3 +176,26 @@ flowchart LR
   la pantalla usa la última escena guardada.
 - Don Gota **nunca** es un modelo: sus cifras salen de `escena/gota.py`.
 - Teclas y ensayo: [`ESCENA.md`](./ESCENA.md).
+
+## Versiones interactivas (Archify)
+
+Los diagramas 2 y de despliegue también están como HTML interactivo, hecho con
+Archify (tarea 4.4 de `agente-openclaw`). Se abren con doble clic, sin red, y
+cada caja enlaza al archivo del código que la respalda. La fuente de cada uno
+es su `.json`; el HTML se genera y nunca se edita a mano.
+
+| Archivo | Qué muestra |
+|---|---|
+| [`agente-openclaw.html`](./agente-openclaw.html) | Un turno de WhatsApp: Meta → webhook → despachador → gateway de OpenClaw → MCP `sucursal` → Meta, y el salto al grafo si el gateway falla |
+| [`despliegue-openclaw.html`](./despliegue-openclaw.html) | Dónde corre cada pieza: Windows (FastAPI, MCP, pantalla), WSL (gateway) y fuera (Meta, túnel, DeepSeek), con los puertos en loopback |
+
+Ninguno muestra números de teléfono, tokens ni datos de invitados: el
+invitado aparece como `wa:<huella>`. Para regenerarlos, con Archify instalado
+como dice el [README](../README.md#diagramas-interactivos-de-la-fase-2-archify):
+
+```bash
+node ~/.agents/skills/archify/bin/archify.mjs finalize sequence \
+  docs/agente-openclaw.json docs/agente-openclaw.html --repo-root . --quality showcase --json
+node ~/.agents/skills/archify/bin/archify.mjs finalize architecture \
+  docs/despliegue-openclaw.json docs/despliegue-openclaw.html --repo-root . --quality showcase --json
+```
