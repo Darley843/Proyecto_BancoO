@@ -9,19 +9,32 @@ en lugar de abrir la red por su cuenta.
 from __future__ import annotations
 
 import os
+from collections.abc import Mapping
 from decimal import Decimal
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from ..asistente.validacion import cifras_duras
+from ..canal.contratos import ResultadoDiagnostico
+from ..cifras_legibles import (
+    anotar,
+    cifra,
+    formatear_dias,
+    formatear_meses,
+    formatear_pesos,
+    formatear_porcentaje,
+    formatear_puntos,
+    formatear_tasa_ea,
+    formatear_veces,
+)
 from ..diagnostico.comite import auditar_texto, construir_escenarios
 from ..diagnostico.escenarios import CambioEscenario, comparar_resultado
+from ..diagnostico.motor import calcular, entrada_desde_respuestas
 from ..escena.auditor import ETIQUETA_VEREDICTO, veredicto_desde_hallazgos
 from ..escena.comparacion import alertas_comparacion
 from ..escena.comparacion import comparar_gota_banco as _comparar_gota_banco
 from ..escena.contratos import HallazgoEscena
 from ..escena.gota import calcular_prestamo_gota as _calcular_gota
-from ..escena.gota import formatear_pesos
 from ..escena.negociacion import negociar
 from ..escena.proyecto import crear_recuperador_proyecto, es_pregunta_del_proyecto
 from ..mcp_servidor import conocimiento, control
@@ -30,8 +43,9 @@ from ..mcp_servidor.servidor import buscar_en_boveda
 from ..mcp_servidor.servidor import consultar_tasa as _consultar_tasa
 from ..mcp_servidor.servidor import simular_cuota as _simular_cuota
 from ..pana.desde_diagnostico import tarjeta_y_texto
+from ..sucursal.ajustes import leer_modo_demo
 from ..tablero.tasas import cargar_config_tasas, clave_producto
-from .comun import como_json, diagnostico_de, error, ok
+from .comun import aplicar_monto_exacto, como_json, error, mensaje_de_validacion, ok
 from .esquemas import (
     AuditarRespuestaEntrada,
     BuscarEnDocumentosEntrada,
@@ -45,17 +59,74 @@ from .esquemas import (
     ConvocarComiteEntrada,
     DiagnosticarCapacidadEntrada,
     GenerarFichaOpcionEntrada,
+    MontoExactoEntrada,
     NegociarOpcionEntrada,
+    PreguntaProyecto,
     ResponderSobreProyectoEntrada,
+    RespuestasEntrevista,
     SalidaHerramienta,
     SimularCuotaEntrada,
+    TasaEfectivaAnual,
+    UnidadTasaEntrada,
     VerificarUsuraEntrada,
+    error_de_respuestas,
+    pregunta_pendiente,
+    respuestas_o_error,
 )
 
 #: Preguntas máximas de palabras que se muestran de un fragmento del proyecto.
 MAXIMO_PALABRAS_PROYECTO: int = 40
 #: Tope de cifras permitidas que acepta el auditor.
 MAXIMO_CIFRAS_AUDITOR: int = 40
+#: Tope de la tasa que se lee como fracción cuando no se declara la unidad.
+TOPE_FRACCION: float = 100.0
+
+
+def _diagnostico(
+    herramienta: str,
+    respuestas: list[str],
+    monto: int | None = None,
+) -> ResultadoDiagnostico | SalidaHerramienta:
+    """Calcula el diagnóstico o devuelve el error con el catálogo de la entrevista.
+
+    Args:
+        herramienta: nombre del catálogo, para el sobre de error.
+        respuestas: ids canónicos de la entrevista.
+        monto: monto exacto del invitado para reemplazar el valor del rango.
+
+    Returns:
+        El resultado del motor o el sobre de error con los valores válidos.
+    """
+    fallo = respuestas_o_error(herramienta, respuestas)
+    if fallo is not None:
+        return fallo
+    try:
+        entrada = entrada_desde_respuestas(respuestas)
+        if monto is not None:
+            ajustada = aplicar_monto_exacto(herramienta, entrada, monto)
+            if isinstance(ajustada, SalidaHerramienta):
+                return ajustada
+            entrada = ajustada
+        return calcular(entrada)
+    except ValidationError as exc:
+        return error_de_respuestas(herramienta, mensaje_de_validacion(exc))
+    except ValueError as exc:
+        return error_de_respuestas(herramienta, str(exc))
+
+
+def _tasa_efectiva(valor: float, unidad: str | None) -> tuple[float, str]:
+    """Normaliza la tasa E.A. a fracción y declara cómo se interpretó.
+
+    Args:
+        valor: tasa recibida, en fracción o en porcentaje.
+        unidad: `fraccion`, `porcentaje` o `None` para inferirla.
+
+    Returns:
+        La tasa como fracción (0,2834 = 28,34 %) y la unidad interpretada.
+    """
+    if unidad == "porcentaje" or (unidad is None and valor > TOPE_FRACCION):
+        return valor / 100, "porcentaje"
+    return valor, "fraccion"
 
 
 def consultar_tasa(
@@ -108,18 +179,28 @@ def simular_cuota(producto: str, monto: float, plazo_meses: int) -> SalidaHerram
     return ok("simular_cuota", resultado)
 
 
-def verificar_usura(tasa_ea: float, producto: str | None = None) -> SalidaHerramienta:
+def verificar_usura(
+    tasa_ea: TasaEfectivaAnual,
+    producto: str | None = None,
+    unidad: UnidadTasaEntrada = None,
+) -> SalidaHerramienta:
     """Compara una tasa E.A. con la usura certificada en `config/tasas.toml`.
 
+    Acepta tasas por encima del 100 % (el gota a gota es 791,61 % E.A.). Si no
+    se declara `unidad`, una cifra de hasta 100 se lee como fracción y una mayor
+    como porcentaje.
+
     Args:
-        tasa_ea: tasa efectiva anual como fracción (0,2834 = 28,34 %).
+        tasa_ea: tasa efectiva anual, en fracción (7,9161 = 791,61 %) o en
+            porcentaje (791,61), según `unidad`.
         producto: producto al que se aplicaría; vivienda, ahorro y CDT están
             exceptuados de la usura de consumo y ordinario.
+        unidad: `fraccion`, `porcentaje` o `None` para inferirla.
 
     Returns:
         Si la tasa excede la usura, el exceso en puntos y la fuente certificada.
     """
-    entrada = VerificarUsuraEntrada(tasa_ea=tasa_ea, producto=producto)
+    entrada = VerificarUsuraEntrada(tasa_ea=tasa_ea, producto=producto, unidad=unidad)
     ajustes = cargar_config_tasas()
     usura = ajustes.usura
     if not usura.certificada:
@@ -128,65 +209,136 @@ def verificar_usura(tasa_ea: float, producto: str | None = None) -> SalidaHerram
             "usura_sin_certificar",
             "La usura no está certificada en config/tasas.toml.",
         )
+    tasa, interpretada = _tasa_efectiva(entrada.tasa_ea, entrada.unidad)
     limite = float(usura.tasa_ea)
-    exceso = max(0.0, entrada.tasa_ea - limite)
+    exceso = max(0.0, tasa - limite)
     clave = clave_producto(entrada.producto) if entrada.producto else ""
     aplica = not clave or clave not in usura.exceptuados
-    return ok(
-        "verificar_usura",
-        {
-            "tasa_ea": round(entrada.tasa_ea, 6),
-            "tasa_ea_pct": round(entrada.tasa_ea * 100, 4),
-            "usura_ea": limite,
-            "usura_ea_pct": round(limite * 100, 4),
-            "excede": exceso > 0,
-            "exceso_puntos": round(exceso * 100, 4),
-            "aplica": aplica,
-            "producto": clave or None,
-            "exceptuados": sorted(usura.exceptuados),
-            "vigencia": f"{usura.vigencia_desde.isoformat()}/{usura.vigencia_hasta.isoformat()}",
-            "fuente": usura.fuente,
-            "resolucion": usura.resolucion,
-            "nota": (
-                "La usura se mide en tasa efectiva anual. Un spread sobre IPC o IBR "
-                "no es una tasa y no se compara con este límite."
+    datos = {
+        "tasa_ea": round(tasa, 6),
+        "tasa_ea_pct": round(tasa * 100, 4),
+        "unidad_interpretada": interpretada,
+        "usura_ea": limite,
+        "usura_ea_pct": round(limite * 100, 4),
+        "excede": exceso > 0,
+        "exceso_puntos": round(exceso * 100, 4),
+        "aplica": aplica,
+        "producto": clave or None,
+        "exceptuados": sorted(usura.exceptuados),
+        "vigencia": f"{usura.vigencia_desde.isoformat()}/{usura.vigencia_hasta.isoformat()}",
+        "fuente": usura.fuente,
+        "resolucion": usura.resolucion,
+        "nota": (
+            "La usura se mide en tasa efectiva anual y no tiene tope de entrada: "
+            "el gota a gota supera el 100 %. Un spread sobre IPC o IBR no es una "
+            "tasa y no se compara con este límite."
+        ),
+    }
+    anotar(
+        datos,
+        (
+            cifra("tasa_ea", tasa, formatear_tasa_ea(tasa), "porcentaje_ea", etiqueta="tasa E.A."),
+            cifra(
+                "tasa_ea_pct",
+                round(tasa * 100, 4),
+                formatear_porcentaje(tasa),
+                "porcentaje",
+                etiqueta="tasa E.A. en porcentaje",
             ),
-        },
+            cifra(
+                "usura_ea",
+                limite,
+                formatear_tasa_ea(limite),
+                "porcentaje_ea",
+                etiqueta="usura vigente",
+            ),
+            cifra(
+                "usura_ea_pct",
+                round(limite * 100, 4),
+                formatear_porcentaje(limite),
+                "porcentaje",
+                etiqueta="usura vigente en porcentaje",
+            ),
+            cifra(
+                "exceso_puntos",
+                round(exceso * 100, 4),
+                formatear_puntos(exceso * 100),
+                "puntos",
+                etiqueta="exceso sobre la usura",
+            ),
+        ),
     )
+    return ok("verificar_usura", datos)
 
 
-def diagnosticar_capacidad(respuestas: list[str]) -> SalidaHerramienta:
-    """Calcula el diagnóstico completo a partir de las respuestas de la entrevista.
+def diagnosticar_capacidad(
+    respuestas: RespuestasEntrevista,
+    monto: MontoExactoEntrada = None,
+) -> SalidaHerramienta:
+    """Conduce la entrevista y calcula el diagnóstico completo.
+
+    Con respuestas parciales no falla: devuelve `faltan_datos` con la siguiente
+    pregunta de la entrevista del canal y sus opciones exactas. Después del
+    bloque de monto pide el monto exacto en un paso aparte; cuando llega, lo usa
+    si cae dentro de los límites del rango.
 
     Args:
-        respuestas: ids canónicos de la entrevista.
+        respuestas: ids canónicos de la entrevista en la forma bloque.valor:
+            objetivo.* y vinculacion.* (uno de cada lista), ingresos.*,
+            gastos.* y cuotas.* (obligatorios), monto.* y plazo.* (en crédito) y
+            cuota_trasladar.* (solo en compra de cartera). Puede venir vacía o
+            incompleta: la herramienta indica qué preguntar.
+        monto: monto exacto que dijo el invitado, en pesos.
 
     Returns:
-        El resultado determinista con cuota, semáforo, alertas y trazabilidad.
+        El paso `faltan_datos` con la pregunta y sus opciones, o el resultado
+        determinista con cuota, semáforo, alertas y trazabilidad.
     """
-    entrada = DiagnosticarCapacidadEntrada(respuestas=respuestas)
-    resultado = diagnostico_de(entrada.respuestas)
+    fallo = respuestas_o_error("diagnosticar_capacidad", respuestas, parcial=True)
+    if fallo is not None:
+        return fallo
+    entrada = DiagnosticarCapacidadEntrada(respuestas=respuestas, monto=monto)
+    pendiente = pregunta_pendiente(entrada.respuestas, entrada.monto)
+    if pendiente is not None:
+        return ok("diagnosticar_capacidad", pendiente)
+    resultado = _diagnostico("diagnosticar_capacidad", entrada.respuestas, monto=entrada.monto)
+    if isinstance(resultado, SalidaHerramienta):
+        return resultado
     return ok("diagnosticar_capacidad", {"resultado": como_json(resultado)})
 
 
 def comparar_escenario(
-    respuestas: list[str],
+    respuestas: RespuestasEntrevista,
     campo: CampoEscenarioHerramienta,
     valor: float,
+    monto: MontoExactoEntrada = None,
 ) -> SalidaHerramienta:
     """Compara un «¿Y si…?» contra el diagnóstico original, sin el grafo.
 
     Args:
-        respuestas: ids de la entrevista original.
+        respuestas: ids canónicos de la entrevista original, como en
+            `diagnosticar_capacidad`.
         campo: insumo que cambia (`monto_credito`, `plazo_meses`, `ingreso_mensual`,
             `gastos_mensuales` o `cuotas_deudas`).
         valor: valor nuevo del insumo.
+        monto: monto exacto que dijo el invitado; se usa igual que en
+            `diagnosticar_capacidad`.
 
     Returns:
         El escenario calculado y la comparación con su tendencia.
     """
-    entrada = CompararEscenarioEntrada(respuestas=respuestas, campo=campo, valor=valor)
-    resultado = diagnostico_de(entrada.respuestas)
+    fallo = respuestas_o_error("comparar_escenario", respuestas)
+    if fallo is not None:
+        return fallo
+    entrada = CompararEscenarioEntrada(
+        respuestas=respuestas,
+        monto=monto,
+        campo=campo,
+        valor=valor,
+    )
+    resultado = _diagnostico("comparar_escenario", entrada.respuestas, monto=entrada.monto)
+    if isinstance(resultado, SalidaHerramienta):
+        return resultado
     cambio = CambioEscenario(campo=entrada.campo, valor=Decimal(str(entrada.valor)))
     nuevo, comparacion = comparar_resultado(resultado, cambio, origen="herramienta")
     return ok(
@@ -198,7 +350,10 @@ def comparar_escenario(
     )
 
 
-def convocar_comite(respuestas: list[str]) -> SalidaHerramienta:
+def convocar_comite(
+    respuestas: RespuestasEntrevista,
+    monto: MontoExactoEntrada = None,
+) -> SalidaHerramienta:
     """Convoca el comité de crédito cuando el diagnóstico es amarillo o rojo.
 
     El comité usa el modelo de DeepSeek del proyecto. Sin `DEEPSEEK_API_KEY` la
@@ -206,14 +361,22 @@ def convocar_comite(respuestas: list[str]) -> SalidaHerramienta:
     precalculados y un error explicable para que el agente ofrezca el respaldo.
 
     Args:
-        respuestas: ids canónicos de la entrevista.
+        respuestas: ids canónicos de la entrevista, como en
+            `diagnosticar_capacidad`.
+        monto: monto exacto que dijo el invitado; se usa igual que en
+            `diagnosticar_capacidad`.
 
     Returns:
         La deliberación con posturas, recomendación y hallazgos, o el motivo por
         el que no se convocó.
     """
-    entrada = ConvocarComiteEntrada(respuestas=respuestas)
-    resultado = diagnostico_de(entrada.respuestas)
+    fallo = respuestas_o_error("convocar_comite", respuestas)
+    if fallo is not None:
+        return fallo
+    entrada = ConvocarComiteEntrada(respuestas=respuestas, monto=monto)
+    resultado = _diagnostico("convocar_comite", entrada.respuestas, monto=entrada.monto)
+    if isinstance(resultado, SalidaHerramienta):
+        return resultado
     if resultado.semaforo not in {"amarillo", "rojo"} or resultado.cuota_mensual is None:
         return ok(
             "convocar_comite",
@@ -241,63 +404,267 @@ def convocar_comite(respuestas: list[str]) -> SalidaHerramienta:
 def calcular_prestamo_gota(monto: int) -> SalidaHerramienta:
     """Calcula el préstamo de Don Gota con la aritmética de la escena.
 
+    Cada cifra viaja con su ``valor_legible`` en formato colombiano y con
+    ``cifras_permitidas`` para ``auditar_respuesta``. La tasa E.A. se entrega
+    como ``791,61 % E.A.`` y el identificador de la fórmula queda solo en
+    ``metadatos``: nunca en un campo de texto que el modelo pueda copiar.
+
     Args:
         monto: capital en pesos.
 
     Returns:
-        Interés, cuota diaria, totales y tasa E.A. equivalente, con su fuente.
+        Interés, cuota diaria, totales y tasa E.A. equivalente, con su fuente,
+        sus cifras legibles y el resumen para leer en voz alta.
     """
     entrada = CalcularPrestamoGotaEntrada(monto=monto)
     prestamo = _calcular_gota(entrada.monto)
     datos = como_json(prestamo)
+    version = datos.pop("version_formula", None)
+    datos["metadatos"] = {
+        "version_formula": version,
+        "dias_ciclo": prestamo.dias_ciclo,
+        "meses_horizonte": prestamo.meses_horizonte,
+        "supuesto": prestamo.supuesto,
+    }
     datos["resumen"] = (
-        f"{formatear_pesos(prestamo.monto)} al {prestamo.tasa_mensual * 100:.0f} % mensual: "
+        f"{formatear_pesos(prestamo.monto)} al "
+        f"{formatear_porcentaje(prestamo.tasa_mensual)} mensual: "
         f"interés de {formatear_pesos(prestamo.interes_mensual)} y cuota diaria de "
         f"{formatear_pesos(prestamo.cuota_diaria)}."
+    )
+    anotar(
+        datos,
+        (
+            cifra(
+                "monto",
+                prestamo.monto,
+                formatear_pesos(prestamo.monto),
+                "pesos",
+                etiqueta="monto prestado",
+            ),
+            cifra(
+                "tasa_mensual",
+                prestamo.tasa_mensual,
+                f"{formatear_porcentaje(prestamo.tasa_mensual)} mensual",
+                "porcentaje",
+                etiqueta="tasa mensual",
+            ),
+            cifra(
+                "interes_mensual",
+                prestamo.interes_mensual,
+                formatear_pesos(prestamo.interes_mensual),
+                "pesos",
+                etiqueta="interés del ciclo",
+            ),
+            cifra(
+                "total_ciclo",
+                prestamo.total_ciclo,
+                formatear_pesos(prestamo.total_ciclo),
+                "pesos",
+                etiqueta="total del ciclo",
+            ),
+            cifra(
+                "cuota_diaria",
+                prestamo.cuota_diaria,
+                formatear_pesos(prestamo.cuota_diaria),
+                "pesos",
+                etiqueta="cuota diaria",
+            ),
+            cifra(
+                "dias_ciclo",
+                prestamo.dias_ciclo,
+                formatear_dias(prestamo.dias_ciclo),
+                "dias",
+                etiqueta="días del ciclo",
+            ),
+            cifra(
+                "meses_horizonte",
+                prestamo.meses_horizonte,
+                formatear_meses(prestamo.meses_horizonte),
+                "meses",
+                etiqueta="meses del horizonte",
+            ),
+            cifra(
+                "intereses_horizonte",
+                prestamo.intereses_horizonte,
+                formatear_pesos(prestamo.intereses_horizonte),
+                "pesos",
+                etiqueta=f"intereses de {formatear_meses(prestamo.meses_horizonte)}",
+            ),
+            cifra(
+                "total_pagado_horizonte",
+                prestamo.total_pagado_horizonte,
+                formatear_pesos(prestamo.total_pagado_horizonte),
+                "pesos",
+                etiqueta="total pagado en el horizonte",
+            ),
+            cifra(
+                "tasa_ea",
+                prestamo.tasa_ea,
+                formatear_tasa_ea(prestamo.tasa_ea),
+                "porcentaje_ea",
+                etiqueta="tasa efectiva anual",
+            ),
+        ),
     )
     return ok("calcular_prestamo_gota", datos)
 
 
-def comparar_gota_banco(monto: int, respuestas: list[str]) -> SalidaHerramienta:
+def comparar_gota_banco(monto: int, respuestas: RespuestasEntrevista) -> SalidaHerramienta:
     """Compara el gota a gota con el banco y con la usura vigente.
+
+    La comparación es siempre contra **libre inversión a la tasa máxima del
+    banco**, aunque las respuestas nombren otro producto: la escena conserva ese
+    producto y las cifras verificadas de la demostración.
+
+    Las tasas y los totales se devuelven con ``valor_legible`` y el bloque
+    ``cifras_permitidas``; el identificador de la fórmula del préstamo no sale
+    en ningún campo de texto.
 
     Args:
         monto: mismo monto para los dos lados.
-        respuestas: ids de la entrevista con ingresos, gastos, deudas y plazo.
+        respuestas: ids canónicos de la entrevista con ingresos, gastos, deudas,
+            monto y plazo, como en ``diagnosticar_capacidad``. El producto de
+            estas respuestas no cambia el lado del banco: siempre es libre
+            inversión a la tasa máxima.
 
     Returns:
-        La comparación con los totales, la usura y los supuestos.
+        La comparación con los totales, la usura y los supuestos, con sus cifras
+        legibles listas para auditar.
     """
+    fallo = respuestas_o_error("comparar_gota_banco", respuestas)
+    if fallo is not None:
+        return fallo
     entrada = CompararGotaBancoEntrada(monto=monto, respuestas=respuestas)
+    diagnostico = _diagnostico("comparar_gota_banco", entrada.respuestas)
+    if isinstance(diagnostico, SalidaHerramienta):
+        return diagnostico
     prestamo = _calcular_gota(entrada.monto)
-    diagnostico = diagnostico_de(entrada.respuestas)
     comparacion = _comparar_gota_banco(prestamo, diagnostico.entrada)
+    detalle = como_json(comparacion)
+    cifras = [
+        cifra(
+            "monto",
+            comparacion.monto,
+            formatear_pesos(comparacion.monto),
+            "pesos",
+            etiqueta="monto del préstamo",
+        ),
+        cifra(
+            "plazo_meses",
+            comparacion.plazo_meses,
+            formatear_meses(comparacion.plazo_meses),
+            "meses",
+            etiqueta="plazo del horizonte",
+        ),
+        cifra(
+            "tasa_ea_gota",
+            comparacion.tasa_ea_gota,
+            formatear_tasa_ea(comparacion.tasa_ea_gota),
+            "porcentaje_ea",
+            etiqueta="tasa E.A. de Don Gota",
+        ),
+        cifra(
+            "tasa_ea_banco",
+            comparacion.tasa_ea_banco,
+            formatear_tasa_ea(comparacion.tasa_ea_banco),
+            "porcentaje_ea",
+            etiqueta="tasa E.A. máxima del banco",
+        ),
+        cifra(
+            "total_gota",
+            comparacion.total_gota,
+            formatear_pesos(comparacion.total_gota),
+            "pesos",
+            etiqueta="total pagado con Don Gota",
+        ),
+        cifra(
+            "total_banco",
+            comparacion.total_banco,
+            formatear_pesos(comparacion.total_banco),
+            "pesos",
+            etiqueta="total pagado con el banco",
+        ),
+        cifra(
+            "diferencia",
+            comparacion.diferencia,
+            formatear_pesos(comparacion.diferencia),
+            "pesos",
+            etiqueta="diferencia entre los dos totales",
+        ),
+    ]
+    if comparacion.usura_ea is not None:
+        cifras.append(
+            cifra(
+                "usura_ea",
+                comparacion.usura_ea,
+                formatear_tasa_ea(comparacion.usura_ea),
+                "porcentaje_ea",
+                etiqueta="usura vigente",
+            )
+        )
+    if comparacion.veces_total is not None:
+        cifras.append(
+            cifra(
+                "veces_total",
+                comparacion.veces_total,
+                formatear_veces(comparacion.veces_total),
+                "veces",
+                etiqueta="veces el total del banco",
+            )
+        )
+    if comparacion.veces_usura is not None:
+        cifras.append(
+            cifra(
+                "veces_usura",
+                comparacion.veces_usura,
+                formatear_veces(comparacion.veces_usura),
+                "veces",
+                etiqueta="veces la usura",
+            )
+        )
+    anotar(detalle, cifras)
     return ok(
         "comparar_gota_banco",
         {
-            "comparacion": como_json(comparacion),
+            "comparacion": detalle,
             "alertas": list(alertas_comparacion(comparacion)),
+            "cifras": detalle["cifras"],
+            "cifras_permitidas": detalle["cifras_permitidas"],
         },
     )
 
 
-def negociar_opcion(respuestas: list[str], modo_demo: bool = False) -> SalidaHerramienta:
+def negociar_opcion(
+    respuestas: RespuestasEntrevista,
+    monto: MontoExactoEntrada = None,
+) -> SalidaHerramienta:
     """Negocia la opción del joven y del banco sobre la mesa precalculada.
 
-    Con `modo_demo` la política es determinista de principio a fin, sin modelo.
-    Sin `DEEPSEEK_API_KEY` la lógica ya cae a reglas por su cuenta.
+    La negociación usa siempre las respuestas del invitado. El modo demo no lo
+    decide el modelo: lo lee el servidor de `SUCURSAL_DEMO` con
+    `leer_modo_demo`, y sin `DEEPSEEK_API_KEY` la lógica ya cae a reglas.
 
     Args:
-        respuestas: ids de la entrevista que arman la mesa.
-        modo_demo: fuerza la política determinista.
+        respuestas: ids canónicos de la entrevista que arman la mesa, como en
+            `diagnosticar_capacidad`.
+        monto: monto exacto que dijo el invitado. Si se pasa, debe ser el mismo
+            que se usó en `calcular_prestamo_gota`; reemplaza el valor de
+            cálculo del rango solo si cae dentro de sus límites y, si no, la
+            herramienta devuelve `entrada_invalida` con los límites. Sin este
+            campo se usa el valor del rango.
 
     Returns:
         Los turnos, el acuerdo o `None`, el veredicto y el registro de validaciones.
     """
-    entrada = NegociarOpcionEntrada(respuestas=respuestas, modo_demo=modo_demo)
-    diagnostico = diagnostico_de(entrada.respuestas)
-    entorno = {"SUCURSAL_DEMO": "1"} if entrada.modo_demo else None
-    resultado = negociar(diagnostico.entrada, entorno=entorno)
+    fallo = respuestas_o_error("negociar_opcion", respuestas)
+    if fallo is not None:
+        return fallo
+    entrada = NegociarOpcionEntrada(respuestas=respuestas, monto=monto)
+    diagnostico = _diagnostico("negociar_opcion", entrada.respuestas, monto=entrada.monto)
+    if isinstance(diagnostico, SalidaHerramienta):
+        return diagnostico
+    resultado = negociar(diagnostico.entrada, entorno=_entorno_negociacion())
     return ok(
         "negociar_opcion",
         {
@@ -311,17 +678,46 @@ def negociar_opcion(respuestas: list[str], modo_demo: bool = False) -> SalidaHer
     )
 
 
-def generar_ficha_opcion(respuestas: list[str]) -> SalidaHerramienta:
+def _entorno_negociacion() -> Mapping[str, str]:
+    """Devuelve el entorno que decide el modo demo de la negociación.
+
+    La bandera la pone el servidor, nunca el modelo: `SUCURSAL_DEMO` activa la
+    política determinista y, si no está, la negociación decide por la presencia
+    de `DEEPSEEK_API_KEY`.
+
+    Returns:
+        El entorno del proceso, forzado a demo cuando `SUCURSAL_DEMO` está activo.
+    """
+    if leer_modo_demo(os.environ):
+        return {"SUCURSAL_DEMO": "1"}
+    return os.environ
+
+
+def generar_ficha_opcion(
+    respuestas: RespuestasEntrevista,
+    monto: MontoExactoEntrada = None,
+) -> SalidaHerramienta:
     """Genera la ficha textual de la opción recomendada, sin datos personales.
 
     Args:
-        respuestas: ids canónicos de la entrevista.
+        respuestas: ids canónicos de la entrevista, como en
+            `diagnosticar_capacidad`.
+        monto: monto exacto que dijo el invitado. Si se pasa, debe ser el mismo
+            que se usó en `calcular_prestamo_gota`; reemplaza el valor de
+            cálculo del rango solo si cae dentro de sus límites y, si no, la
+            herramienta devuelve `entrada_invalida` con los límites. Sin este
+            campo se usa el valor del rango.
 
     Returns:
         El texto equivalente de la tarjeta de Pana y las cifras de la opción.
     """
-    entrada = GenerarFichaOpcionEntrada(respuestas=respuestas)
-    resultado = diagnostico_de(entrada.respuestas)
+    fallo = respuestas_o_error("generar_ficha_opcion", respuestas)
+    if fallo is not None:
+        return fallo
+    entrada = GenerarFichaOpcionEntrada(respuestas=respuestas, monto=monto)
+    resultado = _diagnostico("generar_ficha_opcion", entrada.respuestas, monto=entrada.monto)
+    if isinstance(resultado, SalidaHerramienta):
+        return resultado
     imagen, texto = tarjeta_y_texto(resultado)
     return ok(
         "generar_ficha_opcion",
@@ -336,8 +732,12 @@ def generar_ficha_opcion(respuestas: list[str]) -> SalidaHerramienta:
     )
 
 
-def responder_sobre_proyecto(pregunta: str, k: int = 3) -> SalidaHerramienta:
+def responder_sobre_proyecto(pregunta: PreguntaProyecto, k: int = 3) -> SalidaHerramienta:
     """Responde con el corpus versionado del proyecto usando BM25, sin modelo.
+
+    Solo sirve para preguntas sobre el proyecto —equipo, arquitectura, tecnología,
+    corpus, RAG y decisiones—; no para preguntas de crédito, tasas, cuotas,
+    requisitos de productos ni el diagnóstico.
 
     Args:
         pregunta: pregunta sobre el repositorio, el corpus, el RAG o la escena.
@@ -452,8 +852,9 @@ def auditar_respuesta(
 
     Args:
         texto: lo que se quiere auditar.
-        cifras_permitidas: cifras que el texto puede citar, en dígitos como las
-            devuelven las herramientas.
+        cifras_permitidas: cifras que el texto puede citar; normalmente se pasa
+            el `cifras_permitidas` que devuelve la herramienta. Acepta el texto
+            legible («791,61 % E.A.») y también los dígitos de máquina.
         personaje: quién envía el texto.
 
     Returns:
@@ -464,15 +865,15 @@ def auditar_respuesta(
         control.AuditarRespuestaEntrada(texto=entrada.texto, personaje=personaje)
     )
     permitidas: set[str] = set()
-    for cifra in (entrada.cifras_permitidas or [])[:MAXIMO_CIFRAS_AUDITOR]:
-        permitidas |= cifras_duras(cifra) or {cifra.strip()}
+    for permitida in (entrada.cifras_permitidas or [])[:MAXIMO_CIFRAS_AUDITOR]:
+        permitidas |= cifras_duras(permitida) or {permitida.strip()}
     hallazgos = [h for h in revision.hallazgos if h.codigo != "cifra_inventada"]
-    for cifra in sorted(control.cifras_sin_respaldo(entrada.texto) - permitidas):
+    for inventada in sorted(control.cifras_sin_respaldo(entrada.texto) - permitidas):
         hallazgos.append(
             HallazgoEscena(
                 codigo="cifra_inventada",
                 turno_id=control.ID_RESPUESTA,
-                detalle=f"El texto dice {cifra} y no está entre las cifras permitidas.",
+                detalle=f"El texto dice {inventada} y no está entre las cifras permitidas.",
                 gravedad="alta",
             )
         )

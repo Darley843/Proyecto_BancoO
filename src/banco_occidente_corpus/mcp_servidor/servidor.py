@@ -50,6 +50,13 @@ from ..boveda.indice import leer_fragmentos, leer_metadatos
 from ..boveda.recuperador import crear_recuperador
 from ..boveda.rutas import carpeta_boveda
 from ..boveda.tipos import Fragmento
+from ..cifras_legibles import (
+    bloque_cifras,
+    cifra,
+    formatear_meses,
+    formatear_pesos,
+    formatear_porcentaje,
+)
 from ..config import Config, load_config
 from ..diagnostico.calculo import (
     PRODUCTOS_CREDITO,
@@ -153,15 +160,25 @@ def _resolver_producto(producto: str) -> str:
 
 
 def _fila_json(fila: FilaTasa) -> dict[str, Any]:
-    """Convierte una fila de tasas en un objeto JSON con su descripción legible.
+    """Convierte una fila de tasas en un objeto JSON con sus textos legibles.
 
     El segmento se presenta con la etiqueta del Tablero («De $500 mil a $99
-    millones»); Gold conserva el texto crudo del PDF.
+    millones»); Gold conserva el texto crudo del PDF. Cada tasa viaja con su
+    ``_legible`` para que el agente no tenga que interpretar la escala.
     """
     datos = fila.como_dict()
     datos["segmento"] = etiqueta_banda(fila.segmento) if fila.segmento else None
     datos["descripcion"] = describir_tasa(fila)
-    datos["plazo"] = plazo_legible(fila.plazo_dias) if fila.plazo_dias is not None else None
+    datos["valor_legible"] = datos["descripcion"]
+    datos["tasa_ea_desde_legible"] = f"{_porcentaje(fila.tasa_ea_desde)} % E.A."
+    datos["tasa_ea_hasta_legible"] = f"{_porcentaje(fila.tasa_ea_hasta)} % E.A."
+    if fila.tasa_mv_desde is not None and fila.tasa_mv_hasta is not None:
+        datos["tasa_mv_desde_legible"] = f"{_porcentaje(fila.tasa_mv_desde)} % M.V."
+        datos["tasa_mv_hasta_legible"] = f"{_porcentaje(fila.tasa_mv_hasta)} % M.V."
+    plazo = plazo_legible(fila.plazo_dias) if fila.plazo_dias is not None else None
+    datos["plazo"] = plazo
+    if plazo is not None:
+        datos["plazo_dias_legible"] = plazo
     return datos
 
 
@@ -185,16 +202,17 @@ def _spreads_producto(
                 continue
             if plazo_dias is not None and fila.plazo_dias != plazo_dias:
                 continue
+            plazo = plazo_legible(fila.plazo_dias) if fila.plazo_dias is not None else None
             encontrados.append(
                 {
                     "producto": fila.producto,
                     "segmento": etiqueta_banda(fila.segmento) if fila.segmento else None,
                     "plazo_dias": fila.plazo_dias,
-                    "plazo": (
-                        plazo_legible(fila.plazo_dias) if fila.plazo_dias is not None else None
-                    ),
+                    "plazo": plazo,
+                    "plazo_dias_legible": plazo,
                     "tipo_tasa": fila.tipo_tasa,
                     "descripcion": describir_tasa(fila),
+                    "valor_legible": describir_tasa(fila),
                     "vigencia_desde": fila.vigencia_desde.isoformat(),
                     "vigencia_hasta": fila.vigencia_hasta.isoformat(),
                     "fuente": fila.fuente,
@@ -284,19 +302,32 @@ def _resumen_producto(
         if fila.tasa_mv_desde is not None and fila.tasa_mv_hasta is not None
     ]
     publicadas = len(mensuales) == len(filas)
+    descripcion = _descripcion_rango(desde, hasta)
     resumen: dict[str, Any] = {
         "producto": producto,
         "segmento": segmento,
-        "descripcion": _descripcion_rango(desde, hasta),
+        "descripcion": descripcion,
+        "valor_legible": descripcion,
         "tasa_ea_desde": float(desde),
         "tasa_ea_hasta": float(hasta),
+        "tasa_ea_desde_legible": f"{_porcentaje(desde)} % E.A.",
+        "tasa_ea_hasta_legible": f"{_porcentaje(hasta)} % E.A.",
         "tasa_mv_desde": (float(min(valor[0] for valor in mensuales)) if publicadas else None),
         "tasa_mv_hasta": (float(max(valor[1] for valor in mensuales)) if publicadas else None),
         **comun,
     }
+    if publicadas:
+        resumen["tasa_mv_desde_legible"] = (
+            f"{_porcentaje(min(valor[0] for valor in mensuales))} % M.V."
+        )
+        resumen["tasa_mv_hasta_legible"] = (
+            f"{_porcentaje(max(valor[1] for valor in mensuales))} % M.V."
+        )
     if producto == PRODUCTO_CDT:
         resumen["plazo_dias"] = plazo_dias
-        resumen["plazo"] = plazo_legible(plazo_dias) if plazo_dias is not None else None
+        plazo = plazo_legible(plazo_dias) if plazo_dias is not None else None
+        resumen["plazo"] = plazo
+        resumen["plazo_dias_legible"] = plazo
         if monto is None:
             resumen["descripcion"] = f"{resumen['descripcion']} según el monto"
             resumen["depende_de"] = ["monto"]
@@ -331,12 +362,107 @@ def _agrupar_por_plazo(
             {
                 "plazo_dias": plazo,
                 "plazo": plazo_legible(plazo),
+                "plazo_dias_legible": plazo_legible(plazo),
                 "tasas": list(dict.fromkeys(str(fila["descripcion"]) for fila in bandas)),
                 "bandas": bandas,
                 "spreads": [item["descripcion"] for item in indices],
             }
         )
     return grupos
+
+
+def _cifras_consulta(
+    resumen: dict[str, Any],
+    tasas: list[dict[str, Any]],
+    spreads: list[dict[str, Any]],
+) -> list[dict[str, Any]]:
+    """Reúne las cifras de una consulta con su texto legible.
+
+    Args:
+        resumen: resumen del producto con sus rangos.
+        tasas: filas por segmento ya serializadas.
+        spreads: índices IPC/IBR ya serializados.
+
+    Returns:
+        Las cifras listas para `bloque_cifras`, con su unidad y su texto
+        legible; un spread se declara en puntos y nunca como tasa E.A.
+    """
+    cifras: list[dict[str, Any]] = []
+    if "tasa_ea_desde" in resumen:
+        rango = {"desde": resumen["tasa_ea_desde"], "hasta": resumen["tasa_ea_hasta"]}
+        cifras.append(
+            cifra(
+                "tasa_ea",
+                rango,
+                str(resumen["valor_legible"]),
+                "porcentaje_ea",
+                etiqueta="rango E.A. del producto",
+            )
+        )
+        cifras.append(
+            cifra(
+                "tasa_ea_desde",
+                resumen["tasa_ea_desde"],
+                str(resumen["tasa_ea_desde_legible"]),
+                "porcentaje_ea",
+                etiqueta="tasa E.A. mínima",
+            )
+        )
+        cifras.append(
+            cifra(
+                "tasa_ea_hasta",
+                resumen["tasa_ea_hasta"],
+                str(resumen["tasa_ea_hasta_legible"]),
+                "porcentaje_ea",
+                etiqueta="tasa E.A. máxima",
+            )
+        )
+        if "tasa_mv_desde_legible" in resumen:
+            cifras.append(
+                cifra(
+                    "tasa_mv_desde",
+                    resumen["tasa_mv_desde"],
+                    str(resumen["tasa_mv_desde_legible"]),
+                    "porcentaje",
+                    etiqueta="tasa M.V. mínima",
+                )
+            )
+            cifras.append(
+                cifra(
+                    "tasa_mv_hasta",
+                    resumen["tasa_mv_hasta"],
+                    str(resumen["tasa_mv_hasta_legible"]),
+                    "porcentaje",
+                    etiqueta="tasa M.V. máxima",
+                )
+            )
+    for indice, fila in enumerate(tasas, start=1):
+        if not fila.get("valor_legible"):
+            continue
+        segmento = fila.get("segmento") or f"segmento {indice}"
+        cifras.append(
+            cifra(
+                f"tasa_{indice}",
+                {"desde": fila.get("tasa_ea_desde"), "hasta": fila.get("tasa_ea_hasta")},
+                str(fila["valor_legible"]),
+                "porcentaje_ea",
+                etiqueta=f"tasa E.A. de {segmento}",
+            )
+        )
+    for indice, item in enumerate(spreads, start=1):
+        if not item.get("valor_legible"):
+            continue
+        segmento = item.get("segmento") or f"segmento {indice}"
+        cifras.append(
+            cifra(
+                f"spread_{indice}",
+                item.get("descripcion"),
+                str(item["valor_legible"]),
+                "puntos",
+                etiqueta=f"spread IPC/IBR de {segmento}",
+            )
+        )
+    return cifras
 
 
 def _validar_filtros(plazo_dias: int | None, monto: int | None) -> dict[str, Any] | None:
@@ -459,7 +585,12 @@ def consultar_tasa(
     if clave != PRODUCTO_CDT and (plazo_dias is not None or monto is not None):
         resultado["aviso_filtros"] = _aviso_filtros_solo_cdt(clave, plazo_dias, monto)
     if clave == PRODUCTO_CDT:
-        resultado["filtros"] = {"plazo_dias": plazo_dias, "monto": monto}
+        resultado["filtros"] = {
+            "plazo_dias": plazo_dias,
+            "plazo_dias_legible": (plazo_legible(plazo_dias) if plazo_dias is not None else None),
+            "monto": monto,
+            "monto_legible": formatear_pesos(monto) if monto is not None else None,
+        }
         if plazo_dias is None:
             resultado["por_plazo"] = _agrupar_por_plazo(tasas, spreads)
             resultado["nota"] = (
@@ -467,6 +598,7 @@ def consultar_tasa(
                 "plazo_dias y monto. Los spreads sobre IPC o IBR se presentan en "
                 "puntos y nunca como tasa E.A."
             )
+    resultado.update(bloque_cifras(_cifras_consulta(resultado["resumen"], tasas, spreads)))
     return resultado
 
 
@@ -491,9 +623,32 @@ def _pesos(valor: Decimal) -> str:
     return f"{signo}${abs(entero):,}".replace(",", ".")
 
 
-def _rango_json(desde: Decimal, hasta: Decimal, descripcion: str | None = None) -> dict[str, Any]:
-    """Arma un rango JSON con sus dos extremos y la descripción legible opcional."""
-    datos: dict[str, Any] = {"desde": float(desde), "hasta": float(hasta)}
+def _rango_json(
+    desde: Decimal,
+    hasta: Decimal,
+    descripcion: str | None = None,
+    *,
+    unidad: str = "pesos",
+) -> dict[str, Any]:
+    """Arma un rango JSON con sus extremos, su descripción y su texto legible.
+
+    ``valor_legible`` siempre acompaña a las cifras para que el agente las
+    copie; si no se pasa `descripcion`, se escribe con el formateador de la
+    unidad («$16.400.000», «28,34 % E.A.» o «1,59–2,10 % mensual»).
+    """
+    legible = descripcion
+    if legible is None:
+        if unidad == "porcentaje_ea":
+            legible = _descripcion_rango_porcentaje(desde, hasta, "% E.A.")
+        elif unidad == "porcentaje":
+            legible = _descripcion_rango_porcentaje(desde, hasta, "% mensual")
+        else:
+            legible = _descripcion_rango_pesos(desde, hasta)
+    datos: dict[str, Any] = {
+        "desde": float(desde),
+        "hasta": float(hasta),
+        "valor_legible": legible,
+    }
     if descripcion is not None:
         datos["descripcion"] = descripcion
     return datos
@@ -504,6 +659,22 @@ def _descripcion_cuota(desde: Decimal, hasta: Decimal) -> str:
     if desde == hasta:
         return _pesos(desde)
     return f"{_pesos(desde)}–{_pesos(hasta)}"
+
+
+def _descripcion_rango_pesos(desde: Decimal, hasta: Decimal) -> str:
+    """Escribe un rango de pesos como «$16.400.000» o «$2.000.000–$2.400.000»."""
+    if desde == hasta:
+        return formatear_pesos(desde)
+    return f"{formatear_pesos(desde)}–{formatear_pesos(hasta)}"
+
+
+def _descripcion_rango_porcentaje(desde: Decimal, hasta: Decimal, sufijo: str) -> str:
+    """Escribe un rango de porcentajes con su unidad, sin ambigüedad de escala."""
+    inicio = formatear_porcentaje(desde).removesuffix(" %")
+    fin = formatear_porcentaje(hasta).removesuffix(" %")
+    if desde == hasta:
+        return f"{inicio} {sufijo}"
+    return f"{inicio}–{fin} {sufijo}"
 
 
 def _monto_decimal(monto: object) -> Decimal | None:
@@ -566,10 +737,11 @@ def simular_cuota(producto: str, monto: float, plazo_meses: int) -> dict[str, An
 
     Returns:
         La cuota en rango entre la tasa mínima y la máxima, las dos tasas E.A. y
-        M.V., los totales, la versión de la fórmula, la vigencia, la fuente, el
+        M.V., los totales con su texto legible, la vigencia, la fuente, el
         `sha256_pdf` y las alertas, con `vigencia_vencida` cuando la tabla ya no
-        cubre la fecha de hoy. Un producto sin cuota o una entrada inválida
-        devuelven un error estructurado.
+        cubre la fecha de hoy. La versión de la fórmula queda solo en
+        `metadatos`. Un producto sin cuota o una entrada inválida devuelven un
+        error estructurado.
     """
     return _simular_cuota(producto, monto, plazo_meses)
 
@@ -631,21 +803,26 @@ def _simular_cuota(
     fecha = hoy if hoy is not None else _hoy()
     vencida = not esta_vigente(rango.vigencia_desde, rango.vigencia_hasta, fecha)
     vigencia = vigencia_legible(rango.vigencia_desde, rango.vigencia_hasta)
-    return {
+    descripcion_ea = _descripcion_rango(rango.ea_desde, rango.ea_hasta)
+    descripcion_mensual = _descripcion_rango_porcentaje(interes_min, interes_max, "% mensual")
+    descripcion_cuota = _descripcion_cuota(cuota_min, cuota_max)
+    descripcion_intereses = _descripcion_rango_pesos(pagado_min - capital, pagado_max - capital)
+    descripcion_pagado = _descripcion_rango_pesos(pagado_min, pagado_max)
+    datos: dict[str, Any] = {
         "producto": clave,
         "nombre": nombre,
         "monto": float(capital),
+        "monto_legible": formatear_pesos(capital),
         "plazo_meses": plazo,
-        "version_formula": VERSION_FORMULA,
-        "tasa_ea": _rango_json(
-            rango.ea_desde, rango.ea_hasta, _descripcion_rango(rango.ea_desde, rango.ea_hasta)
+        "plazo_meses_legible": formatear_meses(plazo),
+        "metadatos": {"version_formula": VERSION_FORMULA},
+        "tasa_ea": _rango_json(rango.ea_desde, rango.ea_hasta, descripcion_ea),
+        "tasa_mensual": _rango_json(interes_min, interes_max, descripcion_mensual),
+        "cuota_mensual": _rango_json(cuota_min, cuota_max, descripcion_cuota),
+        "total_intereses": _rango_json(
+            pagado_min - capital, pagado_max - capital, descripcion_intereses
         ),
-        "tasa_mensual": _rango_json(interes_min, interes_max),
-        "cuota_mensual": _rango_json(
-            cuota_min, cuota_max, _descripcion_cuota(cuota_min, cuota_max)
-        ),
-        "total_intereses": _rango_json(pagado_min - capital, pagado_max - capital),
-        "total_pagado": _rango_json(pagado_min, pagado_max),
+        "total_pagado": _rango_json(pagado_min, pagado_max, descripcion_pagado),
         "fuente": rango.fuente,
         "vigencia_desde": rango.vigencia_desde.isoformat(),
         "vigencia_hasta": rango.vigencia_hasta.isoformat(),
@@ -655,6 +832,48 @@ def _simular_cuota(
         "alertas": [ALERTA_VIGENCIA_VENCIDA] if vencida else [],
         "aviso": AVISO_SIMULACION.format(vigencia=vigencia),
     }
+    datos.update(
+        bloque_cifras(
+            (
+                cifra("monto", capital, formatear_pesos(capital), "pesos"),
+                cifra("plazo_meses", plazo, formatear_meses(plazo), "meses"),
+                cifra(
+                    "tasa_ea",
+                    {"desde": float(rango.ea_desde), "hasta": float(rango.ea_hasta)},
+                    descripcion_ea,
+                    "porcentaje_ea",
+                ),
+                cifra(
+                    "tasa_mensual",
+                    {"desde": float(interes_min), "hasta": float(interes_max)},
+                    descripcion_mensual,
+                    "porcentaje",
+                ),
+                cifra(
+                    "cuota_mensual",
+                    {"desde": float(cuota_min), "hasta": float(cuota_max)},
+                    descripcion_cuota,
+                    "pesos",
+                ),
+                cifra(
+                    "total_intereses",
+                    {
+                        "desde": float(pagado_min - capital),
+                        "hasta": float(pagado_max - capital),
+                    },
+                    descripcion_intereses,
+                    "pesos",
+                ),
+                cifra(
+                    "total_pagado",
+                    {"desde": float(pagado_min), "hasta": float(pagado_max)},
+                    descripcion_pagado,
+                    "pesos",
+                ),
+            )
+        )
+    )
+    return datos
 
 
 def _tokens(texto: str) -> list[str]:

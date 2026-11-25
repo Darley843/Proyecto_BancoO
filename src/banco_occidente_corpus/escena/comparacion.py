@@ -36,6 +36,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 
 from ..canal.contratos import EntradaDiagnostico, ResultadoDiagnostico
+from ..cifras_legibles import formatear_pesos, formatear_tasa_ea
 from ..diagnostico import motor
 from ..tablero.tasas import ConfiguracionTasas, cargar_config_tasas, vigencia_legible
 from .contratos import (
@@ -49,8 +50,6 @@ from .contratos import (
 from .gota import (
     SUPUESTO_RENOVACION,
     PrestamoGota,
-    formatear_pesos,
-    formatear_tasa_ea,
 )
 
 #: Referencia legal que cita Pana; es informativa y no acusa a una persona real.

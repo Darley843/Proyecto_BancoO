@@ -577,7 +577,10 @@ def test_consultar_tasa_cdt_con_plazo_y_monto_devuelve_una_banda() -> None:
     assert fila["descripcion"] == "11,90 % E.A."
     assert resultado["resumen"]["tasa_ea_desde"] == 0.119
     assert resultado["resumen"]["tasa_ea_hasta"] == 0.119
-    assert resultado["filtros"] == {"plazo_dias": 360, "monto": 200_000_000}
+    assert resultado["filtros"]["plazo_dias"] == 360
+    assert resultado["filtros"]["monto"] == 200_000_000
+    assert resultado["filtros"]["plazo_dias_legible"] == "360 días (12 meses)"
+    assert resultado["filtros"]["monto_legible"] == "$200.000.000"
     assert all(item["plazo_dias"] == 360 for item in resultado["spreads"])
 
 
@@ -747,12 +750,11 @@ def test_simular_cuota_devuelve_rango_dos_tasas_y_trazabilidad() -> None:
     assert resultado["producto"] == "libre_inversion"
     assert resultado["monto"] == 15_000_000.0
     assert resultado["plazo_meses"] == 48
-    assert resultado["version_formula"] == "v1"
-    assert resultado["tasa_ea"] == {
-        "desde": 0.2056,
-        "hasta": 0.2817,
-        "descripcion": "20,56–28,17 % E.A.",
-    }
+    assert resultado["metadatos"]["version_formula"] == "v1"
+    assert resultado["tasa_ea"]["desde"] == 0.2056
+    assert resultado["tasa_ea"]["hasta"] == 0.2817
+    assert resultado["tasa_ea"]["descripcion"] == "20,56–28,17 % E.A."
+    assert resultado["tasa_ea"]["valor_legible"] == "20,56–28,17 % E.A."
     assert resultado["tasa_mensual"]["desde"] < resultado["tasa_mensual"]["hasta"]
     assert resultado["cuota_mensual"]["descripcion"] == "$447.269–$498.003"
     assert resultado["cuota_mensual"]["desde"] == 447_269.0

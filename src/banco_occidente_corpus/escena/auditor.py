@@ -44,6 +44,7 @@ from decimal import Decimal, InvalidOperation
 from typing import Literal
 
 from ..asistente.validacion import cifras_duras, detectar_pii
+from ..cifras_legibles import formatear_pesos, formatear_porcentaje, formatear_tasa_ea
 from ..diagnostico.comite import auditar_texto, negada_antes
 from .contratos import (
     CifraEscena,
@@ -53,7 +54,6 @@ from .contratos import (
     TurnoEscena,
     VeredictoAuditor,
 )
-from .gota import formatear_pesos, formatear_porcentaje, formatear_tasa_ea
 
 #: Veredictos posibles; ninguno es un color del semáforo.
 Veredicto = Literal["conforme", "con_observaciones", "objeta"]
