@@ -48,6 +48,7 @@ from banco_occidente_corpus.canal.envio import (
 from banco_occidente_corpus.canal.webhook import crear_router_canal
 from banco_occidente_corpus.config import Config, load_config
 from banco_occidente_corpus.escena.api import crear_router_escena
+from banco_occidente_corpus.herramientas.api import crear_router_herramientas
 from banco_occidente_corpus.sucursal.ajustes import (
     ConfiguracionSucursal,
     cargar_configuracion_sucursal,
@@ -257,6 +258,7 @@ def crear_app(
     )
     app.include_router(crear_router_canal(despachador.recibir if despachador is not None else None))
     app.include_router(crear_router_escena())
+    app.include_router(crear_router_herramientas())
 
     @app.get("/health", response_model=SaludRespuesta, tags=["salud"])
     def salud(response: Response) -> SaludRespuesta:
