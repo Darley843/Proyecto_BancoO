@@ -30,13 +30,19 @@
 
 ## 3. Medición, t-SNE y herramientas de conocimiento — Anny (lunes 23 a jueves 26)
 
-- [ ] 3.1 Anny (lunes 23): medir `recall@10` y `nDCG@10` de la Bóveda con `arqueo/metricas.py` sobre las preguntas con fuente esperada; verificar que la corrida es reproducible, que usa `K_RECALL = 10` y que los números y el comando quedan en `docs/AGENTE_OPENCLAW.md`.
-- [ ] 3.2 Anny (lunes 23): generar la proyección t-SNE de los embeddings de la Bóveda con `scikit-learn` y semilla fija, sin volver a vectorizar y sin red; verificar que dos corridas con la misma semilla producen la misma figura y que el archivo y los datos quedan documentados en `docs/AGENTE_OPENCLAW.md`.
-- [ ] 3.3 Anny (martes 24): implementar `buscar_en_documentos` y `consultar_tarifas` envolviendo `buscar_en_boveda` y el Tablero, con esquemas Pydantic y sin escritura en el corpus; verificar que los fragmentos vuelven citados con título, URL y puntaje, que una consulta sin coincidencias no inventa y que las dos herramientas son de solo lectura.
-- [ ] 3.4 Anny (miércoles 25): implementar `clasificar_pregunta` y `auditar_respuesta` sobre el Digiturno y `auditar_texto`, con resultado determinista y sin colores; verificar que una pregunta de tasa va a la ruta T, una de producto a la B, una fuera de dominio se rechaza y que el auditor detecta cifra inventada, fuente ausente, promesa y PII.
+- [x] 3.1 Anny (lunes 23): medir `recall@10` y `nDCG@10` de la Bóveda con `arqueo/metricas.py` sobre las preguntas con fuente esperada; verificar que la corrida es reproducible, que usa `K_RECALL = 10` y que los números y el comando quedan en `docs/AGENTE_OPENCLAW.md`.
+  > Hecha: `docs/ARQUEO.md` (recall@10 0,8241 y nDCG@10 0,6362 con `K_RECALL = 10`, comando `make arqueo`).
+- [x] 3.2 Anny (lunes 23): generar la proyección t-SNE de los embeddings de la Bóveda con `scikit-learn` y semilla fija, sin volver a vectorizar y sin red; verificar que dos corridas con la misma semilla producen la misma figura y que el archivo y los datos quedan documentados en `docs/AGENTE_OPENCLAW.md`.
+  > Hecha en el #193: `docs/PROYECCION.md`, `docs/img/proyeccion_tsne.svg` y `data/evaluacion/proyeccion.json`, semilla 1965.
+- [x] 3.3 Anny (martes 24): implementar `buscar_en_documentos` y `consultar_tarifas` envolviendo `buscar_en_boveda` y el Tablero, con esquemas Pydantic y sin escritura en el corpus; verificar que los fragmentos vuelven citados con título, URL y puntaje, que una consulta sin coincidencias no inventa y que las dos herramientas son de solo lectura.
+  > Hecha en el #198 (`mcp_servidor/conocimiento.py`); el catálogo delega en ella desde el PR que conecta las herramientas 17–20.
+- [x] 3.4 Anny (miércoles 25): implementar `clasificar_pregunta` y `auditar_respuesta` sobre el Digiturno y `auditar_texto`, con resultado determinista y sin colores; verificar que una pregunta de tasa va a la ruta T, una de producto a la B, una fuera de dominio se rechaza y que el auditor detecta cifra inventada, fuente ausente, promesa y PII.
+  > Hecha en el #199 (`mcp_servidor/control.py`); el catálogo delega en ella desde el PR que conecta las herramientas 17–20.
 - [ ] 3.5 Anny (miércoles 25): escribir las pruebas de inyección con texto de WhatsApp que intenta cambiar reglas, con fragmentos de la Bóveda como datos y con argumentos de herramienta manipulados; verificar que ningún intento cambia el sistema, la ruta ni el catálogo, y que `auditar_respuesta` marca el intento sin filtrar el prompt.
+  > Catálogo y 49 pruebas sin red en el #200; corrida contra el gateway lista en el #203 (`docs/INYECCION.md`). Falta la corrida en vivo.
 - [ ] 3.6 Anny (miércoles 25): probar el recorrido de invitados con Darley: consentimiento, tope, turnos, borrado y rechazo fuera de ventana; verificar que no se guardan números ni nombres y que el conteo por huella no se puede saltar reiniciando el proceso.
 - [ ] 3.7 Anny (jueves 26): solo correcciones y documentación; armar la tabla de evidencia para la rúbrica (herramienta, prueba, archivo, resultado) y revisar que `recall@10`, `nDCG@10`, t-SNE, inyección e invitados quedan citados con su comando.
+  > Tabla en `docs/EVIDENCIA.md` (#201); se completa con los resultados del miércoles.
 
 ## 4. Producto, documentación y sustentación — Yoldy (lunes 23 a jueves 26)
 
