@@ -13,12 +13,12 @@ from pathlib import Path
 
 import pytest
 
+from banco_occidente_corpus.cifras_legibles import formatear_tasa_ea
 from banco_occidente_corpus.config import PROJECT_ROOT
 from banco_occidente_corpus.escena.gota import (
     SUPUESTO_RENOVACION,
     calcular_prestamo_gota,
     cargar_config_gota,
-    formatear_tasa_ea,
     seleccionar_frase,
     turnos_don_gota,
 )

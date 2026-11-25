@@ -84,7 +84,7 @@ def test_ninguna_tabla_guarda_numero_nombre_ni_texto(tmp_path: Path) -> None:
 
 
 def test_mensajes_tiene_las_columnas_del_diseno(tmp_path: Path) -> None:
-    """La tabla de deduplicación conserva id, usuario, estado y fechas."""
+    """La tabla de deduplicación conserva id, usuario, estado, fechas y motor."""
     ruta = tmp_path / "whatsapp.sqlite"
     inicializar_almacen(ruta)
 
@@ -94,7 +94,31 @@ def test_mensajes_tiene_las_columnas_del_diseno(tmp_path: Path) -> None:
         "estado",
         "recibido_en",
         "procesado_en",
+        "motor",
     ]
+
+
+def test_migra_una_base_anterior_sin_motor(tmp_path: Path) -> None:
+    """Una base creada antes del motor recibe la columna sin perder datos."""
+    ruta = tmp_path / "whatsapp.sqlite"
+    with sqlite3.connect(str(ruta)) as conexion:
+        conexion.execute(
+            "CREATE TABLE mensajes ("
+            "id_mensaje TEXT PRIMARY KEY, usuario_id TEXT NOT NULL, "
+            "estado TEXT NOT NULL, recibido_en TEXT NOT NULL, procesado_en TEXT)"
+        )
+        conexion.execute(
+            "INSERT INTO mensajes (id_mensaje, usuario_id, estado, recibido_en) "
+            "VALUES (?, ?, ?, ?)",
+            ("wamid.VIEJO", "u" * 32, "respondido", "2026-11-16T12:00:00+00:00"),
+        )
+
+    inicializar_almacen(ruta)
+
+    assert "motor" in _columnas(ruta, "mensajes")
+    with sqlite3.connect(str(ruta)) as conexion:
+        total = conexion.execute("SELECT COUNT(*) FROM mensajes").fetchone()[0]
+    assert total == 1
 
 
 def test_crea_la_carpeta_padre(tmp_path: Path) -> None:

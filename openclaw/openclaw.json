@@ -32,7 +32,6 @@
           "file.stat",
           "file.write",
           "fs.listDir",
-          "screen.record",
           "screen.snapshot",
           "stt.listen",
           "stt.status",
@@ -80,7 +79,14 @@
         "enabled": true
       },
       "whatsapp": {
-        "enabled": true
+        "enabled": false
+      },
+      "memory-core": {
+        "config": {
+          "dreaming": {
+            "enabled": false
+          }
+        }
       }
     }
   },
@@ -161,7 +167,13 @@
             "update_goal",
             "tts",
             "talk_voice"
-          ]
+          ],
+          "alsoAllow": [
+            "bundle-mcp"
+          ],
+          "exec": {
+            "security": "deny"
+          }
         },
         "skills": [],
         "thinkingDefault": "off"
@@ -182,6 +194,47 @@
     },
     "elevated": {
       "enabled": false
+    },
+    "sessions": {
+      "visibility": "self"
+    },
+    "agentToAgent": {
+      "enabled": false
+    }
+  },
+  "mcp": {
+    "servers": {
+      "sucursal": {
+        "url": "http://127.0.0.1:8765/mcp",
+        "transport": "streamable-http",
+        "enabled": true,
+        "connectionTimeoutMs": 5000,
+        "requestTimeoutMs": 8000,
+        "toolFilter": {
+          "include": [
+            "consultar_tasa",
+            "simular_cuota",
+            "verificar_usura",
+            "diagnosticar_capacidad",
+            "comparar_escenario",
+            "convocar_comite",
+            "calcular_prestamo_gota",
+            "comparar_gota_banco",
+            "negociar_opcion",
+            "generar_ficha_opcion",
+            "responder_sobre_proyecto",
+            "registrar_consentimiento",
+            "olvidar_mis_datos",
+            "solicitar_asesor",
+            "consultar_caso",
+            "generar_tarjeta_pana",
+            "buscar_en_documentos",
+            "consultar_tarifas",
+            "clasificar_pregunta",
+            "auditar_respuesta"
+          ]
+        }
+      }
     }
   }
 }

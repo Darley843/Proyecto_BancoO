@@ -30,6 +30,7 @@ from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Context, Decimal, InvalidOperation, localcontext
 from pathlib import Path
 
+from ..cifras_legibles import formatear_pesos, formatear_porcentaje
 from ..config import PROJECT_ROOT
 from .contratos import CifraEscena, FuenteCifra, PrestamoGota, TurnoEscena, UnidadCifra
 
@@ -234,46 +235,6 @@ def turnos_don_gota(
             )
         )
     return tuple(turnos)
-
-
-def formatear_pesos(valor: Decimal) -> str:
-    """Escribe un monto en pesos con separador de miles y signo.
-
-    Args:
-        valor: monto en pesos.
-
-    Returns:
-        El texto, como ``$1.000.000``.
-    """
-    entero = int(Decimal(valor).quantize(Decimal(1), rounding=ROUND_HALF_UP))
-    signo = "-" if entero < 0 else ""
-    return f"{signo}${abs(entero):,}".replace(",", ".")
-
-
-def formatear_porcentaje(valor: Decimal) -> str:
-    """Escribe una fracción como porcentaje con dos decimales y coma.
-
-    Args:
-        valor: fracción, donde 0,20 es 20 %.
-
-    Returns:
-        El texto, como ``20 %`` o ``791,61 %``.
-    """
-    centenas = _cuantizar(Decimal(valor) * 100, 2)
-    texto = f"{centenas:.2f}".replace(".", ",").removesuffix(",00")
-    return f"{texto} %"
-
-
-def formatear_tasa_ea(valor: Decimal) -> str:
-    """Escribe una tasa E.A. con su unidad.
-
-    Args:
-        valor: tasa como fracción, donde 0,2834 es 28,34 % E.A.
-
-    Returns:
-        El texto, como ``28,34 % E.A.``.
-    """
-    return f"{formatear_porcentaje(valor)} E.A."
 
 
 #: Ids de los turnos, en el mismo orden que `GRUPOS_FRASES`.

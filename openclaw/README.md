@@ -102,8 +102,9 @@ ni se copia a WSL: si la configuración real cambia, se vuelve a exportar.
 | `agents.defaults` | Valores por defecto de todos los agentes: modelo principal y alternativo. |
 | `agents.entries` | Los agentes declarados: `main` (la terminal) y `pana` (la escena). |
 | `channels.whatsapp` | Canal de WhatsApp del gateway: apagado. |
+| `mcp` | Servidor MCP local `sucursal` con las veinte herramientas y su lista cerrada `toolFilter`. |
 | `talk` | Qué agente atiende la voz. |
-| `tools` | Límites globales de herramientas: sistema de archivos y permisos elevados. |
+| `tools` | Límites globales de herramientas: sistema de archivos, permisos elevados, visibilidad de sesiones y mensajería entre agentes. |
 
 #### `gateway`: loopback, token y API de chat
 
@@ -120,7 +121,9 @@ ni se copia a WSL: si la configuración real cambia, se vuelve a exportar.
   sigue protegida por el token y por el loopback.
 - `nodes.commands.allow`: los comandos que un nodo (canvas, dispositivo,
   archivos, pantalla, voz, terminal) puede ejecutar. Es una lista cerrada: lo
-  que no está, no se ejecuta.
+  que no está, no se ejecuta. Desde la auditoría no incluye `screen.record`:
+  grabar la pantalla no hace falta para la escena y ampliaba el permiso de los
+  nodos.
 
 #### `agents.defaults`: modelo principal y alternativo
 
@@ -147,6 +150,10 @@ Es el agente de la escena. Además de `workspace` (lo que sincroniza
   subagentes o sesiones, administrar metas, TTS y voz, y la interfaz móvil.
   La lista vive en el gateway, no en el prompt: es defensa en profundidad. El
   `AGENTS.md` del workspace lo explica en palabras; esta lista lo hace cumplir.
+- **`exec.security: "deny"`**: el perfil `minimal` no basta para cerrar la
+  ejecución de comandos; esta clave la bloquea de forma explícita. No afecta a
+  las herramientas del MCP, que entran por `alsoAllow: ["bundle-mcp"]` y no por
+  el ejecutor del gateway (ver [Auditoría de seguridad](#auditoría-de-seguridad)).
 - **`skills: []`**: vacío a propósito. Pana no carga skills del gateway; todo
   lo que sabe está en los cuatro archivos del workspace, que se envían en cada
   turno. Un skill nuevo aparecería en el `diff` de este archivo.
@@ -162,11 +169,38 @@ Es el agente de la escena. Además de `workspace` (lo que sincroniza
   la configuración real vuelve a traer teléfonos o JID de grupo, el script de
   exportación los redacta antes de versionar.
 - `plugins.entries`: `device-pair` habilitado con `publicUrl` en loopback;
-  `whatsapp` habilitado como plugin (distinto de `channels.whatsapp`, que es el
-  canal); `anthropic` y `codex` con el catálogo de sesiones apagado.
+  `whatsapp` **apagado** como plugin (distinto de `channels.whatsapp`, que es el
+  canal y también está apagado): la escena no lo usa, así que la auditoría de
+  seguridad pedía cerrarlo; `anthropic` y `codex` con el catálogo de sesiones
+  apagado.
 - `talk.agentId: "main"`: la voz la atiende el agente de la terminal.
 - `tools.fs.workspaceOnly: true`: el acceso a archivos no sale del workspace.
   `tools.elevated.enabled: false`: sin permisos elevados.
+
+### MCP del agente `pana`
+
+La copia versionada añade un servidor MCP local con las veinte herramientas del
+agente (ver [`docs/AGENTE_OPENCLAW.md`](../docs/AGENTE_OPENCLAW.md)):
+
+```json
+"mcp": {
+  "servers": {
+    "sucursal": {
+      "url": "http://127.0.0.1:8765/mcp",
+      "transport": "streamable-http",
+      "enabled": true,
+      "toolFilter": {"include": ["consultar_tasa", "…las veinte…"]}
+    }
+  }
+}
+```
+
+Además, `agents.entries.pana.tools.alsoAllow` incluye `bundle-mcp`: el perfil
+`minimal` no expone los servidores MCP por sí solo. El servidor se levanta con
+`make agente-mcp` en el host de Windows y escucha solo en `127.0.0.1:8765`; el
+gateway lo alcanza desde WSL con la red espejo. Si el bloque no está en el
+`openclaw.json` real de WSL, `openclaw mcp probe sucursal` no verá las
+herramientas: replica el bloque allí y vuelve a exportar la copia redactada.
 
 ### Cómo se exporta
 
@@ -208,3 +242,46 @@ Lo que **nunca** entra a este archivo: el token del gateway, claves de
 proveedores, contraseñas, teléfonos ni rutas con datos de personas. Si el
 script falla en el paso de comprobación, no lo fuerces: agrega el patrón que
 falta al `deny` correspondiente o corrige el valor en WSL.
+
+## Auditoría de seguridad
+
+`openclaw security audit` revisa el `openclaw.json` real de WSL. Se corrió el
+**24 de noviembre de 2026** sobre esta configuración:
+
+```text
+openclaw security audit
+```
+
+| Resultado | Antes | Después |
+|---|---|---|
+| Críticas | 0 | 0 |
+| Advertencias | 7 | 2 |
+
+No hay hallazgos críticos ni altos: la entrega no queda bloqueada. De las siete
+advertencias iniciales se corrigieron cinco cambiando configuración; las dos
+restantes se aceptan con la justificación de abajo.
+
+### Advertencias corregidas
+
+| Advertencia | Cómo se corrigió |
+|---|---|
+| Sesiones compartidas: `tools.sessions` sin visibilidad acotada | `tools.sessions.visibility: "self"`: cada sesión solo ve la suya. |
+| Mensajería entre agentes habilitada (`tools.agentToAgent`) | `tools.agentToAgent.enabled: false`: Pana no puede hablar con otros agentes. |
+| Grabación de pantalla permitida en los nodos: `screen.record` dentro de `gateway.nodes.commands.allow` | Se quitó `screen.record` de la lista; queda `screen.snapshot`, que es lo único que usa la escena. |
+| Plugin de WhatsApp habilitado sin usarse: `plugins.entries.whatsapp.enabled` | `enabled: false`. El canal del proyecto va por Meta, no por este plugin. |
+| Ejecución de comandos permitida en `pana`: `agents.entries.pana.tools.exec.security` distinto de `deny` | `exec.security: "deny"`. El perfil `minimal` no lo cubría. |
+
+Con `exec.security: "deny"` el agente **sigue usando las herramientas del MCP**:
+no pasan por el ejecutor de comandos, sino por `alsoAllow: ["bundle-mcp"]` y el
+servidor `sucursal`. Se probó con `consultar_tasa` en una sesión nueva del
+gateway y respondió con la tasa del Tablero.
+
+### Advertencias que quedan
+
+| Advertencia | Justificación |
+|---|---|
+| `gateway.trusted_proxies_missing` | El gateway solo escucha en loopback (`bind: "loopback"`, `127.0.0.1:18789`) y el panel no se publica, así que no hay proxy delante que pueda falsificar `X-Forwarded-For`. Declarar proxies de confianza sería ruido para un servicio que nadie alcanza desde fuera. |
+| `plugins.installs_unpinned_npm_specs` | Riesgo de cadena de suministro: algún plugin se instala con una especificación npm sin versión fija. Queda pendiente **fijar las versiones después de la entrega**; hacerlo ahora cambiaría el entorno del gateway en plena preparación de la demo. Se mitiga con el resto del cierre: gateway en loopback, token obligatorio y plugins sin uso apagados. |
+
+Se vuelve a correr `openclaw security audit` antes de la etiqueta
+`entrega-final`; un hallazgo crítico o alto bloquea la entrega.
