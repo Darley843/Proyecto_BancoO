@@ -62,14 +62,14 @@ banco nació en Cali en 1965.
 
 **Voz** (lo que dice Pana):
 
-> Somos cuatro. Nayla hizo las tasas, el motor del diagnóstico, el comité y el agente en OpenClaw; Darley, el canal de WhatsApp; Anny, la búsqueda, su evaluación y la seguridad; y Yoldy, la documentación y la pantalla.
+> Somos cuatro. Nayla hizo las tasas, el motor del diagnóstico, el comité y el agente en OpenClaw; Darley, WhatsApp y el servidor MCP; Anny, la búsqueda, su evaluación y la seguridad; y Yoldy, la documentación y la pantalla.
 
 **Detalle (para el panel, no para la voz):**
 
 | Quién | Sucursal 1965 y agente | Escena «Pana vs. el gota a gota» |
 |---|---|---|
-| Nayla | Tasas 2026, motor del diagnóstico, comité, MCP y entrevista por WhatsApp; agente en OpenClaw y sus herramientas | Don Gota, comparación con el motor y negociación |
-| Darley | Canal de WhatsApp con Meta, HITL y modo evento | Entrada por voz, voluntario (tecla V) y API de la escena |
+| Nayla | Tasas 2026, motor del diagnóstico, comité y entrevista por WhatsApp; agente en OpenClaw y los módulos de 11 herramientas | Don Gota, comparación con el motor y negociación |
+| Darley | Canal de WhatsApp con Meta, HITL, modo evento y servidor MCP de las 20 herramientas | Entrada por voz, voluntario (tecla V) y API de la escena |
 | Anny | Bóveda: evaluación (Arqueo y t-SNE), seguridad, Roba la Bóveda y cuatro herramientas del agente | Auditor y plan B |
 | Yoldy | Frontend, Tablero, mapa y operación/latencia; documentación y diagramas | Pantalla, voces, retratos y Pana anfitrión |
 
