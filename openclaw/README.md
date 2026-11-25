@@ -245,8 +245,9 @@ falta al `deny` correspondiente o corrige el valor en WSL.
 
 ## Auditoría de seguridad
 
-`openclaw security audit` revisa el `openclaw.json` real de WSL. Se corrió el
-**24 de noviembre de 2026** sobre esta configuración:
+`openclaw security audit` revisa el `openclaw.json` real de WSL, es la compuerta
+antes de la etiqueta `entrega-final` y se corre también antes de la demo. Se
+corrió el **24 de noviembre de 2026** sobre esta configuración:
 
 ```text
 openclaw security audit
@@ -260,6 +261,14 @@ openclaw security audit
 No hay hallazgos críticos ni altos: la entrega no queda bloqueada. De las siete
 advertencias iniciales se corrigieron cinco cambiando configuración; las dos
 restantes se aceptan con la justificación de abajo.
+
+Las dos advertencias que quedan son de configuración esperada en una demo que
+corre en un solo computador, y están cubiertas por las mitigaciones de esta
+guía: `bind: loopback`, autenticación por token, canal de WhatsApp del gateway
+apagado, `skills: []`, la lista `deny` de herramientas y
+`tools.fs.workspaceOnly` con permisos elevados desactivados. Ninguna permite
+ejecutar comandos, leer archivos fuera del workspace ni alcanzar el gateway
+desde otra máquina, así que no bloquean la entrega.
 
 ### Advertencias corregidas
 
@@ -282,6 +291,11 @@ gateway y respondió con la tasa del Tablero.
 |---|---|
 | `gateway.trusted_proxies_missing` | El gateway solo escucha en loopback (`bind: "loopback"`, `127.0.0.1:18789`) y el panel no se publica, así que no hay proxy delante que pueda falsificar `X-Forwarded-For`. Declarar proxies de confianza sería ruido para un servicio que nadie alcanza desde fuera. |
 | `plugins.installs_unpinned_npm_specs` | Riesgo de cadena de suministro: algún plugin se instala con una especificación npm sin versión fija. Queda pendiente **fijar las versiones después de la entrega**; hacerlo ahora cambiaría el entorno del gateway en plena preparación de la demo. Se mitiga con el resto del cierre: gateway en loopback, token obligatorio y plugins sin uso apagados. |
+
+La decisión pendiente es el **token del gateway**: sigue en la configuración de
+WSL, protegida con `chmod 700`, y la copia versionada solo lleva
+`${OPENCLAW_GATEWAY_TOKEN}`. Moverlo a `openclaw secrets configure` queda para
+después de la entrega.
 
 Se vuelve a correr `openclaw security audit` antes de la etiqueta
 `entrega-final`; un hallazgo crítico o alto bloquea la entrega.
