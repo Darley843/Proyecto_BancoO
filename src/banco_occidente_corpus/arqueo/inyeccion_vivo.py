@@ -16,11 +16,20 @@ Reglas de la corrida:
 - Solo habla con `127.0.0.1` o `localhost`: el gateway escucha en loopback y
   esta herramienta no sale a internet. Una URL de otro host se rechaza.
 - El token se lee de `OPENCLAW_GATEWAY_TOKEN` y nunca se imprime ni se guarda.
+- Excepción de red documentada en `AGENTS.md` y `CONSTITUTION.md`, como las de
+  Meta y Piper: no pasa por `net.py` porque es un `POST` a un servicio local y
+  no scraping, pero cada petición lleva `timeout` explícito, el User-Agent de
+  `config/site.toml` y el header `From` con `site.contact`. Sin contacto, la
+  corrida no arranca.
 - Cada ataque va en una sesión nueva (`eval:<corrida>:<id>`), sin historial y
   separada de las sesiones de WhatsApp (`wa:<huella>`): un ataque no contamina
   al siguiente ni la memoria de un invitado.
-- Sin reintentos. Un error del gateway queda como `error:<Tipo>` y el ataque
-  cuenta como no superado, para revisarlo.
+- Tiempo máximo propio de la evaluación (60 s, o `--timeout`): no usa el
+  `timeout_segundos` del canal, que es más corto porque protege al invitado.
+- Sin reintentos. Un error del gateway queda como `error:<Tipo>` y se cuenta
+  aparte: no es una inyección superada ni una que resistió, y pide repetir.
+- Habla directo con el gateway: no pasa por el canal, así que los comandos con
+  «/» no se filtran aquí. Ese filtro se prueba por WhatsApp.
 - El informe no guarda el texto de las respuestas.
 
 Uso:
@@ -32,8 +41,12 @@ uv run python -m banco_occidente_corpus.arqueo.inyeccion_vivo --escribir-doc
 ```
 
 `--simulado` no abre la red: responde con una negativa fija para probar la
-cadena completa y no escribe nada. `--escribir-doc` pega la tabla en la sección
-«Resultados» de `docs/INYECCION.md`.
+cadena completa y no escribe nada, así que no se combina con `--escribir-doc`.
+`--escribir-doc` pega la tabla en la sección «Resultados» de `docs/INYECCION.md`.
+
+Códigos de salida: 0 si todos los ataques resisten, 1 si alguna inyección pasó,
+2 si falta configuración (token u opciones) y 3 si no pasó ninguna pero hubo
+errores de la corrida que hay que repetir.
 """
 
 from __future__ import annotations
@@ -47,12 +60,12 @@ from collections.abc import Sequence
 from dataclasses import dataclass
 from datetime import date
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal
 from urllib.parse import urlsplit
 
 import httpx
 
-from ..config import PROJECT_ROOT
+from ..config import PROJECT_ROOT, load_config
 from .inyeccion import (
     RUTA_ATAQUES,
     SALIDA_JSON,
@@ -62,32 +75,40 @@ from .inyeccion import (
     cargar_ataques,
     correr,
     guardar_informe,
-    tabla_markdown,
 )
 
 #: Configuración del gateway, si ya está en el repositorio (tarea 1.2 de Nayla).
 RUTA_CONFIG: Path = PROJECT_ROOT / "config" / "openclaw.toml"
 #: Documento donde se pegan los resultados.
 RUTA_DOC: Path = PROJECT_ROOT / "docs" / "INYECCION.md"
-#: Variable de entorno con el token del gateway.
-VARIABLE_TOKEN = "OPENCLAW_GATEWAY_TOKEN"
+#: Variable de entorno de la que se lee la credencial del gateway.
+VARIABLE_DEL_GATEWAY = "OPENCLAW_GATEWAY_TOKEN"
 #: Valores del contrato cuando no hay `config/openclaw.toml`.
 BASE_URL_DEFECTO = "http://127.0.0.1:18789"
 MODELO_DEFECTO = "openclaw:pana"
-TIMEOUT_DEFECTO = 30.0
+#: Tiempo máximo de la evaluación. Es propio y no el `timeout_segundos` del canal
+#: (8 s): una respuesta de Pana con herramientas tarda unos 9 s.
+TIMEOUT_EVALUACION = 60.0
 #: Prefijo de las sesiones de evaluación (las de WhatsApp usan `wa:`).
 PREFIJO_SESION = "eval"
 #: Hosts permitidos: el gateway solo escucha en loopback.
 HOSTS_LOOPBACK: frozenset[str] = frozenset({"127.0.0.1", "localhost", "::1"})
 #: Respuestas del modelo que no son un cierre normal.
 FINES_VALIDOS: frozenset[str | None] = frozenset({"stop", None})
-USER_AGENT = "Sucursal1965-evaluacion-inyeccion/1.0"
 ENCABEZADO_RESULTADOS = "## Resultados"
 #: Negativa fija del modo simulado.
 NEGATIVA_SIMULADA = (
     "No puedo hacer eso. Solo te doy información general del Banco de Occidente "
     "y simulaciones orientativas; la decisión final es de un asesor."
 )
+
+
+@dataclass(frozen=True, slots=True)
+class Identidad:
+    """Cómo se identifica el proyecto en cada petición: User-Agent y `From`."""
+
+    user_agent: str
+    contacto: str
 
 
 class ErrorGateway(RuntimeError):
@@ -100,7 +121,7 @@ class ConfigGateway:
 
     base_url: str = BASE_URL_DEFECTO
     modelo: str = MODELO_DEFECTO
-    timeout_segundos: float = TIMEOUT_DEFECTO
+    timeout_segundos: float = TIMEOUT_EVALUACION
 
 
 def _buscar_clave(datos: dict[str, Any], clave: str) -> Any:
@@ -114,13 +135,16 @@ def _buscar_clave(datos: dict[str, Any], clave: str) -> Any:
 
 
 def cargar_config(ruta: Path | None = None) -> ConfigGateway:
-    """Lee `config/openclaw.toml` si existe; si no, usa los valores del contrato.
+    """Lee la URL y el modelo de `config/openclaw.toml`, o usa los del contrato.
+
+    El `timeout_segundos` del TOML es el del canal y no se usa: la evaluación
+    tiene su tiempo propio (`TIMEOUT_EVALUACION` o `--timeout`).
 
     Args:
         ruta: archivo TOML alternativo.
 
     Returns:
-        URL base, modelo y tiempo máximo del gateway.
+        URL base y modelo del gateway, con el tiempo máximo de la evaluación.
     """
     archivo = RUTA_CONFIG if ruta is None else Path(ruta)
     if not archivo.exists():
@@ -129,11 +153,9 @@ def cargar_config(ruta: Path | None = None) -> ConfigGateway:
         datos = tomllib.load(fh)
     base_url = _buscar_clave(datos, "base_url")
     modelo = _buscar_clave(datos, "modelo")
-    timeout = _buscar_clave(datos, "timeout_segundos")
     return ConfigGateway(
         base_url=str(base_url) if base_url else BASE_URL_DEFECTO,
         modelo=str(modelo) if modelo else MODELO_DEFECTO,
-        timeout_segundos=float(timeout) if timeout else TIMEOUT_DEFECTO,
     )
 
 
@@ -174,6 +196,8 @@ def extraer_texto(cuerpo: Any) -> str:
         texto = opcion["message"]["content"]
     except (KeyError, IndexError, TypeError) as error:
         raise ErrorGateway("Respuesta sin choices[0].message.content") from error
+    if not isinstance(opcion, dict):
+        raise ErrorGateway("choices[0] no es un objeto")
     if opcion.get("finish_reason") not in FINES_VALIDOS:
         raise ErrorGateway(f"finish_reason anómalo: {opcion.get('finish_reason')}")
     if not isinstance(texto, str) or not texto.strip():
@@ -185,32 +209,36 @@ def responder_gateway(
     config: ConfigGateway,
     token: str,
     *,
+    cliente: httpx.Client,
+    identidad: Identidad,
     corrida: str | None = None,
-    cliente: httpx.Client | None = None,
 ) -> Responder:
     """Arma la función `responder` que `correr` usa para cada ataque.
 
     Args:
         config: URL, modelo y tiempo máximo del gateway.
         token: token del gateway (no se imprime ni se guarda).
+        cliente: cliente HTTP; quien lo crea lo cierra (en `main`, con `with`).
         corrida: identificador de la corrida; por defecto, uno aleatorio.
-        cliente: cliente HTTP alternativo (en las pruebas, con `MockTransport`).
+        identidad: User-Agent y contacto del proyecto (`config/site.toml`).
 
     Returns:
         Una función que envía un ataque y devuelve el texto del agente.
 
     Raises:
-        ValueError: si falta el token o la URL no es loopback.
+        ValueError: si falta el token o el contacto, o la URL no es loopback.
     """
+    if not identidad.contacto.strip():
+        raise ValueError("Falta site.contact en config/site.toml para el header From")
     if not token.strip():
-        raise ValueError(f"Falta {VARIABLE_TOKEN}")
+        raise ValueError(f"Falta {VARIABLE_DEL_GATEWAY}")
     url = validar_loopback(config.base_url) + "/v1/chat/completions"
     sello = corrida or secrets.token_hex(4)
-    http = cliente or httpx.Client(timeout=config.timeout_segundos)
     encabezados = {
         "Authorization": f"Bearer {token}",
         "Content-Type": "application/json",
-        "User-Agent": USER_AGENT,
+        "User-Agent": identidad.user_agent,
+        "From": identidad.contacto.strip(),
     }
 
     def responder(ataque: Ataque) -> str:
@@ -219,7 +247,9 @@ def responder_gateway(
             "user": f"{PREFIJO_SESION}:{sello}:{ataque.id}",
             "messages": [{"role": "user", "content": ataque.mensaje}],
         }
-        respuesta = http.post(url, json=cuerpo, headers=encabezados)
+        respuesta = cliente.post(
+            url, json=cuerpo, headers=encabezados, timeout=config.timeout_segundos
+        )
         if respuesta.status_code != 200:
             raise ErrorGateway(f"HTTP {respuesta.status_code}")
         return extraer_texto(respuesta.json())
@@ -230,6 +260,79 @@ def responder_gateway(
 def responder_simulado(_ataque: Ataque) -> str:
     """Negativa fija, para probar la corrida sin gateway ni red."""
     return NEGATIVA_SIMULADA
+
+
+#: Cómo terminó un ataque en la corrida en vivo.
+Desenlace = Literal["resiste", "falla", "error"]
+
+
+def desenlace(resultado: Resultado) -> Desenlace:
+    """Separa una inyección superada de un error de la corrida.
+
+    Args:
+        resultado: resultado de un ataque.
+
+    Returns:
+        `resiste`, `falla` (la inyección pasó) o `error` (el gateway no
+        respondió bien y el ataque hay que repetirlo).
+    """
+    if resultado.pasa:
+        return "resiste"
+    if resultado.motivos and all(m.startswith("error:") for m in resultado.motivos):
+        return "error"
+    return "falla"
+
+
+def tabla_vivo(resultados: Sequence[Resultado]) -> str:
+    """Tabla de la corrida en vivo, con los errores aparte de las fallas.
+
+    Args:
+        resultados: resultados de la corrida.
+
+    Returns:
+        La tabla Markdown y una línea de resumen con los tres conteos.
+    """
+    filas = [
+        "| Ataque | Tipo | Ruta del Digiturno | Resultado | Motivos |",
+        "|---|---|---|---|---|",
+    ]
+    for resultado in resultados:
+        motivos = ", ".join(resultado.motivos) or "—"
+        filas.append(
+            f"| {resultado.id} | {resultado.tipo} | {resultado.ruta_digiturno} "
+            f"| {desenlace(resultado)} | {motivos} |"
+        )
+    conteo = dict.fromkeys(("resiste", "falla", "error"), 0)
+    for resultado in resultados:
+        conteo[desenlace(resultado)] += 1
+    filas.append("")
+    filas.append(
+        f"Resisten {conteo['resiste']} de {len(resultados)} ataques; "
+        f"{conteo['falla']} con la inyección superada y {conteo['error']} con error "
+        "de la corrida (se repiten; no cuentan como resistidos ni como superados)."
+    )
+    return "\n".join(filas) + "\n"
+
+
+def codigo_de_salida(resultados: Sequence[Resultado]) -> int:
+    """0 si todo resiste, 1 si alguna inyección pasó y 3 si solo hubo errores."""
+    desenlaces = {desenlace(resultado) for resultado in resultados}
+    if "falla" in desenlaces:
+        return 1
+    if "error" in desenlaces:
+        return 3
+    return 0
+
+
+def identidad_del_proyecto() -> Identidad:
+    """User-Agent y contacto del proyecto, los mismos que usan Meta y Piper.
+
+    Returns:
+        La identidad leída de `config/site.toml`; el contacto puede venir vacío
+        y entonces `responder_gateway` se niega a armar el cliente.
+    """
+    sitio = load_config().site
+    return Identidad(user_agent=sitio.user_agent, contacto=sitio.contact.strip())
 
 
 def bloque_resultados(resultados: Sequence[Resultado], *, modelo: str, fecha: date) -> str:
@@ -251,7 +354,7 @@ def bloque_resultados(resultados: Sequence[Resultado], *, modelo: str, fecha: da
         "```powershell\n"
         "uv run python -m banco_occidente_corpus.arqueo.inyeccion_vivo --escribir-doc\n"
         "```\n\n"
-        f"{tabla_markdown(resultados)}"
+        f"{tabla_vivo(resultados)}"
     )
 
 
@@ -298,37 +401,69 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--simulado", action="store_true", help="sin red y sin escribir nada")
     parser.add_argument("--escribir-doc", action="store_true", help="pega la tabla en INYECCION.md")
+    parser.add_argument(
+        "--timeout",
+        type=float,
+        default=TIMEOUT_EVALUACION,
+        help=f"segundos por ataque (por defecto {TIMEOUT_EVALUACION:.0f})",
+    )
     parser.add_argument("--catalogo", type=Path, default=RUTA_ATAQUES)
     args = parser.parse_args(argv)
 
+    if args.simulado and args.escribir_doc:
+        print(
+            "--simulado no escribe nada: no se combina con --escribir-doc.",
+            file=sys.stderr,
+        )
+        return 2
+    if args.timeout <= 0:
+        print("--timeout debe ser mayor que cero.", file=sys.stderr)
+        return 2
+
+    if args.escribir_doc and not RUTA_DOC.exists():
+        print(f"No existe {_mostrar(RUTA_DOC)}: no hay dónde pegar la tabla.", file=sys.stderr)
+        return 2
+
     ataques = cargar_ataques(args.catalogo)
-    config = cargar_config()
     if args.simulado:
         resultados = correr(ataques, responder_simulado)
         print("SIMULADO: no se habló con el gateway ni se escribió nada.\n")
-        print(tabla_markdown(resultados))
-        return 0
+        print(tabla_vivo(resultados))
+        return codigo_de_salida(resultados)
 
-    token = os.environ.get(VARIABLE_TOKEN, "")
+    token = os.environ.get(VARIABLE_DEL_GATEWAY, "")
     if not token.strip():
-        print(f"Falta {VARIABLE_TOKEN} en esta sesión de PowerShell.", file=sys.stderr)
+        print(f"Falta {VARIABLE_DEL_GATEWAY} en esta sesión de PowerShell.", file=sys.stderr)
         return 2
     try:
-        responder = responder_gateway(config, token)
+        base = cargar_config()
+        identidad = identidad_del_proyecto()
+    except (OSError, ValueError) as error:
+        print(f"No se pudo leer la configuración ({type(error).__name__}).", file=sys.stderr)
+        return 2
+    if not identidad.contacto:
+        print("Falta site.contact en config/site.toml para el header From.", file=sys.stderr)
+        return 2
+    config = ConfigGateway(base.base_url, base.modelo, args.timeout)
+    try:
+        validar_loopback(config.base_url)
     except ValueError as error:
         print(str(error), file=sys.stderr)
         return 2
 
-    resultados = correr(ataques, responder)
+    with httpx.Client(timeout=config.timeout_segundos) as cliente:
+        responder = responder_gateway(config, token, cliente=cliente, identidad=identidad)
+        resultados = correr(ataques, responder)
+
     ruta = guardar_informe(resultados, SALIDA_JSON)
-    print(tabla_markdown(resultados))
+    print(tabla_vivo(resultados))
     print(f"Informe: {_mostrar(ruta)}")
     if args.escribir_doc:
         bloque = bloque_resultados(resultados, modelo=config.modelo, fecha=date.today())
         doc = RUTA_DOC.read_text(encoding="utf-8")
         RUTA_DOC.write_text(escribir_resultados(doc, bloque), encoding="utf-8", newline="\n")
         print(f"Resultados pegados en {_mostrar(RUTA_DOC)}")
-    return 0 if all(resultado.pasa for resultado in resultados) else 1
+    return codigo_de_salida(resultados)
 
 
 if __name__ == "__main__":

@@ -145,6 +145,14 @@ descarga masiva de PDF, transcripción de vídeo.
 > con `piper-tts` debe cumplir la GPL-3.0 (decisión registrada en la tabla de
 > decisiones).
 
+> **Evaluación del agente (inyección):** `arqueo/inyeccion_vivo.py` envía el
+> catálogo de ataques al gateway local de OpenClaw (`127.0.0.1:18789`) con
+> `httpx`, `timeout` explícito (60 s por ataque o `--timeout`), el User-Agent de
+> `config/site.toml` y el header `From`. Es un `POST` a un servicio en loopback,
+> no scraping del sitio del banco, así que no pasa por `net.py` ni le aplican
+> `robots.txt`/1,5 s; rechaza cualquier host que no sea loopback, no reintenta y
+> el token vive solo en `OPENCLAW_GATEWAY_TOKEN`.
+
 > **App del asistente:** `app/web/` es una app estática (HTML, CSS y
 > JavaScript) que consume la API de `sucursal/api.py` y delega toda la lógica en
 > `asistente/` y `sucursal/`; no contiene reglas de negocio ni accede a la red por
@@ -770,6 +778,7 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 | 2026-11-17 | Digiturno: cuarta letra `D` (diagnóstico) con reglas deterministas en `[digiturno]` antes de la cortesía; el nodo `diagnostico` responde una invitación fija al diagnóstico guiado, sin recuperador, Tablero ni modelo, y la API, la Ventanilla y el Arqueo aceptan la letra (PR #134) | Revisa la decisión del 2026-11-13 de no añadir letras: la intención de diagnóstico no es una búsqueda en la Bóveda ni en el Tablero ni un rechazo, y por motivo quedaba contada como `B` o caía en `X` cuando el modelo la juzgaba fuera de alcance (rechazo indebido en el filtro de dominio). El diagnóstico guiado sigue fuera del grafo, como dice `openspec/changes/corresponsal-whatsapp/design.md`: el nodo solo invita y el canal conduce la entrevista |
 | 2026-11-17 | Digiturno: una duda que el modelo no responde se reintenta una vez y, si sigue sin respuesta, va a `X` (`rechazo:modelo_sin_respuesta`); `tasa` e `intereses` proponen `T`; una pregunta válida con una instrucción incrustada para cambiar o revelar las reglas va a `X` completa (PR #134) | Reemplaza el respaldo a `B` del 2026-11-04: aceptar por defecto era un fallo abierto (fail-open) que dejaba pasar fuera de dominio cuando DeepSeek no respondía. Medido con `arqueo/filtro_digiturno.py` sobre los 114 casos de `data/evaluacion/filtro_dominio.jsonl` (3 corridas con DeepSeek): fuga 0 de 50 antes y después, rechazo indebido de 5 a 1–3 de 50 y frontera de 10 a 14 de 14 (`filtro_dominio_informe_antes.md` y `_despues.md`). El costo del cierre es que una caída del modelo rechaza una pregunta válida, que el cliente puede repetir |
 | 2026-11-21 | Voces de la escena con Piper (`piper-tts`, GPL-3.0) local; la descarga de modelos en `voz/descarga.py` es la segunda excepción de red fuera de `net.py`, con las mismas reglas que la de Meta | Voz sin internet ni costo y distinta por personaje; la descarga cumple `timeout`, User-Agent y `From`; el código sigue MIT y quien distribuya el conjunto con `piper-tts` cumple la GPL-3.0 |
+| 2026-11-24 | La corrida de inyección contra el gateway local de OpenClaw (`arqueo/inyeccion_vivo.py`) es la tercera excepción de red fuera de `net.py`, con las mismas reglas que Meta y Piper | `net.py` es un cliente `GET` para el sitio del banco, con pausa de 1,5 s y reintentos; la evaluación hace `POST` a un servicio en `127.0.0.1`, sin reintentos (un reintento repetiría el ataque) y con un tiempo propio de 60 s, porque una respuesta con herramientas tarda unos 9 s. Cumple `timeout`, User-Agent y `From`, rechaza hosts que no sean loopback y el token vive solo en `OPENCLAW_GATEWAY_TOKEN` |
 
 ## 12. Configuración local (no trackear)
 
