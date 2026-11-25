@@ -157,10 +157,12 @@ es [`DESPLIEGUE_WHATSAPP.md`](./DESPLIEGUE_WHATSAPP.md), sección 8.
 
 ### DeepSeek
 
-- [ ] Saldo suficiente en `platform.deepseek.com`. Un comité cuesta alrededor
-      de un centavo de dólar; el tope diario de la app es US$ 0,20 y
-      `SUCURSAL_TOPE_USD` lo cambia solo para esa sesión. Con varios invitados
-      a la vez, revisar en los ensayos si alcanza.
+- [ ] Saldo suficiente en `platform.deepseek.com`. Una deliberación del comité
+      cuesta menos de una décima de centavo de dólar (USD 0,0005, medido por
+      Nayla) y un mensaje con el agente, entre una y dos décimas; el tope
+      diario de la app es US$ 0,20 y `SUCURSAL_TOPE_USD` lo cambia solo para
+      esa sesión. Con varios invitados a la vez, revisar en los ensayos si
+      alcanza.
 - [ ] El tope de la app **no cuenta** lo que gasta el gateway de OpenClaw,
       que llama a DeepSeek por su cuenta. Lo acota el modo evento: todo mensaje
       de un invitado pasa por el tope global de 300, y a unos 0,2 centavos por
