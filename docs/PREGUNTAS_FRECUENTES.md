@@ -102,9 +102,9 @@ las inventa el modelo: salen de código. Fuente: `docs/RESULTADOS_FASE2.md`.
 
 ### ¿Cuánto cuesta cada conversación?
 
-Muy poco: en la evaluación, 44 preguntas costaron 0,0157 USD en total, unos
-0,0004 USD por pregunta. Las preguntas de tasas no usan el modelo y cuestan
-cero. Fuente: `docs/RESULTADOS_FASE2.md` («Uso y costo»).
+Muy poco. Con OpenClaw, cada mensaje usa el modelo: el equipo midió entre
+0,1 y 0,2 centavos de dólar por mensaje. En la evaluación anterior, 44
+preguntas costaron 0,0157 USD. Fuente: `docs/RESULTADOS_FASE2.md`.
 
 ### ¿Cómo se despliega el proyecto?
 
