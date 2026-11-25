@@ -542,6 +542,10 @@ def calcular_prestamo_gota(monto: int) -> SalidaHerramienta:
 def comparar_gota_banco(monto: int, respuestas: RespuestasEntrevista) -> SalidaHerramienta:
     """Compara el gota a gota con el banco y con la usura vigente.
 
+    La comparación es siempre contra **libre inversión a la tasa máxima del
+    banco**, aunque las respuestas nombren otro producto: la escena conserva ese
+    producto y las cifras verificadas de la demostración.
+
     Las tasas y los totales se devuelven con ``valor_legible`` y el bloque
     ``cifras_permitidas``; el identificador de la fórmula del préstamo no sale
     en ningún campo de texto.
@@ -549,7 +553,9 @@ def comparar_gota_banco(monto: int, respuestas: RespuestasEntrevista) -> SalidaH
     Args:
         monto: mismo monto para los dos lados.
         respuestas: ids canónicos de la entrevista con ingresos, gastos, deudas,
-            monto y plazo, como en ``diagnosticar_capacidad``.
+            monto y plazo, como en ``diagnosticar_capacidad``. El producto de
+            estas respuestas no cambia el lado del banco: siempre es libre
+            inversión a la tasa máxima.
 
     Returns:
         La comparación con los totales, la usura y los supuestos, con sus cifras

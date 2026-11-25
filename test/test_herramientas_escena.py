@@ -39,6 +39,16 @@ RESPUESTAS_HASTA_5M = [
     "plazo.36",
 ]
 
+RESPUESTAS_VEHICULO = [
+    "objetivo.vehiculo_nuevo",
+    "vinculacion.empleado",
+    "ingresos.DE_3M_A_5M",
+    "gastos.DE_1M_A_2M",
+    "cuotas.NINGUNA",
+    "monto.DE_30M_A_60M",
+    "plazo.36",
+]
+
 CON_RESPUESTAS = (
     "diagnosticar_capacidad",
     "comparar_escenario",
@@ -71,6 +81,27 @@ def test_esquema_de_respuestas_expone_bloques_y_valores() -> None:
         assert campo["examples"][0][0] == "objetivo.libre_inversion"
 
 
+def test_esquema_de_respuestas_trae_la_etiqueta_de_cada_id() -> None:
+    """Cada id canónico viaja con su etiqueta legible y su letra por bloque."""
+    campo = _respuestas_del_esquema("diagnosticar_capacidad")
+    assert "Entre $500 mil y $5 millones" in campo["description"]
+    assert campo["etiquetas"]["monto.HASTA_5M"] == "Entre $500 mil y $5 millones"
+    assert campo["etiquetas"]["objetivo.libre_inversion"] == "Libre inversión"
+
+    monto = campo["opciones"]["monto"]
+    assert monto["pregunta"] == "¿Cuánto dinero necesitas?"
+    assert monto["opciones"][0] == {
+        "letra": "A",
+        "id": "monto.HASTA_5M",
+        "etiqueta": "Entre $500 mil y $5 millones",
+    }
+    assert campo["opciones"]["plazo"]["opciones"][2] == {
+        "letra": "C",
+        "id": "plazo.36",
+        "etiqueta": "36 meses",
+    }
+
+
 def test_el_mcp_expone_los_ids_en_la_firma_de_la_herramienta() -> None:
     """El esquema que ve el modelo sale de la firma, con enum y descripción."""
 
@@ -82,6 +113,9 @@ def test_el_mcp_expone_los_ids_en_la_firma_de_la_herramienta() -> None:
         campo = herramientas["diagnosticar_capacidad"].input_schema["properties"]["respuestas"]
         assert "objetivo.libre_inversion" in campo["description"]
         assert "monto.DE_5M_A_10M" in campo["items"]["enum"]
+        assert "libre inversión a la tasa máxima" in (
+            herramientas["comparar_gota_banco"].description or ""
+        )
 
     asyncio.run(caso())
 
@@ -102,6 +136,13 @@ def test_error_de_entrevista_trae_campos_y_valores_validos() -> None:
     assert "monto.rango_2" in inventado.datos["no_reconocidas"]
     assert "ingresos.DE_3M_A_5M" in inventado.datos["valores_validos"]["ingresos"]
     assert inventado.datos["ejemplo"] == RESPUESTAS
+    opciones = inventado.datos["opciones"]
+    assert opciones["monto"]["opciones"][0] == {
+        "letra": "A",
+        "id": "monto.HASTA_5M",
+        "etiqueta": "Entre $500 mil y $5 millones",
+    }
+    assert opciones["cuotas"]["opciones"][0]["etiqueta"] == "No tengo cuotas"
 
     incompleta = lectura.diagnosticar_capacidad(
         ["objetivo.libre_inversion", "vinculacion.empleado"]
@@ -239,6 +280,32 @@ def test_responder_sobre_proyecto_declara_su_alcance() -> None:
     assert fuera.error.codigo == "fuera_del_corpus"
 
 
+def test_comparar_gota_banco_usa_siempre_libre_inversion() -> None:
+    """Aunque la entrevista nombre otro producto, el banco se compara en libre inversión."""
+    libre = lectura.comparar_gota_banco(2_000_000, RESPUESTAS)
+    vehiculo = lectura.comparar_gota_banco(2_000_000, RESPUESTAS_VEHICULO)
+    assert libre.ok and vehiculo.ok
+    assert (
+        vehiculo.datos["comparacion"]["tasa_ea_banco"]
+        == libre.datos["comparacion"]["tasa_ea_banco"]
+    )
+    assert (
+        vehiculo.datos["comparacion"]["tasa_ea_banco_legible"]
+        == libre.datos["comparacion"]["tasa_ea_banco_legible"]
+    )
+
+
+def test_comparar_gota_banco_declara_el_producto_en_su_descripcion() -> None:
+    """La herramienta avisa que la escena compara con libre inversión a la tasa máxima."""
+    docstring = lectura.comparar_gota_banco.__doc__ or ""
+    assert "libre inversión a la tasa máxima" in docstring
+    assert "aunque las respuestas nombren otro producto" in docstring
+
+    herramienta = catalogo.por_nombre("comparar_gota_banco")
+    assert herramienta is not None
+    assert "libre inversión a la tasa máxima" in (herramienta.funcion.__doc__ or "")
+
+
 def test_agents_de_pana_declara_el_alcance_y_cabe_en_el_presupuesto() -> None:
     """AGENTS.md excluye esas dos herramientas, exige copiar cifras y sigue bajo 4.000."""
     texto = Path("openclaw/workspace/pana/AGENTS.md").read_text(encoding="utf-8")
@@ -251,4 +318,7 @@ def test_agents_de_pana_declara_el_alcance_y_cabe_en_el_presupuesto() -> None:
     assert "Antes de enviar cualquier mensaje con cifras, lo reviso con" in texto
     assert "`auditar_respuesta`" in texto
     assert "`cifras_permitidas`" in texto
+    compacto = " ".join(texto.split())
+    assert "con las opciones exactas del esquema, con sus letras; no invento rangos" in compacto
+    assert "En la escena el producto es libre inversión" in compacto
     assert len(texto) < 4000

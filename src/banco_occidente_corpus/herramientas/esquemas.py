@@ -9,12 +9,14 @@ con una sola forma y el agente nunca recibe una traza de Python.
 
 from __future__ import annotations
 
+import string
 import tomllib
-from collections.abc import Sequence
-from typing import Annotated, Any, Literal
+from collections.abc import Mapping, Sequence
+from typing import Annotated, Any, Literal, cast
 
-from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, StringConstraints
+from pydantic import BaseModel, ConfigDict, Field, FiniteFloat, JsonValue, StringConstraints
 
+from ..cifras_legibles import formatear_pesos
 from ..diagnostico.calculo import PRODUCTOS_DIAGNOSTICO, VINCULACIONES
 from ..diagnostico.motor import RUTA_CONFIG as RUTA_DIAGNOSTICO
 from ..diagnostico.motor import cargar_config
@@ -91,6 +93,148 @@ IDS_ENTREVISTA: frozenset[str] = frozenset(
 IDS_ORDENADOS: tuple[str, ...] = tuple(
     ident for ids in CATALOGO_ENTREVISTA.values() for ident in ids
 )
+
+#: Letras con las que Pana enumera las opciones de cada bloque.
+LETRAS_OPCIONES: tuple[str, ...] = tuple(string.ascii_uppercase)
+#: Preguntas de los bloques fijos, que no viven en `config/diagnostico.toml`.
+PREGUNTAS_FIJAS: dict[str, str] = {
+    "objetivo": "¿Qué quieres hacer?",
+    "vinculacion": "¿Cómo generas tus ingresos?",
+}
+
+
+def _formulario_entrevista() -> tuple[
+    dict[str, list[dict[str, Any]]],
+    dict[str, str],
+    dict[str, str],
+    int,
+]:
+    """Lee del TOML las opciones, las preguntas, los productos y el monto mínimo.
+
+    Returns:
+        Las opciones por bloque, las preguntas por bloque, el nombre legible de
+        cada producto y el monto mínimo de la entrevista, en pesos.
+    """
+    with RUTA_DIAGNOSTICO.open("rb") as fh:
+        datos = tomllib.load(fh)
+    productos = {
+        str(clave): str(valor) for clave, valor in dict(datos.get("productos", {})).items()
+    }
+    minimo = int(dict(datos.get("limites", {})).get("monto_minimo", 500_000))
+    opciones: dict[str, list[dict[str, Any]]] = {}
+    preguntas: dict[str, str] = {}
+    for rango in datos.get("rango", []):
+        clave = str(rango["clave"])
+        preguntas[clave] = str(rango.get("pregunta", "")).strip()
+        opciones[clave] = [dict(opcion) for opcion in rango.get("opcion", [])]
+    return opciones, preguntas, productos, minimo
+
+
+_OPCIONES_TOML, _PREGUNTAS_TOML, _PRODUCTOS_TOML, _MONTO_MINIMO = _formulario_entrevista()
+#: Pregunta de cada bloque de la entrevista, en el orden del TOML.
+PREGUNTAS_ENTREVISTA: dict[str, str] = {**PREGUNTAS_FIJAS, **_PREGUNTAS_TOML}
+
+
+def _monto_corto(pesos: int) -> str:
+    """Escribe un extremo de rango como se muestra en la entrevista.
+
+    Args:
+        pesos: monto en pesos.
+
+    Returns:
+        ``$500 mil``, ``$5 millones`` o el formato completo si no es redondo.
+    """
+    if pesos % 1_000_000 == 0:
+        millones = pesos // 1_000_000
+        return "$1 millón" if millones == 1 else f"${millones} millones"
+    if pesos % 1_000 == 0:
+        return f"${pesos // 1_000} mil"
+    return formatear_pesos(pesos)
+
+
+def _etiqueta_de_opcion(opcion: Mapping[str, Any], desde_defecto: int | None = None) -> str:
+    """Escribe la etiqueta legible de una opción a partir de sus extremos.
+
+    ``monto.HASTA_5M`` se muestra como «Entre $500 mil y $5 millones»: el
+    extremo inferior abierto sale de `[limites] monto_minimo`.
+
+    Args:
+        opcion: opción del TOML con `id`, `texto`, `desde` y `hasta`.
+        desde_defecto: extremo inferior cuando la opción solo declara `hasta`.
+
+    Returns:
+        La etiqueta lista para mostrar al invitado.
+    """
+    texto = str(opcion.get("texto", opcion.get("id", ""))).strip()
+    desde = opcion.get("desde")
+    hasta = opcion.get("hasta")
+    if desde is None and hasta is not None and desde_defecto is not None:
+        desde = desde_defecto
+    if desde is not None and hasta is not None:
+        return f"Entre {_monto_corto(int(desde))} y {_monto_corto(int(hasta))}"
+    if hasta is not None:
+        return f"Menos de {_monto_corto(int(hasta))}"
+    if desde is not None:
+        return f"Más de {_monto_corto(int(desde))}"
+    return texto
+
+
+def _etiquetas_entrevista() -> dict[str, str]:
+    """Asocia cada id canónico con la etiqueta legible que se muestra.
+
+    Returns:
+        El id de la entrevista y su etiqueta, por ejemplo
+        `monto.HASTA_5M` → «Entre $500 mil y $5 millones».
+    """
+    etiquetas = {
+        f"objetivo.{producto}": _PRODUCTOS_TOML.get(
+            producto, producto.replace("_", " ").capitalize()
+        )
+        for producto in sorted(PRODUCTOS_DIAGNOSTICO)
+    }
+    etiquetas.update(
+        {f"vinculacion.{forma}": forma.capitalize() for forma in sorted(VINCULACIONES)}
+    )
+    for clave, opciones in _OPCIONES_TOML.items():
+        desde_defecto = _MONTO_MINIMO if clave == "monto" else None
+        for opcion in opciones:
+            etiquetas[str(opcion["id"])] = _etiqueta_de_opcion(opcion, desde_defecto)
+    return etiquetas
+
+
+#: Etiqueta legible de cada id canónico de la entrevista.
+ETIQUETAS_ENTREVISTA: dict[str, str] = _etiquetas_entrevista()
+
+
+def bloques_entrevista() -> dict[str, dict[str, Any]]:
+    """Agrupa por bloque la pregunta y las opciones con su letra y etiqueta.
+
+    Es la lista que Pana usa para preguntar y la que viaja en el error de una
+    entrevista inválida, para corregir sin inventar rangos.
+
+    Returns:
+        Por cada bloque, su pregunta y sus opciones con `letra`, `id` y
+        `etiqueta`, en el orden del catálogo.
+    """
+    bloques: dict[str, dict[str, Any]] = {}
+    for clave, ids in CATALOGO_ENTREVISTA.items():
+        opciones: list[dict[str, str]] = [
+            {
+                "letra": LETRAS_OPCIONES[indice],
+                "id": ident,
+                "etiqueta": ETIQUETAS_ENTREVISTA[ident],
+            }
+            for indice, ident in enumerate(ids)
+        ]
+        bloques[clave] = {
+            "pregunta": PREGUNTAS_ENTREVISTA.get(clave, clave),
+            "opciones": opciones,
+        }
+    return bloques
+
+
+#: Bloques de la entrevista con sus letras y etiquetas listas para mostrar.
+BLOQUES_ENTREVISTA: dict[str, dict[str, Any]] = bloques_entrevista()
 
 
 def limites_de_monto() -> dict[str, tuple[int, int]]:
@@ -194,6 +338,7 @@ def error_de_respuestas(
         "del_credito": list(BLOQUES_CREDITO),
         "solo_compra_cartera": BLOQUE_COMPRA_CARTERA,
         "valores_validos": {clave: list(ids) for clave, ids in CATALOGO_ENTREVISTA.items()},
+        "opciones": bloques_entrevista(),
         "ejemplo": list(EJEMPLO_RESPUESTAS),
         "motivo": motivo[:300],
     }
@@ -206,7 +351,7 @@ def error_de_respuestas(
         error=ErrorHerramienta(
             codigo="entrada_invalida",
             mensaje=(
-                "La entrevista no es válida: revisa datos['valores_validos'] y envía "
+                "La entrevista no es válida: revisa datos['opciones'] y envía "
                 "un id bloque.valor por bloque."
             ),
         ),
@@ -217,15 +362,26 @@ def _descripcion_entrevista() -> str:
     """Escribe la descripción de `respuestas` con los bloques y sus ids.
 
     Returns:
-        El texto que ve el modelo en el esquema de entrada.
+        El texto que ve el modelo en el esquema de entrada, con la letra y la
+        etiqueta exacta de cada opción.
     """
-    bloques = "; ".join(f"{clave} ({', '.join(ids)})" for clave, ids in CATALOGO_ENTREVISTA.items())
+    bloques = "; ".join(
+        f"{clave} ("
+        + "; ".join(
+            f"{opcion['letra']}. {opcion['id']} = «{opcion['etiqueta']}»"
+            for opcion in BLOQUES_ENTREVISTA[clave]["opciones"]
+        )
+        + ")"
+        for clave in CATALOGO_ENTREVISTA
+    )
     return (
         "Ids canónicos de la entrevista del diagnóstico, con la forma bloque.valor. "
-        "Obligatorios: objetivo, vinculacion, ingresos, gastos y cuotas. En crédito "
-        "se suman monto y plazo; el ahorro no lleva monto ni plazo. cuota_trasladar "
-        "solo aplica a compra de cartera. Envía cada bloque una vez. Valores "
-        f"válidos: {bloques}."
+        "Pregunta cada bloque con estas letras y etiquetas exactas; no inventes "
+        "rangos ni cambies las cifras. Obligatorios: objetivo, vinculacion, "
+        "ingresos, gastos y cuotas. En crédito se suman monto y plazo; el ahorro "
+        "no lleva monto ni plazo. cuota_trasladar solo aplica a compra de cartera. "
+        "Envía cada bloque una vez. Valores válidos (letra. id = etiqueta): "
+        f"{bloques}."
     )
 
 
@@ -245,7 +401,14 @@ RespuestasEntrevista = Annotated[
     list[IdEntrevista],
     Field(
         description=DESCRIPCION_RESPUESTAS,
-        json_schema_extra={"examples": [list(EJEMPLO_RESPUESTAS)]},
+        json_schema_extra=cast(
+            dict[str, JsonValue],
+            {
+                "examples": [list(EJEMPLO_RESPUESTAS)],
+                "etiquetas": ETIQUETAS_ENTREVISTA,
+                "opciones": BLOQUES_ENTREVISTA,
+            },
+        ),
     ),
 ]
 #: Unidad de una tasa E.A.: fracción (0,2834) o porcentaje (28,34).
@@ -423,7 +586,12 @@ class CalcularPrestamoGotaEntrada(BaseModel):
 
 
 class CompararGotaBancoEntrada(BaseModel):
-    """Entrada de `comparar_gota_banco`."""
+    """Entrada de `comparar_gota_banco`.
+
+    La comparación es siempre contra libre inversión a la tasa máxima del banco,
+    aunque las respuestas nombren otro producto: la escena conserva ese producto
+    y sus cifras verificadas.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
