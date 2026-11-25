@@ -179,6 +179,10 @@ agente-mcp: ## Servidor MCP del agente pana con las 20 herramientas en 127.0.0.1
 herramientas: ## Lista las 20 herramientas del agente y sus esquemas Pydantic (JSON=1)
 	$(UV) run python -m banco_occidente_corpus.herramientas $(if $(JSON),--json,)
 
+.PHONY: herramientas-doc
+herramientas-doc: ## Regenera el bloque generado de docs/HERRAMIENTAS.md (secciones manuales intactas)
+	$(UV) run python -m banco_occidente_corpus.herramientas --markdown --salida docs/HERRAMIENTAS.md
+
 .PHONY: traza
 traza: ## Muestra las ultimas llamadas a las herramientas del agente
 	$(UV) run python -m banco_occidente_corpus.herramientas.traza
