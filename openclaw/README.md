@@ -301,11 +301,16 @@ pueda cambiar la sesión de Pana desde el canal:
    texto normal y no cambia la sesión. `/restart`, que estaba activo por
    defecto, también queda apagado.
 
-La evidencia se toma con `make probar-openclaw`, que llama al cliente directo
-(`scripts/probar_openclaw.py`) sin pasar por el despachador y por tanto sí envía
-el texto al gateway. Antes, `/reasoning on` se aplicaba a la sesión; ahora
-`/think high` llega como texto normal, el gateway no lo aplica y la sesión
-conserva `thinkingDefault: "off"`.
+   La documentación de OpenClaw precisa que `commands.text: false` no aplica en
+   superficies sin comandos nativos, como WhatsApp: allí la garantía del canal
+   es la capa 1, el despachador que descarta los mensajes que empiezan por `/`.
+   La evidencia de esta capa 2 se tomó con el cliente directo
+   (`make probar-openclaw`, que llama a `scripts/probar_openclaw.py` sin pasar
+   por el despachador), **no** por WhatsApp. No se promete más de lo probado.
+
+Antes, `/reasoning on` se aplicaba a la sesión; ahora `/think high` llega como
+texto normal, el gateway no lo aplica y la sesión conserva
+`thinkingDefault: "off"`.
 
 ### Advertencias que quedan
 

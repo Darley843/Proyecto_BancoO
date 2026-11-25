@@ -90,7 +90,7 @@ def test_herramienta_fuera_del_catalogo_se_rechaza() -> None:
     asyncio.run(caso())
 
 
-def test_configuracion_solo_acepta_loopback(tmp_path) -> None:
+def test_configuracion_solo_acepta_loopback(tmp_path: Path) -> None:
     """El host del MCP no puede ser público y el puerto por defecto es 8765."""
     assert cargar_configuracion_mcp().host == ConfiguracionMCP().host == "127.0.0.1"
     assert cargar_configuracion_mcp().puerto == 8765
@@ -109,13 +109,16 @@ def test_entrada_del_agente_reexporta_el_servidor() -> None:
 
 
 def test_openclaw_json_declara_las_veinte_y_solo_loopback() -> None:
-    """La copia versionada del gateway apunta al MCP y enumera el catálogo."""
+    """La copia versionada apunta al MCP, enumera el catálogo y cierra comandos."""
     datos = json.loads(Path("openclaw/openclaw.json").read_text(encoding="utf-8"))
     servidor = datos["mcp"]["servers"]["sucursal"]
     assert servidor["url"] == "http://127.0.0.1:8765/mcp"
     assert servidor["transport"] == "streamable-http"
     assert servidor["toolFilter"]["include"] == list(NOMBRES_ESPERADOS)
     assert datos["agents"]["entries"]["pana"]["tools"]["alsoAllow"] == ["bundle-mcp"]
+    comandos = datos["commands"]
+    for nombre in ("text", "restart", "config", "mcp", "plugins", "debug", "bash"):
+        assert comandos[nombre] is False, f"commands.{nombre} debe quedar en false"
 
 
 def test_config_del_gateway_es_local_y_tiene_timeout() -> None:
