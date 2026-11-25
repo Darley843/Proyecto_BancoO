@@ -188,10 +188,12 @@ las instrucciones. Fuente: `docs/INYECCION.md` y `docs/ROBA_BOVEDA.md`.
 
 ### ¿Qué hizo cada integrante del equipo?
 
-Nayla: las tasas, el motor del diagnóstico, el comité, el agente en OpenClaw
-y, en la escena, Don Gota y la negociación. Darley: el canal de WhatsApp con
-Meta, el asesor y el modo evento. Anny: la Bóveda, su evaluación y la
-seguridad. Yoldy: documentación, diagramas y pantalla de la escena.
+Nayla: las tasas, el motor del diagnóstico, el comité y el agente en
+OpenClaw (gateway, workspace, seguridad y conexión del MCP); en la escena, Don
+Gota y la negociación. Darley: el canal de WhatsApp con Meta, el asesor, el
+modo evento y el servidor MCP con las 20 herramientas. Anny: la Bóveda, su
+evaluación y la seguridad. Yoldy: documentación, diagramas y pantalla de la
+escena. Fuente: `docs/PRESENTADOR.md` (P2).
 
 ### ¿Cuántas pruebas tiene el proyecto?
 
