@@ -143,8 +143,10 @@ es [`DESPLIEGUE_WHATSAPP.md`](./DESPLIEGUE_WHATSAPP.md), sección 8.
   ```powershell
   [bool]$env:OPENCLAW_GATEWAY_TOKEN
   ```
-- [ ] ⏳ `openclaw security audit` sin hallazgos altos y `openclaw doctor` en
-      verde; el resultado queda en `docs/AGENTE_OPENCLAW.md`.
+- [ ] `openclaw security audit` sin críticos ni altos, **otra vez el jueves
+      antes de la etiqueta** `entrega-final`. El resultado del 24 de noviembre
+      (0 críticas y 2 advertencias justificadas) está en
+      [`openclaw/README.md`](../openclaw/README.md#auditoría-de-seguridad).
 - [ ] ⏳ MCP `sucursal-agente` en `127.0.0.1:8765` con **exactamente 20
       herramientas** permitidas (`openclaw mcp tools`). `olvidar_mis_datos` y
       `solicitar_asesor` piden confirmación.
@@ -251,8 +253,8 @@ gateway, app y túnel.
 
 | Ventana | Qué | Comando |
 |---|---|---|
-| 1 | Servidor MCP | ⏳ [`DESPLIEGUE.md`](./DESPLIEGUE.md), sección 6 (`127.0.0.1:8765`) |
-| 2 | Gateway de OpenClaw | ⏳ [`DESPLIEGUE.md`](./DESPLIEGUE.md), sección 5 (`127.0.0.1:18789`) |
+| 1 | Servidor MCP | `make agente-mcp` (`127.0.0.1:8765/mcp`); detalle en [`DESPLIEGUE.md`](./DESPLIEGUE.md), sección 6 |
+| 2 | Gateway de OpenClaw | `wsl -d OpenClawGateway` y dejar la pestaña abierta; comprobar con `wsl -d OpenClawGateway -- openclaw health` (`127.0.0.1:18789`). Detalle en [`DESPLIEGUE.md`](./DESPLIEGUE.md), sección 5 |
 | 3 | App y canal | El bloque de abajo |
 | 4 | Túnel | `cloudflared tunnel --url http://127.0.0.1:8000` |
 | 5 | Comprobaciones | El bloque de abajo |
@@ -293,6 +295,9 @@ curl.exe "https://<url-del-tunel>/webhooks/whatsapp?hub.mode=subscribe&hub.verif
 
 - [ ] `/health` responde 200 y las dos comprobaciones del webhook devuelven
       `12345`.
+- [ ] **Ollama encendido**: `ollama list` muestra el modelo de embeddings del
+      proyecto. Sin Ollama, `buscar_en_documentos` (herramienta 17), la
+      Ventanilla y Roba la Bóveda fallan; el plan B está en la sección 6.1.
 - [ ] Saldo de DeepSeek suficiente y tope diario activo.
 - [ ] Modo evento **activo**: la ventana 3 tiene `WHATSAPP_EVENTO = "1"` y
       `desde`/`hasta` cubren la hora actual. Si un número desconocido no

@@ -113,6 +113,7 @@ Para cambiar un retrato basta con reemplazar el `.webp` con el mismo nombre
 | Siguiente turno (Espacio o →) | pasa al siguiente sin esperar |
 | Solo subtítulos (tecla S) | **modo de respaldo**: no suena nada y avanza de a un turno por clic; las respuestas a preguntas salen solo en texto |
 | Preguntas (tecla Q) | abre o cierra el cuadro de preguntas del público |
+| Entrada por voz (tecla V) | abre la captura del perfil del voluntario (`escena:captura`); si no responde o falla el micrófono, se usa el perfil seguro ([`LISTA_DEMO.md`](./LISTA_DEMO.md), sección 6.2) |
 | Núcleo (tecla N) | **plan B**: sigue solo con Don Gota, Pana y el auditor, sin repetir lo ya dicho, y deja la escena en pausa |
 | Trazabilidad (tecla T) | muestra u oculta el panel para quien facilita (empieza oculto) |
 | Reiniciar (tecla R) | vuelve al inicio con la escena completa y borra la escena guardada en la pestaña |
