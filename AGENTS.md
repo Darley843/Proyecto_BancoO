@@ -110,6 +110,7 @@ aplican igual `robots.txt`, el ritmo de cortesía de 1,5 s y el header `From`
 | Pieza | Entrada | Contrato | Pruebas |
 |---|---|---|---|
 | Canal de WhatsApp | `canal/webhook.py` → `canal/cola.py` → `canal/despachador.py` → `canal/envio.py` | `docs/OPERACION_WHATSAPP.md` | `test/test_canal_*.py` |
+| Modo evento | `canal/evento.py` + `[evento]` de `config/whatsapp.toml` | `docs/DESPLIEGUE_WHATSAPP.md` | `test/test_canal_evento.py` |
 | Diagnóstico guiado | `canal/entrevista.py` + `diagnostico/motor.py` | `docs/DIAGNOSTICO.md` | `test/test_diagnostico_*.py`, `test/test_canal_entrevista.py` |
 | Comité de crédito | `diagnostico/comite.py` | `docs/COMITE.md` | `test/test_diagnostico_comite.py` |
 | MCP de solo lectura | `uv run python -m banco_occidente_corpus.mcp_servidor` | `docs/MCP.md` | `test/test_mcp_servidor.py` |
