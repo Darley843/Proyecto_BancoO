@@ -32,7 +32,6 @@
           "file.stat",
           "file.write",
           "fs.listDir",
-          "screen.record",
           "screen.snapshot",
           "stt.listen",
           "stt.status",
@@ -80,7 +79,7 @@
         "enabled": true
       },
       "whatsapp": {
-        "enabled": true
+        "enabled": false
       },
       "memory-core": {
         "config": {
@@ -171,7 +170,10 @@
           ],
           "alsoAllow": [
             "bundle-mcp"
-          ]
+          ],
+          "exec": {
+            "security": "deny"
+          }
         },
         "skills": [],
         "thinkingDefault": "off"
@@ -191,6 +193,12 @@
       "workspaceOnly": true
     },
     "elevated": {
+      "enabled": false
+    },
+    "sessions": {
+      "visibility": "self"
+    },
+    "agentToAgent": {
       "enabled": false
     }
   },
