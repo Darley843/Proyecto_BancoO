@@ -70,10 +70,10 @@ El catálogo completo se imprime con `make herramientas` y sus esquemas con
 | 14 | `solicitar_asesor` | Darley | `canal/almacen.py` |
 | 15 | `consultar_caso` | Darley | `canal/almacen.py` |
 | 16 | `generar_tarjeta_pana` | Darley | `pana/desde_diagnostico.py` (PNG opcional) |
-| 17 | `buscar_en_documentos` | Anny | `boveda/recuperador.py` vía `buscar_en_boveda` |
-| 18 | `consultar_tarifas` | Anny | `data/estructurados/tablero.csv` |
-| 19 | `clasificar_pregunta` | Anny | `sucursal/digiturno.py` |
-| 20 | `auditar_respuesta` | Anny | `diagnostico/comite.py::auditar_texto` |
+| 17 | `buscar_en_documentos` | Anny | `mcp_servidor/conocimiento.py` (#198), sobre `buscar_en_boveda` |
+| 18 | `consultar_tarifas` | Anny | `mcp_servidor/conocimiento.py` (#198), sobre el Tablero |
+| 19 | `clasificar_pregunta` | Anny | `mcp_servidor/control.py` (#199), sobre el Digiturno |
+| 20 | `auditar_respuesta` | Anny | `mcp_servidor/control.py` (#199) y `diagnostico/comite.py::auditar_texto` |
 
 Reglas del catálogo:
 

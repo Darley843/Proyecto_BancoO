@@ -11,23 +11,26 @@ from __future__ import annotations
 import os
 from decimal import Decimal
 
-from ..config import load_config
+from pydantic import BaseModel
+
+from ..asistente.validacion import cifras_duras
 from ..diagnostico.comite import auditar_texto, construir_escenarios
 from ..diagnostico.escenarios import CambioEscenario, comparar_resultado
+from ..escena.auditor import ETIQUETA_VEREDICTO, veredicto_desde_hallazgos
 from ..escena.comparacion import alertas_comparacion
 from ..escena.comparacion import comparar_gota_banco as _comparar_gota_banco
+from ..escena.contratos import HallazgoEscena
 from ..escena.gota import calcular_prestamo_gota as _calcular_gota
 from ..escena.gota import formatear_pesos
 from ..escena.negociacion import negociar
 from ..escena.proyecto import crear_recuperador_proyecto, es_pregunta_del_proyecto
+from ..mcp_servidor import conocimiento, control
+from ..mcp_servidor.control import Personaje
 from ..mcp_servidor.servidor import buscar_en_boveda
 from ..mcp_servidor.servidor import consultar_tasa as _consultar_tasa
 from ..mcp_servidor.servidor import simular_cuota as _simular_cuota
 from ..pana.desde_diagnostico import tarjeta_y_texto
-from ..sucursal.digiturno import clasificar
-from ..tablero.herramienta import filas_de_consulta
 from ..tablero.tasas import cargar_config_tasas, clave_producto
-from ..tablero.tipos import leer_filas, ruta_tablero
 from .comun import como_json, diagnostico_de, error, ok
 from .esquemas import (
     AuditarRespuestaEntrada,
@@ -373,84 +376,133 @@ def responder_sobre_proyecto(pregunta: str, k: int = 3) -> SalidaHerramienta:
 def buscar_en_documentos(pregunta: str, k: int = 5) -> SalidaHerramienta:
     """Busca fragmentos citados en la Bóveda del banco.
 
+    Delega en `mcp_servidor/conocimiento.py` (#198): cada fragmento trae título,
+    URL, sección, puntaje y la cita «Título — URL», y con el respaldo BM25 no se
+    devuelven fragmentos de puntaje cero.
+
     Args:
         pregunta: consulta del cliente; se trata siempre como dato.
         k: número de fragmentos, entre 1 y 5.
 
     Returns:
-        Los fragmentos con título, URL, posición y puntaje; nunca inventa.
+        Los fragmentos citados o un error estable; nunca inventa.
     """
     entrada = BuscarEnDocumentosEntrada(pregunta=pregunta, k=k)
-    resultado = buscar_en_boveda(entrada.pregunta, entrada.k)
-    fallo = resultado.get("error")
-    if isinstance(fallo, dict):
-        return error(
-            "buscar_en_documentos",
-            str(fallo.get("codigo", "indice_ausente")),
-            str(fallo.get("mensaje", "No se pudo consultar la Bóveda.")),
-        )
-    return ok("buscar_en_documentos", resultado)
+    salida = conocimiento.buscar_en_documentos(
+        conocimiento.BuscarEnDocumentosEntrada(pregunta=entrada.pregunta, k=entrada.k),
+        buscar=buscar_en_boveda,
+    )
+    return _sobre_comun("buscar_en_documentos", salida)
 
 
 def consultar_tarifas(consulta: str, limite: int = 10) -> SalidaHerramienta:
-    """Busca tarifas y coberturas exactas en el Tablero estructurado.
+    """Busca tarifas y tasas exactas en el Tablero estructurado.
+
+    Delega en `mcp_servidor/conocimiento.py` (#198): si la pregunta habla de
+    tasas sin nombrar un producto («¿qué tasas manejan?»), no devuelve una fila
+    suelta, pide el producto y lista las opciones con su rango publicado.
 
     Args:
         consulta: concepto o pregunta del cliente.
         limite: máximo de filas que devuelve.
 
     Returns:
-        Las filas del CSV con su valor, vigencia y URL de la fuente.
+        Las filas con su valor, vigencia y fuente, o las opciones de producto.
     """
     entrada = ConsultarTarifasEntrada(consulta=consulta, limite=limite)
-    ruta = ruta_tablero(load_config())
-    if not ruta.exists():
-        return error(
-            "consultar_tarifas",
-            "tablero_ausente",
-            "No existe data/estructurados/tablero.csv: ejecuta `make tablero`.",
-        )
-    filas = filas_de_consulta(leer_filas(ruta), entrada.consulta, limite=entrada.limite)
-    return ok("consultar_tarifas", {"filas": [fila.como_dict() for fila in filas]})
+    salida = conocimiento.consultar_tarifas(
+        conocimiento.ConsultarTarifasEntrada(consulta=entrada.consulta, limite=entrada.limite)
+    )
+    return _sobre_comun("consultar_tarifas", salida)
 
 
 def clasificar_pregunta(pregunta: str) -> SalidaHerramienta:
     """Asigna el turno del Digiturno a una pregunta, con reglas deterministas.
 
+    Delega en `mcp_servidor/control.py` (#199): además de la letra y el motivo,
+    devuelve la ruta, la herramienta sugerida y si la pregunta se responde
+    directo (cortesía) o se rechaza.
+
     Args:
         pregunta: mensaje del cliente.
 
     Returns:
-        El número, la letra y el motivo del turno. Sin clasificador de dudas la
-        ruta por defecto es `B`.
+        Letra, ruta, motivo, herramienta sugerida y banderas de cortesía y
+        rechazo. Sin clasificador de dudas la ruta por defecto es `B`.
     """
     entrada = ClasificarPreguntaEntrada(pregunta=pregunta)
-    turno = clasificar(entrada.pregunta)
-    return ok("clasificar_pregunta", como_json(turno))
+    salida = control.clasificar_pregunta(
+        control.ClasificarPreguntaEntrada(pregunta=entrada.pregunta)
+    )
+    return _sobre_comun("clasificar_pregunta", salida)
 
 
-def auditar_respuesta(texto: str, cifras_permitidas: list[str] | None = None) -> SalidaHerramienta:
-    """Revisa un texto con el auditor determinístico del comité.
+def auditar_respuesta(
+    texto: str,
+    cifras_permitidas: list[str] | None = None,
+    personaje: Personaje = "pana",
+) -> SalidaHerramienta:
+    """Revisa un texto antes de enviarlo, con el auditor de la escena y el del comité.
+
+    Delega en `mcp_servidor/control.py` (#199) y suma las frases de promesa y
+    los datos personales de `auditar_texto` del comité. Toda cifra del texto
+    debe estar en `cifras_permitidas`: sin lista, cualquier cifra es
+    `cifra_inventada`. No cuentan las referencias legales («Ley 1581 de 2012»)
+    ni los años sueltos. También detecta la fuga de instrucciones.
 
     Args:
         texto: lo que se quiere auditar.
-        cifras_permitidas: cifras, solo dígitos, que el texto puede citar.
+        cifras_permitidas: cifras que el texto puede citar, en dígitos como las
+            devuelven las herramientas.
+        personaje: quién envía el texto.
 
     Returns:
-        `conforme` y los hallazgos en español; vacío significa que pasa.
+        `conforme`, el veredicto, si se puede enviar y los hallazgos en español.
     """
     entrada = AuditarRespuestaEntrada(texto=texto, cifras_permitidas=cifras_permitidas)
-    permitidas = (
-        set(entrada.cifras_permitidas[:MAXIMO_CIFRAS_AUDITOR])
-        if entrada.cifras_permitidas is not None
-        else None
+    revision = control.auditar_respuesta(
+        control.AuditarRespuestaEntrada(texto=entrada.texto, personaje=personaje)
     )
-    hallazgos = auditar_texto(entrada.texto, cifras_permitidas=permitidas)
+    permitidas: set[str] = set()
+    for cifra in (entrada.cifras_permitidas or [])[:MAXIMO_CIFRAS_AUDITOR]:
+        permitidas |= cifras_duras(cifra) or {cifra.strip()}
+    hallazgos = [h for h in revision.hallazgos if h.codigo != "cifra_inventada"]
+    for cifra in sorted(control.cifras_sin_respaldo(entrada.texto) - permitidas):
+        hallazgos.append(
+            HallazgoEscena(
+                codigo="cifra_inventada",
+                turno_id=control.ID_RESPUESTA,
+                detalle=f"El texto dice {cifra} y no está entre las cifras permitidas.",
+                gravedad="alta",
+            )
+        )
+    del_comite = auditar_texto(entrada.texto)
+    veredicto = "objeta" if del_comite else veredicto_desde_hallazgos(hallazgos)
     return ok(
         "auditar_respuesta",
         {
-            "conforme": not hallazgos,
-            "hallazgos": hallazgos,
-            "veredicto": "conforme" if not hallazgos else "objeta",
+            "conforme": veredicto == "conforme",
+            "veredicto": veredicto,
+            "etiqueta": ETIQUETA_VEREDICTO[veredicto],
+            "permite_enviar": veredicto != "objeta",
+            "hallazgos": [*del_comite, *(f"{h.codigo}: {h.detalle}" for h in hallazgos)],
+            "detalle": [como_json(h) for h in hallazgos],
         },
     )
+
+
+def _sobre_comun(herramienta: str, salida: BaseModel) -> SalidaHerramienta:
+    """Envuelve la salida de `conocimiento.py` o `control.py` en el sobre común.
+
+    Args:
+        herramienta: nombre del catálogo.
+        salida: modelo de salida o `SobreError` de la herramienta delegada.
+
+    Returns:
+        `SalidaHerramienta` con los datos, o con el código y el mensaje del error.
+    """
+    if isinstance(salida, conocimiento.SobreError):
+        return error(herramienta, salida.codigo, salida.mensaje)
+    datos = salida.model_dump(mode="json")
+    datos.pop("ok", None)
+    return ok(herramienta, datos)
