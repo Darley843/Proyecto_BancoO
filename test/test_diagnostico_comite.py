@@ -1656,6 +1656,19 @@ def test_auditar_texto_admite_un_sustantivo_tras_ninguna_o_ninguno() -> None:
     ]
 
 
+def test_auditar_texto_ningun_niega_igual_que_ninguno() -> None:
+    """«Ningún crédito está aprobado» y su forma sin tildes no son promesas."""
+    assert auditar_texto("Ningún crédito está aprobado") == []
+    assert auditar_texto("ningun credito esta aprobado") == []
+
+
+def test_auditar_texto_ningun_no_niega_la_promesa_de_otra_frase() -> None:
+    """«Ningún problema» es una expresión de ánimo, no una negación de la promesa."""
+    assert auditar_texto("No dudes, ningún problema: te lo aprueban") == [
+        "Promesa de aprobación: «te lo aprueban»"
+    ]
+
+
 def test_auditar_texto_revisa_cifras_contra_las_permitidas() -> None:
     """Solo marca las cifras que no están en la lista permitida."""
     texto = "Por $1.000.000 pagas $40.000 cada día."

@@ -138,7 +138,7 @@ _PROMESAS = re.compile(
 )
 #: Palabras que niegan una promesa cuando la preceden de forma inmediata.
 _NEGACIONES = re.compile(
-    r"\b(?:no|nunca|ni|sin|ninguna|ninguno|jamás|jamas)\b",
+    r"\b(?:no|nunca|ni|sin|ninguna|ninguno|ningún|ningun|jamás|jamas)\b",
     re.IGNORECASE,
 )
 #: Expresiones que introducen o atenúan la frase; nunca niegan la promesa.
@@ -174,6 +174,9 @@ _ENLACES = frozenset(
         "me",
         "está",
         "están",
+        # Formas sin tilde, frecuentes cuando el modelo escribe sin acentos.
+        "esta",
+        "estan",
         "es",
         "son",
         "será",
@@ -202,7 +205,7 @@ _ENLACES = frozenset(
     }
 )
 #: Negaciones que admiten un sustantivo antes de los enlaces.
-_NEGACIONES_CON_SUSTANTIVO = frozenset({"ninguna", "ninguno"})
+_NEGACIONES_CON_SUSTANTIVO = frozenset({"ninguna", "ninguno", "ningún", "ningun"})
 #: Máximo de palabras entre la negación y la promesa.
 _MAX_PALABRAS_ENTRE_NEGACION_Y_PROMESA = 3
 _CODIGO = re.compile(r"\[([a-z0-9_]+)\]")
@@ -1693,9 +1696,10 @@ def _negacion_inmediata(previo: str) -> bool:
     enlace: artículos, preposiciones, pronombres, formas de «ser» o «estar»,
     verbos del descargo («hay», «garantiza», «implica»), modales o «siquiera»;
     también cuenta una palabra que sea promesa, como «garantizamos» en «nunca
-    garantizamos la aprobación». Tras «ninguna» o «ninguno» se admite un
-    sustantivo antes de los enlaces («ninguna opción está garantizada»). «No
-    dudes», «no solo», «no te preocupes» y «sin duda» nunca niegan.
+    garantizamos la aprobación». Tras «ninguna», «ninguno», «ningún» o
+    «ningun» se admite un sustantivo antes de los enlaces («ninguna opción
+    está garantizada»). «No dudes», «no solo», «no te preocupes» y «sin duda»
+    nunca niegan.
 
     Args:
         previo: texto de la cláusula anterior a la promesa, ya cortado por el
