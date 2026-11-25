@@ -171,6 +171,18 @@ demo: ## Prueba el pipeline con una pagina local (sin red)
 simular: ## Recorre el canal de WhatsApp con las personas sinteticas y el enviador falso (sin red)
 	$(UV) run python -m banco_occidente_corpus.simulador
 
+.PHONY: agente-mcp
+agente-mcp: ## Servidor MCP del agente pana con las 20 herramientas en 127.0.0.1:8765
+	$(UV) run python -m banco_occidente_corpus.mcp_servidor.agente
+
+.PHONY: herramientas
+herramientas: ## Lista las 20 herramientas del agente y sus esquemas Pydantic (JSON=1)
+	$(UV) run python -m banco_occidente_corpus.herramientas $(if $(JSON),--json,)
+
+.PHONY: traza
+traza: ## Muestra las ultimas llamadas a las herramientas del agente
+	$(UV) run python -m banco_occidente_corpus.herramientas.traza
+
 # Plan B de la escena. Depende de la tarea 7.2 de Darley
 # (`escena/__main__.py`), que todavía no existe: el objetivo queda listo y no
 # se ejecuta hasta que entre esa tarea. No modifica ni reemplaza `make simular`.
