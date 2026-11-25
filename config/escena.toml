@@ -164,7 +164,7 @@ variantes = [
   "¿Quiénes son los integrantes del equipo?",
   "¿Cómo se repartieron el trabajo?",
 ]
-respuesta = "Somos cuatro. Nayla hizo las tasas, el motor del diagnóstico, el comité y el agente en OpenClaw; Darley, el canal de WhatsApp; Anny, la búsqueda, su evaluación y la seguridad; y Yoldy, la documentación y la pantalla."
+respuesta = "Somos cuatro. Nayla hizo las tasas, el motor del diagnóstico, el comité y el agente en OpenClaw; Darley, WhatsApp y el servidor MCP; Anny, la búsqueda, su evaluación y la seguridad; y Yoldy, la documentación y la pantalla."
 fuente = "docs/PRESENTADOR.md#p2"
 
 [[preguntas.fijas]]
