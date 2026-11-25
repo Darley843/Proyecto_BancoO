@@ -13,6 +13,7 @@ bot desde su propio teléfono.
 |---|---|
 | [`DESPLIEGUE.md`](./DESPLIEGUE.md) | Cómo se instala y se enciende cada pieza |
 | [`OPERACION_WHATSAPP.md`](./OPERACION_WHATSAPP.md) | Meta, token y webhook, paso a paso |
+| [`DESPLIEGUE_WHATSAPP.md`](./DESPLIEGUE_WHATSAPP.md) | Número propio, túnel y modo evento (sección 8) |
 | [`DEMO_GOTA_A_GOTA.md`](./DEMO_GOTA_A_GOTA.md) | La escena: flujo, cifras, roles y plan B |
 | [`ESCENA.md`](./ESCENA.md) | La pantalla: teclas, voces y trazabilidad |
 | [`SEGURIDAD.md`](./SEGURIDAD.md) | §5.1: trazas solo para la demo |
@@ -28,9 +29,10 @@ Reglas generales:
 - **Pana simula y recomienda; nunca aprueba.** La decisión final es del banco.
 
 Lo marcado con ⏳ depende de piezas del cambio `agente-openclaw` que entran a
-`main` hasta el jueves (gateway, MCP de 20 herramientas y modo evento). La
-dueña o el dueño de la pieza confirma el comando exacto en
-[`DESPLIEGUE.md`](./DESPLIEGUE.md) antes del ensayo del viernes.
+`main` hasta el jueves (gateway y MCP de 20 herramientas). La dueña o el dueño
+de la pieza confirma el comando exacto en [`DESPLIEGUE.md`](./DESPLIEGUE.md)
+antes del ensayo del viernes. El modo evento ya está en `main` (#195) y su guía
+es [`DESPLIEGUE_WHATSAPP.md`](./DESPLIEGUE_WHATSAPP.md), sección 8.
 
 ## 1. Calendario
 
@@ -99,17 +101,25 @@ dueña o el dueño de la pieza confirma el comando exacto en
       (`docs/OPERACION_WHATSAPP.md`, pasos 7 y 8).
 - [ ] Nayla agregada como desarrolladora o administradora de la app de Meta,
       para que pueda actualizar el webhook ella misma si el túnel se cae.
-- [ ] ⏳ Modo evento en `config/whatsapp.toml [evento]`: la ventana `desde` y
-      `hasta` cubre solo el sábado 28, con `maximo_invitados`,
-      `maximo_turnos_por_invitado` y `ttl_minutos`. Cómo se activa y se apaga:
-      [`DESPLIEGUE.md`](./DESPLIEGUE.md), sección 3.
+- [ ] Modo evento en `config/whatsapp.toml [evento]`: `desde` y `hasta` cubren
+      el sábado 28 de 08:00 a 20:00 (con `-05:00`; sin zona horaria se leen
+      como UTC), con 30 mensajes por hora y 40 en total por persona
+      (`max_por_hora` y `max_por_usuario`) y 300 en todo el evento
+      (`max_total`). En el repositorio queda `activo = false`: se enciende con
+      `$env:WHATSAPP_EVENTO = "1"` antes de `make app` y se apaga con `"0"`
+      ([`DESPLIEGUE_WHATSAPP.md`](./DESPLIEGUE_WHATSAPP.md), sección 8).
+- [ ] Para los ensayos del jueves y el viernes, la ventana se mueve a la hora
+      del ensayo **solo en el computador de la demo**, sin commit, y se
+      reinicia `make app`: la configuración se lee al arrancar.
 - [ ] Recorrido de invitados probado (Anny y Darley, tarea 3.6) desde un
       teléfono que **no** está en `[autorizados]`:
   - dentro de la ventana, el primer mensaje recibe el aviso de la Ley 1581 y
     nada más hasta que acepta;
   - después de **Acepto**, Pana responde;
-  - al llegar al tope de turnos, Pana lo dice y no sigue;
-  - fuera de la ventana, el número se rechaza;
+  - al pasar la cuota (30 por hora o 40 en total), llega el aviso de cuota
+    sin llamar al modelo;
+  - fuera de la ventana o con el evento apagado, el número no recibe
+    respuesta (el webhook sí registra el `POST 200`);
   - reiniciar la app no reinicia el conteo de turnos;
   - ni el número ni un nombre aparecen en la base ni en los registros.
 - [ ] Huellas de los teléfonos del equipo en `[autorizados]` de
@@ -151,10 +161,12 @@ dueña o el dueño de la pieza confirma el comando exacto en
       de un centavo de dólar; el tope diario de la app es US$ 0,20 y
       `SUCURSAL_TOPE_USD` lo cambia solo para esa sesión. Con varios invitados
       a la vez, revisar en los ensayos si alcanza.
-- [ ] ⏳ El tope de la app **no cuenta** lo que gasta el gateway de OpenClaw,
-      que llama a DeepSeek por su cuenta. Nayla confirma cómo se limita ese
-      gasto. Como la cuenta es prepagada, recargar solo lo que el grupo está
-      dispuesto a gastar ya funciona como tope.
+- [ ] El tope de la app **no cuenta** lo que gasta el gateway de OpenClaw,
+      que llama a DeepSeek por su cuenta. Lo acota el modo evento: todo mensaje
+      de un invitado pasa por el tope global de 300, y a unos 0,2 centavos por
+      mensaje el evento completo cuesta menos de un dólar. Como la cuenta es
+      prepagada, recargar solo lo que el grupo está dispuesto a gastar es el
+      segundo tope.
 - [ ] La clave de DeepSeek de la app va en `..\whatsapp-env.ps1`, junto con las
       variables del canal y fuera del repositorio. Se comprueba sin mostrarla:
   ```powershell
@@ -249,6 +261,7 @@ gateway, app y túnel.
 ```powershell
 . "..\whatsapp-env.ps1"
 $env:WHATSAPP_MODO = "real"
+$env:WHATSAPP_EVENTO = "1"
 $env:OPENCLAW_ACTIVO = "1"
 Get-ChildItem Env: | Where-Object Name -match 'LANGSMITH|LANGCHAIN'
 make app
@@ -279,7 +292,9 @@ curl.exe "https://<url-del-tunel>/webhooks/whatsapp?hub.mode=subscribe&hub.verif
 - [ ] `/health` responde 200 y las dos comprobaciones del webhook devuelven
       `12345`.
 - [ ] Saldo de DeepSeek suficiente y tope diario activo.
-- [ ] ⏳ Modo evento **activo** y con la ventana de hoy.
+- [ ] Modo evento **activo**: la ventana 3 tiene `WHATSAPP_EVENTO = "1"` y
+      `desde`/`hasta` cubren la hora actual. Si un número desconocido no
+      recibe respuesta, lo primero es revisar la ventana.
 - [ ] Un mensaje de prueba desde un teléfono del equipo, respondido de punta a
       punta, con `motor="openclaw"` en la trazabilidad.
 - [ ] La escena abierta en **Edge**, en pantalla completa y con el volumen
@@ -301,7 +316,7 @@ pasos 1 y 2 los resuelve el canal antes del agente.
 | 5 | «¿Qué tasas manejan?» | Pide el producto y muestra las opciones con su rango | `consultar_tarifas` |
 | 6 | «¿En qué año se fundó el Banco de Occidente?» | Respuesta con cita; dice **1965** | `buscar_en_documentos` |
 | 7 | «¿Qué clima hace hoy en Cali?» | Rechazo con la respuesta estándar | `clasificar_pregunta` |
-| 8 | ⏳ Un ataque del catálogo `config/evaluacion/inyeccion.toml` (por ejemplo, el `d01`) | Pana no cambia de reglas, no promete aprobación y no revela sus instrucciones | `auditar_respuesta` |
+| 8 | Un ataque del catálogo `config/evaluacion/inyeccion.toml` (por ejemplo, el `d01`) | Pana no cambia de reglas, no promete aprobación y no revela sus instrucciones | `auditar_respuesta` |
 | 9 | «¿Me alcanza para un crédito?» | Perfil con datos inventados → Don Gota → comparación → negociación → auditor; la pantalla muestra cada turno | `diagnosticar_capacidad`, `calcular_prestamo_gota`, `comparar_gota_banco`, `negociar_opcion` |
 | 10 | Final de la escena | Llega la ficha de la opción recomendada: simulación orientativa, nunca «aprobado» | `generar_ficha_opcion` |
 | 11 | Perfil rojo: Pana ofrece un asesor | Pide confirmación; con **Contactar** llega «Listo, un asesor revisará tu caso…» | `solicitar_asesor` |
@@ -344,8 +359,9 @@ plan B se active en menos de un minuto y que la demo no se detenga.
 | DeepSeek o su saldo | ⏳ El gateway pasa a su modelo alternativo. En la app, modo demo: `$env:SUCURSAL_DEMO = "1"` y reiniciar `make app`. La negociación usa la política determinista ([`DEMO_GOTA_A_GOTA.md`](./DEMO_GOTA_A_GOTA.md), sección 7.5) y la Bóveda usa la pregunta de la misión en vez de la del año (nota de la sección 5) |
 | La pantalla o las voces | Todo sigue por WhatsApp. En la pantalla, **Solo subtítulos** (tecla S) y avanzar con la barra espaciadora; el resto de saltos en la sección 6.2 |
 | Meta o el túnel | Reiniciar `cloudflared`, copiar la URL nueva, actualizar el callback en Meta (Nayla o Darley) y verificar: unos 2 minutos. Último recurso: `make simular` en la pantalla, que firma las conversaciones de las personas sintéticas y las entrega al webhook real con el enviador falso |
-| `ErrorEnvio: destino no autorizado` | Con un invitado: ⏳ el modo evento no está activo o la ventana no es la de hoy; revisar `activo`, `desde` y `hasta` en `[evento]`. Con un teléfono del equipo: falta su huella o cambió la sal; regenerarla, pegarla en `config/whatsapp.toml` y reiniciar la app |
-| Un invitado llega al tope de turnos | Es lo esperado: sigue con el teléfono del equipo |
+| `ErrorEnvio: destino no autorizado` | Con un invitado: el modo evento no está encendido (`WHATSAPP_EVENTO`) o `desde`/`hasta` no cubren la hora; `WHATSAPP_EVENTO` no mueve las fechas. Corregir y reiniciar `make app`. Con un teléfono del equipo: falta su huella o cambió la sal; regenerarla, pegarla en `config/whatsapp.toml` y reiniciar la app |
+| Un invitado pasa su cuota (30 por hora o 40 en total) | Es lo esperado: recibe el aviso de cuota sin gasto de modelo; sigue con el teléfono del equipo |
+| Se llega al tope global de 300 mensajes | El canal deja de atender invitados nuevos. ⏳ Darley confirma si los números de `[autorizados]` cuentan para ese tope; si no cuentan, se sigue con el teléfono del equipo |
 | Ollama o el índice | `buscar_en_documentos` devuelve un error explicable y no inventa: arrancar Ollama y revisar `data/boveda/indice.json`. Mientras tanto, seguir con las tarifas y la escena, que no dependen de Ollama |
 | Sin internet | No hay WhatsApp, DeepSeek ni voces de Edge: app en modo demo, escena proyectada con las voces de Piper y `make simular` |
 
@@ -372,9 +388,14 @@ herramientas, el WhatsApp de los invitados ni la seguridad.
 
 ## 7. Al terminar
 
-- [ ] ⏳ Apagar el **modo evento**, para que nadie más pueda escribir. Al
-      cerrarlo se borran los perfiles, las memorias y las bitácoras de los
-      invitados; solo quedan métricas agregadas sin huellas.
+- [ ] Apagar el **modo evento** con `$env:WHATSAPP_EVENTO = "0"` y reiniciar
+      `make app`: el canal vuelve a la lista cerrada y deja de responder a
+      desconocidos.
+- [ ] ⏳ Borrar los datos de los invitados. Al apagar el evento los
+      consentimientos aceptados **se conservan**, pero el diseño de
+      `agente-openclaw` (decisión 9) pide borrar perfiles, memorias y
+      bitácoras al cerrar y dejar solo métricas agregadas. Darley confirma el
+      comando antes del jueves.
 - [ ] Ctrl + C en el túnel y quitar la URL del webhook en Meta.
 - [ ] Apagar el gateway, el MCP y la app.
 - [ ] Quitar las trazas si se encendieron:
