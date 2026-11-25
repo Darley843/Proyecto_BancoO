@@ -70,7 +70,7 @@ export const INTRODUCCION = Object.freeze(
     ),
     turnoSimple(
       "agente_joven",
-      "Yo soy el agente del joven: defiendo a quien nos escribe y cuido que la cuota le quepa en el bolsillo.",
+      "Yo soy el agente del joven: defiendo a nuestro voluntario y cuido que la cuota le quepa en el bolsillo.",
       "guion_fijo",
     ),
     turnoSimple(
@@ -85,7 +85,7 @@ export const INTRODUCCION = Object.freeze(
     ),
     turnoSimple(
       "pana",
-      "Los protagonistas son ustedes: escríbanme por WhatsApp con datos inventados y verán su caso en esta pantalla. Uso las tasas que publica el Banco de Occidente, pero soy un proyecto académico. Al final, háganme preguntas.",
+      "Los protagonistas son ustedes: elegiré a un voluntario y los demás pueden escribirme por WhatsApp, siempre con datos inventados. Uso las tasas que publica el Banco de Occidente, pero soy un proyecto académico. Al final, háganme preguntas.",
       "guion_fijo",
     ),
   ].map((turno, orden) => Object.freeze({ ...turno, id: `anfitrion.presentacion.${orden + 1}`, orden })),
@@ -167,7 +167,7 @@ const FICHA = Object.freeze([
   {
     claves: ["actividad", "ejercicio", "voluntario", "escena"],
     texto:
-      "Cada invitado me escribe por WhatsApp un crédito inventado, Don Gota le ofrece plata rápida, yo comparo con el banco, los agentes negocian y el auditor revisa las cifras.",
+      "Un voluntario del público pide un crédito inventado, Don Gota le ofrece plata rápida, yo comparo con el banco, los agentes negocian y el auditor revisa las cifras.",
   },
 ]);
 
