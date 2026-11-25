@@ -1,6 +1,6 @@
 # Pantalla de la escena «Pana vs. el gota a gota»
 
-Pantalla para el proyector del viernes: los agentes hablan con voz y subtítulos,
+Pantalla para el proyector del sábado: los agentes hablan con voz y subtítulos,
 y un panel muestra el escenario, el semáforo, las cifras con su fuente y el
 veredicto del auditor.
 

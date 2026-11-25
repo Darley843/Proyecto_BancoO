@@ -1,6 +1,6 @@
 # Demo «Pana vs. el gota a gota»
 
-Escena en vivo del Taller 1 para el **viernes 27 de noviembre de 2026**. Don
+Escena en vivo del Taller 1 para el **sábado 28 de noviembre de 2026**. Don
 Gota es un personaje ficticio: la escena no aprueba créditos, no acusa a
 personas reales y no recomienda el gota a gota. Todas las cifras salen de
 código determinista o del motor del diagnóstico; ningún turno de Don Gota lo
@@ -335,7 +335,7 @@ como aprobada sin el auditor real.
 | Escena proyectada | Falla la API o el plan B no se recupera | `GET /api/escena/proyectado` lee `data/escena/proyectado.json`; si la app se cayó, se reinicia `make app`. |
 | Simulador o escena proyectada | Último recurso, todo en vivo | `make simular` con las personas sintéticas o la escena proyectada (`data/escena/proyectado.json`); sin capturas ni video. |
 
-El ensayo general del jueves 26 mide el tiempo de recuperación de cada salto y
+Los ensayos del viernes 27 miden el tiempo de recuperación de cada salto y
 lo anota aquí (tarea 7.5). La regla es que el plan B se active en menos de un
 minuto y que la escena no se detenga.
 
