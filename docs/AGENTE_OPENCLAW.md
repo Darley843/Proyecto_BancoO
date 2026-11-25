@@ -164,6 +164,19 @@ Dos detalles de OpenClaw que importan:
   operación sepa quién respondió. Una base anterior recibe la columna al
   arrancar, sin perder datos.
 
+Prueba de humo, con el gateway encendido y el token en la misma sesión:
+
+```powershell
+$env:OPENCLAW_ACTIVO = "1"
+$env:OPENCLAW_GATEWAY_TOKEN = "<token>"
+make probar-openclaw PREGUNTA="¿Cuál es la tasa de libre inversión?"
+```
+
+`make probar-openclaw` usa `scripts/probar_openclaw.py`: sale con 0 si el
+gateway responde, 1 si el gateway falla (el canal usaría el grafo) y 2 si falta
+el interruptor, el token o `site.contact`. No imprime el token y usa una huella
+de prueba de 64 hexadecimales.
+
 ## 5. Traza visible
 
 Cada llamada deja una línea JSON en `data/asistente/trazas/herramientas.jsonl`

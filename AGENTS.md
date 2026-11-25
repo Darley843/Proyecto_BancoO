@@ -57,6 +57,7 @@ make tablero     # tarifario + tablas de Gold -> data/estructurados/tablero.csv
 make app         # Sucursal 1965: FastAPI + app web en 127.0.0.1:8000
 make agente-mcp  # servidor MCP del agente pana con las 20 tools en 127.0.0.1:8765
 make herramientas # catálogo de las 20 tools y sus esquemas Pydantic (JSON=1)
+make probar-openclaw # cliente de OpenClaw contra el gateway (token en el entorno)
 make traza       # últimas llamadas a las tools, sin datos personales
 make simular     # canal completo con las personas sintéticas y el enviador falso (sin red)
 make arqueo      # data/evaluacion/arqueo.json y docs/ARQUEO.md (sin DeepSeek)
