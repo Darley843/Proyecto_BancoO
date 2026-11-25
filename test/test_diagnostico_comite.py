@@ -1422,6 +1422,21 @@ NEGACIONES_QUE_ANTES_ANULABAN: tuple[str, ...] = (
     "No hay problema, te lo aprueban",
 )
 
+#: Verbos de afirmación negados con «que»: niegan toda la cláusula, aunque haya
+#: más de tres palabras entre la negación y la promesa.
+NEGACIONES_DE_AFIRMACION: tuple[str, ...] = (
+    "No puedo decir que todos los créditos están aprobados",
+    "No te puedo asegurar que tu crédito está aprobado",
+    "Nunca voy a prometerte que te lo aprueban",
+)
+
+#: Un corte cierra la negación; y «dudar» no es un verbo de afirmación.
+AFIRMACIONES_TRAS_LA_NEGACION: tuple[str, ...] = (
+    "No te voy a mentir: está aprobado",
+    "No puedo decirte que no, ya está aprobado",
+    "No dudes que te lo aprueban",
+)
+
 #: Tokens de negación de `_promesas` antes de los arreglos: no miraban la frase.
 _NEGACIONES_VERSION_ANTERIOR = ("no ", "nunca ", "ni ", "sin ", "ninguna ", "jamás ", "jamas ")
 
@@ -1647,12 +1662,42 @@ def test_auditar_texto_limita_las_palabras_entre_la_negacion_y_la_promesa() -> N
     assert auditar_texto("no está queda fue es aprobado") == ["Promesa de aprobación: «aprobado»"]
 
 
+@pytest.mark.parametrize("texto", NEGACIONES_DE_AFIRMACION)
+def test_auditar_texto_no_marca_una_promesa_tras_un_verbo_de_afirmacion_negado(
+    texto: str,
+) -> None:
+    """«No puedo decir que…» niega la cláusula aunque haya más de tres enlaces."""
+    assert auditar_texto(texto) == []
+
+
+@pytest.mark.parametrize("texto", AFIRMACIONES_TRAS_LA_NEGACION)
+def test_auditar_texto_marca_la_promesa_si_un_corte_o_otro_verbo_la_despega(texto: str) -> None:
+    """Un corte cierra la negación, y «dudar» no es un verbo de afirmación."""
+    hallazgos = auditar_texto(texto)
+
+    assert hallazgos
+    assert all(hallazgo.startswith("Promesa de aprobación") for hallazgo in hallazgos)
+
+
 def test_auditar_texto_admite_un_sustantivo_tras_ninguna_o_ninguno() -> None:
     """«Ninguna opción está garantizada» niega; dos sustantivos ya no son inmediatos."""
     assert auditar_texto("Ninguna opción está garantizada") == []
     assert auditar_texto("Ninguno está garantizado") == []
     assert auditar_texto("Ninguna opción de crédito está garantizada") == [
         "Promesa de aprobación: «garantizada»"
+    ]
+
+
+def test_auditar_texto_ningun_niega_igual_que_ninguno() -> None:
+    """«Ningún crédito está aprobado» y su forma sin tildes no son promesas."""
+    assert auditar_texto("Ningún crédito está aprobado") == []
+    assert auditar_texto("ningun credito esta aprobado") == []
+
+
+def test_auditar_texto_ningun_no_niega_la_promesa_de_otra_frase() -> None:
+    """«Ningún problema» es una expresión de ánimo, no una negación de la promesa."""
+    assert auditar_texto("No dudes, ningún problema: te lo aprueban") == [
+        "Promesa de aprobación: «te lo aprueban»"
     ]
 
 
