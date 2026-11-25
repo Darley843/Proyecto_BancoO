@@ -577,5 +577,9 @@ class AuditarRespuestaEntrada(BaseModel):
     cifras_permitidas: list[str] | None = Field(
         default=None,
         max_length=40,
-        description="Cifras, solo dígitos, que el texto puede citar; sin lista no se revisan.",
+        description=(
+            "Cifras que el texto puede citar: pasa el `cifras_permitidas` de la "
+            "herramienta. Acepta el texto legible («791,61 % E.A.») y los dígitos; "
+            "sin lista, cualquier cifra es inventada."
+        ),
     )

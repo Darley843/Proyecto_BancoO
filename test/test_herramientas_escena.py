@@ -240,10 +240,15 @@ def test_responder_sobre_proyecto_declara_su_alcance() -> None:
 
 
 def test_agents_de_pana_declara_el_alcance_y_cabe_en_el_presupuesto() -> None:
-    """AGENTS.md excluye esas dos herramientas en la escena y sigue bajo 4.000."""
+    """AGENTS.md excluye esas dos herramientas, exige copiar cifras y sigue bajo 4.000."""
     texto = Path("openclaw/workspace/pana/AGENTS.md").read_text(encoding="utf-8")
     frase = (
         "Durante la entrevista y la escena no uso responder_sobre_proyecto ni buscar_en_documentos"
     )
     assert frase in texto
+    assert "Copio las cifras tal como vienen en `valor_legible`" in texto
+    assert "nunca hago cuentas propias ni convierto unidades" in texto
+    assert "Antes de enviar cualquier mensaje con cifras, lo reviso con" in texto
+    assert "`auditar_respuesta`" in texto
+    assert "`cifras_permitidas`" in texto
     assert len(texto) < 4000

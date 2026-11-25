@@ -16,6 +16,17 @@ from pydantic import BaseModel, ValidationError
 
 from ..asistente.validacion import cifras_duras
 from ..canal.contratos import EntradaDiagnostico, ResultadoDiagnostico
+from ..cifras_legibles import (
+    anotar,
+    cifra,
+    formatear_dias,
+    formatear_meses,
+    formatear_pesos,
+    formatear_porcentaje,
+    formatear_puntos,
+    formatear_tasa_ea,
+    formatear_veces,
+)
 from ..diagnostico.comite import auditar_texto, construir_escenarios
 from ..diagnostico.escenarios import CambioEscenario, comparar_resultado
 from ..diagnostico.motor import calcular, entrada_desde_respuestas
@@ -24,7 +35,6 @@ from ..escena.comparacion import alertas_comparacion
 from ..escena.comparacion import comparar_gota_banco as _comparar_gota_banco
 from ..escena.contratos import HallazgoEscena
 from ..escena.gota import calcular_prestamo_gota as _calcular_gota
-from ..escena.gota import formatear_pesos
 from ..escena.negociacion import negociar
 from ..escena.proyecto import crear_recuperador_proyecto, es_pregunta_del_proyecto
 from ..mcp_servidor import conocimiento, control
@@ -258,29 +268,61 @@ def verificar_usura(
     exceso = max(0.0, tasa - limite)
     clave = clave_producto(entrada.producto) if entrada.producto else ""
     aplica = not clave or clave not in usura.exceptuados
-    return ok(
-        "verificar_usura",
-        {
-            "tasa_ea": round(tasa, 6),
-            "tasa_ea_pct": round(tasa * 100, 4),
-            "unidad_interpretada": interpretada,
-            "usura_ea": limite,
-            "usura_ea_pct": round(limite * 100, 4),
-            "excede": exceso > 0,
-            "exceso_puntos": round(exceso * 100, 4),
-            "aplica": aplica,
-            "producto": clave or None,
-            "exceptuados": sorted(usura.exceptuados),
-            "vigencia": f"{usura.vigencia_desde.isoformat()}/{usura.vigencia_hasta.isoformat()}",
-            "fuente": usura.fuente,
-            "resolucion": usura.resolucion,
-            "nota": (
-                "La usura se mide en tasa efectiva anual y no tiene tope de entrada: "
-                "el gota a gota supera el 100 %. Un spread sobre IPC o IBR no es una "
-                "tasa y no se compara con este límite."
+    datos = {
+        "tasa_ea": round(tasa, 6),
+        "tasa_ea_pct": round(tasa * 100, 4),
+        "unidad_interpretada": interpretada,
+        "usura_ea": limite,
+        "usura_ea_pct": round(limite * 100, 4),
+        "excede": exceso > 0,
+        "exceso_puntos": round(exceso * 100, 4),
+        "aplica": aplica,
+        "producto": clave or None,
+        "exceptuados": sorted(usura.exceptuados),
+        "vigencia": f"{usura.vigencia_desde.isoformat()}/{usura.vigencia_hasta.isoformat()}",
+        "fuente": usura.fuente,
+        "resolucion": usura.resolucion,
+        "nota": (
+            "La usura se mide en tasa efectiva anual y no tiene tope de entrada: "
+            "el gota a gota supera el 100 %. Un spread sobre IPC o IBR no es una "
+            "tasa y no se compara con este límite."
+        ),
+    }
+    anotar(
+        datos,
+        (
+            cifra("tasa_ea", tasa, formatear_tasa_ea(tasa), "porcentaje_ea", etiqueta="tasa E.A."),
+            cifra(
+                "tasa_ea_pct",
+                round(tasa * 100, 4),
+                formatear_porcentaje(tasa),
+                "porcentaje",
+                etiqueta="tasa E.A. en porcentaje",
             ),
-        },
+            cifra(
+                "usura_ea",
+                limite,
+                formatear_tasa_ea(limite),
+                "porcentaje_ea",
+                etiqueta="usura vigente",
+            ),
+            cifra(
+                "usura_ea_pct",
+                round(limite * 100, 4),
+                formatear_porcentaje(limite),
+                "porcentaje",
+                etiqueta="usura vigente en porcentaje",
+            ),
+            cifra(
+                "exceso_puntos",
+                round(exceso * 100, 4),
+                formatear_puntos(exceso * 100),
+                "puntos",
+                etiqueta="exceso sobre la usura",
+            ),
+        ),
     )
+    return ok("verificar_usura", datos)
 
 
 def diagnosticar_capacidad(respuestas: RespuestasEntrevista) -> SalidaHerramienta:
@@ -391,19 +433,108 @@ def convocar_comite(respuestas: RespuestasEntrevista) -> SalidaHerramienta:
 def calcular_prestamo_gota(monto: int) -> SalidaHerramienta:
     """Calcula el préstamo de Don Gota con la aritmética de la escena.
 
+    Cada cifra viaja con su ``valor_legible`` en formato colombiano y con
+    ``cifras_permitidas`` para ``auditar_respuesta``. La tasa E.A. se entrega
+    como ``791,61 % E.A.`` y el identificador de la fórmula queda solo en
+    ``metadatos``: nunca en un campo de texto que el modelo pueda copiar.
+
     Args:
         monto: capital en pesos.
 
     Returns:
-        Interés, cuota diaria, totales y tasa E.A. equivalente, con su fuente.
+        Interés, cuota diaria, totales y tasa E.A. equivalente, con su fuente,
+        sus cifras legibles y el resumen para leer en voz alta.
     """
     entrada = CalcularPrestamoGotaEntrada(monto=monto)
     prestamo = _calcular_gota(entrada.monto)
     datos = como_json(prestamo)
+    version = datos.pop("version_formula", None)
+    datos["metadatos"] = {
+        "version_formula": version,
+        "dias_ciclo": prestamo.dias_ciclo,
+        "meses_horizonte": prestamo.meses_horizonte,
+        "supuesto": prestamo.supuesto,
+    }
     datos["resumen"] = (
-        f"{formatear_pesos(prestamo.monto)} al {prestamo.tasa_mensual * 100:.0f} % mensual: "
+        f"{formatear_pesos(prestamo.monto)} al "
+        f"{formatear_porcentaje(prestamo.tasa_mensual)} mensual: "
         f"interés de {formatear_pesos(prestamo.interes_mensual)} y cuota diaria de "
         f"{formatear_pesos(prestamo.cuota_diaria)}."
+    )
+    anotar(
+        datos,
+        (
+            cifra(
+                "monto",
+                prestamo.monto,
+                formatear_pesos(prestamo.monto),
+                "pesos",
+                etiqueta="monto prestado",
+            ),
+            cifra(
+                "tasa_mensual",
+                prestamo.tasa_mensual,
+                f"{formatear_porcentaje(prestamo.tasa_mensual)} mensual",
+                "porcentaje",
+                etiqueta="tasa mensual",
+            ),
+            cifra(
+                "interes_mensual",
+                prestamo.interes_mensual,
+                formatear_pesos(prestamo.interes_mensual),
+                "pesos",
+                etiqueta="interés del ciclo",
+            ),
+            cifra(
+                "total_ciclo",
+                prestamo.total_ciclo,
+                formatear_pesos(prestamo.total_ciclo),
+                "pesos",
+                etiqueta="total del ciclo",
+            ),
+            cifra(
+                "cuota_diaria",
+                prestamo.cuota_diaria,
+                formatear_pesos(prestamo.cuota_diaria),
+                "pesos",
+                etiqueta="cuota diaria",
+            ),
+            cifra(
+                "dias_ciclo",
+                prestamo.dias_ciclo,
+                formatear_dias(prestamo.dias_ciclo),
+                "dias",
+                etiqueta="días del ciclo",
+            ),
+            cifra(
+                "meses_horizonte",
+                prestamo.meses_horizonte,
+                formatear_meses(prestamo.meses_horizonte),
+                "meses",
+                etiqueta="meses del horizonte",
+            ),
+            cifra(
+                "intereses_horizonte",
+                prestamo.intereses_horizonte,
+                formatear_pesos(prestamo.intereses_horizonte),
+                "pesos",
+                etiqueta=f"intereses de {formatear_meses(prestamo.meses_horizonte)}",
+            ),
+            cifra(
+                "total_pagado_horizonte",
+                prestamo.total_pagado_horizonte,
+                formatear_pesos(prestamo.total_pagado_horizonte),
+                "pesos",
+                etiqueta="total pagado en el horizonte",
+            ),
+            cifra(
+                "tasa_ea",
+                prestamo.tasa_ea,
+                formatear_tasa_ea(prestamo.tasa_ea),
+                "porcentaje_ea",
+                etiqueta="tasa efectiva anual",
+            ),
+        ),
     )
     return ok("calcular_prestamo_gota", datos)
 
@@ -411,13 +542,18 @@ def calcular_prestamo_gota(monto: int) -> SalidaHerramienta:
 def comparar_gota_banco(monto: int, respuestas: RespuestasEntrevista) -> SalidaHerramienta:
     """Compara el gota a gota con el banco y con la usura vigente.
 
+    Las tasas y los totales se devuelven con ``valor_legible`` y el bloque
+    ``cifras_permitidas``; el identificador de la fórmula del préstamo no sale
+    en ningún campo de texto.
+
     Args:
         monto: mismo monto para los dos lados.
         respuestas: ids canónicos de la entrevista con ingresos, gastos, deudas,
-            monto y plazo, como en `diagnosticar_capacidad`.
+            monto y plazo, como en ``diagnosticar_capacidad``.
 
     Returns:
-        La comparación con los totales, la usura y los supuestos.
+        La comparación con los totales, la usura y los supuestos, con sus cifras
+        legibles listas para auditar.
     """
     fallo = respuestas_o_error("comparar_gota_banco", respuestas)
     if fallo is not None:
@@ -428,11 +564,96 @@ def comparar_gota_banco(monto: int, respuestas: RespuestasEntrevista) -> SalidaH
         return diagnostico
     prestamo = _calcular_gota(entrada.monto)
     comparacion = _comparar_gota_banco(prestamo, diagnostico.entrada)
+    detalle = como_json(comparacion)
+    cifras = [
+        cifra(
+            "monto",
+            comparacion.monto,
+            formatear_pesos(comparacion.monto),
+            "pesos",
+            etiqueta="monto del préstamo",
+        ),
+        cifra(
+            "plazo_meses",
+            comparacion.plazo_meses,
+            formatear_meses(comparacion.plazo_meses),
+            "meses",
+            etiqueta="plazo del horizonte",
+        ),
+        cifra(
+            "tasa_ea_gota",
+            comparacion.tasa_ea_gota,
+            formatear_tasa_ea(comparacion.tasa_ea_gota),
+            "porcentaje_ea",
+            etiqueta="tasa E.A. de Don Gota",
+        ),
+        cifra(
+            "tasa_ea_banco",
+            comparacion.tasa_ea_banco,
+            formatear_tasa_ea(comparacion.tasa_ea_banco),
+            "porcentaje_ea",
+            etiqueta="tasa E.A. máxima del banco",
+        ),
+        cifra(
+            "total_gota",
+            comparacion.total_gota,
+            formatear_pesos(comparacion.total_gota),
+            "pesos",
+            etiqueta="total pagado con Don Gota",
+        ),
+        cifra(
+            "total_banco",
+            comparacion.total_banco,
+            formatear_pesos(comparacion.total_banco),
+            "pesos",
+            etiqueta="total pagado con el banco",
+        ),
+        cifra(
+            "diferencia",
+            comparacion.diferencia,
+            formatear_pesos(comparacion.diferencia),
+            "pesos",
+            etiqueta="diferencia entre los dos totales",
+        ),
+    ]
+    if comparacion.usura_ea is not None:
+        cifras.append(
+            cifra(
+                "usura_ea",
+                comparacion.usura_ea,
+                formatear_tasa_ea(comparacion.usura_ea),
+                "porcentaje_ea",
+                etiqueta="usura vigente",
+            )
+        )
+    if comparacion.veces_total is not None:
+        cifras.append(
+            cifra(
+                "veces_total",
+                comparacion.veces_total,
+                formatear_veces(comparacion.veces_total),
+                "veces",
+                etiqueta="veces el total del banco",
+            )
+        )
+    if comparacion.veces_usura is not None:
+        cifras.append(
+            cifra(
+                "veces_usura",
+                comparacion.veces_usura,
+                formatear_veces(comparacion.veces_usura),
+                "veces",
+                etiqueta="veces la usura",
+            )
+        )
+    anotar(detalle, cifras)
     return ok(
         "comparar_gota_banco",
         {
-            "comparacion": como_json(comparacion),
+            "comparacion": detalle,
             "alertas": list(alertas_comparacion(comparacion)),
+            "cifras": detalle["cifras"],
+            "cifras_permitidas": detalle["cifras_permitidas"],
         },
     )
 
@@ -654,8 +875,9 @@ def auditar_respuesta(
 
     Args:
         texto: lo que se quiere auditar.
-        cifras_permitidas: cifras que el texto puede citar, en dígitos como las
-            devuelven las herramientas.
+        cifras_permitidas: cifras que el texto puede citar; normalmente se pasa
+            el `cifras_permitidas` que devuelve la herramienta. Acepta el texto
+            legible («791,61 % E.A.») y también los dígitos de máquina.
         personaje: quién envía el texto.
 
     Returns:
@@ -666,15 +888,15 @@ def auditar_respuesta(
         control.AuditarRespuestaEntrada(texto=entrada.texto, personaje=personaje)
     )
     permitidas: set[str] = set()
-    for cifra in (entrada.cifras_permitidas or [])[:MAXIMO_CIFRAS_AUDITOR]:
-        permitidas |= cifras_duras(cifra) or {cifra.strip()}
+    for permitida in (entrada.cifras_permitidas or [])[:MAXIMO_CIFRAS_AUDITOR]:
+        permitidas |= cifras_duras(permitida) or {permitida.strip()}
     hallazgos = [h for h in revision.hallazgos if h.codigo != "cifra_inventada"]
-    for cifra in sorted(control.cifras_sin_respaldo(entrada.texto) - permitidas):
+    for inventada in sorted(control.cifras_sin_respaldo(entrada.texto) - permitidas):
         hallazgos.append(
             HallazgoEscena(
                 codigo="cifra_inventada",
                 turno_id=control.ID_RESPUESTA,
-                detalle=f"El texto dice {cifra} y no está entre las cifras permitidas.",
+                detalle=f"El texto dice {inventada} y no está entre las cifras permitidas.",
                 gravedad="alta",
             )
         )

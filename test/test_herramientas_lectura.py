@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from decimal import Decimal
 
 import pytest
@@ -129,3 +130,90 @@ def test_clasificar_y_auditar_son_deterministas() -> None:
     assert auditor.ok
     assert auditor.datos["conforme"] is False
     assert auditor.datos["veredicto"] == "objeta"
+
+
+def test_calcular_prestamo_gota_trae_cifras_legibles() -> None:
+    """Con $2.000.000 la tasa E.A. se copia como 791,61 % y no como 7,916 %."""
+    salida = lectura.calcular_prestamo_gota(2_000_000)
+    assert salida.ok
+    datos = salida.datos
+    assert datos["tasa_ea_legible"] == "791,61 % E.A."
+    assert datos["cuota_diaria_legible"] == "$80.000"
+    assert datos["total_pagado_horizonte_legible"] == "$16.400.000"
+    assert "791,61 % E.A." in datos["cifras_permitidas"]
+    assert datos["metadatos"]["version_formula"] == "gota-v1"
+    texto = json.dumps(
+        {clave: valor for clave, valor in datos.items() if clave != "metadatos"},
+        ensure_ascii=False,
+    )
+    assert "gota-v1" not in texto
+
+
+def test_comparar_gota_banco_trae_las_tasas_legibles() -> None:
+    """La comparación entrega la tasa del gota y la del banco sin ambigüedad."""
+    salida = lectura.comparar_gota_banco(2_000_000, RESPUESTAS)
+    assert salida.ok
+    comparacion = salida.datos["comparacion"]
+    assert comparacion["tasa_ea_gota_legible"] == "791,61 % E.A."
+    assert comparacion["tasa_ea_banco_legible"].endswith("% E.A.")
+    assert comparacion["usura_ea_legible"] == "28,34 % E.A."
+    assert "$16.400.000" in salida.datos["cifras_permitidas"]
+
+
+def test_consultar_tasa_y_simular_cuota_traen_texto_legible() -> None:
+    """Los rangos de tasa y cuota llevan su `valor_legible` y sus permitidas."""
+    tasa = lectura.consultar_tasa("libre inversión")
+    assert tasa.ok
+    assert tasa.datos["resumen"]["tasa_ea_desde_legible"].endswith("% E.A.")
+    assert tasa.datos["resumen"]["valor_legible"].endswith("% E.A.")
+    assert any("% E.A." in cifra for cifra in tasa.datos["cifras_permitidas"])
+
+    cuota = lectura.simular_cuota("libre inversión", 15_000_000, 48)
+    assert cuota.ok
+    assert cuota.datos["tasa_ea"]["valor_legible"].endswith("% E.A.")
+    assert cuota.datos["tasa_mensual"]["valor_legible"].endswith("% mensual")
+    assert cuota.datos["cuota_mensual"]["valor_legible"].startswith("$")
+    assert "version_formula" not in cuota.datos
+    assert cuota.datos["metadatos"]["version_formula"]
+
+
+def test_verificar_usura_trae_las_tasas_legibles() -> None:
+    """La usura y su exceso se leen en la misma escala que la tasa de entrada."""
+    salida = lectura.verificar_usura(7.9161)
+    assert salida.ok
+    assert salida.datos["tasa_ea_legible"] == "791,61 % E.A."
+    assert salida.datos["usura_ea_legible"] == "28,34 % E.A."
+    assert salida.datos["exceso_puntos_legible"] == "763,27 puntos porcentuales"
+
+
+def test_auditar_respuesta_objeta_la_tasa_mal_escalada() -> None:
+    """«7.916% E.A.» no está respaldado por la cifra legible de la herramienta."""
+    salida = lectura.auditar_respuesta(
+        "Don Gota cobra 7.916% E.A.",
+        cifras_permitidas=["791,61 % E.A."],
+    )
+    assert salida.ok
+    assert salida.datos["veredicto"] == "objeta"
+    assert any("cifra_inventada" in hallazgo for hallazgo in salida.datos["hallazgos"])
+
+
+def test_auditar_respuesta_objeta_un_monto_fuera_de_las_permitidas() -> None:
+    """«$2.400.000 al mes» se objeta cuando solo está permitido el pago diario."""
+    salida = lectura.auditar_respuesta(
+        "Pagarías $2.400.000 al mes solo para no crecer la deuda.",
+        cifras_permitidas=["$80.000"],
+    )
+    assert salida.ok
+    assert salida.datos["veredicto"] == "objeta"
+    assert any("cifra_inventada" in hallazgo for hallazgo in salida.datos["hallazgos"])
+
+
+def test_auditar_respuesta_acepta_las_cifras_legibles_de_la_herramienta() -> None:
+    """La respuesta que copia `valor_legible` queda conforme."""
+    calculo = lectura.calcular_prestamo_gota(2_000_000)
+    salida = lectura.auditar_respuesta(
+        "Don Gota cobra 791,61 % E.A. y la cuota diaria es $80.000.",
+        cifras_permitidas=calculo.datos["cifras_permitidas"],
+    )
+    assert salida.ok
+    assert salida.datos["veredicto"] == "conforme"
