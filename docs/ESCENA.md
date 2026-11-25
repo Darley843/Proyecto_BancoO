@@ -115,6 +115,7 @@ Para cambiar un retrato basta con reemplazar el `.webp` con el mismo nombre
 | Preguntas (tecla Q) | abre o cierra el cuadro de preguntas del público |
 | Núcleo (tecla N) | **plan B**: sigue solo con Don Gota, Pana y el auditor, sin repetir lo ya dicho, y deja la escena en pausa |
 | Trazabilidad (tecla T) | muestra u oculta el panel para quien facilita (empieza oculto) |
+| Herramientas (tecla H) | muestra u oculta, a la vista del público, las últimas herramientas que usó Pana: nombre, dueña, si salió bien y cuánto tardó. Lee `GET /api/herramientas/traza` cada 2 s solo mientras está abierto; nunca muestra argumentos ni huellas. Con el servidor MCP apagado dice que todavía no hay llamadas |
 | Reiniciar (tecla R) | vuelve al inicio con la escena completa y borra la escena guardada en la pestaña |
 
 ## Plan B en la pantalla

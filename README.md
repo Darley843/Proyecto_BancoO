@@ -90,9 +90,21 @@ contra el gateway real y las herramientas del gateway que Pana tiene bloqueadas.
 | 19 | `clasificar_pregunta` | Digiturno y filtro de dominio | `sucursal/digiturno.py` | Anny | — |
 | 20 | `auditar_respuesta` | Cifras con fuente, sin promesas ni datos personales | Auditor | Anny | — |
 
-Hoy el servidor MCP de `main` expone `consultar_tasa`, `simular_cuota` y
-`buscar_en_boveda` ([`docs/MCP.md`](./docs/MCP.md)); las demás se suman sobre
-los módulos que ya existen.
+Las veinte corren en el servidor MCP `sucursal`, por HTTP en
+`127.0.0.1:8765/mcp`, y el gateway de OpenClaw solo ve esas veinte:
+
+```bash
+make agente-mcp      # servidor MCP con las 20 herramientas
+make herramientas    # lista las 20 y sus esquemas Pydantic
+make traza           # últimas llamadas, sin textos libres ni datos personales
+```
+
+Cada llamada queda en la traza local (`data/asistente/trazas/herramientas.jsonl`,
+sin versionar). La pantalla de la escena la muestra en vivo con la tecla **H**
+(`GET /api/herramientas/traza`: nombre, resultado y latencia, sin argumentos).
+El servidor de solo lectura por stdio de la fase 2 (`consultar_tasa`,
+`simular_cuota`, `buscar_en_boveda`) sigue disponible para OpenCode
+([`docs/MCP.md`](./docs/MCP.md)).
 
 ### Dentro del canal
 
@@ -125,7 +137,7 @@ flowchart LR
 | Comité | Tres miradas (riesgo, comercial, auditor) en una sola ronda para casos amarillos y rojos | `diagnostico/comite.py` | [`COMITE.md`](./docs/COMITE.md) |
 | Pana y tarjetas | El personaje y la tarjeta del resultado (PNG + texto equivalente) | `pana/` | — |
 | «¿Y si…?» | Compara otro plazo o monto sin tocar el diagnóstico original | `diagnostico/escenarios.py` | [`DIAGNOSTICO.md`](./docs/DIAGNOSTICO.md) |
-| MCP | Servidor de solo lectura: `consultar_tasa`, `simular_cuota`, `buscar_en_boveda` | `mcp_servidor/` | [`MCP.md`](./docs/MCP.md) |
+| MCP | Servidor `sucursal` con las 20 herramientas en `127.0.0.1:8765` (`make agente-mcp`) y el de solo lectura por stdio para OpenCode | `mcp_servidor/` | [`MCP.md`](./docs/MCP.md) |
 | Agente pana | Veinte herramientas Pydantic sobre el Tablero, el motor, la escena y la Bóveda, con traza local y confirmación en dos pasos | `herramientas/`, `openclaw/` | [`AGENTE_OPENCLAW.md`](./docs/AGENTE_OPENCLAW.md) |
 | Roba la Bóveda | Juego de ataque: inyección, extracción del prompt, datos personales y fuera de tema | `roba/` | [`ROBA_BOVEDA.md`](./docs/ROBA_BOVEDA.md) |
 | Operación y latencia | Vista con mensajes, consentimientos, casos y p50/p95 real por flujo | `arqueo/latencia.py`, `app/web/vistas/operacion.js` | [`ARQUEO.md`](./docs/ARQUEO.md) |

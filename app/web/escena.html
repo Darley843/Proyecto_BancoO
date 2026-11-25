@@ -54,6 +54,7 @@
     <button type="button" id="escena-captura-abrir" class="escena__boton--secundario" aria-expanded="false" aria-controls="escena-captura">Entrada del voluntario (V)</button>
     <button type="button" id="escena-nucleo" class="escena__boton--secundario">Núcleo (N)</button>
     <button type="button" id="escena-ver-traza" class="escena__boton--secundario" aria-expanded="false" aria-controls="escena-traza">Trazabilidad (T)</button>
+    <button type="button" id="escena-ver-herramientas" class="escena__boton--secundario" aria-expanded="false" aria-controls="escena-herramientas">Herramientas (H)</button>
     <label class="escena__casilla" for="escena-solo-subtitulos">
       <input type="checkbox" id="escena-solo-subtitulos">
       Solo subtítulos (respaldo)
@@ -61,7 +62,7 @@
     <span class="escena__estado" id="escena-modo"></span>
     <span class="escena__estado" id="escena-contador"></span>
     <span class="escena__estado" id="escena-voz"></span>
-    <span class="escena__estado">Teclas: Espacio siguiente · P reproducir/pausar · S subtítulos · Q preguntas · N núcleo · T trazabilidad · R reiniciar</span>
+    <span class="escena__estado">Teclas: Espacio siguiente · P reproducir/pausar · S subtítulos · Q preguntas · N núcleo · T trazabilidad · H herramientas · R reiniciar</span>
   </div>
 
   <section class="escena__captura" id="escena-captura" aria-label="Entrada del voluntario" hidden>
@@ -118,6 +119,12 @@
     </table>
     <ul class="escena__hallazgos" id="escena-traza-hallazgos"></ul>
     <p class="escena__estado" id="escena-traza-sellos"></p>
+  </aside>
+
+  <aside class="escena__herramientas" id="escena-herramientas" aria-label="Herramientas que usa Pana" aria-live="polite" hidden>
+    <h2>Pana está usando</h2>
+    <ol class="escena__herramientas-lista" id="escena-herramientas-lista"></ol>
+    <p class="escena__estado" id="escena-herramientas-aviso" hidden></p>
   </aside>
 </body>
 </html>
