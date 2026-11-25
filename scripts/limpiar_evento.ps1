@@ -30,12 +30,22 @@
        derivado de las sesiones que se acaban de eliminar, sin arrastrar
        memorias de otras sesiones del mismo agente.
 
-    3. Borra los archivos locales de memoria del workspace de WSL:
+    3. Purga los archivos archivados de las sesiones en la base SQLite del
+       agente, con python3 y el modulo sqlite3 dentro de WSL, en la misma
+       ventana en que el gateway esta detenido para el olvido del paso 2. Con
+       -PurgarArchivos comprueba las tablas session_transcript_archives y
+       session_transcript_cold_archives; en modo de prueba solo cuenta sus
+       filas y con -Confirmar las borra con DELETE FROM, trunca el WAL con
+       PRAGMA wal_checkpoint(TRUNCATE) y compacta con VACUUM. Informa cuantas
+       filas borro y el tamano de la base antes y despues. No toca ninguna otra
+       tabla y no hace copia de respaldo de esas dos.
+
+    4. Borra los archivos locales de memoria del workspace de WSL:
        MEMORY.md, DREAMS.md y todo el contenido de memory\ (bitacora diaria,
        dreaming y .dreams\session-corpus). Nunca toca los .example ni los
        archivos versionados SOUL.md, AGENTS.md, USER.md e IDENTITY.md.
 
-    4. Borra en Windows data\asistente\trazas\herramientas.jsonl y
+    5. Borra en Windows data\asistente\trazas\herramientas.jsonl y
        data\evaluacion\inyeccion.json si existen.
 
     El canal de WhatsApp no se toca: los perfiles, consentimientos y casos son
@@ -53,16 +63,37 @@
     "openclaw memory reset" limpia el indice derivado y la cache de embeddings
     sin tocar las sesiones.
 
-    En OpenClaw 2026.11.6 no hay un comando que purgue el blob archivado del
-    transcript. Ese blob queda local, dentro de WSL, y no sale del equipo. Si
-    de verdad hay que purgarlo, el procedimiento manual (no lo hace este
-    script) es: detener el gateway con "openclaw daemon stop", respaldar
-    openclaw-agent.sqlite, borrar las filas de esas dos tablas por session_id y
-    volver a arrancar el gateway. La ruta de la base es
-    \home\openclaw\.openclaw\agents\pana\agent\openclaw-agent.sqlite.
+    OpenClaw 2026.11.6 no expone un comando que purgue ese blob archivado y la
+    promesa del consentimiento es borrar los datos de los invitados. Por eso,
+    con -PurgarArchivos el script entra con python3 y el modulo sqlite3 dentro
+    de WSL a la base del agente
+    (el equivalente a ~/.openclaw/agents/pana/agent/openclaw-agent.sqlite) y:
+
+      - comprueba que existan las dos tablas; si falta alguna, lo avisa y sigue;
+      - en modo de prueba solo cuenta las filas de cada tabla;
+      - con -Confirmar hace DELETE FROM en las dos tablas,
+        PRAGMA wal_checkpoint(TRUNCATE) y VACUUM, para que las filas no queden
+        en paginas libres ni en el WAL;
+      - informa cuantas filas borro y el tamano de la base antes y despues;
+      - no toca ninguna otra tabla.
+
+    La purga corre en el mismo momento en que el gateway ya esta detenido para
+    "openclaw memory forget", asi que no hay una segunda ventana sin gateway.
+
+    NO se hace copia de respaldo de esas dos tablas: una copia conservaria
+    justo los datos que el consentimiento promete borrar. El resto de la base
+    no se respalda ni se modifica.
+
+    Esta purga se prueba el viernes 27, despues de los dos ensayos, antes de
+    usarla en el evento del sabado 28 (docs/LISTA_DEMO.md, seccion 7).
 
 .PARAMETER Confirmar
     Borra de verdad. Sin este interruptor el script solo muestra el resumen.
+
+.PARAMETER PurgarArchivos
+    Purga tambien las filas de session_transcript_archives y
+    session_transcript_cold_archives de la base SQLite del agente en WSL. En
+    modo de prueba solo las cuenta. make la activa junto con CONFIRMAR=1.
 
 .PARAMETER Distro
     Distribucion de WSL donde corre el gateway. Por defecto OpenClawGateway.
@@ -86,6 +117,11 @@
     Modo de prueba: muestra cuantas sesiones y archivos se borrarian.
 
 .EXAMPLE
+    powershell -ExecutionPolicy Bypass -File scripts\limpiar_evento.ps1 -PurgarArchivos
+
+    Modo de prueba con el conteo de los archivos archivados de las sesiones.
+
+.EXAMPLE
     powershell -ExecutionPolicy Bypass -File scripts\limpiar_evento.ps1 -Confirmar
 
     Borra de verdad. Detiene el gateway un momento para olvidar las memorias y
@@ -94,6 +130,7 @@
 [CmdletBinding()]
 param(
     [switch]$Confirmar,
+    [switch]$PurgarArchivos,
     [string]$Distro = 'OpenClawGateway',
     [string]$Agente = 'pana',
     [string]$Workspace = '\\wsl$\OpenClawGateway\home\openclaw\.openclaw\workspaces\pana',
@@ -110,7 +147,89 @@ $ArchivosWindows = @(
     (Join-Path $RaizRepo 'data\evaluacion\inyeccion.json')
 )
 $ArchivosVersionados = @('SOUL.md', 'AGENTS.md', 'USER.md', 'IDENTITY.md')
+$TablasArchivadas = @(
+    'session_transcript_archives',
+    'session_transcript_cold_archives'
+)
 $Fallos = New-Object System.Collections.Generic.List[string]
+
+# Ayudante que corre dentro de WSL con python3. Solo usa el modulo sqlite3 de la
+# biblioteca estandar; imprime lineas clave=valor que el script traduce.
+$ScriptPurga = @'
+import os
+import sqlite3
+import sys
+
+TABLAS = ("session_transcript_archives", "session_transcript_cold_archives")
+
+
+def tamano(ruta):
+    total = 0
+    for sufijo in ("", "-wal", "-shm"):
+        try:
+            total += os.path.getsize(ruta + sufijo)
+        except OSError:
+            pass
+    return total
+
+
+def main():
+    if len(sys.argv) < 3:
+        print("ERROR=uso: purga.py <base> <contar|purgar>")
+        return 2
+
+    ruta = sys.argv[1]
+    modo = sys.argv[2]
+    if modo not in ("contar", "purgar"):
+        print("ERROR=modo invalido: %s" % modo)
+        return 2
+    if not os.path.isfile(ruta):
+        print("ERROR=no existe la base: %s" % ruta)
+        return 1
+
+    print("TAMANO_ANTES=%d" % tamano(ruta))
+    conexion = sqlite3.connect(ruta, timeout=30, isolation_level=None)
+    try:
+        existentes = set(
+            fila[0]
+            for fila in conexion.execute(
+                "SELECT name FROM sqlite_master WHERE type = 'table' "
+                "AND name IN (?, ?)",
+                TABLAS,
+            )
+        )
+        for tabla in TABLAS:
+            if tabla not in existentes:
+                print("AUSENTE=%s" % tabla)
+                continue
+            filas = conexion.execute(
+                "SELECT count(*) FROM %s" % tabla
+            ).fetchone()[0]
+            print("FILAS_%s=%d" % (tabla, filas))
+            if modo != "purgar":
+                continue
+            conexion.execute("BEGIN IMMEDIATE")
+            borradas = conexion.execute("DELETE FROM %s" % tabla).rowcount
+            conexion.execute("COMMIT")
+            print("BORRADAS_%s=%d" % (tabla, borradas))
+        if modo == "purgar":
+            conexion.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+            conexion.execute("VACUUM")
+            conexion.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+    finally:
+        conexion.close()
+
+    print("TAMANO_DESPUES=%d" % tamano(ruta))
+    print("OK=1")
+    return 0
+
+
+try:
+    sys.exit(main())
+except Exception as error:
+    print("ERROR=%s" % str(error).replace("\n", " "))
+    sys.exit(1)
+'@
 
 function Invoke-OpenClaw {
     <#
@@ -176,6 +295,141 @@ function Esperar-Gateway {
         Start-Sleep -Seconds 1
     }
     return $false
+}
+
+function Get-RutaBaseAgente {
+    <#
+        Devuelve la ruta de la base SQLite del agente dentro de WSL. Usa el HOME
+        real de la distro y cae a /home/openclaw si no lo puede leer.
+    #>
+    $homeWsl = (@(& wsl -d $Distro -- printenv HOME 2>$null) |
+        ForEach-Object { [string]$_ }) -join ''
+    $homeWsl = $homeWsl.Trim()
+    if (-not $homeWsl.StartsWith('/')) { $homeWsl = '/home/openclaw' }
+    return "$homeWsl/.openclaw/agents/$Agente/agent/openclaw-agent.sqlite"
+}
+
+function Invoke-PurgaArchivos {
+    <#
+        Cuenta o purga las filas de session_transcript_archives y
+        session_transcript_cold_archives en la base SQLite del agente, con
+        python3 y sqlite3 dentro de WSL. Solo toca esas dos tablas. No hace
+        copia de respaldo: una copia conservaria lo que se quiere borrar.
+    #>
+    param(
+        [ValidateSet('contar', 'purgar')]
+        [string]$Modo = 'contar',
+        [string]$RutaBase
+    )
+
+    $salida = [pscustomobject]@{
+        Ok       = $false
+        Filas    = @{}
+        Borradas = @{}
+        Ausentes = @()
+        Antes    = $null
+        Despues  = $null
+        Error    = $null
+    }
+
+    $ayudanteWsl = "/tmp/limpiar_evento_purga_$PID.py"
+    $ayudanteWindows = "\\wsl$\$Distro\tmp\limpiar_evento_purga_$PID.py"
+
+    try {
+        [System.IO.File]::WriteAllText(
+            $ayudanteWindows,
+            $ScriptPurga,
+            (New-Object System.Text.UTF8Encoding($false))
+        )
+    } catch {
+        $salida.Error = "no se pudo escribir el ayudante en WSL: $($_.Exception.Message)"
+        return $salida
+    }
+
+    try {
+        $lineas = & wsl -d $Distro -- python3 $ayudanteWsl $RutaBase $Modo 2>$null
+        $codigo = $LASTEXITCODE
+    } finally {
+        Remove-Item -LiteralPath $ayudanteWindows -Force -ErrorAction SilentlyContinue
+    }
+
+    $texto = (@($lineas) | ForEach-Object { [string]$_ }) -join "`n"
+    foreach ($linea in ($texto -split "`n")) {
+        $linea = $linea.Trim()
+        if (-not $linea) { continue }
+        if ($linea -like 'ERROR=*') {
+            $salida.Error = $linea.Substring(6)
+        } elseif ($linea -like 'AUSENTE=*') {
+            $salida.Ausentes += $linea.Substring(8)
+        } elseif ($linea -like 'FILAS_*=*') {
+            $partes = $linea -split '=', 2
+            $salida.Filas[$partes[0].Substring(6)] = [int]$partes[1]
+        } elseif ($linea -like 'BORRADAS_*=*') {
+            $partes = $linea -split '=', 2
+            $salida.Borradas[$partes[0].Substring(9)] = [int]$partes[1]
+        } elseif ($linea -like 'TAMANO_ANTES=*') {
+            $salida.Antes = $linea.Substring(13)
+        } elseif ($linea -like 'TAMANO_DESPUES=*') {
+            $salida.Despues = $linea.Substring(15)
+        } elseif ($linea -eq 'OK=1') {
+            $salida.Ok = $true
+        }
+    }
+
+    if ($codigo -ne 0 -and -not $salida.Error) {
+        $salida.Error = "python3 devolvio el codigo $codigo"
+    }
+    return $salida
+}
+
+function Write-PurgaArchivos {
+    <#
+        Imprime el resultado de la purga: tablas ausentes, filas contadas o
+        borradas y el tamano de la base antes y despues.
+    #>
+    param(
+        [pscustomobject]$Resultado,
+        [bool]$Borrar
+    )
+
+    if ($null -eq $Resultado) { return }
+    if ($Resultado.Error) {
+        Write-Host "   No se pudo leer la base: $($Resultado.Error)" -ForegroundColor Red
+        return
+    }
+    if ($null -ne $Resultado.Antes) {
+        $etiqueta = if ($Borrar) { 'antes' } else { 'actual' }
+        Write-Host "   Tamano de la base ($etiqueta): $($Resultado.Antes) bytes"
+    }
+    foreach ($tabla in $TablasArchivadas) {
+        if ($Resultado.Ausentes -contains $tabla) {
+            Write-Host "   $tabla`: no existe (se omite)" -ForegroundColor Yellow
+            continue
+        }
+        if ($Borrar) {
+            $cuenta = 0
+            if ($Resultado.Borradas.ContainsKey($tabla)) {
+                $cuenta = $Resultado.Borradas[$tabla]
+            }
+            Write-Host "   $tabla`: $cuenta filas borradas"
+        } else {
+            $cuenta = 0
+            if ($Resultado.Filas.ContainsKey($tabla)) {
+                $cuenta = $Resultado.Filas[$tabla]
+            }
+            Write-Host "   $tabla`: $cuenta filas"
+        }
+    }
+    if ($Borrar) {
+        if ($Resultado.Ok) {
+            Write-Host '   WAL truncado (wal_checkpoint) y VACUUM: hechos'
+        }
+        if ($null -ne $Resultado.Despues) {
+            Write-Host "   Tamano de la base despues: $($Resultado.Despues) bytes"
+        }
+    } else {
+        Write-Host '   Solo se contaron las filas; con -Confirmar se borran.'
+    }
 }
 
 function Get-ArchivosWorkspace {
@@ -323,21 +577,37 @@ if ($claves.Count -gt 0) {
 }
 
 # ---------------------------------------------------------------------------
-#  2. Memorias derivadas
+#  2. Memorias derivadas y archivos archivados
 # ---------------------------------------------------------------------------
 
 Write-Host ''
-Write-Host '2. Memorias derivadas'
+Write-Host '2. Memorias derivadas y archivos archivados'
 
 $SesionesOlvidadas = 0
 $IndiceLimpiado = $false
+$Purga = $null
+$haySesiones = ($claves.Count -gt 0)
 
-if ($claves.Count -eq 0) {
+if (-not $Confirmar) {
+    if ($haySesiones) {
+        Write-Host "   Se olvidarian las memorias derivadas de $($claves.Count) sesiones."
+        Write-Host '   openclaw memory forget es offline-only: con -Confirmar el script'
+        Write-Host '   detiene el gateway, olvida, limpia el indice y lo vuelve a levantar.'
+    } else {
+        Write-Host '   No hay sesiones de las que olvidar memorias.'
+    }
+
+    if ($PurgarArchivos) {
+        $rutaBase = Get-RutaBaseAgente
+        Write-Host ''
+        Write-Host '   Archivos archivados'
+        Write-Host "   Base: $rutaBase"
+        $Purga = Invoke-PurgaArchivos -Modo 'contar' -RutaBase $rutaBase
+        Write-PurgaArchivos -Resultado $Purga -Borrar $false
+        if ($Purga.Error) { $Fallos.Add('purga: conteo de archivos') }
+    }
+} elseif (-not $haySesiones -and -not $PurgarArchivos) {
     Write-Host '   No hay sesiones de las que olvidar memorias.'
-} elseif (-not $Confirmar) {
-    Write-Host "   Se olvidarian las memorias derivadas de $($claves.Count) sesiones."
-    Write-Host '   openclaw memory forget es offline-only: con -Confirmar el script'
-    Write-Host '   detiene el gateway, olvida, limpia el indice y lo vuelve a levantar.'
 } else {
     Write-Host '   Deteniendo el gateway para tener propiedad exclusiva del estado...'
     $parada = Invoke-OpenClaw -Argumentos @('daemon', 'stop')
@@ -349,32 +619,47 @@ if ($claves.Count -eq 0) {
         $Fallos.Add('gateway no se detuvo')
     } else {
         try {
-            for ($inicio = 0; $inicio -lt $claves.Count; $inicio += $LoteMemorias) {
-                $fin = [Math]::Min($inicio + $LoteMemorias, $claves.Count) - 1
-                $lote = @($claves[$inicio..$fin])
+            if ($haySesiones) {
+                for ($inicio = 0; $inicio -lt $claves.Count; $inicio += $LoteMemorias) {
+                    $fin = [Math]::Min($inicio + $LoteMemorias, $claves.Count) - 1
+                    $lote = @($claves[$inicio..$fin])
 
-                $argumentos = @('memory', 'forget', '--agent', $Agente)
-                foreach ($clave in $lote) {
-                    $argumentos += @('--session', $clave)
+                    $argumentos = @('memory', 'forget', '--agent', $Agente)
+                    foreach ($clave in $lote) {
+                        $argumentos += @('--session', $clave)
+                    }
+
+                    $resultado = Invoke-OpenClaw -Argumentos $argumentos
+                    if ($resultado.Codigo -eq 0) {
+                        $SesionesOlvidadas += $lote.Count
+                    } else {
+                        $Fallos.Add("memory forget lote $([int]($inicio / $LoteMemorias) + 1)")
+                        Write-Host "   Olvido: fallo el lote $([int]($inicio / $LoteMemorias) + 1) (codigo $($resultado.Codigo))" -ForegroundColor Red
+                    }
                 }
 
-                $resultado = Invoke-OpenClaw -Argumentos $argumentos
-                if ($resultado.Codigo -eq 0) {
-                    $SesionesOlvidadas += $lote.Count
+                Write-Host '   Limpiando el indice derivado y la cache de embeddings...'
+                $limpieza = Invoke-OpenClaw -Argumentos @(
+                    'memory', 'reset', '--agent', $Agente, '--yes'
+                )
+                if ($limpieza.Codigo -eq 0) {
+                    $IndiceLimpiado = $true
                 } else {
-                    $Fallos.Add("memory forget lote $([int]($inicio / $LoteMemorias) + 1)")
-                    Write-Host "   Olvido: fallo el lote $([int]($inicio / $LoteMemorias) + 1) (codigo $($resultado.Codigo))" -ForegroundColor Red
+                    Write-Host "   No se pudo limpiar el indice (codigo $($limpieza.Codigo))." -ForegroundColor Yellow
                 }
+            } else {
+                Write-Host '   No hay sesiones de las que olvidar memorias.'
             }
 
-            Write-Host '   Limpiando el indice derivado y la cache de embeddings...'
-            $limpieza = Invoke-OpenClaw -Argumentos @(
-                'memory', 'reset', '--agent', $Agente, '--yes'
-            )
-            if ($limpieza.Codigo -eq 0) {
-                $IndiceLimpiado = $true
-            } else {
-                Write-Host "   No se pudo limpiar el indice (codigo $($limpieza.Codigo))." -ForegroundColor Yellow
+            if ($PurgarArchivos) {
+                # Misma ventana sin gateway: no hay un segundo apagado.
+                $rutaBase = Get-RutaBaseAgente
+                Write-Host ''
+                Write-Host '   Archivos archivados'
+                Write-Host "   Base: $rutaBase"
+                $Purga = Invoke-PurgaArchivos -Modo 'purgar' -RutaBase $rutaBase
+                Write-PurgaArchivos -Resultado $Purga -Borrar $true
+                if ($Purga.Error) { $Fallos.Add('purga: archivos archivados') }
             }
         } finally {
             Write-Host '   Volviendo a levantar el gateway...'
@@ -459,17 +744,35 @@ foreach ($ruta in $ArchivosWindows) {
 #  5. Resumen
 # ---------------------------------------------------------------------------
 
+$PurgaFilas = 0
+$PurgaBorradas = 0
+if ($null -ne $Purga) {
+    foreach ($tabla in $TablasArchivadas) {
+        if ($Purga.Filas.ContainsKey($tabla)) { $PurgaFilas += $Purga.Filas[$tabla] }
+        if ($Purga.Borradas.ContainsKey($tabla)) { $PurgaBorradas += $Purga.Borradas[$tabla] }
+    }
+}
+
 Write-Host ''
 Write-Host 'RESUMEN'
 if ($Confirmar) {
     Write-Host "  Sesiones borradas:              $SesionesBorradas de $($claves.Count)"
     Write-Host "  Sesiones con memoria olvidada:  $SesionesOlvidadas"
     Write-Host "  Indice derivado limpiado:       $(if ($IndiceLimpiado) { 'si' } else { 'no' })"
+    if ($PurgarArchivos) {
+        Write-Host "  Filas archivadas borradas:      $PurgaBorradas"
+        if ($null -ne $Purga -and $null -ne $Purga.Antes) {
+            Write-Host "  Base del agente:                $($Purga.Antes) -> $($Purga.Despues) bytes"
+        }
+    }
     Write-Host "  Archivos borrados en WSL:       $ArchivosWorkspaceBorrados"
     Write-Host "  Archivos borrados en Windows:   $ArchivosWindowsBorrados"
 } else {
     Write-Host "  Sesiones que se borrarian:      $SesionesBorradas de $($claves.Count)"
     Write-Host "  Memorias que se olvidarian:     $($claves.Count) sesiones"
+    if ($PurgarArchivos) {
+        Write-Host "  Filas archivadas que se borrarian: $PurgaFilas"
+    }
     Write-Host "  Archivos de WSL que se borrarian: $ArchivosWorkspaceBorrados"
     Write-Host "  Archivos de Windows que se borrarian: $ArchivosWindowsBorrados"
     Write-Host ''
@@ -477,12 +780,19 @@ if ($Confirmar) {
     Write-Host '    make limpiar-evento CONFIRMAR=1'
 }
 Write-Host ''
-Write-Host 'Nota 1: los archivos archivados de las sesiones borradas quedan en la'
-Write-Host 'base SQLite del agente dentro de WSL (session_transcript_archives y'
-Write-Host 'session_transcript_cold_archives). memory forget borra lo derivado y'
-Write-Host 'memory reset limpia el indice; OpenClaw 2026.11.6 no expone un comando'
-Write-Host 'para purgar el blob archivado. Queda local y no sale del equipo; el'
-Write-Host 'procedimiento manual esta en la cabecera del script.'
+if ($PurgarArchivos) {
+    Write-Host 'Nota 1: los archivos archivados de las sesiones borradas viven en la'
+    Write-Host 'base SQLite del agente dentro de WSL (session_transcript_archives y'
+    Write-Host 'session_transcript_cold_archives). Con -PurgarArchivos se borran sus'
+    Write-Host 'filas, se trunca el WAL y se hace VACUUM, sin tocar ninguna otra'
+    Write-Host 'tabla y sin copia de respaldo: una copia conservaria justo lo que el'
+    Write-Host 'consentimiento promete borrar.'
+} else {
+    Write-Host 'Nota 1: los archivos archivados de las sesiones borradas siguen en la'
+    Write-Host 'base SQLite del agente dentro de WSL (session_transcript_archives y'
+    Write-Host 'session_transcript_cold_archives). Agrega -PurgarArchivos para'
+    Write-Host 'contarlos en modo de prueba y borrarlos con -Confirmar.'
+}
 Write-Host ''
 Write-Host 'Nota 2: el canal de WhatsApp no se toca. Los perfiles, consentimientos'
 Write-Host 'y casos son de Darley y se borran aparte.'

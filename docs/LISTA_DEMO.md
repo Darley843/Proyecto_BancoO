@@ -402,14 +402,28 @@ herramientas, el WhatsApp de los invitados ni la seguridad.
       make limpiar-evento CONFIRMAR=1     # borra de verdad
       ```
       Lista y borra las sesiones del agente `pana`, olvida sus memorias
-      derivadas (detiene el gateway un momento y lo vuelve a levantar), borra
-      `MEMORY.md`, la bitácora y `DREAMS.md` del workspace, y borra
+      derivadas (detiene el gateway un momento y lo vuelve a levantar), purga
+      los archivos archivados de esas sesiones, borra `MEMORY.md`, la bitácora
+      y `DREAMS.md` del workspace, y borra
       `data/asistente/trazas/herramientas.jsonl` y
       `data/evaluacion/inyeccion.json`. No toca los archivos versionados
       (`SOUL`, `AGENTS`, `USER`, `IDENTITY`) ni los `.example`, no imprime el
       token ni el contenido de las sesiones y no borra la sesión principal
-      `agent:pana:main`, que OpenClaw protege. Queda una nota con lo que no se
-      puede purgar y por qué.
+      `agent:pana:main`, que OpenClaw protege.
+      **Archivos archivados.** `sessions delete` guarda el transcript en las
+      tablas `session_transcript_archives` y
+      `session_transcript_cold_archives` de `openclaw-agent.sqlite`, dentro de
+      WSL. `CONFIRMAR=1` activa también `-PurgarArchivos`: en la misma ventana
+      en que el gateway está detenido para `memory forget`, python3 y el módulo
+      `sqlite3` dentro de WSL comprueban que las dos tablas existan, hacen
+      `DELETE FROM` en ellas, `PRAGMA wal_checkpoint(TRUNCATE)` y `VACUUM`, y
+      reportan las filas borradas y el tamaño de la base antes y después. **No
+      hay copia de respaldo de esas dos tablas**: una copia conservaría justo
+      los datos que el consentimiento promete borrar. No se toca ninguna otra
+      tabla. En modo de prueba solo se cuentan las filas; el conteo se ve con
+      `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\limpiar_evento.ps1 -PurgarArchivos`.
+      Esa purga **se prueba el viernes 27 después de los ensayos**, antes de
+      usarla en el evento del sábado 28.
       Al apagar el evento los consentimientos aceptados **se conservan**. Los
       perfiles, consentimientos y casos del canal de WhatsApp son de Darley y
       se borran aparte: el script no los toca.

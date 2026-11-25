@@ -287,24 +287,33 @@ Qué hace, en orden:
    `openclaw memory reset --agent pana --yes` y vuelve a arrancar el gateway
    (`openclaw daemon start`) en un bloque `finally`, aunque algo falle. En modo
    de prueba no detiene nada: solo informa qué olvidaría.
-4. Borra `MEMORY.md`, `DREAMS.md` y todo el contenido de
+4. Purga los archivos archivados de las sesiones en la base SQLite del agente
+   dentro de WSL (`openclaw-agent.sqlite`), con python3 y el módulo `sqlite3`:
+   comprueba que existan `session_transcript_archives` y
+   `session_transcript_cold_archives` (si falta alguna, lo avisa y sigue),
+   cuenta sus filas en modo de prueba y, con `-Confirmar`, hace `DELETE FROM`
+   en las dos, `PRAGMA wal_checkpoint(TRUNCATE)` y `VACUUM`. Esa purga corre en
+   la misma ventana en que el gateway ya está detenido para el olvido, informa
+   cuántas filas borró y el tamaño de la base antes y después, no toca ninguna
+   otra tabla y no deja copia de respaldo de esas dos.
+5. Borra `MEMORY.md`, `DREAMS.md` y todo el contenido de
    `memory\` del workspace de WSL, incluidos `dreaming\` y
    `.dreams\session-corpus\`. Nunca toca los `.example` ni los archivos
    versionados `SOUL.md`, `AGENTS.md`, `USER.md` e `IDENTITY.md`.
-5. Borra en Windows `data/asistente/trazas/herramientas.jsonl` y
+6. Borra en Windows `data/asistente/trazas/herramientas.jsonl` y
    `data/evaluacion/inyeccion.json` si existen.
 
 **Archivos archivados.** `openclaw sessions delete` archiva el transcript
-dentro de la base SQLite del agente (`openclaw-agent.sqlite`, tablas
-`session_transcript_archives` y `session_transcript_cold_archives`); por diseño,
-esos archivos retenidos pueden seguir siendo elegibles para la búsqueda de
-memoria. `memory forget` borra las memorias y los artefactos derivados de las
-sesiones indicadas, y `memory reset` limpia el índice derivado y la caché de
-embeddings. OpenClaw 2026.11.6 no expone un comando que purgue el blob
-archivado del transcript. Ese blob queda local, dentro de WSL, y no sale del
-equipo; si de verdad hay que purgarlo, el procedimiento manual (no lo hace el
-script) es detener el gateway, respaldar `openclaw-agent.sqlite`, borrar las
-filas de esas dos tablas por `session_id` y volver a arrancar el gateway.
+dentro de la base SQLite del agente (tablas `session_transcript_archives` y
+`session_transcript_cold_archives`); por diseño, esos archivos retenidos pueden
+seguir siendo elegibles para la búsqueda de memoria. OpenClaw 2026.11.6 no
+expone un comando que purgue ese blob, y la promesa del consentimiento es
+borrar los datos de los invitados. Por eso `-PurgarArchivos` hace la purga
+dentro de WSL sobre `~/.openclaw/agents/pana/agent/openclaw-agent.sqlite`, sin
+copia de respaldo de esas dos tablas (una copia conservaría lo que se quiere
+borrar). El resto de la base no se respalda ni se modifica. Esa purga se prueba
+el viernes después de los ensayos, antes de usarla el sábado
+([`LISTA_DEMO.md`](./LISTA_DEMO.md), sección 7).
 
 **Canal de WhatsApp.** El script no toca perfiles, consentimientos ni casos
 del canal: son de Darley y se borran aparte. Al apagar el evento los

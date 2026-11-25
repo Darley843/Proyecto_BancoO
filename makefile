@@ -192,8 +192,8 @@ probar-openclaw: ## Prueba el cliente de OpenClaw contra el gateway (requiere OP
 	$(UV) run python scripts/probar_openclaw.py $(if $(PREGUNTA),--texto "$(PREGUNTA)",)
 
 .PHONY: limpiar-evento
-limpiar-evento: ## Borra los datos de los invitados de OpenClaw al terminar el evento (prueba; CONFIRMAR=1 borra)
-	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/limpiar_evento.ps1 $(if $(CONFIRMAR),-Confirmar,)
+limpiar-evento: ## Borra los datos de los invitados de OpenClaw al terminar el evento (prueba; CONFIRMAR=1 borra y purga los archivos archivados)
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/limpiar_evento.ps1 $(if $(CONFIRMAR),-Confirmar -PurgarArchivos,)
 # Plan B de la escena. Depende de la tarea 7.2 de Darley
 # (`escena/__main__.py`), que todavía no existe: el objetivo queda listo y no
 # se ejecuta hasta que entre esa tarea. No modifica ni reemplaza `make simular`.
