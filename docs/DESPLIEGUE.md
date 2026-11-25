@@ -14,8 +14,8 @@ llenan cuando su pieza entre a `main`; mientras tanto dicen qué va a ir ahí.
 | [2. Código, datos y app](#2-código-datos-y-app) | Yoldy | Listo |
 | [3. WhatsApp por Meta](#3-whatsapp-por-meta) | Darley | Listo con el número de prueba; ⏳ SIM nueva y modo evento |
 | [4. Túnel](#4-túnel) | Darley | Listo |
-| [5. Gateway de OpenClaw](#5-gateway-de-openclaw) | Nayla | Configuración y workspace listos; ⏳ arranque, MCP y auditoría |
-| [6. Servidor MCP y herramientas](#6-servidor-mcp-y-herramientas) | Nayla | Listo el MCP de solo lectura; ⏳ las 20 herramientas |
+| [5. Gateway de OpenClaw](#5-gateway-de-openclaw) | Nayla | Listo |
+| [6. Servidor MCP y herramientas](#6-servidor-mcp-y-herramientas) | Nayla | Listo |
 | [7. Pantalla de la escena](#7-pantalla-de-la-escena) | Yoldy | Listo |
 | [8. Encender todo en orden](#8-encender-todo-en-orden) | Todos | Listo; ⏳ se completa con 3, 5 y 6 |
 | [9. Comprobar de punta a punta](#9-comprobar-de-punta-a-punta) | Todos | Listo |
@@ -128,17 +128,61 @@ guardar**. Si no está instalado:
 OpenSpec `agente-openclaw`.
 
 **Dónde corre.** El gateway corre dentro de **WSL**, en la distribución
-`OpenClawGateway`, con el usuario `openclaw`. Si el computador no permite la
-red espejo de WSL, el plan B es instalar el gateway directo en Windows (⏳ lo
-confirma Nayla en la tarea 1.7).
+`OpenClawGateway`, con el usuario `openclaw`.
+
+**Arranque.** Deja abierta una pestaña de PowerShell con la distribución
+levantada:
+
+```powershell
+wsl -d OpenClawGateway
+```
+
+Para reiniciar el gateway sin entrar a la distribución:
+
+```powershell
+wsl -d OpenClawGateway -- openclaw daemon restart
+```
+
+Y para revisar que responde:
+
+```powershell
+wsl -d OpenClawGateway -- openclaw health
+```
+
+`openclaw mcp doctor` y `mcp probe` solo funcionan con el gateway **apagado**:
+con el demonio arriba no ven las herramientas. Se detiene, se comprueba y se
+vuelve a arrancar:
+
+```powershell
+wsl -d OpenClawGateway -- openclaw daemon stop
+wsl -d OpenClawGateway -- openclaw mcp doctor sucursal --probe
+wsl -d OpenClawGateway -- openclaw daemon start
+```
+
+**Red espejo.** El gateway vive en WSL y el servidor MCP en Windows, en
+`127.0.0.1:8765`. En `%USERPROFILE%\.wslconfig` se declara:
+
+```ini
+[wsl2]
+networkingMode=mirrored
+```
+
+y se reinicia WSL desde PowerShell:
+
+```powershell
+wsl --shutdown
+```
+
+Con eso el gateway alcanza el MCP en `127.0.0.1:8765`, así que el plan B de
+instalar el gateway directo en Windows no fue necesario.
 
 | Tema | Cómo queda |
 |---|---|
 | Escucha | `127.0.0.1:18789` (`bind: loopback`): no sale a la red local ni a internet |
-| Autenticación | Token en cada petición. Hoy el token real está en la configuración del gateway en WSL, no en un almacén de secretos; al exportar la configuración al repo, `scripts\exportar_config_openclaw.ps1` lo reemplaza por `${OPENCLAW_GATEWAY_TOKEN}`. ⏳ Miércoles 25: moverlo a un almacén de secretos con `openclaw secrets configure` |
+| Autenticación | Token en cada petición. El token real sigue en la configuración del gateway en WSL, protegida con `chmod 700`; al exportar la configuración al repo, `scripts\exportar_config_openclaw.ps1` lo reemplaza por `${OPENCLAW_GATEWAY_TOKEN}`. Moverlo a un almacén de secretos queda para después de la entrega |
 | API | `POST /v1/chat/completions` activado (misma forma que OpenAI). El canal manda `user = "wa:<huella>"`: cada invitado tiene su hilo y el número nunca viaja |
 | Modelo | `deepseek/deepseek-flash` principal y `deepseek/deepseek-v4-pro` alternativo |
-| Agente `pana` | Perfil de herramientas `minimal` con lista `deny` (sin terminal, archivos, navegador, mensajes propios ni subagentes), `skills: []` y `thinkingDefault: "off"` (responde más rápido) |
+| Agente `pana` | Perfil de herramientas `minimal` con lista `deny` (sin terminal, archivos, navegador, mensajes propios ni subagentes), `skills: []`, `thinkingDefault: "off"` (sin razonamiento, responde más rápido), `dreaming` apagado en `memory-core` y sin tareas programadas |
 | Archivos | `tools.fs.workspaceOnly: true` y sin permisos elevados |
 | Canal WhatsApp del gateway | **Apagado**: WhatsApp va solo por Meta (sección 3) |
 
@@ -162,10 +206,11 @@ con pinta de clave):
 powershell -ExecutionPolicy Bypass -File scripts\exportar_config_openclaw.ps1
 ```
 
-**⏳ Por completar (Nayla):** el comando para arrancar el gateway, cómo se
-conecta al MCP (sección 6), el token en el almacén de secretos, el resultado de
-`openclaw security audit` y la comprobación de que el hilo sobrevive a un
-reinicio.
+**Auditoría de seguridad.** `openclaw security audit` no reporta ninguna
+crítica y deja dos advertencias justificadas. El resultado y la razón de cada
+una están en la sección
+[«Auditoría de seguridad»](../openclaw/README.md#auditoría-de-seguridad) de
+`openclaw/README.md`.
 
 **Respaldo.** Si el gateway no responde, el canal contesta con el grafo actual.
 Para forzarlo durante la demo: `$env:OPENCLAW_ACTIVO = "0"` antes de `make app`
@@ -178,21 +223,67 @@ respuesta del agente, y en la traza se ve qué herramienta eligió.
 
 *Mantiene: Nayla, con las herramientas de Darley y Anny.*
 
-**Hoy (en `main`)**: un servidor MCP de solo lectura por stdio, sin puertos,
-con `consultar_tasa`, `simular_cuota` y `buscar_en_boveda`. Detalle en
-[`MCP.md`](./MCP.md).
+El servidor `sucursal-agente` expone las **20 herramientas** del agente por HTTP
+en `127.0.0.1:8765/mcp` (tabla en el
+[README](../README.md#las-20-herramientas)). Se arranca en su propia pestaña:
 
 ```powershell
-uv run python -m banco_occidente_corpus.mcp_servidor
+make agente-mcp      # servidor MCP en 127.0.0.1:8765/mcp
+make herramientas    # lista las 20 y sus esquemas Pydantic (JSON=1 para JSON)
+make traza           # últimas llamadas, sin textos libres ni datos personales
 ```
 
-**⏳ Por completar**: el servidor `sucursal-agente` por HTTP en `127.0.0.1:8765`
-(se arranca con `make agente-mcp`, tarea 1.6) con las **20
-herramientas** (tabla en el [README](../README.md#las-20-herramientas)), cómo
-se conecta al gateway (`openclaw mcp add`, `openclaw mcp tools`, `openclaw mcp
-probe`), la lista de herramientas permitidas y, si el gateway corre en WSL, la
-red espejo (`networkingMode=mirrored`). Las herramientas que borran datos o
-crean casos (`olvidar_mis_datos`, `solicitar_asesor`) **piden confirmación**.
+`make herramientas` imprime nombre, dueña, entrada y salida de cada una;
+`make traza` lee la traza local de cada llamada. **Ollama tiene que estar
+encendido**, porque `buscar_en_documentos` consulta la Bóveda. Después de
+cambiar el código de las herramientas hay que reiniciar `make agente-mcp`: el
+gateway no recarga el proceso por su cuenta.
+
+**Cómo lo ve el gateway.** `openclaw/openclaw.json` declara el servidor con la
+lista cerrada de veinte herramientas:
+
+```json
+"mcp": {
+  "servers": {
+    "sucursal": {
+      "url": "http://127.0.0.1:8765/mcp",
+      "transport": "streamable-http",
+      "enabled": true,
+      "connectionTimeoutMs": 5000,
+      "requestTimeoutMs": 8000,
+      "toolFilter": {
+        "include": [
+          "consultar_tasa", "simular_cuota", "verificar_usura",
+          "diagnosticar_capacidad", "comparar_escenario", "convocar_comite",
+          "calcular_prestamo_gota", "comparar_gota_banco", "negociar_opcion",
+          "generar_ficha_opcion", "responder_sobre_proyecto",
+          "registrar_consentimiento", "olvidar_mis_datos", "solicitar_asesor",
+          "consultar_caso", "generar_tarjeta_pana", "buscar_en_documentos",
+          "consultar_tarifas", "clasificar_pregunta", "auditar_respuesta"
+        ]
+      }
+    }
+  }
+}
+```
+
+El perfil `minimal` de Pana no expone los servidores MCP por sí solo, así que su
+política de herramientas incluye `bundle-mcp` además de la lista `deny`:
+
+```json
+"agents": { "entries": { "pana": { "tools": { "alsoAllow": ["bundle-mcp"] } } } }
+```
+
+Con eso, el gateway solo ve las veinte: lo que no está en `toolFilter.include`
+no existe para el agente. Para comprobarlo,
+`openclaw mcp doctor sucursal --probe` devuelve `sucursal: ok`; recuerda que ese
+comando corre con el gateway apagado (sección 5). Desde WSL, el gateway alcanza
+`127.0.0.1:8765` por la red espejo.
+
+Las herramientas que borran datos o crean casos (`olvidar_mis_datos`,
+`solicitar_asesor`) **piden confirmación**. El servidor de solo lectura por
+stdio (`uv run python -m banco_occidente_corpus.mcp_servidor`, detalle en
+[`MCP.md`](./MCP.md)) sigue disponible para pruebas sin puerto.
 
 ## 7. Pantalla de la escena
 

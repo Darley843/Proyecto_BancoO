@@ -234,3 +234,22 @@ Lo que **nunca** entra a este archivo: el token del gateway, claves de
 proveedores, contraseñas, teléfonos ni rutas con datos de personas. Si el
 script falla en el paso de comprobación, no lo fuerces: agrega el patrón que
 falta al `deny` correspondiente o corrige el valor en WSL.
+
+## Auditoría de seguridad
+
+`openclaw security audit` es la compuerta antes de la etiqueta `entrega-final`
+y se corre también antes de la demo. Resultado del 24 de noviembre de 2026:
+**0 hallazgos críticos** y **2 advertencias justificadas**.
+
+Las dos advertencias son de configuración esperada en una demo que corre en un
+solo computador, y están cubiertas por las mitigaciones de esta guía: `bind:
+loopback`, autenticación por token, canal de WhatsApp del gateway apagado,
+`skills: []`, la lista `deny` de herramientas y `tools.fs.workspaceOnly` con
+permisos elevados desactivados.
+
+La decisión pendiente es el **token del gateway**: sigue en la configuración de
+WSL, protegida con `chmod 700`, y la copia versionada solo lleva
+`${OPENCLAW_GATEWAY_TOKEN}`. Moverlo a `openclaw secrets configure` queda para
+después de la entrega. Ninguna de las dos advertencias permite ejecutar
+comandos, leer archivos fuera del workspace ni alcanzar el gateway desde otra
+máquina, así que no bloquean la entrega.

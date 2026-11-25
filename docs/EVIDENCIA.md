@@ -64,20 +64,28 @@ En el agente, el resto lo decide el modelo con las reglas de `AGENTS.md`.
 | ⏳ Un invitado no registrado entra solo con consentimiento y dentro de la ventana | Prueba conjunta del miércoles | `canal/modo_evento.py`, `test/test_canal_modo_evento.py` | Pendiente |
 | ⏳ No se guardan números ni nombres y el tope por huella no se salta reiniciando | Prueba conjunta del miércoles | Base del canal y registros | Pendiente |
 
+## Ítems de Nayla — 24 de noviembre de 2026
+
+Todo lo de esta sección se comprobó el 24 de noviembre de 2026 con el gateway
+en WSL y el MCP en `127.0.0.1:8765`.
+
+| Qué se afirma | Cómo se comprueba | Dónde | Resultado |
+|---|---|---|---|
+| El router elige la herramienta según la pregunta y no busca cuando lo saludan | `make traza` | Traza de `sucursal` (`data/asistente/traza.jsonl`, no versionada), `herramientas/traza.py` | «¿Cuál es la tasa de un CDT a 360 días por 10 millones?» llamó `sucursal__consultar_tasa`; «Hola, buenas tardes» no llamó ninguna herramienta |
+| La memoria por capas conserva el hilo por huella aunque se reinicie el gateway | Petición a la API con `user: "wa:huella-prueba-memoria"` y reinicio del gateway | `openclaw/workspace/pana/MEMORY.md.example`, `memory/AAAA-MM-DD.md.example` (locales y en `.gitignore`) | Después del reinicio el agente recordó el personaje (Lucía y su moto); `MEMORY.md` y la bitácora son locales y sin datos de invitados |
+| El gateway escucha solo en loopback, exige token y declara modelo principal y alternativo | Revisión del archivo versionado y `diff` contra la configuración de WSL | `openclaw/openclaw.json` (#190 y #189) | Copia versionada sin secretos (`${OPENCLAW_GATEWAY_TOKEN}`), `bind: "loopback"`, `deepseek/deepseek-flash` con alternativo `deepseek/deepseek-v4-pro` |
+| El workspace define a Pana y respeta los límites del proyecto | Tres preguntas al agente (proyecto, aprobación y configuración) | `openclaw/workspace/pana/` (`SOUL.md`, `AGENTS.md`, `USER.md`, `IDENTITY.md`), #190 | Se presenta como proyecto académico, no promete aprobaciones y no revela su configuración |
+| El gateway ve las 20 herramientas y solo esas | `openclaw mcp doctor sucursal --probe` (con el gateway apagado) | `openclaw/openclaw.json` (`mcp.servers.sucursal.toolFilter`), `mcp_servidor/agente.py` (#189 y #208) | `sucursal: ok` y la lista cerrada de 20 herramientas |
+| La auditoría del gateway queda sin críticas y las herramientas peligrosas están bloqueadas | `openclaw security audit` | `openclaw/README.md` («Auditoría de seguridad»), `openclaw/openclaw.json` (`agents.entries.pana.tools.deny`, `tools.fs.workspaceOnly`), #209 | De 7 a 2 advertencias y 0 críticas; las herramientas peligrosas quedan bloqueadas, `exec.security: deny` no rompe el MCP y las sesiones están aisladas entre agentes |
+
 ## Ítems del resto del equipo
 
 | Ítem | Responsable | Qué falta documentar aquí |
 |---|---|---|
 | 1.1 Herramientas 1 a 16 | Nayla y Darley | ⏳ Archivo, pruebas y PR de cada herramienta |
-| 1.2 Razonamiento y router | Nayla | ⏳ Traza donde se vea qué herramienta eligió el agente y que no busca ante un saludo |
-| 1.3 Memoria por capas | Nayla y Darley | ⏳ Hilo por huella que sobrevive al reinicio; `MEMORY.md` sin datos personales |
 | 2.1 Pipeline del M1 | Todos | ⏳ Comando que reconstruye el corpus y conserva la fuente |
-| 3.1 Gateway de OpenClaw | Nayla | ⏳ `openclaw/openclaw.json`, loopback y token, modelo alternativo |
 | 3.2 WhatsApp en producción | Darley | ⏳ SIM real en Meta, modo evento y prueba desde tres teléfonos |
-| 3.3 Workspace | Nayla | ⏳ `openclaw/workspace/pana/` y la bitácora |
-| 3.4 Skill o MCP | Nayla | ⏳ servidor `sucursal-agente` en `127.0.0.1:8765` (tarea 1.6) y `openclaw mcp tools` con las 20 |
 | 4.1 Código y pruebas | Todos | `make check` en verde: 2534 pruebas en main (sin red, sin DeepSeek y sin Ollama) |
-| 4.2 Seguridad (gateway) | Nayla | ⏳ `openclaw security audit` sin hallazgos altos, sandbox, `tools.deny`, `fs.workspaceOnly` |
 | 4.3 Documentación | Yoldy | README, `docs/DESPLIEGUE.md` (#191), `docs/DIAGRAMAS.md` (#192), LICENSE MIT (#194) |
 | 5.1 y 5.2 Pitch y discusión técnica | Todos | ⏳ Guion del pitch de 7 minutos y reparto de la discusión |
 
