@@ -120,7 +120,36 @@ Para cambiar un retrato basta con reemplazar el `.webp` con el mismo nombre
 | Núcleo (tecla N) | **plan B**: sigue solo con Don Gota, Pana y el auditor, sin repetir lo ya dicho, y deja la escena en pausa |
 | Trazabilidad (tecla T) | muestra u oculta el panel para quien facilita (empieza oculto) |
 | Herramientas (tecla H) | muestra u oculta, a la vista del público, las últimas herramientas que usó Pana: nombre, dueña, si salió bien y cuánto tardó. Lee `GET /api/herramientas/traza` cada 2 s solo mientras está abierto; nunca muestra argumentos ni huellas. Con el servidor MCP apagado dice que todavía no hay llamadas |
-| Reiniciar (tecla R) | vuelve al inicio con la escena completa y borra la escena guardada en la pestaña |
+| En vivo (tecla E) | entra o sale del **modo en vivo**: deja la escena guardada en pausa y reproduce, en orden, los turnos que publican el canal y las herramientas mientras el voluntario escribe por WhatsApp. Ver [Modo en vivo](#modo-en-vivo-tecla-e) |
+| Reiniciar (tecla R) | vuelve al inicio con la escena completa y borra la escena guardada en la pestaña  (en vivo: vuelve a pedir la lista desde el principio) |
+
+## Modo en vivo (tecla E)
+
+Contrato completo: [`ESCENA_EN_VIVO.md`](./ESCENA_EN_VIVO.md), §11. La
+pantalla lo implementa en `app/web/escena/envivo.js`.
+
+- **Entrar (E o botón «En vivo»).** Pausa la escena guardada, limpia el
+  escenario y pide `GET /api/escena/en-vivo?desde=0`. Muestra los turnos que ya
+  existan y luego los nuevos.
+- **Sondeo.** Cada 2 s, una petición a la vez, con techo de 1,5 s y sin caché.
+  Con la pestaña oculta se detiene y al volver pide de inmediato. El cursor
+  `desde` vive solo en memoria.
+- **Cola.** Se ordena y se deduplica por `seq`, y suena un turno a la vez. Un
+  turno que no cumple el contrato no se dice: la barra muestra «Turno
+  descartado» y la cola sigue.
+- **Quién habla.** Pana, Don Gota, los dos agentes y el auditor con su voz. El
+  **invitado** (el voluntario escribiendo por WhatsApp) sale **solo en
+  subtítulo**, con la etiqueta «Invitado», en su propia silla, y se lee
+  entre 2 y 6 segundos. Con **S** nadie usa la voz.
+- **Teclas en vivo.** **P** pausa o reanuda la cola (sigue llegando lo nuevo),
+  **Espacio** corta el turno actual y sigue con el próximo, **R** vuelve a
+  pedir la lista desde el principio. **Q**, **N** y **V** salen primero del
+  modo en vivo para no mezclar las dos escenas.
+- **Barra de estado.** «En vivo · esperando el primer turno», el último `seq`,
+  cuántos turnos hay en cola o «Sin conexión (reintentando)». Nunca muestra
+  datos personales.
+- **Salir (E otra vez).** Para el sondeo, vacía la cola y devuelve la escena
+  guardada al mismo turno en que estaba, en pausa.
 
 ## Plan B en la pantalla
 

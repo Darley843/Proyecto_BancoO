@@ -119,6 +119,10 @@ h2 {
 .escena__personaje--agente_joven { color: var(--agente_joven); }
 .escena__personaje--agente_banco { color: var(--agente_banco); }
 .escena__personaje--auditor { color: var(--auditor); }
+.escena__personaje--invitado { color: var(--joven); }
+/* El invitado solo tiene silla en el modo en vivo: la escena guardada sigue con seis. */
+.escena:not(.escena--en-vivo) .escena__personaje--invitado { display: none; }
+.escena--en-vivo .escena__personajes { grid-template-columns: repeat(7, minmax(0, 1fr)); }
 .escena__figura { fill: currentColor; }
 
 .escena__nombre { font-weight: 700; font-size: 15px; text-align: center; color: var(--texto); }
@@ -191,6 +195,7 @@ h2 {
 .escena__quien--agente_joven { color: var(--agente_joven); }
 .escena__quien--agente_banco { color: var(--agente_banco); }
 .escena__quien--auditor { color: var(--auditor); }
+.escena__quien--invitado { color: var(--joven); }
 .escena__origen { font: 500 11px var(--fuente-cifras); letter-spacing: .06em; text-transform: uppercase; padding: 2px 7px; border: 1px solid var(--linea); border-radius: 3px; color: var(--tenue); }
 .escena__error { color: var(--rojo); font-weight: 800; }
 .escena__texto { margin: 8px 0 0; font-size: clamp(20px, 2.4vw, 34px); line-height: 1.3; min-height: 2.6em; }
@@ -204,6 +209,19 @@ h2 {
 .escena__casilla { display: inline-flex; align-items: center; gap: 8px; font-size: 15px; cursor: pointer; }
 .escena__casilla input { width: 18px; height: 18px; accent-color: var(--pana); }
 .escena__estado { font: 13px var(--fuente-cifras); color: var(--tenue); }
+
+/* Modo «En vivo» (tecla E): botón con punto rojo y barra de estado. */
+.escena__controles .escena__boton--vivo { background: transparent; color: var(--texto); border: 1px solid var(--rojo); }
+.escena__controles .escena__boton--vivo::before { content: "●"; color: var(--rojo); margin-right: 6px; }
+.escena__controles .escena__boton--vivo[aria-pressed="true"] { background: var(--rojo); color: var(--sala); }
+.escena__controles .escena__boton--vivo[aria-pressed="true"]::before { color: var(--sala); }
+.escena__envivo { color: var(--texto); overflow-wrap: anywhere; }
+.escena__envivo[hidden] { display: none; }
+.escena--en-vivo .escena__barra { box-shadow: inset 0 -3px 0 var(--rojo); }
+@media (prefers-reduced-motion: no-preference) {
+  .escena__controles .escena__boton--vivo[aria-pressed="true"]::before { animation: escena-latido 1.2s ease-in-out infinite; }
+}
+@keyframes escena-latido { 50% { opacity: 0.35; } }
 
 /* ---------- Preguntas del público ---------- */
 .escena__pregunta { margin: 0 0 8px; font-size: clamp(16px, 1.6vw, 22px); color: var(--joven); font-style: italic; }
@@ -320,6 +338,7 @@ h2 {
 @media (max-width: 900px) {
   .escena__pantalla { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto auto; }
   .escena__personajes { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .escena--en-vivo .escena__personajes { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .escena__panel { grid-row: auto; grid-column: 1; border-left: 0; border-top: 1px solid var(--linea); }
   .escena__subtitulos { grid-row: 3; }
 }

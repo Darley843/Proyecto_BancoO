@@ -48,6 +48,7 @@
 
   <div class="escena__controles">
     <button type="button" id="escena-reproducir">Empezar</button>
+    <button type="button" id="escena-en-vivo" class="escena__boton--vivo" aria-pressed="false">En vivo (E)</button>
     <button type="button" id="escena-siguiente" class="escena__boton--secundario">Siguiente turno</button>
     <button type="button" id="escena-reiniciar" class="escena__boton--secundario">Reiniciar</button>
     <button type="button" id="escena-preguntar" class="escena__boton--secundario">Preguntas (Q)</button>
@@ -59,10 +60,11 @@
       <input type="checkbox" id="escena-solo-subtitulos">
       Solo subtítulos (respaldo)
     </label>
+    <span class="escena__estado escena__envivo" id="escena-envivo-estado" role="status" hidden></span>
     <span class="escena__estado" id="escena-modo"></span>
     <span class="escena__estado" id="escena-contador"></span>
     <span class="escena__estado" id="escena-voz"></span>
-    <span class="escena__estado">Teclas: Espacio siguiente · P reproducir/pausar · S subtítulos · Q preguntas · N núcleo · T trazabilidad · H herramientas · R reiniciar</span>
+    <span class="escena__estado">Teclas: Espacio siguiente · P reproducir/pausar · S subtítulos · Q preguntas · N núcleo · T trazabilidad · H herramientas · E en vivo · R reiniciar</span>
   </div>
 
   <section class="escena__captura" id="escena-captura" aria-label="Entrada del voluntario" hidden>
