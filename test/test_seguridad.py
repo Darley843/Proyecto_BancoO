@@ -51,6 +51,8 @@ RUTAS_IGNORADAS: tuple[str, ...] = (
     "data/asistente/perfil.sqlite",
     "data/escena/proyectado.json",
     "data/escena/nucleo.json",
+    "data/escena/en_vivo.jsonl",
+    "data/escena/en_vivo.lock",
 )
 
 #: Patrones de claves de API que no deben aparecer en archivos versionados.
