@@ -535,7 +535,7 @@ Respuesta (modelo Pydantic cerrado, `extra="forbid"`):
 | Línea inválida | Se ignora; la ruta no falla por una línea a medias o corrupta. |
 | Escritura | Ninguna: no crea archivos, no abre SQLite, no toca el bloqueo. |
 | Caché | `Cache-Control: no-store`; la pantalla pide `cache: "no-store"`. |
-| Host y túnel | La app escucha en 127.0.0.1, pero el túnel de cloudflared reenvía desde 127.0.0.1, así que eso no protege la ruta. Mientras el túnel esté abierto, toda petición que llegue por él (cabecera Cf-Connecting-IP o Cf-Ray) y no vaya a /webhooks/whatsapp responde 404. Lo ideal es un listener aparte solo para el webhook (127.0.0.1:8001) con el túnel apuntando a él. |
+| Host y túnel | La app escucha en 127.0.0.1, pero el túnel de cloudflared reenvía desde 127.0.0.1, así que el loopback no protege la ruta. La superficie pública la acota el middleware `solo_webhook_por_tunel` de `app.py` (#229): si la petición trae `CF-Ray`, `CF-Connecting-IP` o `X-Forwarded-For`, o un `Host` no local, solo pasan `/webhooks/whatsapp` y `/health`; el resto responde 404 sin confirmar qué rutas existen. No se levanta un listener aparte: el túnel sigue apuntando a `127.0.0.1:8000`. `/health` queda público porque el runbook lo consulta desde la URL del túnel y solo devuelve el estado operativo (si hay índice, fragmentos y modelo de embeddings), sin rutas, claves ni datos de clientes. |
 | Errores | 422 para `desde` inválido; 200 con lista vacía para archivo ausente o interruptor apagado. |
 
 La ruta no devuelve la ruta del archivo, ni el bloqueo, ni la huella, ni el
@@ -729,7 +729,7 @@ openspec validate agente-openclaw --strict
 10. El ensayo completo dura menos de seis minutos y el facilitador puede
     explicar la limitación de §9.5 sin leer el documento.
 11. Desde la URL del túnel, `/api/escena/en-vivo`, `/escena.html` y `/`
-    responden 404; solo `/webhooks/whatsapp` responde.
+    responden 404; solo `/webhooks/whatsapp` y `/health` responden.
 
 Si falla un punto 1, 2, 5, 6, 7, 8 u 11, **no se enciende la escena en vivo**
 para la demo: se usa el plan B. Los puntos 3, 4, 9 y 10 pueden quedar en rojo
