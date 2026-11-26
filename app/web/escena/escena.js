@@ -59,6 +59,8 @@ import {
 } from "./contrato.js";
 import { crearSondeo, pideVoz, registrosNuevos, tiempoDeLectura } from "./envivo.js";
 import { detenerMicrofono, escuchando, escuchar, hayMicrofono } from "./microfono.js";
+import { paraVoz } from "./voz_cifras.js";
+import { paraPantalla } from "./pantalla_cifras.js";
 import {
   CLAVE_COMPLETA,
   CLAVE_NUCLEO,
@@ -327,7 +329,7 @@ function mostrar(indice) {
     crear("span", `escena__quien escena__quien--${turno.personaje}`, FICHAS[turno.personaje].nombre),
     crear("span", "escena__origen", turno.origen),
   );
-  subtitulo.textContent = turno.subtitulo || turno.texto;
+  subtitulo.textContent = paraPantalla(turno.subtitulo || turno.texto);
   pintarPanel(turno);
   pintarTraza(turno);
   porId("escena-contador").textContent = `Turno ${indice + 1} de ${estado.turnos.length}`;
@@ -527,7 +529,7 @@ function decir(turno) {
       window.setTimeout(listo, lectura);
       return;
     }
-    decirComo(turno.personaje, turno.texto, { alTerminar: listo })
+    decirComo(turno.personaje, paraVoz(turno.texto), { alTerminar: listo })
       .then((voz) => {
         porId("escena-voz").textContent = voz === "piper" ? "Voz: Piper" : voz === "navegador" ? "Voz: navegador" : "";
       })
@@ -784,7 +786,7 @@ function hablarPana(turno, pregunta) {
     crear("span", "escena__quien escena__quien--pana", FICHAS.pana.nombre),
     crear("span", "escena__origen", turno.origen),
   );
-  porId("escena-texto").textContent = turno.texto;
+  porId("escena-texto").textContent = paraPantalla(turno.texto);
   return decir(turno);
 }
 
