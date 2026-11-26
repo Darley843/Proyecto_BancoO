@@ -103,6 +103,23 @@ def test_el_readme_explica_tunel_y_meta() -> None:
         assert pieza in readme, pieza
 
 
+def test_el_despliegue_dice_donde_va_la_url_del_tunel() -> None:
+    """El despliegue señala el único campo de Meta y el arranque por ventana."""
+    texto = (RAIZ / "docs" / "DESPLIEGUE_WHATSAPP.md").read_text(encoding="utf-8")
+
+    for pieza in (
+        "URL de devolución de llamada",
+        "whatsapp-business/wa-settings",
+        "/webhooks/whatsapp",
+        "Verificar y guardar",
+        "WHATSAPP_ID_SALT",
+        "WHATSAPP_EVENTO",
+        "..\\whatsapp-env.ps1",
+        "127.0.0.1:8000",
+    ):
+        assert pieza in texto, pieza
+
+
 def test_el_despliegue_explica_que_solo_el_webhook_es_publico() -> None:
     """El runbook dice qué rutas quedan públicas y cómo comprobarlo desde fuera."""
     texto = (RAIZ / "docs" / "DESPLIEGUE_WHATSAPP.md").read_text(encoding="utf-8")
