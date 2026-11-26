@@ -941,7 +941,7 @@ def auditar_respuesta(
                     reglas=(),
                 ),
                 orden=90,
-            ),
+            ).model_copy(update={"hallazgos": todos}),
         )
     )
     return ok(

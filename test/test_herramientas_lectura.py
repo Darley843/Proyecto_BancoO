@@ -299,6 +299,45 @@ def test_auditar_respuesta_publica_el_turno_del_auditor(escena_viva: Path) -> No
     assert turnos[0]["origen"] == "reglas"
 
 
+def test_el_turno_publicado_del_auditor_trae_los_hallazgos(escena_viva: Path) -> None:
+    """Con una promesa de aprobación el turno publicado no dice «conforme»."""
+    salida = lectura.auditar_respuesta("Tu crédito está aprobado y te lo garantizo.")
+    assert salida.ok
+    assert salida.datos["veredicto"] == "objeta"
+
+    turnos = _turnos(_publicados(escena_viva))
+    assert len(turnos) == 1
+    assert turnos[0]["hallazgos"]
+    assert "conforme" not in str(turnos[0]["texto"])
+
+
+def test_el_turno_publicado_del_auditor_limpio_sigue_conforme(escena_viva: Path) -> None:
+    """Un texto limpio publica el veredicto conforme y sin hallazgos."""
+    salida = lectura.auditar_respuesta("Todo tiene su fuente y cada frase está sustentada.")
+    assert salida.ok
+    assert salida.datos["veredicto"] == "conforme"
+
+    turnos = _turnos(_publicados(escena_viva))
+    assert len(turnos) == 1
+    assert turnos[0]["hallazgos"] == []
+    assert "conforme" in str(turnos[0]["texto"])
+
+
+def test_el_cambio_de_veredicto_no_se_oculta_como_turno_repetido(escena_viva: Path) -> None:
+    """Pasar de conforme a objeta publica un turno nuevo, no lo descarta."""
+    conforme = lectura.auditar_respuesta("Todo tiene su fuente y cada frase está sustentada.")
+    objeta = lectura.auditar_respuesta("Tu crédito está aprobado y te lo garantizo.")
+    assert conforme.datos["veredicto"] == "conforme"
+    assert objeta.datos["veredicto"] == "objeta"
+
+    turnos = _turnos(_publicados(escena_viva))
+    assert len(turnos) == 2
+    assert turnos[0]["hallazgos"] == []
+    assert "conforme" in str(turnos[0]["texto"])
+    assert turnos[1]["hallazgos"]
+    assert "conforme" not in str(turnos[1]["texto"])
+
+
 def test_generar_ficha_opcion_publica_un_turno_de_pana(escena_viva: Path) -> None:
     """La ficha viaja como texto equivalente, nunca como PNG en la lista."""
     salida = lectura.generar_ficha_opcion(RESPUESTAS)
