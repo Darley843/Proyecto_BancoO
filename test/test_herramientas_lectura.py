@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import json
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 
+from banco_occidente_corpus.escena import en_vivo
 from banco_occidente_corpus.herramientas import lectura
 
 RESPUESTAS = [
@@ -217,3 +219,134 @@ def test_auditar_respuesta_acepta_las_cifras_legibles_de_la_herramienta() -> Non
     )
     assert salida.ok
     assert salida.datos["veredicto"] == "conforme"
+
+
+# --- Escena en vivo: las herramientas publican sus turnos -----------------------
+
+
+@pytest.fixture
+def escena_viva(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    """Enciende el interruptor y manda la lista a una carpeta temporal."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    ruta = tmp_path / "escena" / "en_vivo.jsonl"
+    monkeypatch.setattr(en_vivo, "RUTA_EN_VIVO", ruta)
+    return ruta
+
+
+def _publicados(ruta: Path) -> list[dict[str, object]]:
+    """Lee todos los turnos publicados en la lista temporal."""
+    registros, _ = en_vivo.leer_turnos(0, limite=1000, ruta=ruta)
+    return [dict(registro) for registro in registros]
+
+
+def _turnos(registros: list[dict[str, object]]) -> list[dict[str, object]]:
+    """Extrae los turnos de los registros de la lista."""
+    return [dict(registro["turno"]) for registro in registros]  # type: ignore[arg-type]
+
+
+def test_calcular_prestamo_gota_publica_cuatro_turnos_de_don_gota(escena_viva: Path) -> None:
+    """Don Gota deja sus cuatro turnos con origen de herramienta."""
+    salida = lectura.calcular_prestamo_gota(1_000_000)
+    assert salida.ok
+
+    registros = _publicados(escena_viva)
+    assert len(registros) == 4
+    assert all(registro["origen"] == "herramienta" for registro in registros)
+    turnos = _turnos(registros)
+    assert [turno["personaje"] for turno in turnos] == ["don_gota"] * 4
+    assert [turno["orden"] for turno in turnos] == [1, 2, 3, 4]
+    assert [int(registro["seq"]) for registro in registros] == sorted(
+        int(registro["seq"]) for registro in registros
+    )
+
+
+def test_comparar_gota_banco_publica_tres_turnos_de_pana(escena_viva: Path) -> None:
+    """La comparación deja golpe, tasa y ley como turnos de Pana."""
+    salida = lectura.comparar_gota_banco(1_000_000, RESPUESTAS)
+    assert salida.ok
+
+    turnos = _turnos(_publicados(escena_viva))
+    assert len(turnos) == 3
+    assert [turno["personaje"] for turno in turnos] == ["pana"] * 3
+    assert [turno["orden"] for turno in turnos] == [8, 9, 10]
+
+
+def test_negociar_opcion_publica_solo_los_dos_agentes(
+    escena_viva: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """La negociación publica de uno a cuatro turnos de los dos agentes."""
+    monkeypatch.setenv("SUCURSAL_DEMO", "1")
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+    salida = lectura.negociar_opcion(RESPUESTAS)
+    assert salida.ok
+
+    turnos = _turnos(_publicados(escena_viva))
+    assert 1 <= len(turnos) <= 4
+    assert {turno["personaje"] for turno in turnos} <= {"agente_joven", "agente_banco"}
+
+
+def test_auditar_respuesta_publica_el_turno_del_auditor(escena_viva: Path) -> None:
+    """Aun cuando objeta, el veredicto es parte de la escena."""
+    salida = lectura.auditar_respuesta("Tu crédito está aprobado y te lo garantizo.")
+    assert salida.ok
+    assert salida.datos["veredicto"] == "objeta"
+
+    turnos = _turnos(_publicados(escena_viva))
+    assert len(turnos) == 1
+    assert turnos[0]["personaje"] == "auditor"
+    assert turnos[0]["orden"] == 90
+    assert turnos[0]["origen"] == "reglas"
+
+
+def test_generar_ficha_opcion_publica_un_turno_de_pana(escena_viva: Path) -> None:
+    """La ficha viaja como texto equivalente, nunca como PNG en la lista."""
+    salida = lectura.generar_ficha_opcion(RESPUESTAS)
+    assert salida.ok
+
+    turnos = _turnos(_publicados(escena_viva))
+    assert len(turnos) == 1
+    assert turnos[0]["personaje"] == "pana"
+    assert turnos[0]["id"] == "vivo.ficha.v1"
+    assert turnos[0]["subtitulo"] == "Ficha de la opción"
+    assert turnos[0]["texto"] == salida.datos["texto"]
+
+
+def test_apagado_las_herramientas_no_publican(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """Sin el interruptor no se crea la carpeta de la escena en vivo."""
+    monkeypatch.delenv("ESCENA_EN_VIVO", raising=False)
+    ruta = tmp_path / "escena" / "en_vivo.jsonl"
+    monkeypatch.setattr(en_vivo, "RUTA_EN_VIVO", ruta)
+
+    assert lectura.calcular_prestamo_gota(1_000_000).ok
+    assert lectura.comparar_gota_banco(1_000_000, RESPUESTAS).ok
+    assert lectura.auditar_respuesta("Don Gota cobra 20 % mensual.").ok
+    assert lectura.generar_ficha_opcion(RESPUESTAS).ok
+
+    assert not ruta.parent.exists()
+
+
+def test_un_error_de_la_herramienta_no_publica(escena_viva: Path) -> None:
+    """Si la herramienta devuelve error, la lista queda vacía."""
+    salida = lectura.comparar_gota_banco(1_000_000, ["respuesta.invalida"])
+    assert not salida.ok
+    assert _publicados(escena_viva) == []
+
+
+def test_si_la_publicacion_falla_la_herramienta_responde_igual(
+    escena_viva: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """La publicación es un efecto lateral: un fallo no cambia el sobre."""
+
+    def fallar(*_args: object, **_kwargs: object) -> tuple[int, ...]:
+        raise OSError("disco lleno")
+
+    monkeypatch.setattr(lectura, "publicar_turnos", fallar)
+    salida = lectura.calcular_prestamo_gota(1_000_000)
+
+    assert salida.ok
+    assert salida.datos["cuota_diaria_legible"] == "$40.000"
