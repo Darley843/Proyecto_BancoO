@@ -23,9 +23,16 @@
  * micrófono: la persona del público pregunta y Pana responde con voz y
  * subtítulos, solo sobre el proyecto (`anfitrion.js`).
  *
+ * Modo «En vivo» (tecla E o su botón): la pantalla deja la escena guardada en
+ * pausa y reproduce, en orden de `seq`, los turnos que publican el canal de
+ * WhatsApp y las herramientas de Pana (`envivo.js`, `docs/ESCENA_EN_VIVO.md`).
+ * El invitado sale solo en subtítulos, en su propia silla. Al salir, la
+ * escena guardada vuelve al mismo punto.
+ *
  * Teclado: Espacio o → pasa al siguiente turno, P reproduce o pausa, S activa
  * el modo solo subtítulos, Q abre o cierra las preguntas, N pasa al núcleo,
- * T muestra la trazabilidad y R vuelve al inicio.
+ * T muestra la trazabilidad, E entra o sale del modo en vivo y R vuelve al
+ * inicio (en vivo: vuelve a pedir la lista desde el principio).
  */
 
 import { decirComo, detenerVoz } from "../voz.js";
@@ -39,9 +46,9 @@ import { montarCaptura } from "./captura.js";
 import { montarHerramientas } from "./herramientas.js";
 import {
   PASOS,
+  PERSONAJES,
   PASO_PREGUNTAS,
   PASO_PRESENTACION,
-  PERSONAJES,
   TEXTO_VEREDICTO,
   erroresDelTurno,
   erroresDelVeredicto,
@@ -50,6 +57,7 @@ import {
   pasoDelTurno,
   veredictoDeHallazgos,
 } from "./contrato.js";
+import { crearSondeo, pideVoz, registrosNuevos, tiempoDeLectura } from "./envivo.js";
 import { detenerMicrofono, escuchando, escuchar, hayMicrofono } from "./microfono.js";
 import {
   CLAVE_COMPLETA,
@@ -71,6 +79,7 @@ const FICHAS = Object.freeze({
   agente_joven: { nombre: "Agente del joven" },
   agente_banco: { nombre: "Agente del banco" },
   auditor: { nombre: "Auditor" },
+  invitado: { nombre: "Invitado" },
 });
 
 /** Escena precalculada, su núcleo y los turnos de ejemplo. */
@@ -104,6 +113,7 @@ const estado = {
   indice: -1,
   paso: -1,
   reproduciendo: false,
+  generacion: 0,
   cifras: new Map(),
   vistos: new Set(),
   escenario: null,
@@ -116,7 +126,18 @@ const estado = {
   sellos: {},
   traza: false,
   auditorHablo: false,
+  vivo: {
+    activo: false,
+    pausado: false,
+    cola: [],
+    conectado: true,
+    descarte: "",
+    guardado: null,
+  },
 };
+
+/** Sondeo de la lista en vivo (se crea al iniciar la pantalla). */
+let sondeo = null;
 
 /**
  * Atajo para buscar un elemento por id.
@@ -148,7 +169,7 @@ function crear(etiqueta, clase = "", texto = "") {
 }
 
 /**
- * Arma el escenario (seis personajes) y la barra de pasos.
+ * Arma el escenario con los personajes del contrato y la barra de pasos.
  *
  * @returns {void}
  */
@@ -272,8 +293,10 @@ function mostrar(indice) {
     subtitulo.textContent = errores.join(" · ");
     return false;
   }
+  // En vivo no hay presentación: todos los turnos son de la escena.
+  const largoIntroduccion = estado.vivo.activo ? 0 : estado.largoIntroduccion;
   estado.paso =
-    indice < estado.largoIntroduccion
+    indice < largoIntroduccion
       ? PASO_PRESENTACION
       : pasoDelTurno(turno, Math.min(estado.paso, PASO_PREGUNTAS - 1));
   estado.vistos.add(turno.personaje);
@@ -289,8 +312,13 @@ function mostrar(indice) {
     estado.todas.set(claveDeLaCifra(cifra), cifra);
   }
   // En la presentación el auditor solo se presenta: aún no hay veredicto.
-  if (turno.personaje === "auditor" && indice >= estado.largoIntroduccion) {
+  if (turno.personaje === "auditor" && indice >= largoIntroduccion) {
     estado.auditorHablo = true;
+    if (estado.vivo.activo) {
+      // En vivo no hay veredicto precalculado: sale de los hallazgos del turno
+      // del auditor, así la trazabilidad (T) lo conserva hasta el final.
+      estado.veredicto = { veredicto: veredictoDeHallazgos(turno.hallazgos), hallazgos: turno.hallazgos };
+    }
   }
   iluminar(turno.personaje);
   marcarPasos();
@@ -303,6 +331,7 @@ function mostrar(indice) {
   pintarPanel(turno);
   pintarTraza(turno);
   porId("escena-contador").textContent = `Turno ${indice + 1} de ${estado.turnos.length}`;
+  pintarEstadoEnVivo();
   return true;
 }
 
@@ -478,18 +507,24 @@ async function cambiarANucleo() {
  * Dice el turno con la voz de su personaje, o espera lo que tarda leerlo.
  *
  * El joven es la persona voluntaria: habla en persona, así que su turno solo
- * se muestra en subtítulos.
+ * se muestra en subtítulos. El invitado (el voluntario escribiendo por
+ * WhatsApp en el modo en vivo) tampoco tiene voz.
  *
  * @param {object} turno Turno ya mostrado.
  * @returns {Promise<void>} Se resuelve cuando termina de sonar.
  */
 function decir(turno) {
-  const soloSubtitulos = porId("escena-solo-subtitulos").checked || turno.personaje === "joven";
+  const casilla = porId("escena-solo-subtitulos").checked;
+  const soloSubtitulos = turno.personaje === "joven" || !pideVoz(turno.personaje, casilla);
   const caja = porId(`personaje-${turno.personaje}`);
   caja.classList.toggle("escena__personaje--mudo", soloSubtitulos);
+  const texto = turno.subtitulo || turno.texto;
+  const lectura = estado.vivo.activo
+    ? tiempoDeLectura(texto)
+    : Math.max(LECTURA_MINIMA_MS, turno.texto.length * MS_POR_LETRA);
   return new Promise((listo) => {
     if (soloSubtitulos) {
-      window.setTimeout(listo, Math.max(LECTURA_MINIMA_MS, turno.texto.length * MS_POR_LETRA));
+      window.setTimeout(listo, lectura);
       return;
     }
     decirComo(turno.personaje, turno.texto, { alTerminar: listo })
@@ -497,9 +532,10 @@ function decir(turno) {
         porId("escena-voz").textContent = voz === "piper" ? "Voz: Piper" : voz === "navegador" ? "Voz: navegador" : "";
       })
       .catch(() => {
-        // Si la voz falla, el turno ya está en subtítulos: se sigue sin esperar.
-        porId("escena-voz").textContent = "Voz: falló";
-        listo();
+        // Si la voz falla (o el navegador bloquea el audio), el turno ya está
+        // en subtítulos: en vivo se deja leer; si no, se sigue sin esperar.
+        porId("escena-voz").textContent = estado.vivo.activo ? "Voz bloqueada: solo subtítulos" : "Voz: falló";
+        window.setTimeout(listo, estado.vivo.activo ? lectura : 0);
       });
   });
 }
@@ -518,7 +554,7 @@ function esperar(ms) {
  * Reproduce desde el turno actual hasta el final o hasta que se pause.
  *
  * En modo solo subtítulos avanza de a un turno por clic, para que quien
- * presenta lleve el ritmo.
+ * presenta lleve el ritmo; en vivo sigue solo, con el tiempo de lectura.
  *
  * @returns {Promise<void>} Se resuelve al terminar o al pausar.
  */
@@ -527,18 +563,27 @@ async function reproducir() {
     return;
   }
   estado.reproduciendo = true;
+  // Cada pausa abre una generación nueva: un bucle viejo que despierta tarde
+  // (por ejemplo, el temporizador de un subtítulo) ya no avanza la escena.
+  const generacion = estado.generacion;
   actualizarBotones();
-  while (estado.reproduciendo && estado.indice < estado.turnos.length - 1) {
+  while (
+    estado.reproduciendo &&
+    generacion === estado.generacion &&
+    estado.indice < estado.turnos.length - 1
+  ) {
     estado.indice += 1;
     if (mostrar(estado.indice)) {
       await decir(estado.turnos[estado.indice]);
     }
-    if (porId("escena-solo-subtitulos").checked) {
+    if (porId("escena-solo-subtitulos").checked && !estado.vivo.activo) {
       break;
     }
     await esperar(PAUSA_ENTRE_TURNOS_MS);
   }
-  estado.reproduciendo = false;
+  if (generacion === estado.generacion) {
+    estado.reproduciendo = false;
+  }
   actualizarBotones();
 }
 
@@ -549,17 +594,24 @@ async function reproducir() {
  */
 function pausar() {
   estado.reproduciendo = false;
+  estado.generacion += 1;
   detenerVoz();
   actualizarBotones();
 }
 
 /**
- * Muestra el siguiente turno sin esperar a la voz anterior.
+ * Muestra el siguiente turno sin esperar a la voz anterior (en vivo, sin
+ * pausa, la cola sigue sola desde ese turno).
  *
  * @returns {void}
  */
 function siguiente() {
   pausar();
+  if (estado.vivo.activo && !estado.vivo.pausado) {
+    // En vivo, Espacio corta el turno actual y la cola sigue sola.
+    reproducir();
+    return;
+  }
   if (estado.indice < estado.turnos.length - 1) {
     estado.indice += 1;
     if (mostrar(estado.indice)) {
@@ -622,14 +674,19 @@ function prepararInicio() {
 function actualizarBotones() {
   const alFinal = estado.indice >= estado.turnos.length - 1;
   const reproducirBoton = porId("escena-reproducir");
-  reproducirBoton.textContent = estado.reproduciendo
-    ? "Pausar"
-    : estado.indice < 0
-      ? "Empezar"
-      : alFinal
-        ? "Terminó"
-        : "Seguir";
-  reproducirBoton.disabled = !estado.reproduciendo && alFinal;
+  if (estado.vivo.activo) {
+    reproducirBoton.textContent = estado.vivo.pausado ? "Seguir (en vivo)" : "Pausar";
+    reproducirBoton.disabled = false;
+  } else {
+    reproducirBoton.textContent = estado.reproduciendo
+      ? "Pausar"
+      : estado.indice < 0
+        ? "Empezar"
+        : alFinal
+          ? "Terminó"
+          : "Seguir";
+    reproducirBoton.disabled = !estado.reproduciendo && alFinal;
+  }
   porId("escena-siguiente").disabled = alFinal;
   porId("escena-nucleo").disabled = estado.modo === "nucleo" || estado.original.length === 0;
 }
@@ -786,23 +843,279 @@ function teclado(evento) {
     evento.preventDefault();
     siguiente();
   } else if (tecla === "p") {
-    estado.reproduciendo ? pausar() : reproducir();
+    alternarReproduccion();
   } else if (tecla === "s") {
     const casilla = porId("escena-solo-subtitulos");
     casilla.checked = !casilla.checked;
   } else if (tecla === "q") {
-    estado.preguntas ? cerrarPreguntas() : abrirPreguntas();
+    alternarPreguntas();
   } else if (tecla === "v") {
     document.dispatchEvent(new CustomEvent("escena:captura"));
   } else if (tecla === "n") {
-    cambiarANucleo();
+    irAlNucleo();
   } else if (tecla === "t") {
     alternarTraza();
   } else if (tecla === "h") {
     document.dispatchEvent(new CustomEvent("escena:herramientas"));
+  } else if (tecla === "e") {
+    alternarEnVivo();
   } else if (tecla === "r") {
+    reiniciarSegunModo();
+  }
+}
+
+/**
+ * P o el botón principal: reproduce o pausa. En vivo pausa o reanuda la cola
+ * sin dejar de pedir turnos nuevos.
+ *
+ * @returns {void}
+ */
+function alternarReproduccion() {
+  if (estado.vivo.activo) {
+    estado.vivo.pausado = !estado.vivo.pausado;
+    if (estado.vivo.pausado) {
+      pausar();
+    } else {
+      reproducir();
+    }
+    actualizarBotones();
+    pintarEstadoEnVivo();
+    return;
+  }
+  estado.reproduciendo ? pausar() : reproducir();
+}
+
+/**
+ * Q o su botón: las preguntas no se mezclan con la lista en vivo, así que
+ * primero se sale del modo en vivo.
+ *
+ * @returns {void}
+ */
+function alternarPreguntas() {
+  salirEnVivo();
+  estado.preguntas ? cerrarPreguntas() : abrirPreguntas();
+}
+
+/**
+ * N, su botón o el evento `escena:nucleo`: el núcleo es de la escena
+ * guardada, así que primero se sale del modo en vivo.
+ *
+ * @returns {Promise<void>} Se resuelve al quedar el núcleo listo.
+ */
+function irAlNucleo() {
+  salirEnVivo();
+  return cambiarANucleo();
+}
+
+/**
+ * R o el botón Reiniciar: en vivo vuelve a pedir la lista desde el principio;
+ * si no, reinicia la escena guardada.
+ *
+ * @returns {void}
+ */
+function reiniciarSegunModo() {
+  if (estado.vivo.activo) {
+    reiniciarEnVivo();
+  } else {
     reiniciar();
   }
+}
+
+/**
+ * Deja limpio el escenario para la lista en vivo (sin tocar la escena guardada).
+ *
+ * @returns {void}
+ */
+function limpiarParaEnVivo() {
+  pausar();
+  estado.turnos = [];
+  estado.vivo.cola = [];
+  estado.vivo.descarte = "";
+  estado.indice = -1;
+  estado.paso = -1;
+  estado.cifras = new Map();
+  estado.todas = new Map();
+  estado.vistos = new Set();
+  estado.escenario = null;
+  estado.veredicto = null;
+  estado.auditorHablo = false;
+  iluminar("");
+  marcarPasos();
+  porId("escena-quien").replaceChildren();
+  porId("escena-pregunta").hidden = true;
+  porId("escena-texto").textContent = "En vivo: esperando el primer turno del voluntario.";
+  porId("escena-escenario").replaceChildren(crear("span", "escena__chip", "Esperando al voluntario"));
+  porId("escena-cifras").replaceChildren();
+  porId("escena-sin-cifras").hidden = false;
+  porId("escena-caja-hallazgos").hidden = true;
+  porId("escena-semaforo").dataset.color = "";
+  porId("escena-semaforo-texto").textContent = "Semáforo sin calcular";
+  porId("escena-contador").textContent = "0 turnos";
+  pintarTraza(null);
+}
+
+/**
+ * Entra al modo en vivo: guarda el punto de la escena, limpia y empieza a
+ * pedir la lista desde `desde=0`.
+ *
+ * @returns {void}
+ */
+function entrarEnVivo() {
+  if (estado.vivo.activo) {
+    return;
+  }
+  cerrarPreguntas();
+  pausar();
+  estado.vivo.guardado = {
+    turnos: estado.turnos,
+    indice: estado.indice,
+    paso: estado.paso,
+    cifras: estado.cifras,
+    todas: estado.todas,
+    vistos: estado.vistos,
+    escenario: estado.escenario,
+    veredicto: estado.veredicto,
+    auditorHablo: estado.auditorHablo,
+    modo: estado.modo,
+    selloOculto: porId("escena-sello").hidden,
+  };
+  estado.vivo.activo = true;
+  estado.vivo.pausado = false;
+  estado.vivo.conectado = true;
+  estado.modo = "en_vivo";
+  limpiarParaEnVivo();
+  // El sello habla de la escena guardada (ejemplo o sin servidor), no de la lista.
+  porId("escena-sello").hidden = true;
+  porId("escena-modo").textContent = "";
+  porId("escena-en-vivo").setAttribute("aria-pressed", "true");
+  document.body.classList.add("escena--en-vivo");
+  porId("escena-envivo-estado").hidden = false;
+  pintarEstadoEnVivo();
+  actualizarBotones();
+  sondeo.iniciar();
+}
+
+/**
+ * Sale del modo en vivo: para el sondeo, vacía la cola y deja la escena
+ * guardada en pausa, en el mismo punto en que estaba.
+ *
+ * @returns {void}
+ */
+function salirEnVivo() {
+  if (!estado.vivo.activo) {
+    return;
+  }
+  sondeo.detener();
+  pausar();
+  const guardado = estado.vivo.guardado;
+  estado.vivo.activo = false;
+  estado.vivo.pausado = false;
+  estado.vivo.cola = [];
+  estado.vivo.guardado = null;
+  const { selloOculto, ...escenaGuardada } = guardado;
+  Object.assign(estado, escenaGuardada);
+  porId("escena-sello").hidden = selloOculto;
+  porId("escena-en-vivo").setAttribute("aria-pressed", "false");
+  document.body.classList.remove("escena--en-vivo");
+  porId("escena-envivo-estado").hidden = true;
+  porId("escena-modo").textContent = estado.modo === "nucleo" ? "Núcleo" : "";
+  if (estado.indice >= 0 && mostrar(estado.indice)) {
+    actualizarBotones();
+    return;
+  }
+  prepararInicio();
+}
+
+/**
+ * E o el botón «En vivo»: entra o sale del modo.
+ *
+ * @returns {void}
+ */
+function alternarEnVivo() {
+  if (estado.vivo.activo) {
+    salirEnVivo();
+  } else {
+    entrarEnVivo();
+  }
+}
+
+/**
+ * R en vivo: cola vacía y la lista otra vez desde `desde=0`.
+ *
+ * @returns {void}
+ */
+function reiniciarEnVivo() {
+  estado.vivo.pausado = false;
+  limpiarParaEnVivo();
+  pintarEstadoEnVivo();
+  actualizarBotones();
+  sondeo.reiniciar();
+}
+
+/**
+ * Añade a la cola los turnos nuevos de la lista y, si no está en pausa, los
+ * reproduce uno a la vez.
+ *
+ * @param {object[]} registros Registros `{seq, ts, origen, turno}` de la ruta.
+ * @returns {void}
+ */
+function recibirEnVivo(registros) {
+  if (!estado.vivo.activo) {
+    return;
+  }
+  const { nuevos, descartados } = registrosNuevos(estado.vivo.cola, registros);
+  if (descartados.length > 0) {
+    estado.vivo.descarte = descartados[descartados.length - 1];
+  }
+  if (nuevos.length > 0) {
+    estado.vivo.cola.push(...nuevos);
+    estado.turnos.push(...nuevos.map((registro) => registro.turno));
+    if (!estado.vivo.pausado) {
+      reproducir();
+    }
+  }
+  pintarEstadoEnVivo();
+  actualizarBotones();
+}
+
+/**
+ * Guarda si la ruta respondió en el último sondeo y lo muestra.
+ *
+ * @param {{conectado: boolean}} estadoDelSondeo Estado que avisa `envivo.js`.
+ * @returns {void}
+ */
+function cambioDeConexion({ conectado }) {
+  estado.vivo.conectado = conectado;
+  pintarEstadoEnVivo();
+}
+
+/**
+ * Pinta la barra del modo en vivo: conexión, último `seq`, turnos en cola y el
+ * último descarte. Nunca muestra datos personales: solo números de la lista.
+ *
+ * @returns {void}
+ */
+function pintarEstadoEnVivo() {
+  if (!estado.vivo.activo) {
+    return;
+  }
+  const { cola, conectado, pausado, descarte } = estado.vivo;
+  const partes = [];
+  if (!conectado) {
+    partes.push("Sin conexión (reintentando)");
+  } else if (cola.length === 0) {
+    partes.push("En vivo · esperando el primer turno");
+  } else {
+    partes.push(`En vivo · último ${cola[cola.length - 1].seq}`);
+  }
+  partes.push(`en cola ${Math.max(0, estado.turnos.length - 1 - estado.indice)}`);
+  if (pausado) {
+    partes.push("en pausa (P)");
+  }
+  if (descarte) {
+    partes.push(`Turno descartado: ${descarte}`);
+  }
+  porId("escena-envivo-estado").textContent = partes.join(" · ");
 }
 
 /**
@@ -819,6 +1132,7 @@ function cargarEscenaViva(datos) {
   if (!datos || !Array.isArray(datos.turnos) || datos.turnos.length === 0) {
     return;
   }
+  salirEnVivo();
   const escena = normalizarEscena(datos);
   estado.original = escena.turnos;
   estado.veredictoOriginal = escena.veredicto;
@@ -857,17 +1171,15 @@ async function iniciar() {
   if (turnos.length === 0) {
     porId("escena-texto").textContent = "No hay turnos de la escena: solo la presentación.";
   }
-  porId("escena-reproducir").addEventListener("click", () =>
-    estado.reproduciendo ? pausar() : reproducir(),
-  );
+  porId("escena-reproducir").addEventListener("click", alternarReproduccion);
   porId("escena-siguiente").addEventListener("click", siguiente);
-  porId("escena-reiniciar").addEventListener("click", reiniciar);
-  porId("escena-nucleo").addEventListener("click", cambiarANucleo);
+  porId("escena-reiniciar").addEventListener("click", reiniciarSegunModo);
+  porId("escena-nucleo").addEventListener("click", irAlNucleo);
   porId("escena-ver-traza").addEventListener("click", alternarTraza);
-  document.addEventListener("escena:nucleo", cambiarANucleo);
-  porId("escena-preguntar").addEventListener("click", () =>
-    estado.preguntas ? cerrarPreguntas() : abrirPreguntas(),
-  );
+  document.addEventListener("escena:nucleo", irAlNucleo);
+  porId("escena-preguntar").addEventListener("click", alternarPreguntas);
+  porId("escena-en-vivo").addEventListener("click", alternarEnVivo);
+  sondeo = crearSondeo({ alRecibir: recibirEnVivo, alEstado: cambioDeConexion });
   porId("escena-form-pregunta").addEventListener("submit", (evento) => {
     evento.preventDefault();
     contestar(porId("escena-pregunta-texto").value);

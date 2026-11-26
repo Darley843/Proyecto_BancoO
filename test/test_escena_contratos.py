@@ -17,6 +17,11 @@ from banco_occidente_corpus.escena.contratos import (
     VeredictoAuditor,
 )
 
+#: Personajes que ya existían antes del contrato de la escena en vivo.
+PERSONAJES_ANTERIORES = ("pana", "don_gota", "joven", "agente_joven", "agente_banco", "auditor")
+#: Orígenes que ya existían antes del contrato de la escena en vivo.
+ORIGENES_ANTERIORES = ("guion_fijo", "motor", "llm", "reglas", "entrada_voz")
+
 
 def _fuente() -> FuenteCifra:
     """Fuente válida para las cifras de prueba.
@@ -75,6 +80,33 @@ def test_turno_valido_construye() -> None:
     assert turno.cifras[0].fuente.referencia == "config/escena.toml#gota.tasa_mensual"
     assert turno.escenario is not None and turno.escenario.codigo == "comparacion"
     assert turno.hallazgos == ()
+
+
+def test_turno_del_invitado_por_el_canal_es_valido() -> None:
+    """El contrato aditivo acepta al invitado de WhatsApp y el origen del canal."""
+    turno = _turno(
+        personaje="invitado",
+        origen="canal",
+        texto="¿Me lo aprueban?",
+        cifras=(),
+        escenario=None,
+    )
+
+    assert turno.personaje == "invitado"
+    assert turno.origen == "canal"
+    assert turno.texto == "¿Me lo aprueban?"
+
+
+@pytest.mark.parametrize("personaje", PERSONAJES_ANTERIORES)
+def test_los_personajes_anteriores_siguen_validando(personaje: str) -> None:
+    """Los personajes que ya existían conservan su validez."""
+    assert _turno(personaje=personaje).personaje == personaje
+
+
+@pytest.mark.parametrize("origen", ORIGENES_ANTERIORES)
+def test_los_origenes_anteriores_siguen_validando(origen: str) -> None:
+    """Los orígenes que ya existían conservan su validez."""
+    assert _turno(origen=origen).origen == origen
 
 
 def test_campo_extra_falla() -> None:

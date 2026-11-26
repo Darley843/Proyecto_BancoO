@@ -22,8 +22,10 @@ RAIZ = Path(__file__).resolve().parents[1]
 WEB = RAIZ / "app" / "web"
 ESCENA = WEB / "escena"
 
-PERSONAJES = {"pana", "don_gota", "joven", "agente_joven", "agente_banco", "auditor"}
-ORIGENES = {"guion_fijo", "motor", "llm", "reglas", "entrada_voz"}
+PERSONAJES = {"pana", "don_gota", "joven", "agente_joven", "agente_banco", "auditor", "invitado"}
+#: El invitado escribe por WhatsApp y va solo en subtítulo: no tiene voz ni retrato.
+PERSONAJES_CON_VOZ = PERSONAJES - {"invitado"}
+ORIGENES = {"guion_fijo", "motor", "llm", "reglas", "entrada_voz", "canal"}
 TIPOS_FUENTE = {"config", "gold", "motor", "calculo_gota", "usura", "guion", "documento"}
 UNIDADES = {"pesos", "porcentaje_ea", "porcentaje", "meses", "dias", "veces"}
 SEMAFOROS = {None, "verde", "amarillo", "rojo"}
@@ -94,9 +96,9 @@ def test_el_ejemplo_cumple_el_contrato_de_python() -> None:
 
 
 def test_los_cinco_que_hablan_aparecen() -> None:
-    """El ejemplo recorre a todos los personajes y cierra el auditor."""
+    """El ejemplo recorre a los personajes con voz y cierra el auditor."""
     turnos = _turnos()
-    assert {t["personaje"] for t in turnos} == PERSONAJES
+    assert {t["personaje"] for t in turnos} == PERSONAJES_CON_VOZ
     assert turnos[-1]["personaje"] == "auditor"
 
 
@@ -201,7 +203,7 @@ def test_el_contrato_js_declara_los_mismos_conjuntos() -> None:
 
 
 def test_cada_personaje_tiene_rostro_con_boca() -> None:
-    """rostros.js dibuja a los seis (respaldo) y escena.js usa los retratos."""
+    """rostros.js dibuja a todos los del contrato (respaldo) y escena.js usa los retratos."""
     codigo = (ESCENA / "rostros.js").read_text(encoding="utf-8")
     bloque = re.search(r"const DIBUJOS = Object\.freeze\(\{(.*?)\}\);", codigo, re.S)
     assert bloque
@@ -212,9 +214,9 @@ def test_cada_personaje_tiene_rostro_con_boca() -> None:
 
 
 def test_cada_personaje_tiene_retrato_liviano() -> None:
-    """Hay un retrato .webp por personaje y ninguno pesa más de 60 KB."""
+    """Hay un retrato .webp por personaje con voz y ninguno pesa más de 60 KB."""
     retratos = {archivo.stem: archivo for archivo in (ESCENA / "rostros").glob("*.webp")}
-    assert set(retratos) == PERSONAJES
+    assert set(retratos) == PERSONAJES_CON_VOZ
     for nombre, archivo in retratos.items():
         assert archivo.stat().st_size < 60_000, nombre
         assert archivo.read_bytes()[8:12] == b"WEBP", nombre
