@@ -103,6 +103,25 @@ def test_el_readme_explica_tunel_y_meta() -> None:
         assert pieza in readme, pieza
 
 
+def test_el_despliegue_explica_que_solo_el_webhook_es_publico() -> None:
+    """El runbook dice qué rutas quedan públicas y cómo comprobarlo desde fuera."""
+    texto = (RAIZ / "docs" / "DESPLIEGUE_WHATSAPP.md").read_text(encoding="utf-8")
+    readme = (RAIZ / "README.md").read_text(encoding="utf-8")
+
+    for pieza in (
+        "Qué queda público",
+        "solo deja pasar",
+        "/webhooks/whatsapp",
+        "/health",
+        "SEGURIDAD.md",
+        "/api/estado",
+        "404",
+    ):
+        assert pieza in texto, pieza
+    assert "**solo** `/webhooks/whatsapp`" in readme
+    assert "§3.12" in readme
+
+
 def test_los_comandos_del_modulo_usan_uv() -> None:
     """Ningún comando del paquete se invoca con el Python del sistema."""
     for archivo in ("README.md", "docs/OPERACION_WHATSAPP.md"):

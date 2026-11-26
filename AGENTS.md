@@ -249,6 +249,10 @@ REJECT if:
   `app.py` fija `HOST = "127.0.0.1"` y `main()` lo pasa a `uvicorn.run`;
   `test/test_app_web.py::test_escucha_solo_en_localhost` y
   `test/test_seguridad.py::test_uvicorn_recibe_solo_loopback` lo comprueban.
+- Se publica por el túnel una ruta distinta de `/webhooks/whatsapp` o `/health`,
+  o se quita la guarda de `app.py` que responde `404` a las peticiones que no
+  son locales. La superficie pública y su residual están en
+  `docs/SEGURIDAD.md` §3.12; `test/test_tunel_publico.py` lo comprueba.
 - Se repiten los precios de DeepSeek (`0.15/0.003/0.60` valle,
   `0.30/0.006/1.20` pico) en código de producción (`src/` fuera de
   `arqueo/metricas.py`, `app.py`, `scripts/` o `config/`). La única fuente es

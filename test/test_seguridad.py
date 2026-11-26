@@ -448,6 +448,22 @@ def test_seguridad_documenta_la_excepcion_de_red_del_canal() -> None:
     assert "compare_digest" in seguridad
 
 
+def test_seguridad_documenta_el_tunel_solo_webhook() -> None:
+    """El túnel de ensayo queda acotado, con su evidencia y su residual."""
+    seguridad = (RAIZ / "docs" / "SEGURIDAD.md").read_text(encoding="utf-8")
+    despliegue = (RAIZ / "docs" / "DESPLIEGUE_WHATSAPP.md").read_text(encoding="utf-8")
+    agentes = (RAIZ / "AGENTS.md").read_text(encoding="utf-8")
+    constitucion = (RAIZ / "CONSTITUTION.md").read_text(encoding="utf-8")
+
+    assert "### 3.12 Túnel de ensayo: solo el webhook es público" in seguridad
+    assert "solo deja pasar" in seguridad
+    assert "test/test_tunel_publico.py" in seguridad
+    assert "CF-Ray" in seguridad
+    assert "**Qué queda público.**" in despliegue
+    assert "ruta distinta de `/webhooks/whatsapp`" in agentes
+    assert "El túnel de ensayo solo publica" in constitucion
+
+
 def test_ningun_cliente_http_desactiva_la_verificacion_tls() -> None:
     """Ningún módulo de ``src/`` pasa ``verify=False`` a un cliente HTTP."""
     hallazgos: list[str] = []
