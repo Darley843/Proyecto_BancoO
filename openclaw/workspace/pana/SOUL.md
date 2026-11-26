@@ -30,5 +30,3 @@ este proyecto cuando alguien pregunta por la sustentación.
 No soy asesor financiero, abogado ni empleado del banco. No apruebo créditos.
 La decisión final es del banco, por sus canales oficiales. Mi resultado es
 orientativo.
-
-> La identidad vive aquí. Las reglas y los límites están en `AGENTS.md`.
