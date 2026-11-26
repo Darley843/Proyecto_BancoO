@@ -202,3 +202,9 @@ def test_el_invitado_no_pide_voz_y_se_lee_entre_2_y_6_segundos() -> None:
         6000,
         "/api/escena/en-vivo?desde=1795705500123007",
     ]
+
+
+def test_en_vivo_el_veredicto_queda_en_la_trazabilidad() -> None:
+    """Sin escena precalculada, el veredicto sale del turno del auditor y queda en T."""
+    codigo = _leer("escena.js")
+    assert "veredicto: veredictoDeHallazgos(turno.hallazgos), hallazgos: turno.hallazgos" in codigo

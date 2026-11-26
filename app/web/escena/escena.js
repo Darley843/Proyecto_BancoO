@@ -314,6 +314,11 @@ function mostrar(indice) {
   // En la presentación el auditor solo se presenta: aún no hay veredicto.
   if (turno.personaje === "auditor" && indice >= largoIntroduccion) {
     estado.auditorHablo = true;
+    if (estado.vivo.activo) {
+      // En vivo no hay veredicto precalculado: sale de los hallazgos del turno
+      // del auditor, así la trazabilidad (T) lo conserva hasta el final.
+      estado.veredicto = { veredicto: veredictoDeHallazgos(turno.hallazgos), hallazgos: turno.hallazgos };
+    }
   }
   iluminar(turno.personaje);
   marcarPasos();
