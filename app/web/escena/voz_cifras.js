@@ -232,11 +232,27 @@ function sinMarcas(texto) {
 /**
  * Convierte los rangos de montos en «entre … y … pesos».
  *
+ * Los rangos pueden venir con la escala al final («$20 a $50 millones»): la
+ * escala vale para las dos puntas y se dice una sola vez, después del último
+ * número.
+ *
  * @param {string} texto Texto con rangos en formato colombiano.
  * @returns {string} El texto con los rangos en palabras.
  */
 function cambiarRangos(texto) {
-  return texto.replace(
+  const conEscala = texto.replace(
+    /\$\s*(\d[\d.]*)\s+a\s+\$\s*(\d[\d.]*)\s*(millones|millón)\b/gi,
+    (coincidencia, desde, hasta, escala) => {
+      const inicio = montoEnPalabras(desde);
+      const fin = montoEnPalabras(hasta);
+      if (!inicio || !fin) {
+        return coincidencia;
+      }
+      const unidad = /^millones$/i.test(escala) ? "millones" : "millón";
+      return `de ${inicio.palabras} a ${fin.palabras} ${unidad} de pesos`;
+    },
+  );
+  return conEscala.replace(
     /\$\s*(\d[\d.]*)\s*[–—−-]\s*\$\s*(\d[\d.]*)/g,
     (coincidencia, desde, hasta) => {
       const inicio = montoEnPalabras(desde);
@@ -247,6 +263,31 @@ function cambiarRangos(texto) {
       return `entre ${inicio.palabras} y ${fin.palabras} ${fin.conDe ? "de pesos" : "pesos"}`;
     },
   );
+}
+
+/**
+ * Convierte los montos abreviados con «mil», «millón» o «millones».
+ *
+ * «$20 millones» se lee «veinte millones de pesos» y «Menos de $500 mil» se
+ * lee «menos de quinientos mil pesos».
+ *
+ * @param {string} texto Texto con montos abreviados.
+ * @returns {string} El texto con esos montos en palabras.
+ */
+function cambiarMontosConEscala(texto) {
+  return texto
+    .replace(/\$\s*(\d[\d.]*)\s*millones\b/gi, (coincidencia, crudo) => {
+      const monto = montoEnPalabras(crudo);
+      return monto ? `${monto.palabras} millones de pesos` : coincidencia;
+    })
+    .replace(/\$\s*(\d[\d.]*)\s*(millón|millon)\b/gi, (coincidencia, crudo) => {
+      const monto = montoEnPalabras(crudo);
+      return monto ? `${apocope(monto.palabras)} millón de pesos` : coincidencia;
+    })
+    .replace(/\$\s*(\d[\d.]*)\s*mil\b/gi, (coincidencia, crudo) => {
+      const monto = montoEnPalabras(crudo);
+      return monto ? `${monto.palabras} mil pesos` : coincidencia;
+    });
 }
 
 /**
@@ -288,6 +329,25 @@ function cambiarPorcentajes(texto) {
 }
 
 /**
+ * Deja el texto sin «$» ni la palabra «dólar».
+ *
+ * Es la red de seguridad: si algún monto no encajó en los patrones anteriores,
+ * se quita el símbolo y se dice «pesos» en su lugar. Así la voz nunca lee
+ * dólares.
+ *
+ * @param {string} texto Texto ya convertido.
+ * @returns {string} El texto sin símbolos de dólar.
+ */
+function sinDolares(texto) {
+  return texto
+    .replace(/\$\s*([^\s.,;:!?)]*)/g, (coincidencia, resto) =>
+      resto ? `${resto} pesos` : "pesos",
+    )
+    .replace(/\bd[oó]lares\b/gi, "pesos")
+    .replace(/\bd[oó]lar\b/gi, "peso");
+}
+
+/**
  * Prepara un texto para que la voz lo lea en español claro.
  *
  * Los subtítulos no pasan por aquí: esta función se llama únicamente justo
@@ -301,7 +361,9 @@ export function paraVoz(texto) {
   limpio = sinUrls(limpio);
   limpio = sinMarcas(limpio);
   limpio = cambiarRangos(limpio);
+  limpio = cambiarMontosConEscala(limpio);
   limpio = cambiarMontos(limpio);
   limpio = cambiarPorcentajes(limpio);
+  limpio = sinDolares(limpio);
   return limpio.replace(/\s+/g, " ").trim();
 }
