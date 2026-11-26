@@ -427,6 +427,20 @@ make simular
 uv run python -m banco_occidente_corpus.simulador --solo pensionado_amarillo
 ```
 
+Para mandar **un mensaje suelto** por el mismo webhook, sin Meta y sin abrir
+puertos, con la app simulada dentro del proceso:
+
+```powershell
+uv run python scripts/mandar_falso.py "hola"
+uv run python scripts/mandar_falso.py --boton consent:acepto Acepto
+uv run python scripts/mandar_falso.py "ESCENA"
+```
+
+El script firma el cuerpo con un App Secret de la corrida, usa el
+`TestClient` de FastAPI y acepta `--numero`. Con la ventana de `[evento]`
+abierta y `ESCENA_EN_VIVO=1` sirve para ensayar la escena en vivo antes de
+conectar Meta.
+
 ### Ensayo con WhatsApp real (evidencia aparte)
 
 El recorrido sintético y el ensayo real no compiten: prueban cosas distintas y
