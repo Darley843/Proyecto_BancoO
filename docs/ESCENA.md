@@ -65,11 +65,11 @@ decisión 1 del cambio `demo-gota-a-gota`), validado en el navegador por
 | Campo | Valores |
 |---|---|
 | `id`, `orden` | identidad y posición del turno |
-| `personaje` | `pana`, `don_gota`, `joven`, `agente_joven`, `agente_banco`, `auditor` |
+| `personaje` | `pana`, `don_gota`, `joven`, `agente_joven`, `agente_banco`, `auditor`, `invitado` (el voluntario de WhatsApp, solo en subtítulo) |
 | `texto` / `subtitulo` | lo que se dice en voz / lo que se lee (si falta, se lee `texto`) |
 | `cifras` | lista de `{etiqueta, valor, valor_legible, unidad, fuente}`; `fuente` es `{tipo, referencia}` con `tipo` `config`, `gold`, `motor`, `calculo_gota`, `usura`, `guion` o `documento`. La pantalla muestra `valor_legible` y no calcula nada |
 | `escenario` | `EscenarioEscena` del motor (`codigo`, `monto`, `plazo_meses`, `semaforo`…) o `null` |
-| `origen` | `guion_fijo`, `motor`, `llm`, `reglas` o `entrada_voz` (los viejos `guion` y `modelo` se rechazan) |
+| `origen` | `guion_fijo`, `motor`, `llm`, `reglas`, `entrada_voz` o `canal` (los viejos `guion` y `modelo` se rechazan) |
 | `hallazgos` | `{codigo, turno_id, detalle, gravedad}` del auditor |
 
 El **veredicto del auditor** (`conforme`, `con observaciones`, `objeta`) llega
@@ -84,14 +84,16 @@ paso 1 es la presentación y el 8 las preguntas.
 
 ## Los rostros
 
-Cada personaje sale con un **retrato en 3D** (`app/web/escena/rostros/<personaje>.webp`,
+Cada personaje con voz sale con un **retrato en 3D** (`app/web/escena/rostros/<personaje>.webp`,
 384 × 384, menos de 60 KB cada uno) dentro de un círculo con borde de su color; el
 que habla brilla. Los retratos se **generaron con IA** a partir de una descripción
 escrita por el equipo: son personajes inventados, no fotos de personas reales.
 
 Si un retrato no carga, la pantalla usa el dibujo plano de respaldo de
 `app/web/escena/rostros.js` (solo figuras SVG). En el dibujo la boca se mueve
-mientras el personaje habla; el voluntario no tiene voz, así que la suya no.
+mientras el personaje habla; el voluntario no tiene voz, así que la suya no. El
+`invitado` no tiene `.webp`: usa siempre el dibujo de respaldo y va solo en
+subtítulo.
 
 Para cambiar un retrato basta con reemplazar el `.webp` con el mismo nombre
 (cuadrado, de los hombros hacia arriba, fondo liso del color del personaje).
@@ -104,6 +106,7 @@ Para cambiar un retrato basta con reemplazar el `.webp` con el mismo nombre
 | Agente del joven | robot amable de pantalla azul con gorra al revés |
 | Agente del banco | robot formal con diadema de atención y corbatín |
 | Auditor | persona mayor con gafas redondas y corbata |
+| Invitado | el voluntario con el teléfono en la mano (sin retrato `.webp`) |
 
 ## Cómo se maneja
 

@@ -7,13 +7,15 @@
  * generó el texto:
  *
  * - `id` y `orden`: identidad del turno en la escena.
- * - `personaje`: pana, don_gota, joven, agente_joven, agente_banco o auditor.
+ * - `personaje`: pana, don_gota, joven, agente_joven, agente_banco, auditor o
+ *   invitado (el voluntario que escribe por WhatsApp y va solo en subtítulo).
  * - `texto`: lo que se dice en voz; `subtitulo` (opcional) lo que se lee.
  * - `cifras`: lista de `{etiqueta, valor, valor_legible, unidad, fuente}`;
  *   `fuente` es `{tipo, referencia, vigencia?, sha256?}`. `valor` llega como
  *   número o como texto decimal (así serializa Pydantic un `Decimal`).
  * - `escenario`: `EscenarioEscena` del motor o `null`.
- * - `origen`: guion_fijo, motor, llm, reglas o entrada_voz.
+ * - `origen`: guion_fijo, motor, llm, reglas, entrada_voz o canal (los turnos
+ *   que publica el canal de WhatsApp).
  * - `hallazgos`: `{codigo, turno_id, detalle, gravedad}` del auditor.
  *
  * El veredicto del auditor (`conforme`, `con_observaciones`, `objeta`) viaja
@@ -31,10 +33,18 @@ export const PERSONAJES = Object.freeze([
   "agente_joven",
   "agente_banco",
   "auditor",
+  "invitado",
 ]);
 
 /** De dónde puede salir el texto de un turno. */
-export const ORIGENES = Object.freeze(["guion_fijo", "motor", "llm", "reglas", "entrada_voz"]);
+export const ORIGENES = Object.freeze([
+  "guion_fijo",
+  "motor",
+  "llm",
+  "reglas",
+  "entrada_voz",
+  "canal",
+]);
 
 /** Tipos de fuente verificable de una cifra. */
 export const TIPOS_FUENTE = Object.freeze([
@@ -263,7 +273,8 @@ export function veredictoDeHallazgos(hallazgos) {
  * El contrato no trae el paso: se deduce de quién habla y de lo que ya pasó,
  * y nunca retrocede. La presentación (paso 0) y las preguntas (paso 7) las
  * marca la pantalla; aquí solo se deducen los pasos 1 (Voluntario) a 6
- * (Veredicto). Pana compara cuando dice cifras del cálculo de Don Gota.
+ * (Veredicto). Pana compara cuando dice cifras del cálculo de Don Gota y el
+ * invitado cae en Voluntario sin hacer retroceder la escena.
  *
  * @param {{personaje: string, cifras: Array<{fuente: {tipo: string}}>}} turno Turno actual.
  * @param {number} anterior Paso del turno anterior (-1 o 0 al empezar).
@@ -272,7 +283,9 @@ export function veredictoDeHallazgos(hallazgos) {
 export function pasoDelTurno(turno, anterior) {
   const tipos = (turno.cifras ?? []).map((cifra) => cifra.fuente?.tipo);
   let paso = 1;
-  if (turno.personaje === "auditor") {
+  if (turno.personaje === "invitado") {
+    paso = 1;
+  } else if (turno.personaje === "auditor") {
     paso = 6;
   } else if (turno.personaje === "agente_joven" || turno.personaje === "agente_banco") {
     paso = 5;

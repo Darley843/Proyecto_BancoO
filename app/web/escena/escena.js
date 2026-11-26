@@ -71,6 +71,7 @@ const FICHAS = Object.freeze({
   agente_joven: { nombre: "Agente del joven" },
   agente_banco: { nombre: "Agente del banco" },
   auditor: { nombre: "Auditor" },
+  invitado: { nombre: "Invitado" },
 });
 
 /** Escena precalculada, su núcleo y los turnos de ejemplo. */
@@ -148,7 +149,7 @@ function crear(etiqueta, clase = "", texto = "") {
 }
 
 /**
- * Arma el escenario (seis personajes) y la barra de pasos.
+ * Arma el escenario con los personajes del contrato y la barra de pasos.
  *
  * @returns {void}
  */
@@ -477,14 +478,17 @@ async function cambiarANucleo() {
 /**
  * Dice el turno con la voz de su personaje, o espera lo que tarda leerlo.
  *
- * El joven es la persona voluntaria: habla en persona, así que su turno solo
- * se muestra en subtítulos.
+ * El joven y el invitado son la persona voluntaria: hablan en persona o
+ * escriben por WhatsApp, así que su turno solo se muestra en subtítulos.
  *
  * @param {object} turno Turno ya mostrado.
  * @returns {Promise<void>} Se resuelve cuando termina de sonar.
  */
 function decir(turno) {
-  const soloSubtitulos = porId("escena-solo-subtitulos").checked || turno.personaje === "joven";
+  const soloSubtitulos =
+    porId("escena-solo-subtitulos").checked ||
+    turno.personaje === "joven" ||
+    turno.personaje === "invitado";
   const caja = porId(`personaje-${turno.personaje}`);
   caja.classList.toggle("escena__personaje--mudo", soloSubtitulos);
   return new Promise((listo) => {

@@ -23,6 +23,11 @@ Reglas de gravedad alta (cualquiera da `objeta`):
   o el banco da por sostenible un escenario que el motor dejó en rojo.
 - `dato_personal`: teléfono, correo, documento o tarjeta en el texto.
 
+El personaje `invitado` queda fuera de las reglas de texto: es el voluntario
+escribiendo por WhatsApp, así que puede citar cifras o preguntar por una
+aprobación sin que el auditor las tome como promesas de Pana. Sus datos
+personales sí se revisan.
+
 Observaciones de gravedad media (sin altas, dan `con_observaciones`):
 `sin_negociacion`, `sin_acuerdo`, `tasa_no_disponible`,
 `usura_sin_certificar` y `vigencia_vencida`.
@@ -109,6 +114,9 @@ ETIQUETA_VEREDICTO: dict[Veredicto, str] = {
 }
 #: Personajes que hablan en la negociación.
 AGENTES_NEGOCIACION: frozenset[str] = frozenset({"agente_joven", "agente_banco"})
+#: Personajes cuyas palabras no se auditan como si prometieran por Pana o el
+#: banco: el invitado escribe libremente por WhatsApp y solo se revisa su PII.
+PERSONAJES_SIN_AUDITORIA_DE_TEXTO: frozenset[str] = frozenset({"invitado"})
 #: Cifras que la escena cita y que no son financieras: el artículo del Código Penal.
 CIFRAS_LEGALES: frozenset[str] = frozenset({"305"})
 
@@ -181,41 +189,43 @@ def auditar_turno(
         Los hallazgos del turno, sin repetir; vacío si el turno pasa.
     """
     hallazgos: list[HallazgoEscena] = []
+    audita_texto = turno.personaje not in PERSONAJES_SIN_AUDITORIA_DE_TEXTO
     audita_cifras = bool(turno.cifras) or turno.escenario is not None
-    permitidas = _cifras_permitidas(turno) if audita_cifras else None
+    permitidas = _cifras_permitidas(turno) if audita_cifras and audita_texto else None
 
-    for texto in auditar_texto(
-        turno.texto,
-        cifras_permitidas=permitidas,
-        revisar_promesas=True,
-        mensaje_pii=_MARCA_PII,
-    ):
-        if texto.startswith(_PREFIJO_PROMESA):
-            frase = texto.removeprefix(_PREFIJO_PROMESA).strip("«»")
+    if audita_texto:
+        for texto in auditar_texto(
+            turno.texto,
+            cifras_permitidas=permitidas,
+            revisar_promesas=True,
+            mensaje_pii=_MARCA_PII,
+        ):
+            if texto.startswith(_PREFIJO_PROMESA):
+                frase = texto.removeprefix(_PREFIJO_PROMESA).strip("«»")
+                hallazgos.append(
+                    _hallazgo("promesa_aprobacion", turno.id, f"Promete una aprobación: «{frase}».")
+                )
+            elif texto.startswith(_PREFIJO_CIFRA):
+                cifra = texto.removeprefix(_PREFIJO_CIFRA)
+                hallazgos.append(
+                    _hallazgo(
+                        "cifra_inventada",
+                        turno.id,
+                        f"El texto dice {cifra} y ninguna cifra del turno la respalda.",
+                    )
+                )
+
+        for frase in _promesas_escena(turno.texto):
             hallazgos.append(
                 _hallazgo("promesa_aprobacion", turno.id, f"Promete una aprobación: «{frase}».")
             )
-        elif texto.startswith(_PREFIJO_CIFRA):
-            cifra = texto.removeprefix(_PREFIJO_CIFRA)
-            hallazgos.append(
-                _hallazgo(
-                    "cifra_inventada",
-                    turno.id,
-                    f"El texto dice {cifra} y ninguna cifra del turno la respalda.",
-                )
-            )
-
-    for frase in _promesas_escena(turno.texto):
-        hallazgos.append(
-            _hallazgo("promesa_aprobacion", turno.id, f"Promete una aprobación: «{frase}».")
-        )
 
     for cifra in turno.cifras:
         motivo = _motivo_fuente(cifra, turno, mesa)
         if motivo:
             hallazgos.append(_hallazgo("fuente_ausente", turno.id, motivo))
 
-    if turno.personaje != "don_gota":
+    if audita_texto and turno.personaje != "don_gota":
         for frase in _recomendaciones_gota(turno.texto):
             hallazgos.append(
                 _hallazgo(
@@ -225,7 +235,7 @@ def auditar_turno(
                 )
             )
 
-    motivo_semaforo = _motivo_semaforo(turno)
+    motivo_semaforo = _motivo_semaforo(turno) if audita_texto else ""
     if motivo_semaforo:
         hallazgos.append(_hallazgo("semaforo_alterado", turno.id, motivo_semaforo))
 
@@ -685,6 +695,7 @@ def _nombre(personaje: PersonajeEscena) -> str:
         "agente_joven": "El agente del joven",
         "agente_banco": "El agente del banco",
         "auditor": "El auditor",
+        "invitado": "El invitado",
     }
     return nombres.get(personaje, personaje)
 

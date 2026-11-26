@@ -21,10 +21,16 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from ..canal.contratos import ResultadoDiagnostico
 
-#: Personajes de la escena; coinciden con las claves de `config/voz.toml`.
-PersonajeEscena = Literal["pana", "don_gota", "joven", "agente_joven", "agente_banco", "auditor"]
-#: Origen de un turno. Don Gota siempre usa `guion_fijo`.
-OrigenTurno = Literal["guion_fijo", "motor", "llm", "reglas", "entrada_voz"]
+#: Personajes de la escena; salvo `invitado`, coinciden con las claves de
+#: `config/voz.toml`. El invitado es el voluntario que escribe por WhatsApp y
+#: va solo en subtítulo, sin voz.
+PersonajeEscena = Literal[
+    "pana", "don_gota", "joven", "agente_joven", "agente_banco", "auditor", "invitado"
+]
+#: Origen de un turno. Don Gota siempre usa `guion_fijo`; `canal` distingue los
+#: turnos que publica el canal de WhatsApp (mensaje del invitado o respuesta de
+#: Pana) de los que salen de una herramienta o del guion.
+OrigenTurno = Literal["guion_fijo", "motor", "llm", "reglas", "entrada_voz", "canal"]
 #: Naturaleza verificable de una cifra. `documento` cita un archivo del
 #: repositorio con su ancla (`docs/ARQUEO.md#ancla`).
 TipoFuente = Literal["config", "gold", "motor", "calculo_gota", "usura", "guion", "documento"]
