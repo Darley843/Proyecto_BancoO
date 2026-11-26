@@ -230,7 +230,8 @@ La secuencia determinista es:
 4. `agente_banco` cierra con el escenario aceptado o con `sin_acuerdo`.
 
 El banco **nunca acepta ni aprueba**: recomienda, contrapropone o rechaza. El
-cierre siempre incluye «La decisión final es de un asesor.». El texto prohíbe
+cierre siempre incluye «La decisión final es del banco, por sus canales
+oficiales.». El texto prohíbe
 `acepto`, `aceptamos`, `cerramos`, `aprobado`, `aprobación`, `aprobamos` y
 «me quedo con el crédito». El modelo solo aporta un argumento corto, sin
 dígitos, sin nombres de color, sin promesas y sin recomendar el gota a gota;
@@ -252,8 +253,8 @@ ficticios: verde `$5.000.000 / $2.000.000 / $0`, amarillo
 > «Quisiera $10.000.000 a 36 meses; la cuota sería $398.006.»
 
 > «Esta opción es sostenible: la cuota de $398.006 para $10.000.000 a 36 meses
-> cabe con holgura y el total es $14.328.216. La decisión final es de un
-> asesor.»
+> cabe con holgura y el total es $14.328.216. La decisión final es del banco,
+> por sus canales oficiales.»
 
 ### 7.3 Amarillo
 
@@ -271,8 +272,8 @@ uno holgado.
 > Quisiera $25.000.000 a 48 meses; la cuota sería $830.005.»
 
 > «Esta opción es sostenible: la cuota de $830.005 para $25.000.000 a 48 meses
-> cabe con holgura y el total es $39.840.240. La decisión final es de un
-> asesor.»
+> cabe con holgura y el total es $39.840.240. La decisión final es del banco,
+> por sus canales oficiales.»
 
 La contrapropuesta siempre compara las dos cifras: la cuota que baja y el total
 que sube, con la diferencia de total. No se presenta la cuota más baja como una
@@ -289,7 +290,7 @@ ventaja sin decir cuánto cuesta en total.
 
 > «Con $30.000.000 a 60 meses la cuota de $881.897 sigue por encima de tu
 > capacidad. Con el monto menor la cuota sería $716.412 y tampoco alcanza: no
-> hay acuerdo hoy. La decisión final es de un asesor.»
+> hay acuerdo hoy. La decisión final es del banco, por sus canales oficiales.»
 
 En el rojo el joven prueba primero el plazo de 60 meses y después el monto
 menor. El escenario de 60 meses deja margen `-$381.897`; el monto 40 % menor

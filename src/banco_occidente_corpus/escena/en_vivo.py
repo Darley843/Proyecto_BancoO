@@ -3,9 +3,12 @@
 Una sola lista `data/escena/en_vivo.jsonl`, con un turno `TurnoEscena` por
 linea. La escritura solo ocurre con ``ESCENA_EN_VIVO=1`` y pasa por un bloqueo
 del sistema sobre ``en_vivo.lock``, para que el MCP y la app no repitan ``seq``
-ni mezclen lineas. Las funciones nunca lanzan hacia la herramienta: un fallo de
-escritura, un bloqueo ocupado o un turno invalido se registran por codigo y la
-respuesta sigue. El texto de los turnos nunca se registra en los logs.
+ni mezclen lineas. Un turno identico al ultimo publicado del mismo personaje
+(mismo ``id`` y mismo ``texto``) se descarta, para que la pantalla no repita
+cuatro veces el veredicto del auditor. Las funciones nunca lanzan hacia la
+herramienta: un fallo de escritura, un bloqueo ocupado o un turno invalido se
+registran por codigo y la respuesta sigue. El texto de los turnos nunca se
+registra en los logs.
 """
 
 from __future__ import annotations
@@ -207,7 +210,8 @@ def _escribir_lote(
 
     La seccion critica lee el ultimo ``seq`` valido, calcula los del lote,
     escribe todas las lineas, hace ``flush`` y ``fsync`` y suelta el bloqueo. Un
-    lote usa ``seq`` consecutivos y un solo ``ts``.
+    lote usa ``seq`` consecutivos y un solo ``ts``. Un turno identico al ultimo
+    publicado del mismo personaje se descarta antes de gastar un ``seq``.
     """
     global _CONTADOR
 
@@ -219,12 +223,18 @@ def _escribir_lote(
             return ()
         try:
             ultimo = _ultimo_seq(ruta)
+            ultimos = _ultimos_por_personaje(ruta)
             ahora = datetime.now(UTC)
             base = int(ahora.timestamp() * 1000) * 1000
             ts = ahora.isoformat()
             lineas: list[str] = []
             seqs: list[int] = []
             for datos in registros:
+                personaje = str(datos["personaje"])
+                clave = (str(datos["id"]), str(datos["texto"]))
+                if ultimos.get(personaje) == clave:
+                    logger.warning("escena_en_vivo descarte turno_repetido")
+                    continue
                 candidato = base + (_CONTADOR % 1000)
                 seq = max(ultimo + 1, candidato)
                 linea = _serializar(seq, ts, origen, datos)
@@ -234,6 +244,7 @@ def _escribir_lote(
                 lineas.append(linea)
                 seqs.append(seq)
                 ultimo = seq
+                ultimos[personaje] = clave
                 _CONTADOR += 1
             if not lineas:
                 return ()
@@ -329,6 +340,33 @@ def _ultimo_seq(ruta: Path) -> int:
         if registro is not None:
             ultimo = max(ultimo, registro["seq"])
     return ultimo
+
+
+def _ultimos_por_personaje(ruta: Path) -> dict[str, tuple[str, str]]:
+    """Devuelve el ultimo ``(id, texto)`` publicado por cada personaje.
+
+    Se usa para no repetir en la lista un turno identico al anterior del mismo
+    personaje (el auditor publica el mismo veredicto por cada mensaje con
+    cifras). El orden del archivo es el de publicacion.
+
+    Args:
+        ruta: lista de la escena; puede no existir.
+
+    Returns:
+        Un diccionario ``personaje -> (id, texto)`` con lo ultimo publicado.
+    """
+    if not ruta.is_file():
+        return {}
+    ultimos: dict[str, tuple[str, str]] = {}
+    for linea in _lineas_de(ruta):
+        registro = _registro(linea)
+        if registro is None:
+            continue
+        turno = registro["turno"]
+        personaje = turno.get("personaje")
+        if isinstance(personaje, str):
+            ultimos[personaje] = (str(turno.get("id", "")), str(turno.get("texto", "")))
+    return ultimos
 
 
 def _registro(linea: str) -> _Registro | None:

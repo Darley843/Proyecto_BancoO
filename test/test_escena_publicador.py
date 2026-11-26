@@ -87,6 +87,81 @@ def test_encendido_escribe_una_linea_por_turno_con_seq_consecutivo(
     assert "\r" not in ruta.read_text(encoding="utf-8")
 
 
+def test_el_auditor_no_repite_el_mismo_veredicto_cuatro_veces(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Mismo id y mismo texto que el último del auditor: solo entra el primero."""
+    _encender(monkeypatch)
+    ruta = _ruta(tmp_path)
+    veredicto = TurnoEscena(
+        id="auditor.veredicto.v1",
+        orden=20,
+        personaje="auditor",
+        texto="Auditor: conforme con la escena.",
+        origen="reglas",
+    )
+
+    with caplog.at_level(logging.DEBUG):
+        lotes = [
+            en_vivo.publicar_turnos((veredicto,), origen="herramienta", ruta=ruta) for _ in range(4)
+        ]
+
+    assert len(lotes[0]) == 1
+    assert all(lote == () for lote in lotes[1:])
+    assert len(ruta.read_text(encoding="utf-8").splitlines()) == 1
+    assert "turno_repetido" in caplog.text
+
+
+def test_solo_se_compara_con_lo_ultimo_del_mismo_personaje(
+    monkeypatch: pytest.MonkeyPatch,
+    tmp_path: Path,
+) -> None:
+    """El repetido del lote se descarta; otro personaje y otro texto sí entran."""
+    _encender(monkeypatch)
+    ruta = _ruta(tmp_path)
+    conforme = TurnoEscena(
+        id="auditor.veredicto.v1",
+        orden=20,
+        personaje="auditor",
+        texto="Auditor: conforme con la escena.",
+        origen="reglas",
+    )
+    pana = TurnoEscena(
+        id="pana.cierre.v1",
+        orden=21,
+        personaje="pana",
+        texto="Auditor: conforme con la escena.",
+        origen="reglas",
+    )
+    objeta = TurnoEscena(
+        id="auditor.veredicto.v1",
+        orden=22,
+        personaje="auditor",
+        texto="Auditor: objeta la escena.",
+        origen="reglas",
+    )
+
+    seqs = en_vivo.publicar_turnos(
+        (conforme, conforme, pana, objeta, conforme),
+        origen="herramienta",
+        ruta=ruta,
+    )
+
+    assert len(seqs) == 4
+    textos = [
+        json.loads(linea)["turno"]["texto"]
+        for linea in ruta.read_text(encoding="utf-8").splitlines()
+    ]
+    assert textos == [
+        "Auditor: conforme con la escena.",
+        "Auditor: conforme con la escena.",
+        "Auditor: objeta la escena.",
+        "Auditor: conforme con la escena.",
+    ]
+
+
 def test_dos_hilos_publican_sin_repetir_seq_ni_corromper_lineas(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,

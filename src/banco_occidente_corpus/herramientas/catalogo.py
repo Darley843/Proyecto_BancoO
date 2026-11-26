@@ -195,8 +195,8 @@ CATALOGO: tuple[Herramienta, ...] = (
             "Convoca al comité (riesgo, comercial y auditor) solo cuando el "
             "diagnóstico es amarillo o rojo con cuota.",
             "No en verde y no para aprobar: el comité recomienda y la decisión "
-            "final es de un asesor. Sin `DEEPSEEK_API_KEY` no inventa una "
-            "deliberación.",
+            "final es del banco, por sus canales oficiales. Sin "
+            "`DEEPSEEK_API_KEY` no inventa una deliberación.",
             "`convocado: false` con el semáforo, o la deliberación con posturas, "
             "recomendación y hallazgos. Sin clave devuelve los escenarios "
             "precalculados y el error `modelo_no_disponible`.",
@@ -248,10 +248,10 @@ CATALOGO: tuple[Herramienta, ...] = (
             "Arma la mesa de negociación con los escenarios del invitado y "
             "devuelve los turnos, el acuerdo o `None`, el veredicto y el "
             "registro.",
-            "No para aprobar ni cerrar el crédito: el cierre es de un asesor. Si "
-            "el invitado dio un monto exacto, pásalo en `monto`; no negocies "
-            "sobre el valor del rango. No intentes fijar `modo_demo` desde la "
-            "entrada.",
+            "No para aprobar ni cerrar el crédito: el cierre es del banco, por "
+            "sus canales oficiales. Si el invitado dio un monto exacto, pásalo "
+            "en `monto`; no negocies sobre el valor del rango. No intentes fijar "
+            "`modo_demo` desde la entrada.",
             "`turnos`, `acuerdo`, `decisiones`, `veredicto`, `registro` y `escenarios`.",
             "`escena/negociacion.py` sobre el motor; el modo demo lo decide el servidor.",
             "escena.negociacion.negociar",

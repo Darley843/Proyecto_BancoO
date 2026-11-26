@@ -161,7 +161,7 @@ Total: **20 herramientas**.
 
 **Para qué sirve.** Convoca al comité (riesgo, comercial y auditor) solo cuando el diagnóstico es amarillo o rojo con cuota.
 
-**Cuándo NO usarla.** No en verde y no para aprobar: el comité recomienda y la decisión final es de un asesor. Sin `DEEPSEEK_API_KEY` no inventa una deliberación.
+**Cuándo NO usarla.** No en verde y no para aprobar: el comité recomienda y la decisión final es del banco, por sus canales oficiales. Sin `DEEPSEEK_API_KEY` no inventa una deliberación.
 
 **Entrada** (`ConvocarComiteEntrada`, `extra="forbid"`):
 
@@ -223,7 +223,7 @@ Total: **20 herramientas**.
 
 **Para qué sirve.** Arma la mesa de negociación con los escenarios del invitado y devuelve los turnos, el acuerdo o `None`, el veredicto y el registro.
 
-**Cuándo NO usarla.** No para aprobar ni cerrar el crédito: el cierre es de un asesor. Si el invitado dio un monto exacto, pásalo en `monto`; no negocies sobre el valor del rango. No intentes fijar `modo_demo` desde la entrada.
+**Cuándo NO usarla.** No para aprobar ni cerrar el crédito: el cierre es del banco, por sus canales oficiales. Si el invitado dio un monto exacto, pásalo en `monto`; no negocies sobre el valor del rango. No intentes fijar `modo_demo` desde la entrada.
 
 **Entrada** (`NegociarOpcionEntrada`, `extra="forbid"`):
 

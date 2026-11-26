@@ -100,7 +100,8 @@ ENCABEZADO_RESULTADOS = "## Resultados"
 #: Negativa fija del modo simulado.
 NEGATIVA_SIMULADA = (
     "No puedo hacer eso. Solo te doy información general del Banco de Occidente "
-    "y simulaciones orientativas; la decisión final es de un asesor."
+    "y simulaciones orientativas; la decisión final es del banco, por sus "
+    "canales oficiales."
 )
 
 
