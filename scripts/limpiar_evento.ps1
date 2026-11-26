@@ -43,8 +43,11 @@
     4. Borra los archivos locales de memoria del workspace de WSL:
        MEMORY.md, DREAMS.md y todo el contenido de memory\ (bitacora diaria,
        dreaming y .dreams\session-corpus), sin filtrar por extension: cualquier
-       archivo que viva bajo memory\ se borra. Nunca toca los .example ni los
-       archivos versionados SOUL.md, AGENTS.md, USER.md e IDENTITY.md.
+       archivo que viva bajo memory\ se borra. Nunca toca los .example ni las
+       semillas versionadas MEMORY.semilla.md y memory\semilla.md, ni los
+       archivos versionados SOUL.md, AGENTS.md, USER.md e IDENTITY.md: los
+       archivos reales se regeneran desde las semillas con
+       scripts\sembrar_memoria.ps1.
 
     5. Borra en Windows data\asistente\trazas\herramientas.jsonl si existe y, con
        el modo En vivo de la escena, data\escena\en_vivo.jsonl y su bloqueo
@@ -156,6 +159,7 @@ $ArchivosWindows = @(
     (Join-Path $RaizRepo 'data\escena\en_vivo.lock')
 )
 $ArchivosVersionados = @('SOUL.md', 'AGENTS.md', 'USER.md', 'IDENTITY.md')
+$ArchivosSemilla = @('MEMORY.semilla.md', 'semilla.md')
 $TablasArchivadas = @(
     'session_transcript_archives',
     'session_transcript_cold_archives'
@@ -445,8 +449,8 @@ function Get-ArchivosWorkspace {
     <#
         Lista los archivos de memoria derivados del workspace. Borra todo el
         contenido de memory\ sin filtrar por extension (bitacora diaria,
-        dreaming y .dreams\session-corpus). Protege los .example y los cuatro
-        archivos versionados.
+        dreaming y .dreams\session-corpus). Protege los .example, las semillas
+        (MEMORY.semilla.md y semilla.md) y los cuatro archivos versionados.
     #>
     $lista = New-Object System.Collections.Generic.List[string]
 
@@ -470,6 +474,7 @@ function Get-ArchivosWorkspace {
     foreach ($ruta in $lista) {
         $nombre = Split-Path -Leaf $ruta
         if ($ArchivosVersionados -contains $nombre) { continue }
+        if ($ArchivosSemilla -contains $nombre) { continue }
         if ($nombre -like '*.example') { continue }
         $limpias.Add($ruta)
     }

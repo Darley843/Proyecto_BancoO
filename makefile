@@ -194,6 +194,10 @@ probar-openclaw: ## Prueba el cliente de OpenClaw contra el gateway (requiere OP
 .PHONY: limpiar-evento
 limpiar-evento: ## Borra los datos de los invitados de OpenClaw al terminar el evento (prueba; CONFIRMAR=1 borra y purga los archivos archivados)
 	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/limpiar_evento.ps1 $(if $(CONFIRMAR),-Confirmar -PurgarArchivos,)
+
+.PHONY: sembrar-memoria
+sembrar-memoria: ## Siembra MEMORY.md y la bitácora de Pana desde las semillas versionadas (FECHA=AAAA-MM-DD; FORZAR=1 sobrescribe)
+	powershell -NoProfile -ExecutionPolicy Bypass -File scripts/sembrar_memoria.ps1 $(if $(FECHA),-Fecha $(FECHA),) $(if $(FORZAR),-Forzar,)
 # Plan B de la escena. Depende de la tarea 7.2 de Darley
 # (`escena/__main__.py`), que todavía no existe: el objetivo queda listo y no
 # se ejecuta hasta que entre esa tarea. No modifica ni reemplaza `make simular`.

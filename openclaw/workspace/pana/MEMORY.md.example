@@ -1,8 +1,10 @@
 # MEMORY.md — Memoria de Pana (plantilla)
 
-> Copia este archivo como `MEMORY.md` en el workspace local y bórralo al
-> terminar el evento. `MEMORY.md` no se versiona. No escribas datos de
-> invitados: ni nombres, ni números, ni montos, ni deudas, ni documentos.
+> Plantilla vacía de la memoria. Para dejar una memoria con contenido se usan
+> las semillas versionadas y `scripts\sembrar_memoria.ps1` (ver
+> `openclaw/README.md`). `MEMORY.md` no se versiona y se borra al terminar el
+> evento. No escribas datos de invitados: ni nombres, ni teléfonos, ni montos,
+> ni deudas, ni documentos.
 
 ## Aprendizajes generales
 
