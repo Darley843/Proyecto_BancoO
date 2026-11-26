@@ -59,6 +59,7 @@ import {
 } from "./contrato.js";
 import { crearSondeo, pideVoz, registrosNuevos, tiempoDeLectura } from "./envivo.js";
 import { detenerMicrofono, escuchando, escuchar, hayMicrofono } from "./microfono.js";
+import { paraVoz } from "./voz_cifras.js";
 import {
   CLAVE_COMPLETA,
   CLAVE_NUCLEO,
@@ -527,7 +528,7 @@ function decir(turno) {
       window.setTimeout(listo, lectura);
       return;
     }
-    decirComo(turno.personaje, turno.texto, { alTerminar: listo })
+    decirComo(turno.personaje, paraVoz(turno.texto), { alTerminar: listo })
       .then((voz) => {
         porId("escena-voz").textContent = voz === "piper" ? "Voz: Piper" : voz === "navegador" ? "Voz: navegador" : "";
       })
