@@ -109,7 +109,7 @@ export const RESPUESTAS = Object.freeze({
   artistas:
     "Sé que al profesor Jan le gustan mucho Karol G y Shakira, ¡y a nosotros también! Pero eso no tiene nada que ver con nuestro proyecto. Si quieren, les cuento cómo funciona Pana.",
   fuera_de_tema:
-    "No tengo información sobre eso. Puedo contarles sobre el proyecto, la tecnología que usamos, las decisiones del equipo, la actividad de hoy o los productos del banco.",
+    "No tengo información sobre eso; del proyecto sí les cuento. Para productos y tasas, escríbanme por WhatsApp.",
 });
 
 /**
@@ -151,6 +151,31 @@ const FICHA = Object.freeze([
       "Además de esta pantalla, atiendo por WhatsApp: hago la entrevista del diagnóstico, mando la tarjeta con el resultado y respondo el ¿Y si…?",
   },
   {
+    claves: ["pull request", "repositorio", "github", "commits", "ramas"],
+    texto:
+      "El repositorio es público y está en GitHub. Cada cambio entra por una rama y un pull request que aprueba otra persona; la tecla G muestra su QR.",
+  },
+  {
+    claves: ["token", "tokens", "secretos", "credencial"],
+    texto:
+      "Un token es una credencial, no un archivo del repositorio. Las claves van por variables de entorno y nunca se versionan; el repositorio no guarda secretos.",
+  },
+  {
+    claves: ["codigo", "src", "organizado", "capas", "modulos"],
+    texto:
+      "Está en capas: corpus, asistente, Bóveda, sucursal, canal, diagnóstico y escena. Cada módulo vive en su carpeta de src y tiene su prueba en test.",
+  },
+  {
+    claves: ["diagrama", "arquitectura", "archify"],
+    texto:
+      "Sí: arquitectura, flujo de datos, canal y diagnóstico son diagramas interactivos hechos con Archify. La tecla G abre el panel con los seis.",
+  },
+  {
+    claves: ["pruebas", "pytest", "make check", "integracion continua"],
+    texto:
+      "Con pruebas automáticas sin red: lint, tipos y pytest. make check corre las tres y el pipeline de GitHub las repite en cada pull request.",
+  },
+  {
     claves: ["privacidad", "consentimiento", "1581", "datos personales", "mis datos"],
     texto:
       "Los datos del voluntario son inventados. En WhatsApp pido consentimiento antes de guardar algo, se puede revocar y los datos se borran, como pide la Ley 1581.",
@@ -168,6 +193,13 @@ const FICHA = Object.freeze([
     claves: ["actividad", "ejercicio", "voluntario", "escena"],
     texto:
       "Un voluntario del público pide un crédito inventado, Don Gota le ofrece plata rápida, yo comparo con el banco, los agentes negocian y el auditor revisa las cifras.",
+  },
+  {
+    // Va al final para no tapar las respuestas específicas que también
+    // mencionan el proyecto: solo responde la pregunta general.
+    claves: ["proyecto", "sucursal 1965", "de que se trata", "de que trata"],
+    texto:
+      "Somos Pana, un asistente que responde por WhatsApp con la información pública de Banco de Occidente y cita la fuente. Prepara a los jóvenes para su primer crédito. Se llama Sucursal 1965 porque el banco nació en 1965.",
   },
 ]);
 

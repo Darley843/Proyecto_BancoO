@@ -10,7 +10,7 @@ Cada pregunta tiene dos textos:
 
 - **Voz:** la respuesta fija que dice Pana. Si la pregunta del público coincide
   con una de estas, Pana la dice tal cual (`origen: "guion_fijo"`), con la línea
-  `Fuente:` que apunta al ancla de esta ficha (`docs/PRESENTADOR.md#p1` a `#p17`).
+  `Fuente:` que apunta al ancla de esta ficha (`docs/PRESENTADOR.md#p1` a `#p22`).
   Máximo tres frases y 40 palabras contando esa línea, como exige la 6.14.
 - **Detalle:** la versión larga, para el panel de la pantalla y para quien
   presenta. No se dice en voz alta.
@@ -386,6 +386,114 @@ viernes en el computador de la demo.
 **Fuente:** `docs/LISTA_DEMO.md` (sección 6, plan B del canal y de la escena) y
 `openspec/changes/demo-gota-a-gota/tasks.md` (7.5: completa → núcleo → solo
 subtítulos → perfil seguro → escena proyectada).
+
+---
+
+## E. El repositorio, el código y las pruebas
+
+<a id="p18"></a>
+
+### P18. ¿Dónde está el repositorio y puedo ver los pull requests?
+
+**Variantes:** repositorio público, ver el código, los PR, dónde suben el proyecto.
+
+**Voz** (lo que dice Pana):
+
+> El repositorio es público y está en GitHub. Cada cambio entra por una rama y un pull request con la plantilla del proyecto, y lo aprueba alguien distinto de quien lo escribió. La tecla G muestra el QR del repositorio.
+
+**Detalle (para el panel, no para la voz):**
+El repositorio está en GitHub, en la cuenta del equipo
+(`Darley843/Proyecto_BancoO`), y es público: se abre sin cuenta. Cada cambio va
+en una rama propia y entra por un pull request que usa la plantilla
+`.github/PULL_REQUEST_TEMPLATE.md`; lo aprueba alguien distinto de quien subió el
+último commit. En la pantalla, la tecla **G** abre el panel de recursos con el QR
+y el enlace del repositorio, y con los seis diagramas de Archify.
+
+**Fuente:** `README.md` («Cómo contribuir»), `CONSTITUTION.md` §14 y
+`.github/PULL_REQUEST_TEMPLATE.md`.
+
+<a id="p19"></a>
+
+### P19. ¿Qué es un token en git? ¿Usan tokens?
+
+**Variantes:** tokens de GitHub, claves, secretos, tokens en el repositorio.
+
+**Voz** (lo que dice Pana):
+
+> Un token es una credencial, no un archivo del repositorio. Las claves van por variables de entorno y nunca se versionan; el único token es el del gateway local de OpenClaw. El repositorio no guarda secretos.
+
+**Detalle (para el panel, no para la voz):**
+Un token es una credencial de acceso, no un archivo que se guarde en el
+repositorio. Las claves viajan por variables de entorno de la sesión, el proyecto
+no lee `.env` y `make check` no las necesita. El único token del proyecto es el
+del gateway local de OpenClaw, en `127.0.0.1`. El repositorio no contiene tokens
+ni claves, y `.env.example` solo lista los nombres.
+
+**Fuente:** `docs/SEGURIDAD.md` §4 (secretos), `AGENTS.md` (solo `uv` y sin
+`.env`) y `.env.example`.
+
+<a id="p20"></a>
+
+### P20. ¿Cómo está organizado el código?
+
+**Variantes:** explicar el código, qué hay en src, cómo se lee el proyecto.
+
+**Voz** (lo que dice Pana):
+
+> Está en capas: corpus Medallion, asistente, Bóveda, sucursal, canal, diagnóstico y escena. Cada módulo vive en su carpeta de src y tiene su prueba en test; el mapa completo está en el repositorio.
+
+**Detalle (para el panel, no para la voz):**
+`src/banco_occidente_corpus/` está en capas: `discover`/`fetch`/`extract`/`gold`
+para el corpus Medallion; `asistente` para el RAG; `boveda` para fragmentos,
+embeddings y Qdrant; `sucursal` para el grafo y la API; `canal` para WhatsApp;
+`diagnostico` para el motor y el comité; `escena` para Pana y la pantalla; y
+`tablero`, `pana`, `herramientas` y `mcp_servidor` como piezas de apoyo. Cada
+módulo tiene su archivo en `test/`, y el mapa completo está en `AGENTS.md` y en
+`docs/CODIGO.md`.
+
+**Fuente:** `AGENTS.md` («Mapa del código») y `docs/CODIGO.md`.
+
+<a id="p21"></a>
+
+### P21. ¿Tienen un diagrama de arquitectura?
+
+**Variantes:** ver los diagramas, cómo se conectan las piezas, cómo se ve la arquitectura.
+
+**Voz** (lo que dice Pana):
+
+> Sí. Arquitectura, flujo de datos, canal y diagnóstico son diagramas interactivos hechos con Archify, y la tecla G abre el panel con seis. El HTML sale de un JSON versionado; nadie lo edita a mano.
+
+**Detalle (para el panel, no para la voz):**
+Hay seis diagramas interactivos generados con Archify: `docs/arquitectura.html`
+(arquitectura), `docs/datos.html` (flujo de datos), `docs/canal.html` (secuencia
+del canal), `docs/diagnostico.html` (flujo del diagnóstico),
+`docs/agente-openclaw.html` y `docs/despliegue-openclaw.html`. Cada uno tiene su
+fuente `.json` versionada y su HTML se genera con `archify finalize`; nunca se
+edita a mano. La app los sirve en `/diagramas/<nombre>.html` y el panel de
+recursos (tecla **G**) enlaza los seis.
+
+**Fuente:** `README.md` («Diagramas interactivos de la fase 2»),
+`docs/DIAGRAMAS.md` y los `docs/*.json` versionados.
+
+<a id="p22"></a>
+
+### P22. ¿Cómo prueban el proyecto?
+
+**Variantes:** pruebas automáticas, make check, integración continua, cómo evitan romper el código.
+
+**Voz** (lo que dice Pana):
+
+> Con pruebas automáticas que corren sin red: lint, tipos y pytest. make check corre las tres y debe quedar en verde antes de cada cambio; el pipeline de GitHub las repite en cada pull request.
+
+**Detalle (para el panel, no para la voz):**
+`make check` corre `ruff` (lint y formato), `ty` (tipos) y `pytest`. Las pruebas
+no usan red: `test/conftest.py` bloquea cualquier conexión fuera de loopback y
+los clientes de DeepSeek y Ollama se reemplazan por dobles. El pipeline de
+GitHub (`.github/workflows/ci.yml`) repite `make check` en cada pull request, y
+los hooks de `.pre-commit-config.yaml` lo revisan antes del commit.
+
+**Fuente:** `AGENTS.md` («Verificación antes de dar algo por terminado»),
+`pyproject.toml`, `test/conftest.py` y `.github/workflows/ci.yml`.
 
 ---
 

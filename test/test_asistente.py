@@ -21,6 +21,7 @@ from banco_occidente_corpus.asistente import cli as cli_mod
 from banco_occidente_corpus.asistente import faq as faq_mod
 from banco_occidente_corpus.asistente.contexto_prompt import (
     ContextoAusente,
+    ContextoPrompt,
     PresupuestoContextoError,
     cargar_contexto,
     normalizar_digitos,
@@ -47,6 +48,7 @@ from banco_occidente_corpus.asistente.modelo import (
     parametros_de,
 )
 from banco_occidente_corpus.asistente.prompts import (
+    Prompt,
     PromptNoEncontrado,
     cargar_prompt,
 )
@@ -119,13 +121,13 @@ def contexto_path(tmp_path: Path) -> Path:
 
 
 @pytest.fixture
-def contexto(contexto_path: Path):
+def contexto(contexto_path: Path) -> ContextoPrompt:
     """Contexto cargado desde el fixture."""
     return cargar_contexto(archivo=contexto_path)
 
 
 @pytest.fixture
-def prompt_qa():
+def prompt_qa() -> Prompt:
     """Prompt de Q&A versionado en el repositorio."""
     return cargar_prompt("qa")
 
@@ -650,6 +652,10 @@ def test_detectar_pii_categorias(texto: str, categoria: str) -> None:
         "¿La tasa es 4,5 %?",
         "¿Qué pasó en 2026?",
         "¿Cuál es la línea 018000 514652?",
+        "2000000",
+        "monto 2000000",
+        "$2.000.000",
+        "quiero 2.000.000",
     ],
 )
 def test_detectar_pii_no_marca_cifras_publicas(texto: str) -> None:

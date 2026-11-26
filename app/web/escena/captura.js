@@ -2,26 +2,29 @@
  * Captura del voluntario de la escena: fila y silla, tarjetas A–F, monto,
  * micrófono con aviso de servicio externo y confirmación de Pana.
  *
- * La transcripción la hace el navegador (`microfono.js`); aquí solo viaja el
- * texto a `POST /api/escena/interpretar` y se descarta al confirmar. Sin
- * micrófono, todo se puede hacer con teclado y tarjetas. Al confirmar se pide
- * `POST /api/escena` y se avisa a la pantalla con el evento `escena:lista`.
+ * La transcripción la hace el navegador (`microfono.js`); aquí el texto viaja a
+ * `POST /api/escena/hablar`, que lo interpreta y devuelve la línea de Pana, y se
+ * descarta al confirmar. Sin micrófono, todo se puede hacer con teclado y
+ * tarjetas. Al confirmar se pide `POST /api/escena` y se avisa a la pantalla con
+ * el evento `escena:lista`.
  *
  * No guarda nada: ni el perfil, ni el texto, ni la selección. Las pruebas de la
  * página viven en `test/test_web_escena.py`.
  */
 
-import { detenerMicrofono, escuchar, hayMicrofono } from "./microfono.js";
+import { detenerMicrofono, escuchando, escuchar, hayMicrofono } from "./microfono.js";
 
 /** Rutas de la API de la escena. */
 const RUTA_OPCIONES = "/api/escena/opciones";
 const RUTA_PERFILES = "/api/escena/perfiles";
 const RUTA_VOLUNTARIO = "/api/escena/voluntario";
-const RUTA_INTERPRETAR = "/api/escena/interpretar";
+const RUTA_HABLAR = "/api/escena/hablar";
 const RUTA_ESCENA = "/api/escena";
 
 /** Espera máxima de cada petición de la captura. */
 const ESPERA_MS = 8000;
+/** Espera del turno libre: el canal puede tardar lo que tarda OpenClaw. */
+const ESPERA_HABLAR_MS = 50000;
 
 /** Intentos por pregunta antes de ofrecer el perfil seguro. */
 const INTENTOS_MAXIMOS = 2;
@@ -86,12 +89,13 @@ function avisar(texto, error = false) {
  *
  * @param {string} ruta Ruta de la API.
  * @param {object} [opciones] Opciones de `fetch`.
+ * @param {number} [espera] Tiempo máximo en milisegundos.
  * @returns {Promise<object>} El JSON de la respuesta.
  */
-async function pedir(ruta, opciones = {}) {
+async function pedir(ruta, opciones = {}, espera = ESPERA_MS) {
   const respuesta = await fetch(ruta, {
     ...opciones,
-    signal: AbortSignal.timeout(ESPERA_MS),
+    signal: AbortSignal.timeout(espera),
     headers: { "Content-Type": "application/json", ...(opciones.headers ?? {}) },
   });
   const datos = await respuesta.json().catch(() => ({}));
@@ -193,7 +197,11 @@ function elegirTarjeta(letra) {
 }
 
 /**
- * Envía la respuesta actual al parser y avanza a la siguiente pregunta.
+ * Envía la respuesta actual al servidor y avanza a la siguiente pregunta.
+ *
+ * El texto viene del campo o del micrófono. `POST /api/escena/hablar` devuelve
+ * la interpretación y la línea con la que Pana confirma; si no entendió, la
+ * línea se muestra y la pregunta no avanza.
  *
  * @returns {Promise<void>} Se resuelve cuando la respuesta quedó registrada.
  */
@@ -216,13 +224,22 @@ async function enviar() {
     return;
   }
   try {
-    const datos = await pedir(RUTA_INTERPRETAR, {
+    const datos = await pedir(RUTA_HABLAR, {
       method: "POST",
       body: JSON.stringify({ pregunta: pregunta.clave, texto }),
     });
+    const linea = datos.turno?.texto ?? datos.mensaje ?? "";
+    if (!datos.respuesta) {
+      estado.intentos += 1;
+      avisar(linea || "No entendí la respuesta. Dime una letra o un monto.", true);
+      if (estado.intentos >= INTENTOS_MAXIMOS) {
+        avisar(`${linea} Dos intentos: puedes seguir con el perfil seguro.`, true);
+      }
+      return;
+    }
     estado.respuestas.set(pregunta.clave, datos.respuesta);
     estado.intentos = 0;
-    avisar(datos.ajustado ? (datos.mensaje ?? "Ajusté el monto.") : "Respuesta registrada.");
+    avisar(linea || (datos.ajustado ? "Ajusté el monto." : "Respuesta registrada."));
     estado.indice += 1;
     if (estado.indice < estado.preguntas.length) {
       pintarPregunta();
@@ -375,9 +392,65 @@ function dictar() {
   escuchar({
     alResultado: (texto) => {
       porId("captura-texto").value = texto;
-      avisar(`Escuché: «${texto}». Revisa y pulsa «Enviar».`);
+      avisar(`Escuché: «${texto}». Enviando a Pana…`);
+      void enviar();
     },
     alError: () => avisar("No pude escuchar. Escribe la respuesta o usa una tarjeta.", true),
+    alTerminar: () => boton.setAttribute("aria-pressed", "false"),
+  });
+}
+
+/**
+ * Envía una frase libre al voluntario activo y muestra lo que respondió Pana.
+ *
+ * La ruta del canal aplica los filtros, busca al voluntario en memoria y envía
+ * la respuesta (y la ficha, si la hay) por WhatsApp. Aquí solo se pinta el
+ * texto que la pantalla puede mostrar.
+ *
+ * @param {string} texto Frase dictada por el voluntario.
+ * @returns {Promise<void>} Se resuelve cuando la respuesta quedó pintada.
+ */
+async function enviarAPana(texto) {
+  const linea = porId("captura-pana-estado");
+  try {
+    const datos = await pedir(
+      RUTA_HABLAR,
+      { method: "POST", body: JSON.stringify({ texto }) },
+      ESPERA_HABLAR_MS,
+    );
+    const respuesta = String(datos?.turno?.texto ?? datos?.mensaje ?? "").trim();
+    const ficha = datos?.ficha ? " También te envié la ficha por WhatsApp." : "";
+    linea.textContent = `${respuesta}${ficha}` || "Pana no respondió.";
+  } catch (error) {
+    linea.textContent = error.message;
+  }
+}
+
+/**
+ * Escucha una pregunta libre y la manda al canal del voluntario activo.
+ *
+ * @returns {void}
+ */
+function preguntarAPana() {
+  const boton = porId("captura-pana");
+  const linea = porId("captura-pana-estado");
+  if (!hayMicrofono()) {
+    linea.textContent = "Este navegador no tiene micrófono: escribe en WhatsApp.";
+    return;
+  }
+  if (escuchando()) {
+    detenerMicrofono();
+    return;
+  }
+  boton.setAttribute("aria-pressed", "true");
+  escuchar({
+    alResultado: (texto) => {
+      linea.textContent = `Escuché: «${texto}». Enviando a Pana…`;
+      void enviarAPana(texto);
+    },
+    alError: (mensaje) => {
+      linea.textContent = mensaje;
+    },
     alTerminar: () => boton.setAttribute("aria-pressed", "false"),
   });
 }
@@ -407,5 +480,8 @@ export function montarCaptura(opciones = {}) {
   const microfono = porId("captura-microfono");
   microfono.hidden = !hayMicrofono();
   microfono.addEventListener("click", dictar);
+  const pana = porId("captura-pana");
+  pana.hidden = !hayMicrofono();
+  pana.addEventListener("click", preguntarAPana);
   document.addEventListener("escena:captura", alternar);
 }

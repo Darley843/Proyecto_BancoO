@@ -103,6 +103,23 @@ def test_el_readme_explica_tunel_y_meta() -> None:
         assert pieza in readme, pieza
 
 
+def test_el_despliegue_dice_donde_va_la_url_del_tunel() -> None:
+    """El despliegue señala el único campo de Meta y el arranque por ventana."""
+    texto = (RAIZ / "docs" / "DESPLIEGUE_WHATSAPP.md").read_text(encoding="utf-8")
+
+    for pieza in (
+        "URL de devolución de llamada",
+        "whatsapp-business/wa-settings",
+        "/webhooks/whatsapp",
+        "Verificar y guardar",
+        "WHATSAPP_ID_SALT",
+        "WHATSAPP_EVENTO",
+        "..\\whatsapp-env.ps1",
+        "127.0.0.1:8000",
+    ):
+        assert pieza in texto, pieza
+
+
 def test_el_despliegue_explica_que_solo_el_webhook_es_publico() -> None:
     """El runbook dice qué rutas quedan públicas y cómo comprobarlo desde fuera."""
     texto = (RAIZ / "docs" / "DESPLIEGUE_WHATSAPP.md").read_text(encoding="utf-8")
@@ -129,3 +146,11 @@ def test_los_comandos_del_modulo_usan_uv() -> None:
 
         assert "uv run python -m banco_occidente_corpus.canal.identidad" in texto, archivo
         assert re.search(r"(?<!uv run )python -m banco_occidente_corpus", texto) is None, archivo
+
+
+def test_la_guia_documenta_el_codigo_de_la_escena() -> None:
+    """La operación explica que el comando exige el código de cuatro dígitos."""
+    texto = (RAIZ / "docs" / "OPERACION_WHATSAPP.md").read_text(encoding="utf-8")
+
+    for pieza in ("ESCENA_CODIGO", "cuatro dígitos", "ESCENA 1965"):
+        assert pieza in texto, pieza

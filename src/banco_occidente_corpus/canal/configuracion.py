@@ -39,6 +39,7 @@ class ConfiguracionCanal:
     limite_intentos_roba: int = 20
     retencion_dias: int = 30
     entrevista_ttl_minutos: int = 30
+    escena_ttl_minutos: int = 180
     huellas: tuple[str, ...] = ()
     evento: Evento = field(default_factory=Evento)
 
@@ -104,6 +105,7 @@ def cargar_configuracion_canal(ruta: Path | None = None) -> ConfiguracionCanal:
         limite_intentos_roba=int(canal.get("limite_intentos_roba", 20)),
         retencion_dias=int(canal.get("retencion_dias", 30)),
         entrevista_ttl_minutos=int(canal.get("entrevista_ttl_minutos", 30)),
+        escena_ttl_minutos=int(evento_toml.get("escena_ttl_minutos", 180)),
         huellas=tuple(str(huella) for huella in autorizados.get("huellas", [])),
         evento=leer_evento(evento_toml, activo_entorno=_booleano_entorno("WHATSAPP_EVENTO")),
     )

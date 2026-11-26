@@ -36,21 +36,50 @@ Cómo decide Pana qué responder (gana la primera regla que aplica):
    devuelve `{"tema": "…", "turno": {…}}` con un turno de Pana del contrato
    (`escena/respondedor.py`). La audiencia la fija el servidor (`publico`): un
    campo de más en la petición es un 422. En la pantalla la Ventanilla no
-   responde: las preguntas de tasas y productos reciben el rechazo y se
-   contestan por WhatsApp. Sin `DEEPSEEK_API_KEY` o con `SUCURSAL_DEMO`, las
-   respuestas fijas funcionan igual y las del proyecto usan la frase de
-   respaldo.
+   responde: las preguntas de tasas y productos reciben el rechazo, que invita
+   al WhatsApp del canal, y el panel muestra el QR. Sin `DEEPSEEK_API_KEY` o con
+   `SUCURSAL_DEMO`, las respuestas fijas funcionan igual y las del proyecto usan
+   la frase de respaldo.
 4. Si el servidor no responde: una **ficha corta de respaldo** en `anfitrion.js`
    (menos de 40 palabras por respuesta) contesta lo más probable del proyecto
    (gota a gota, agentes, Bóveda y Qdrant, DeepSeek, voces, WhatsApp,
-   privacidad, público, equipo, actividad); lo demás: «No tengo información
-   sobre eso…». Quien presenta ve el aviso.
+   privacidad, público, equipo, actividad, repositorio, tokens, código,
+   diagramas y pruebas); lo demás: «No tengo información sobre eso…». Quien
+   presenta ve el aviso.
    Si el servidor responde pero solo con su rechazo o su respaldo fijo
    (`pana.pregunta.rechazo.v1`, `pana.pregunta.respaldo.v1`) y la ficha corta
    sí tiene la respuesta, gana la ficha.
 
 La pregunta del público es un dato no confiable: no se guarda y nunca cambia lo
 que hace Pana.
+
+## Panel de recursos (tecla G)
+
+El panel `escena-recursos` se abre con **G** o con su botón, en cualquier paso
+(incluso en vivo). Trae, en orden:
+
+| Recurso | Qué hace | De dónde sale |
+|---|---|---|
+| **QR del repositorio** | El público escanea y abre el repositorio público del proyecto | `GET /api/escena/repositorio/qr.png`, dibujado en memoria con `segno` desde `URL_REPOSITORIO` |
+| **Abrir repositorio** | Abre el repositorio en otra pestaña | `GET /api/escena/repositorio`, que devuelve la URL; el HTML no lleva URLs externas |
+| **QR de WhatsApp** | El público escanea y pregunta por el canal | `GET /api/escena/whatsapp/qr.png`, dibujado en memoria con `segno` |
+| **Diagramas de Archify** | Abre arquitectura, flujo de datos, canal, diagnóstico y los dos de OpenClaw | `GET /diagramas/<nombre>.html` (lista cerrada de seis archivos de `docs/`) |
+
+El número de WhatsApp **no vive en el repositorio**: `escena/recursos.py` lo lee
+de la variable de entorno `PANA_WHATSAPP_NUMERO` (solo dígitos, formato
+internacional). Sin la variable, `GET /api/escena/whatsapp` responde
+`{"disponible": false}`, el QR devuelve 404 y la pantalla oculta el bloque; el
+número nunca se escribe en un log ni en la respuesta JSON. El QR del repositorio
+no depende de variables: la URL es pública y está versionada en `recursos.py`.
+
+El túnel público no expone estas rutas: solo pasan `/webhooks/whatsapp` y
+`/health`. Las preguntas de productos y tasas siguen sin responderse en la
+pantalla: el rechazo invita a WhatsApp y el QR está en el panel G. Las preguntas
+del proyecto que el profesor suele hacer —repositorio, tokens, código, diagramas
+y pruebas— son respuestas fijas (`repositorio`, `git_tokens`, `codigo`,
+`diagrama` y `pruebas` en `config/escena.toml`, con fuente en
+`docs/PRESENTADOR.md#p18` a `#p22`), así que funcionan sin modelo, sin red y sin
+Ollama.
 
 ## De dónde salen los turnos
 
@@ -122,10 +151,11 @@ Para cambiar un retrato basta con reemplazar el `.webp` con el mismo nombre
 | Siguiente turno (Espacio o →) | pasa al siguiente sin esperar |
 | Solo subtítulos (tecla S) | **modo de respaldo**: no suena nada y avanza de a un turno por clic; las respuestas a preguntas salen solo en texto |
 | Preguntas (tecla Q) | abre o cierra el cuadro de preguntas del público |
-| Entrada por voz (tecla V) | abre la captura del perfil del voluntario (`escena:captura`); si no responde o falla el micrófono, se usa el perfil seguro ([`LISTA_DEMO.md`](./LISTA_DEMO.md), sección 6.2) |
+| Entrada por voz (tecla V) | abre la captura del perfil del voluntario (`escena:captura`). El botón **Hablar** transcribe con el navegador y manda el texto a `POST /api/escena/hablar`, que devuelve la interpretación y la línea de Pana; si no entiende, Pana pide repetir y no avanza. El botón **Hablar con Pana** manda una frase libre: si hay voluntario activo, pasa por los filtros del canal y el motor, y la respuesta y la ficha llegan por WhatsApp. Si falla el micrófono, se escribe o se usa el perfil seguro ([`LISTA_DEMO.md`](./LISTA_DEMO.md), sección 6.2) |
 | Núcleo (tecla N) | **plan B**: sigue solo con Don Gota, Pana y el auditor, sin repetir lo ya dicho, y deja la escena en pausa |
 | Trazabilidad (tecla T) | muestra u oculta el panel para quien facilita (empieza oculto) |
 | Herramientas (tecla H) | muestra u oculta, a la vista del público, las últimas herramientas que usó Pana: nombre, dueña, si salió bien y cuánto tardó. Lee `GET /api/herramientas/traza` cada 2 s solo mientras está abierto; nunca muestra argumentos ni huellas. Con el servidor MCP apagado dice que todavía no hay llamadas |
+| Recursos (tecla G) | muestra u oculta el panel con el QR del repositorio, el enlace para abrirlo, el QR de WhatsApp (si hay número) y los seis diagramas de Archify. Se puede abrir en cualquier paso |
 | En vivo (tecla E) | entra o sale del **modo en vivo**: deja la escena guardada en pausa y reproduce, en orden, los turnos que publican el canal y las herramientas mientras el voluntario escribe por WhatsApp. Ver [Modo en vivo](#modo-en-vivo-tecla-e) |
 | Reiniciar (tecla R) | vuelve al inicio con la escena completa y borra la escena guardada en la pestaña  (en vivo: vuelve a pedir la lista desde el principio) |
 
@@ -159,6 +189,14 @@ pantalla lo implementa en `app/web/escena/envivo.js`.
   datos personales.
 - **Salir (E otra vez).** Para el sondeo, vacía la cola y devuelve la escena
   guardada al mismo turno en que estaba, en pausa.
+
+El otro extremo lo pone el canal: el voluntario escribe `ESCENA` y el código de
+cuatro dígitos de la sesión por WhatsApp y
+`canal/escena_vivo.py` publica su mensaje y la respuesta de Pana con
+`ESCENA_EN_VIVO=1`; `escena/api_en_vivo.py` sirve la ruta. El detalle está en
+[`OPERACION_WHATSAPP.md`](./OPERACION_WHATSAPP.md), sección «Escena en vivo».
+Si el publicador no está o el interruptor está apagado, la ruta responde la
+lista vacía y la pantalla sigue con la escena guardada.
 
 ## Plan B en la pantalla
 

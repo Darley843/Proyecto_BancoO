@@ -32,8 +32,12 @@ Taller 1 del curso TAAML (UAO). Antes de tocar código, lee
    `usuario_id = HMAC-SHA256(número, WHATSAPP_ID_SALT)` dentro de la petición;
    el número en claro no se persiste, no se registra en logs y nunca se envía al
    modelo. Solo se guarda el hash, el nombre y el rol que la persona declare,
-   con consentimiento previo. Sigue prohibido capturar teléfonos del sitio o de
-   terceros.
+   con consentimiento previo. **Tercera excepción, solo para el voluntario activo
+   de la escena:** `canal/escena_vivo.py` guarda el destino normalizado en RAM
+   mientras dura el TTL, únicamente para que `POST /api/escena/hablar` envíe la
+   respuesta y la ficha por WhatsApp; no se persiste, no se registra, no se
+   envía al modelo y se borra al vencer. Sigue prohibido capturar teléfonos del
+   sitio o de terceros.
 6. **Commits:** Conventional Commits en español (`feat:`, `fix:`, `docs:`,
    `test:`, `chore:`). La CI y los hooks deben quedar en verde.
 
@@ -181,6 +185,9 @@ rol declarados, con consentimiento.
 | `.../canal/hitl.py` | `interrupt()`, botones Contactar/Descartar y caso de asesor |
 | `.../canal/envio.py` | Cliente de Meta: `timeout`, User-Agent y `From` |
 | `.../canal/openclaw.py` | Cliente del gateway OpenClaw: 45 s de techo, sin reintentos, UA, `From` y respaldo al grafo |
+| `.../canal/escena_vivo.py` | `ESCENA` activa al voluntario, TTL en memoria y publicación de invitado y Pana |
+| `.../escena/api_en_vivo.py` | `GET /api/escena/en-vivo`: solo lectura, 200 turnos y `no-store` |
+| `.../escena/recursos.py` | QR del repositorio y de WhatsApp (`PANA_WHATSAPP_NUMERO`) y los diagramas de `docs/` |
 | `.../canal/almacen.py` | Mensajes, consentimientos y casos en SQLite |
 | `.../diagnostico/motor.py` | Contratos del canal → cálculo → `ResultadoDiagnostico` |
 | `.../diagnostico/calculo.py` | Tasa mensual y cuota francesa |

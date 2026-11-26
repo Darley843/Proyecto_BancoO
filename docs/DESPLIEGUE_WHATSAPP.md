@@ -9,6 +9,19 @@ Todo lo que se pega en Meta está marcado con **Meta**; lo que se ejecuta en
 PowerShell, con **PowerShell**. Los secretos van **solo** en
 `whatsapp-env.ps1`, fuera del repositorio.
 
+## 0. Ruta rápida (dos ventanas)
+
+| # | Dónde | Qué haces |
+|---|---|---|
+| 1 | PowerShell | Crear `..\whatsapp-env.ps1` fuera del repo (§2.1) |
+| 2 | PowerShell (ventana 1) | `cd` al repo, cargar el `.ps1`, `$env:WHATSAPP_MODO = "real"` y `make app` (§6) |
+| 3 | PowerShell (ventana 2) | `cloudflared tunnel --url http://127.0.0.1:8000` y copiar la URL (§5) |
+| 4 | Meta | Pegar `https://<url>/webhooks/whatsapp` en **Webhook → Editar → URL de devolución de llamada** (§3.1 y §4.5) |
+| 5 | WhatsApp | Escribir «hola» desde un número autorizado (§7) |
+
+La URL del túnel se pega en **un solo lugar de Meta**: el webhook de la app. No
+va en el «Paso 1», ni en WhatsApp Manager, ni en `whatsapp-env.ps1`.
+
 ## 1. Datos del canal (sin secretos)
 
 Los identificadores reales **no viven en el repositorio**: este documento los
@@ -28,51 +41,129 @@ nivel arriba del proyecto y fuera de Git.
 > solo en `whatsapp-env.ps1`. El número de prueba compartido de Meta se conserva
 > como respaldo, con su propio límite de 5 destinatarios. No se elimina.
 
-## 2. Variables de entorno (fuera del repositorio)
+## 2. Variables de entorno: archivo, carga y precedencia
 
-Archivo `..\whatsapp-env.ps1`, un nivel arriba de `ProyectoAvance1`:
+### 2.1 Dónde vive el archivo
+
+`whatsapp-env.ps1` está **un nivel arriba** de `ProyectoAvance1`, nunca dentro
+del repositorio:
+
+```text
+3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\
+├── whatsapp-env.ps1        ← credenciales (fuera de Git)
+└── ProyectoAvance1\        ← este repositorio
+```
+
+Ruta absoluta típica:
+
+```text
+D:\...\SegundoSemestre\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje\whatsapp-env.ps1
+```
+
+Si no existe, se crea una vez:
 
 ```powershell
+cd "D:\...\3.tecnicasAvanzadaDeIA_AplicadasEnModeloDeLenguaje"
+notepad whatsapp-env.ps1
+```
+
+`.env` **no** se usa: el proyecto no lo lee (`docs/SEGURIDAD.md` §4).
+
+### 2.2 Contenido del archivo
+
+```powershell
+# Fuera del repositorio. No se versiona y no se comparte.
 $env:WHATSAPP_PHONE_NUMBER_ID = "<PHONE_NUMBER_ID>"
 $env:WHATSAPP_APP_SECRET      = "<App Secret de Prueba1>"
-$env:WHATSAPP_VERIFY_TOKEN    = "<cadena alfanumérica inventada>"
+$env:WHATSAPP_VERIFY_TOKEN    = "<token alfanumérico inventado>"
 $env:WHATSAPP_ACCESS_TOKEN    = "<token del usuario del sistema>"
 $env:WHATSAPP_ID_SALT         = "<sal aleatoria, no se cambia nunca>"
-$env:WHATSAPP_MODO            = "real"
+
+# Modo seguro por defecto: no sale a Meta hasta que la ventana lo cambie.
+$env:WHATSAPP_MODO            = "falso"
 # Opcional: enciende el modo evento sin editar el TOML.
 # $env:WHATSAPP_EVENTO        = "1"
 ```
 
-| Variable | Secreta | De dónde sale | Si está mal |
-|---|---|---|---|
-| `WHATSAPP_APP_SECRET` | Sí | App → Configuración → Básica → Clave secreta | Meta recibe `403`; no entra ningún mensaje |
-| `WHATSAPP_VERIFY_TOKEN` | Trátala como secreta | La inventas y la pegas también en Meta | «Verificar y guardar» falla |
-| `WHATSAPP_ACCESS_TOKEN` | Sí | Usuario del sistema `sucursal-1965-bot` | El mensaje entra, la respuesta falla con `401` |
-| `WHATSAPP_ID_SALT` | Sí, irrecuperable | La inventas una vez | Cambian todas las huellas y los consentimientos quedan huérfanos |
-| `WHATSAPP_MODO` | No | `falso` o `real` | En `falso` la respuesta se registra pero no sale a Meta |
-
-Cargar en cada ventana nueva:
+Generar la sal una sola vez (48 caracteres alfanuméricos):
 
 ```powershell
+-join ((48..57) + (65..90) + (97..122) | Get-Random -Count 48 |
+  ForEach-Object { [char]$_ })
+```
+
+| Variable | Para qué sirve | Secreta | Si está mal |
+|---|---|---|---|
+| `WHATSAPP_PHONE_NUMBER_ID` | Número desde el que responde el bot | No | El envío falla con `400`/`404` |
+| `WHATSAPP_APP_SECRET` | Verifica `X-Hub-Signature-256` | Sí | Meta recibe `403`; no entra ningún mensaje |
+| `WHATSAPP_VERIFY_TOKEN` | Reto `GET` del webhook | Trátala como secreta | «Verificar y guardar» falla |
+| `WHATSAPP_ACCESS_TOKEN` | Enviar respuestas por `graph.facebook.com` | Sí | El mensaje entra, la respuesta falla con `401` |
+| `WHATSAPP_ID_SALT` | `usuario_id = HMAC-SHA256(número, sal)` | Sí, irrecuperable | Si falta, el canal no procesa (200 y silencio); si cambia, se invalidan huellas y consentimientos |
+| `WHATSAPP_MODO` | `falso` registra sin enviar; `real` envía | No | En `falso` el teléfono no recibe nada |
+| `WHATSAPP_EVENTO` | `1` enciende el modo evento; `0` lo apaga | No | Manda sobre `[evento] activo`, pero no mueve `desde`/`hasta` |
+
+**La sal no se cambia.** Las huellas de `config/whatsapp.toml` y los
+consentimientos guardados se calculan con ella; otra sal produce otros
+`usuario_id` y deja los consentimientos huérfanos. Si se pierde, hay que
+regenerar todas las huellas con `--huella` (§7.2).
+
+**La sal tampoco se configura aparte.** Viaja dentro de `whatsapp-env.ps1`, que
+es el mismo archivo que se carga en la ventana de la app; no se pega en Meta y
+el túnel no la usa. Si la app arranca sin `WHATSAPP_ID_SALT`, `app.py` no crea
+el despachador: el webhook responde `200` pero no procesa nada y el teléfono
+queda en silencio.
+
+### 2.3 Cómo se cargan en la ventana
+
+Las variables viven **solo en la ventana de PowerShell** donde se cargan. Cada
+ventana nueva empieza sin ellas. Desde la carpeta del repo:
+
+```powershell
+cd "D:\...\ProyectoAvance1"
 . "..\whatsapp-env.ps1"
 ```
 
-Verificar:
+El punto inicial (`.`) ejecuta el archivo en la sesión actual. Si PowerShell
+bloquea el script por la política de ejecución:
+
+```powershell
+Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass
+. "..\whatsapp-env.ps1"
+```
+
+Comprobar sin imprimir secretos:
 
 ```powershell
 @("WHATSAPP_PHONE_NUMBER_ID","WHATSAPP_APP_SECRET","WHATSAPP_VERIFY_TOKEN",
   "WHATSAPP_ACCESS_TOKEN","WHATSAPP_ID_SALT") |
   ForEach-Object { "$_ = $([bool](Get-Item "env:$_" -ErrorAction SilentlyContinue))" }
+
+# No son secretos: se pueden mostrar.
+"WHATSAPP_MODO   = $env:WHATSAPP_MODO"
+"WHATSAPP_EVENTO = $env:WHATSAPP_EVENTO"
 ```
 
+### 2.4 Precedencia
+
+1. `whatsapp-env.ps1` define los valores base.
+2. Una asignación posterior en la **misma** ventana gana:
+   `$env:WHATSAPP_MODO = "real"`, `$env:WHATSAPP_EVENTO = "1"`.
+3. Si la variable no existe, manda `config/whatsapp.toml` (`canal.modo`,
+   `[evento] activo`).
+4. `make app` hereda el entorno de esa ventana; no lee el `.ps1` por su cuenta.
+
 ## 3. Enlaces de Meta
+
+Sustituye `<APP_ID>` por el App ID de `Prueba1` (no se guarda en el
+repositorio).
 
 | Qué | Enlace |
 |---|---|
 | Panel de apps | <https://developers.facebook.com/apps/> |
 | App `Prueba1` | `https://developers.facebook.com/apps/<APP_ID>/` |
-| Configuración de WhatsApp (webhooks, número) | `https://developers.facebook.com/apps/<APP_ID>/whatsapp-business/wa-settings/` |
+| **Webhook: aquí se pega la URL del túnel** | `https://developers.facebook.com/apps/<APP_ID>/whatsapp-business/wa-settings/` |
 | Configuración de la API (Paso 1) | `https://developers.facebook.com/apps/<APP_ID>/whatsapp-business/wa-dev-console/` |
+| Webhooks de la app (objeto WABA) | `https://developers.facebook.com/apps/<APP_ID>/webhooks/` |
 | WhatsApp Manager → Números de teléfono | <https://business.facebook.com/wa/manage/phone-numbers/> |
 | Configuración del negocio (personas, activos, sistema) | <https://business.facebook.com/settings/> |
 | Usuarios del sistema (token permanente) | <https://business.facebook.com/settings/system-users> |
@@ -80,6 +171,33 @@ Verificar:
 > El botón `+ Agregar` de **Business Settings → Cuentas de WhatsApp** crea otra
 > WABA, no un número. Los números se agregan desde el panel de la app o desde
 > WhatsApp Manager.
+
+### 3.1 Dónde se pega la URL del túnel
+
+La URL del túnel se escribe **una sola vez**, en el webhook de la app:
+
+1. Abre
+   `https://developers.facebook.com/apps/<APP_ID>/whatsapp-business/wa-settings/`
+   (o **Panel de apps → Prueba1 → WhatsApp → Configuración**).
+2. Baja a la tarjeta **Webhook** y pulsa **Editar**.
+3. En **URL de devolución de llamada** pega
+   `https://<url-del-túnel>/webhooks/whatsapp`. El path es obligatorio; no
+   agregues `/` al final y no uses `127.0.0.1` ni `localhost`.
+4. En **Token de verificación** pega el valor de `WHATSAPP_VERIFY_TOKEN`.
+5. Pulsa **Verificar y guardar**. Meta hace un `GET /webhooks/whatsapp`; debe
+   quedar en verde y aparecer `GET /webhooks/whatsapp ... 200 OK` en la ventana
+   de la app. La app y el túnel tienen que estar arriba **antes** de pulsar.
+6. Confirma que el campo **`messages`** está suscrito.
+
+Si tu panel muestra el menú **Webhooks** de la app
+(`https://developers.facebook.com/apps/<APP_ID>/webhooks/`), el objeto es
+**`WhatsApp Business Account`**, no `User`: allí está el mismo campo.
+
+No hay otro lugar en Meta donde vaya la URL. El **Paso 1** (`wa-dev-console`)
+no la pide y WhatsApp Manager solo administra números.
+
+> Cada vez que se reinicia el túnel rápido cambia el subdominio. Si eso pasa,
+> repite solo estos seis pasos: no hay que tocar tokens, números ni el `.ps1`.
 
 ## 4. Meta, paso a paso
 
@@ -144,7 +262,8 @@ activos → Apps → Prueba1**.
 
 ### 4.5 Webhook (callback)
 
-**Meta** → App `Prueba1` → **WhatsApp** → `Configurar webhooks` → **Editar**.
+**Meta** → App `Prueba1` → **WhatsApp** → **Configuración** → tarjeta
+**Webhook** → **Editar**. Enlace directo en §3.1.
 
 | Campo | Valor |
 |---|---|
@@ -154,6 +273,15 @@ activos → Apps → Prueba1**.
 Pulsa **Verificar y guardar**: Meta hace un `GET /webhooks/whatsapp` y debe
 responder `200` con el `hub.challenge`. Después confirma que el campo
 **`messages`** está suscrito.
+
+Antes de pulsar, comprueba el camino completo desde fuera:
+
+```powershell
+curl.exe "https://<url-del-túnel>/health"
+```
+
+Si ese comando no responde `200`, Meta tampoco podrá verificar. Revisa que la
+app escuche en `127.0.0.1:8000` y que el túnel apunte a ese puerto.
 
 > La URL cambia cada vez que se reinicia el túnel rápido de Cloudflare. Si
 > cambia, hay que volver a editar el callback. Para el evento, usar un túnel con
@@ -169,6 +297,9 @@ Se guarda en `whatsapp-env.ps1` y se comparte **solo** por gestor de secretos.
 Comprobar vigencia y app:
 
 ```powershell
+$base = "https://graph.facebook.com/v23.0"
+$tok  = $env:WHATSAPP_ACCESS_TOKEN
+
 Invoke-RestMethod "$base/debug_token?input_token=$tok&access_token=$tok" |
   Select-Object -ExpandProperty data | Select-Object app_id, expires_at, scopes
 ```
@@ -179,7 +310,10 @@ Necesaria solo para **mensajes iniciados por la empresa** (plantillas). Los
 mensajes de servicio —el invitado escribe primero— son gratuitos. Si se agrega,
 usar tarjeta del grupo o virtual y fijar un **límite de gasto** en Facturación.
 
-## 5. Levantar el túnel
+## 5. Levantar el túnel (ventana 2)
+
+Se abre **después** de la app (o antes, pero debe quedar arriba antes de
+verificar el webhook):
 
 ```powershell
 & "$HOME\cloudflared.exe" tunnel --url http://127.0.0.1:8000
@@ -203,15 +337,71 @@ curl.exe -s -o NUL -w "%{http_code}" "https://<url-del-túnel>/api/estado"
 # 404: la API no es pública
 ```
 
-## 6. Levantar la app
+Si `cloudflared` no está instalado:
 
 ```powershell
-. "..\whatsapp-env.ps1"
-$env:WHATSAPP_MODO = "real"
+winget install --id Cloudflare.cloudflared -e
+# o
+Invoke-WebRequest -Uri "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-windows-amd64.exe" `
+  -OutFile "$HOME\cloudflared.exe"
+```
+
+Copia la URL que imprime el recuadro, por ejemplo
+`https://algo-nuevo.trycloudflare.com`, y actualiza el callback del punto 4.5.
+
+- El túnel apunta a `127.0.0.1:8000`; si la app se reinicia en el mismo puerto,
+  la URL no cambia y Meta sigue funcionando.
+- **No cierres esta ventana.** El túnel rápido cambia de subdominio en cada
+  arranque; si se cae o se reinicia, la URL cambia y hay que repetir §3.1.
+- Esta ventana **no** necesita `whatsapp-env.ps1`: el túnel no lee credenciales.
+
+Comprobar de punta a punta:
+
+```powershell
+curl.exe "https://<url-del-túnel>/health"
+```
+
+## 6. Levantar la app (ventana 1)
+
+Todo en la **misma** ventana: cargar el `.ps1`, fijar el modo y arrancar.
+
+```powershell
+cd "D:\...\ProyectoAvance1"
+. "..\whatsapp-env.ps1"        # credenciales (una vez por ventana)
+$env:WHATSAPP_MODO = "real"    # envía de verdad por Meta
+$env:WHATSAPP_EVENTO = "1"     # solo si vas a abrir el modo evento
 make app
 ```
 
-Debe quedar en `http://127.0.0.1:8000` y escuchar **solo** en loopback.
+Debe quedar en `http://127.0.0.1:8000` y escuchar **solo** en loopback:
+
+```powershell
+curl.exe "http://127.0.0.1:8000/health"
+```
+
+Notas de orden:
+
+- El `.ps1` se carga **primero**; las asignaciones `$env:` posteriores ganan en
+  esa ventana (§2.4).
+- Si abres otra ventana para `make app`, vuelve a cargar el `.ps1`: las
+  variables no se heredan entre ventanas.
+- Sin `WHATSAPP_ID_SALT` en esa ventana, la app arranca pero el canal queda
+  apagado: el webhook responde `200` y el teléfono no recibe nada.
+- `make app` **no recarga código**: tras cambiar código, `config/whatsapp.toml`,
+  huellas o variables, hay que reiniciarlo.
+- `WHATSAPP_EVENTO` solo enciende el interruptor; la ventana `desde`/`hasta`
+  sigue saliendo del TOML (§8).
+
+### 6.1 Qué reiniciar y qué no
+
+| Pieza | ¿Reiniciar al cambiar código o variables? | Por qué |
+|---|---|---|
+| App (`make app`) | Sí | Lee el entorno y la configuración al arrancar |
+| Túnel (`cloudflared`) | No | Apunta a `127.0.0.1:8000`; si la app vuelve al mismo puerto, la URL no cambia |
+
+La única excepción es que el túnel se caiga o se cierre: al levantarlo de nuevo
+cambia la URL y hay que repetir §3.1 en Meta. Por eso se deja esa ventana
+quieta.
 
 ## 7. Pruebas del canal
 
@@ -351,14 +541,17 @@ Ensayo con un número que **no** esté en `[autorizados]`, con la ventana abiert
 | Síntoma | Causa probable | Solución |
 |---|---|---|
 | Nada en la consola y nada en el teléfono | URL del callback vieja o `messages` no suscrito | Repetir 4.5 y 4.4 |
+| El túnel se reinició y cambió el subdominio | Cloudflare rápido no conserva la URL | Repetir §3.1 con la URL nueva; no tocar tokens |
 | `403` en la consola | `APP_SECRET` no coincide | Copiar la clave de la app y reiniciar |
 | La consola procesa pero el teléfono no recibe | `WHATSAPP_MODO = falso` | Poner `real` y reiniciar |
+| El webhook recibe `200` pero no hay consentimiento ni respuesta | Falta `WHATSAPP_ID_SALT` en la ventana de la app | Cargar el `.ps1` y reiniciar `make app` |
 | `destino no autorizado para el modo real` | El destino no está en la lista ni dentro de la ventana del evento | Agregar la huella o ajustar `desde`/`hasta` |
 | No responde a un número desconocido aunque `WHATSAPP_EVENTO = 1` | La ventana `desde`/`hasta` del TOML no cubre el momento de la prueba | Ajustar la ventana y reiniciar `make app` |
 | `(#200) Provide valid app ID` | ID equivocado o app sin activo asignado | Usar el WABA ID y asignar la app |
-| «Verificar y guardar» falla | Túnel apagado o token distinto | Revisar cloudflared y `VERIFY_TOKEN` |
+| «Verificar y guardar» falla | Túnel apagado o token distinto | Revisar cloudflared y `VERIFY_TOKEN`; probar `https://<url>/health` |
+| Cambié `WHATSAPP_ID_SALT` y ya no reconoce a nadie | Otra sal produce otras huellas y otros `usuario_id` | Restaurar la sal original; si no se puede, regenerar todas las huellas |
 | Responde cualquier cosa a «tasas» | Pregunta sin producto | Preguntar por producto («tasa de libre inversión») |
-| `ErrorEnvio: faltan credenciales` | Token o `PHONE_NUMBER_ID` vacíos | Cargar `whatsapp-env.ps1` |
+| `ErrorEnvio: faltan credenciales` | Token o `PHONE_NUMBER_ID` vacíos | Cargar `whatsapp-env.ps1` en la ventana de la app |
 | `404` en `/api/...`, `/docs` o la pantalla desde el túnel | La guarda de §3.12 solo publica el webhook y `/health` | Es lo esperado; la pantalla se abre en `127.0.0.1:8000` |
 
 ## 10. Checklist de la rúbrica
@@ -366,9 +559,10 @@ Ensayo con un número que **no** esté en `[autorizados]`, con la ventana abiert
 - [ ] Número verificado y visible en WhatsApp Manager.
 - [ ] `name_status` sin revisión pendiente.
 - [ ] WABA suscrita a la app (`subscribed_apps` lista `Prueba1`).
-- [ ] Callback verificado y campo `messages` suscrito.
-- [ ] `whatsapp-env.ps1` cargado en la ventana de la app.
+- [ ] `whatsapp-env.ps1` creado fuera del repo y cargado en la ventana de la app.
+- [ ] `WHATSAPP_MODO = "real"` y, si aplica, `WHATSAPP_EVENTO = "1"` en esa misma ventana.
 - [ ] Túnel arriba apuntando a `127.0.0.1:8000`.
+- [ ] URL `https://<url-del-túnel>/webhooks/whatsapp` pegada en **Webhook → Editar → URL de devolución de llamada**, verificada y con `messages` suscrito.
 - [ ] Desde fuera, `https://<url-del-túnel>/health` responde y `/api/estado` responde `404`.
 - [ ] Prueba negativa con el evento apagado: número desconocido no recibe respuesta.
 - [ ] Prueba positiva: consentimiento y respuesta con fuente.

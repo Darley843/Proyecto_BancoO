@@ -36,6 +36,9 @@ huellas = [
 activo = false
 desde = "2026-11-28T08:00:00-05:00"
 hasta = "2026-11-28T20:00:00-05:00"
+# Minutos que el voluntario de la escena en vivo queda activo; cada mensaje
+# renueva el vencimiento.
+escena_ttl_minutos = 180
 # Mensajes admitidos por persona en una hora y en todo el evento.
 max_por_hora = 30
 max_por_usuario = 40

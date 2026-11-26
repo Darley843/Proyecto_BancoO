@@ -803,8 +803,11 @@ bloqueado por el WAF y no permitiría volver a capturar. La regla de GGA en
 
 - Solo información **pública**; se respeta `robots.txt` y los términos de uso.
 - Nada de datos personales (Ley 1581 de 2012), salvo el nombre y la empresa que
-  el usuario declara para su memoria de perfil local; ver §1 y
-  [`docs/SEGURIDAD.md`](./docs/SEGURIDAD.md) §3.2.
+  el usuario declara para su memoria de perfil local, y el destino normalizado
+  del voluntario activo de la escena, que vive solo en RAM mientras dura el TTL
+  para enviarle la respuesta y la ficha por WhatsApp. Ninguno se persiste ni se
+  envía al modelo; ver §1 y [`docs/SEGURIDAD.md`](./docs/SEGURIDAD.md) §3.2 y
+  §3.9.
 - Sin martilleo: 1.5 s entre peticiones y pausas periódicas.
 - El corpus se usa con fines académicos y se cita la fuente en cada documento
   (`fuente` en el frontmatter).

@@ -1053,6 +1053,7 @@ no forma parte de `make all`, `make gold`, `make deliver`, `make docs`, `make do
 (trazabilidad) · [`docs/FUENTES.md`](./docs/FUENTES.md) (fuentes y `robots.txt`) ·
 [`docs/ALCANCE.md`](./docs/ALCANCE.md) (20 preguntas) ·
 [`docs/MODELADO.md`](./docs/MODELADO.md) (Módulos 1 y 2) ·
+[`docs/CODIGO.md`](./docs/CODIGO.md) (mapa del código, pruebas y git) ·
 [`docs/ARQUEO.md`](./docs/ARQUEO.md) (recuperación, evaluación y costo) ·
 [`docs/RESULTADOS_FASE2.md`](./docs/RESULTADOS_FASE2.md) (44 preguntas de la fase 2) ·
 [`docs/SEGURIDAD.md`](./docs/SEGURIDAD.md) (modelo de amenazas) ·

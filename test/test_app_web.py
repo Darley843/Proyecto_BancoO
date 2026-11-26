@@ -76,6 +76,7 @@ def test_sirve_los_archivos_de_la_app(cliente: TestClient, ruta: str) -> None:
         "/escena/escena.js",
         "/escena/contrato.js",
         "/escena/escena.css",
+        "/escena/recursos.js",
         "/escena/respaldo.js",
         "/escena/traza.js",
     ],
@@ -105,6 +106,38 @@ def test_la_sucursal_no_enlaza_la_escena(cliente: TestClient) -> None:
     """La escena no entra en la SPA: ``index.html`` y ``app.js`` no la enlazan."""
     assert "escena.html" not in cliente.get("/").text
     assert "escena.html" not in cliente.get("/app.js").text
+
+
+def test_el_panel_de_recursos_trae_repositorio_y_diagramas(cliente: TestClient) -> None:
+    """El panel de la tecla G ofrece el repositorio y los diagramas de Archify."""
+    html = cliente.get("/escena.html").text
+    assert 'href="/diagramas/arquitectura.html"' in html
+    assert 'id="escena-repositorio"' in html
+    assert 'id="escena-whatsapp"' in html
+    assert "github.com" not in html
+
+
+def test_la_app_sirve_el_diagrama_de_arquitectura(cliente: TestClient) -> None:
+    """Los diagramas de Archify se sirven desde la lista cerrada."""
+    respuesta = cliente.get("/diagramas/arquitectura.html")
+    assert respuesta.status_code == 200
+    assert "text/html" in respuesta.headers["content-type"]
+
+
+def test_la_app_sirve_el_qr_del_repositorio(cliente: TestClient) -> None:
+    """El QR del repositorio se dibuja en memoria y no revela secretos."""
+    respuesta = cliente.get("/api/escena/repositorio/qr.png")
+    assert respuesta.status_code == 200
+    assert respuesta.headers["content-type"] == "image/png"
+    assert respuesta.content.startswith(b"\x89PNG")
+
+
+def test_la_app_dice_si_hay_whatsapp_sin_revelar_el_numero(cliente: TestClient) -> None:
+    """La ruta del QR responde un booleano y nunca el número."""
+    respuesta = cliente.get("/api/escena/whatsapp")
+    assert respuesta.status_code == 200
+    assert isinstance(respuesta.json().get("disponible"), bool)
+    assert "numero" not in respuesta.json()
 
 
 def test_la_api_responde_estado(cliente: TestClient) -> None:

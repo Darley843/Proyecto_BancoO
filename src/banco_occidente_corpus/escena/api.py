@@ -19,6 +19,7 @@ from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
+from ..canal.contratos import RespuestaCanal
 from ..config import PROJECT_ROOT
 from ..tablero.tasas import TasaNoDisponible
 from .contratos import (
@@ -51,6 +52,10 @@ from .voluntario import seleccionar_voluntario
 RUTA_SALIDA = PROJECT_ROOT / "data" / "escena"
 #: Largo máximo del texto que se interpreta.
 LARGO_MAXIMO_TEXTO = 300
+#: Largo máximo del texto dictado que viaja al canal.
+LARGO_MAXIMO_HABLAR = 1000
+#: Tope de palabras de la línea de Pana que confirma lo que oyó.
+MAX_PALABRAS_HABLAR = 40
 
 
 class _ModeloApi(BaseModel):
@@ -142,6 +147,27 @@ class InterpretarRespuesta(BaseModel):
     seguro: bool = False
 
 
+class HablarPeticion(_ModeloApi):
+    """Texto que el navegador transcribió del micrófono de la entrada (V).
+
+    Con ``pregunta`` se interpreta una respuesta del perfil (letra o monto).
+    Sin ``pregunta`` se trata como un mensaje libre para el voluntario activo:
+    pasa por los filtros del canal, va al motor y se responde por WhatsApp.
+    """
+
+    texto: str = Field(min_length=1, max_length=LARGO_MAXIMO_HABLAR)
+    pregunta: Pregunta | None = None
+    monto: Decimal | None = None
+
+
+class HablarRespuesta(InterpretarRespuesta):
+    """Interpretación o respuesta del canal, y la línea que dice Pana."""
+
+    turno: TurnoEscena
+    enviado: bool = False
+    ficha: bool = False
+
+
 class RespuestaEntrada(_ModeloApi):
     """Letra y monto declarado de una respuesta; el servidor resuelve el valor."""
 
@@ -198,6 +224,13 @@ class ServicioEscena(Protocol):
 
     def proyectado(self, modo: str) -> Escena | None:
         """Lee la escena de respaldo, o devuelve `None` si no existe."""
+
+
+class CanalVoz(Protocol):
+    """Canal que procesa el texto dictado por el voluntario activo."""
+
+    def hablar(self, texto: str) -> RespuestaCanal | None:
+        """Aplica los filtros del canal, responde y devuelve lo enviado."""
 
 
 class ServicioEscenaReal:
@@ -320,6 +353,51 @@ def _perfil(perfil: PerfilSeguro) -> PerfilRespuesta:
     )
 
 
+def _turno_hablar(resultado: Interpretacion) -> TurnoEscena:
+    """Arma la línea corta con la que Pana confirma lo que oyó.
+
+    Args:
+        resultado: interpretación determinista del texto del voluntario.
+
+    Returns:
+        Un turno de Pana con origen ``entrada_voz`` y sin cifras.
+    """
+    if resultado.respuesta is not None:
+        texto = f"Listo: {resultado.respuesta.texto}."
+        if resultado.ajustado and resultado.mensaje:
+            texto = f"{texto} {resultado.mensaje}"
+    else:
+        texto = resultado.mensaje or "No alcancé a entender. Dime una letra o un monto."
+    palabras = texto.split()
+    if len(palabras) > MAX_PALABRAS_HABLAR:
+        texto = " ".join(palabras[:MAX_PALABRAS_HABLAR]) + "…"
+    return TurnoEscena(
+        id="pana.hablar.v1",
+        orden=0,
+        personaje="pana",
+        texto=texto,
+        origen="entrada_voz",
+    )
+
+
+def _turno_canal(texto: str) -> TurnoEscena:
+    """Convierte la respuesta del canal en un turno de Pana para la pantalla.
+
+    Args:
+        texto: lo que el canal envió por WhatsApp.
+
+    Returns:
+        Un turno del contrato con origen ``canal`` y sin cifras.
+    """
+    return TurnoEscena(
+        id="pana.hablar.canal.v1",
+        orden=0,
+        personaje="pana",
+        texto=texto,
+        origen="canal",
+    )
+
+
 def _error_tasa() -> JSONResponse:
     """Respuesta cuando el Tablero no publica la tasa del producto."""
     return JSONResponse(
@@ -334,6 +412,7 @@ def _error_tasa() -> JSONResponse:
 def crear_router_escena(
     servicio: ServicioEscena | None = None,
     respondedor: Respondedor | None = None,
+    canal: CanalVoz | None = None,
 ) -> APIRouter:
     """Crea el router de la escena para montarlo antes de los estáticos.
 
@@ -341,6 +420,8 @@ def crear_router_escena(
         servicio: servicio alternativo para las pruebas; por defecto el real.
         respondedor: respondedor de preguntas para las pruebas; por defecto el
             real, que se construye en la primera pregunta.
+        canal: despachador del canal de WhatsApp para el texto dictado libre;
+            sin él, `/hablar` solo interpreta respuestas del perfil.
 
     Returns:
         El router con todas las rutas bajo `/api/escena`.
@@ -380,6 +461,53 @@ def crear_router_escena(
             ajustado=resultado.ajustado,
             mensaje=resultado.mensaje,
             seguro=resultado.seguro,
+        )
+
+    @router.post("/hablar", response_model=HablarRespuesta)
+    def hablar(peticion: HablarPeticion) -> HablarRespuesta:
+        """Atiende lo dictado por el micrófono de la entrada (V).
+
+        Con ``pregunta`` interpreta una respuesta del perfil y devuelve la línea
+        de Pana. Sin ``pregunta`` es un mensaje libre del voluntario activo:
+        pasa por los filtros del canal, va al motor (OpenClaw o el grafo) con su
+        huella y la respuesta y la ficha se envían por WhatsApp. El navegador
+        solo manda texto: no se recibe audio ni se guarda.
+        """
+        if peticion.pregunta is None:
+            if canal is None:
+                raise HTTPException(
+                    status_code=503,
+                    detail="el canal de WhatsApp no está configurado",
+                )
+            respuesta = canal.hablar(peticion.texto)
+            if respuesta is None:
+                raise HTTPException(
+                    status_code=409,
+                    detail=(
+                        "no hay un voluntario activo en la escena o la escena "
+                        "está apagada; actívalo con ESCENA y el código de la sesión"
+                    ),
+                )
+            return HablarRespuesta(
+                respuesta=None,
+                turno=_turno_canal(respuesta.texto),
+                enviado=True,
+                ficha=respuesta.imagen is not None,
+            )
+
+        resultado = actual.interpretar(
+            InterpretarPeticion(
+                texto=peticion.texto,
+                pregunta=peticion.pregunta,
+                monto=peticion.monto,
+            )
+        )
+        return HablarRespuesta(
+            respuesta=resultado.respuesta,
+            ajustado=resultado.ajustado,
+            mensaje=resultado.mensaje,
+            seguro=resultado.seguro,
+            turno=_turno_hablar(resultado),
         )
 
     @router.post("", response_model=Escena)
