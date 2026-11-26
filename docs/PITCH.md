@@ -5,11 +5,20 @@ Guion de los 15 minutos del **sábado 28 de noviembre de 2026, 8:00 a. m.**
 habla**: Pana presenta, conduce la actividad y responde las preguntas. El
 equipo opera en silencio desde sus puestos.
 
+**Formato interactivo.** Un voluntario del público escribe a Pana por WhatsApp
+y la pantalla muestra **su** escena, en vivo y con voces: sus mensajes, la
+oferta de Don Gota, la comparación de Pana, la negociación entre los dos
+agentes y el veredicto del auditor. Al final, la ficha de la opción le llega
+al celular. El contrato técnico está en
+[`ESCENA_EN_VIVO.md`](./ESCENA_EN_VIVO.md); si el punto de control del jueves 26
+no queda en verde, se usa la versión B de la sección 2.
+
 | Documento | Para qué |
 |---|---|
 | [`LISTA_DEMO.md`](./LISTA_DEMO.md) | Encendido, prueba de humo y plan B |
 | [`DEMO_GOTA_A_GOTA.md`](./DEMO_GOTA_A_GOTA.md) | La escena: flujo, cifras y roles |
-| [`ESCENA.md`](./ESCENA.md) | La pantalla y sus teclas |
+| [`ESCENA.md`](./ESCENA.md) | La pantalla y sus teclas (E = modo en vivo) |
+| [`ESCENA_EN_VIVO.md`](./ESCENA_EN_VIVO.md) | Contrato de la escena en vivo y su plan B |
 | [`PRESENTADOR.md`](./PRESENTADOR.md) | Las 17 respuestas fijas de Pana |
 | [`PREGUNTAS_FRECUENTES.md`](./PREGUNTAS_FRECUENTES.md) | Las 30 respuestas escritas sobre el proyecto |
 
@@ -21,27 +30,45 @@ en las tarjetas de los invitados, nunca en el repositorio.
 
 | Quién | Puesto | Qué hace en silencio |
 |---|---|---|
-| Nayla | Computador de la demo | Lleva el reloj de la escena, elige el momento de cada bloque y **decide el plan B** |
-| Yoldy | Pantalla | Pasa los turnos (Espacio), abre la entrada del voluntario (V), las herramientas en vivo (H) y las preguntas (Q); cronometra; activa solo subtítulos (S) si falla el audio |
-| Darley | Voluntario y WhatsApp | Acompaña al voluntario y su micrófono; vigila Meta, el túnel y el modo evento |
-| Anny | Invitados y auditor | Reparte las tarjetas con el número y los datos inventados; vigila el veredicto y la trazabilidad (T); ejecuta el salto a núcleo (N) |
+| Nayla | Computador de la demo | Lleva el reloj, vigila el gateway, el MCP y la lista en vivo, y **decide el plan B** |
+| Yoldy | Pantalla | Pasa la presentación (Espacio), entra y sale del modo en vivo (E), pausa la cola si hace falta (P), abre las herramientas (H) y las preguntas (Q); cronometra; activa solo subtítulos (S) si falla el audio |
+| Darley | Voluntario y WhatsApp | Acompaña al voluntario y su celular; vigila Meta, el túnel, el modo evento y que el voluntario haya escrito `ESCENA` |
+| Anny | Invitados y auditor | Reparte la tarjeta o el QR («responde Acepto», «escribe ESCENA» y dos sugerencias); vigila el veredicto y la trazabilidad (T) |
 
 ## 2. Minuto a minuto
+
+### Versión A: escena en vivo (si el punto de control queda en verde)
 
 | Minuto | Bloque | En la pantalla | Quién opera | Qué tiene que quedar claro |
 |---|---|---|---|---|
 | 0:00 – 1:00 | **Presentación** | Los 7 turnos de `INTRODUCCION`: Pana, Don Gota, los dos agentes y el auditor se presentan | Yoldy (Espacio) | Qué es Pana, para quién es (jóvenes con su primer crédito) y que el gota a gota cobra cerca de 791 % E.A. |
-| 1:00 – 1:30 | **Invitación** | Último turno: «los demás pueden escribirme por WhatsApp» | Anny (tarjetas) | Los invitados escriben **con datos inventados**; el resto sigue en la pantalla |
-| 1:30 – 2:30 | **Voluntario** | Entrada del voluntario (V): monto, ingresos, gastos y deudas con letras A–F | Darley (micrófono), Yoldy (V) | Pana confirma las cuatro respuestas; nadie da datos reales |
-| 2:30 – 3:30 | **Don Gota** | Cuatro turnos fijos: interés mensual, total y cuota diaria | Yoldy | Don Gota es un guion, nunca un modelo |
-| 3:30 – 4:30 | **Pana compara** | Golpe de 36 renovaciones, tasa E.A. frente a la usura y artículo 305 | Yoldy | **Cifras 1 y 2:** la usura (28,34 % E.A.) y la tasa del banco |
-| 4:30 – 6:00 | **Negociación** | Agente del joven y agente del banco, hasta cuatro turnos | Yoldy; Anny (N si pasa de 15 s) | Dos opciones: cuota más baja o menos total pagado |
-| 6:00 – 7:00 | **Veredicto y cierre** | El auditor dice su veredicto y Pana cierra según ese veredicto | Yoldy | **Cifra 3:** el veredicto (`conforme`, `con_observaciones` u `objeta`); Pana nunca dice «aprobado» |
-| 7:00 – 12:00 | **Parte técnica** | Herramientas en vivo (H) con lo que piden los invitados por WhatsApp; preguntas del jurado por la Q | Yoldy (H, Q); Anny (T si piden la trazabilidad) | Que es un agente con 20 herramientas, que las cifras salen de código y que hay respaldo si algo cae |
+| 1:00 – 1:30 | **Invitación** | Último turno de la presentación; Yoldy pulsa **E** y la barra dice «En vivo · esperando el primer turno» | Anny (tarjetas), Darley (voluntario) | El voluntario responde **Acepto** y escribe **ESCENA**; los demás invitados escriben con datos inventados y no salen en la pantalla |
+| 1:30 – 2:30 | **El voluntario escribe** | Sus mensajes salen en subtítulo como «Invitado» y Pana le responde con voz | Darley (acompaña), Yoldy (E ya activo) | Que es una conversación real por WhatsApp, sin nombres ni números en la pantalla |
+| 2:30 – 3:30 | **Don Gota** | Los turnos de `calcular_prestamo_gota`: interés mensual, total y cuota diaria | Yoldy (P si hay que esperar) | Don Gota es un cálculo en código, nunca un modelo |
+| 3:30 – 4:30 | **Pana compara** | Los turnos de `comparar_gota_banco`: tasa E.A. frente a la usura y artículo 305 | Yoldy | **Cifras 1 y 2:** la usura (28,34 % E.A.) y la tasa del banco |
+| 4:30 – 6:00 | **Negociación** | Los turnos de `negociar_opcion`: agente del joven y agente del banco | Yoldy (Espacio si un turno se alarga) | Dos opciones: cuota más baja o menos total pagado |
+| 6:00 – 7:00 | **Veredicto y ficha** | El turno de `auditar_respuesta` y la ficha de `generar_ficha_opcion`; la ficha llega al celular del voluntario | Yoldy; Darley (muestra el celular) | **Cifra 3:** el veredicto (`conforme`, `con_observaciones` u `objeta`); Pana nunca dice «aprobado» |
+| 7:00 – 12:00 | **Parte técnica** | Yoldy sale del modo en vivo (**E**); herramientas en vivo (H) con lo que piden los invitados por WhatsApp; preguntas del jurado por la Q | Yoldy (E, H, Q); Anny (T si piden la trazabilidad) | Que es un agente con 20 herramientas, que las cifras salen de código y que hay respaldo si algo cae |
 | 12:00 – 15:00 | **Preguntas** | Apertura de preguntas de Pana; cada pregunta por la Q, escrita o dictada | Yoldy | Pana responde con sus fichas; si no sabe, lo dice |
 
-La escena completa (1:30 a 7:00) dura menos de seis minutos
-([`DEMO_GOTA_A_GOTA.md`](./DEMO_GOTA_A_GOTA.md), sección 1).
+Los minutos 1:30 a 7:00 dependen de lo que escriba el voluntario: las dos
+sugerencias de la tarjeta lo llevan a pedir un préstamo y a preguntar por el
+gota a gota, para que Pana use las cinco herramientas en ese orden. Si a las
+4:30 todavía no habló Don Gota, Nayla decide pasar a la versión B.
+
+### Versión B: plan B del punto de control
+
+Si a las 12:00 del jueves la escena en vivo no queda en verde
+([`ESCENA_EN_VIVO.md`](./ESCENA_EN_VIVO.md), §15.3), `ESCENA_EN_VIVO=0` y:
+
+| Minuto | Bloque | En la pantalla | Quién opera |
+|---|---|---|---|
+| 0:00 – 1:00 | **Presentación** | Igual que en la versión A | Yoldy (Espacio) |
+| 1:00 – 1:30 | **Gancho** | 30 s de la escena guardada: Don Gota hace su oferta y Pana la compara | Yoldy (Espacio) |
+| 1:30 – 7:00 | **Demo por WhatsApp** | El voluntario y los invitados escriben a Pana; el panel **H** muestra cada herramienta que usa | Darley (voluntario), Yoldy (H) |
+| 7:00 – 15:00 | **Parte técnica y preguntas** | Igual que en la versión A | Yoldy (H, Q) |
+
+En las dos versiones el público sale con las mismas tres cifras (sección 4).
 
 ## 3. La parte técnica sin que nadie hable
 
@@ -82,9 +109,11 @@ Con otro monto o perfil, la tasa del banco y el veredicto cambian; la usura no.
 
 | Si falla | Qué se ve | Qué se hace |
 |---|---|---|
+| La lista en vivo (la barra dice «Sin conexión» más de 20 s) | La pantalla se queda en el último turno | Yoldy sale con **E** y sigue la versión B: la escena guardada y el panel H |
+| Un turno llega mal | La barra dice «Turno descartado» | Nada: la cola sigue con el siguiente |
 | La voz o el audio | La escena sigue con texto | Tecla S (solo subtítulos) y avanzar con Espacio |
-| El voluntario o su micrófono | — | Perfil seguro ([`LISTA_DEMO.md`](./LISTA_DEMO.md), sección 6.2) |
-| La negociación tarda más de 15 s | — | Tecla N (núcleo) |
+| El voluntario no escribe o no tiene señal | La barra dice «esperando el primer turno» | Darley le presta el celular del equipo; si no hay tiempo, versión B |
+| La negociación tarda más de 15 s | — | En vivo: Espacio pasa al siguiente turno. En la escena guardada: tecla N (núcleo) |
 | OpenClaw | Los invitados siguen recibiendo respuesta | Nada en vivo: responde el grafo |
 | WhatsApp, Meta o el túnel | El panel H se queda quieto | La escena sigue; Darley reinicia el túnel (unos 2 minutos) |
 | Se acaba el tiempo | — | Se recorta la parte técnica, nunca el veredicto |
@@ -99,5 +128,9 @@ El plan B completo está en [`LISTA_DEMO.md`](./LISTA_DEMO.md), sección 6.
       dónde y qué le faltó a Pana.
 - [ ] Una persona que no conoce el proyecto ve el ensayo y responde: ¿qué es
       Pana?, ¿cuáles fueron las tres cifras?
-- [ ] La escena de 1:30 a 7:00 dura menos de seis minutos.
+- [ ] La escena de 1:30 a 7:00 dura menos de seis minutos, en vivo y con un
+      voluntario que no conoce el guion.
+- [ ] Ensayar la versión B completa al menos una vez.
+- [ ] Antes de empezar, borrar la lista en vivo del ensayo
+      (`scripts/limpiar_evento.ps1`) para que el sábado empiece vacía.
 - [ ] Probar una vez cada salto de la sección 5.
