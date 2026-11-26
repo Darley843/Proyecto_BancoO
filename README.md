@@ -840,6 +840,10 @@ https://algo-nuevo.trycloudflare.com
 se reinicia, hay que actualizarla en Meta. ngrok ya no ofrece dominio estático
 gratis.
 
+> El túnel publica **solo** `/webhooks/whatsapp` y `/health`: cualquier otra
+> ruta responde `404` cuando la petición llega por Cloudflare. El detalle y el
+> residual están en [`docs/SEGURIDAD.md`](./docs/SEGURIDAD.md) §3.12.
+
 ### 8. Registrar el callback en Meta (navegador)
 
 En `Prueba1` → **Webhooks** → objeto **`Whatsapp Business Account`** (no `User`):

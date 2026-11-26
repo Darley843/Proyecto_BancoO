@@ -189,6 +189,20 @@ Copia la URL `https://algo.trycloudflare.com` y actualiza el callback del punto
 4.5. El túnel apunta a `127.0.0.1:8000`; si la app se reinicia en el mismo
 puerto, la URL no cambia y Meta sigue funcionando.
 
+> **Qué queda público.** El túnel rápido publica todo el origen, pero la app
+> solo deja pasar `/webhooks/whatsapp` y `/health` cuando la petición viene de
+> Cloudflare; `/api/...`, `/docs` y la pantalla responden `404`. No hay que
+> configurar nada: la guarda vive en `app.py` y su detalle y residual están en
+> [`SEGURIDAD.md`](./SEGURIDAD.md) §3.12.
+
+Comprobar desde fuera, con la app y el túnel arriba:
+
+```powershell
+curl.exe "https://<url-del-túnel>/health"        # 200, o 503 si falta el índice
+curl.exe -s -o NUL -w "%{http_code}" "https://<url-del-túnel>/api/estado"
+# 404: la API no es pública
+```
+
 ## 6. Levantar la app
 
 ```powershell
@@ -345,6 +359,7 @@ Ensayo con un número que **no** esté en `[autorizados]`, con la ventana abiert
 | «Verificar y guardar» falla | Túnel apagado o token distinto | Revisar cloudflared y `VERIFY_TOKEN` |
 | Responde cualquier cosa a «tasas» | Pregunta sin producto | Preguntar por producto («tasa de libre inversión») |
 | `ErrorEnvio: faltan credenciales` | Token o `PHONE_NUMBER_ID` vacíos | Cargar `whatsapp-env.ps1` |
+| `404` en `/api/...`, `/docs` o la pantalla desde el túnel | La guarda de §3.12 solo publica el webhook y `/health` | Es lo esperado; la pantalla se abre en `127.0.0.1:8000` |
 
 ## 10. Checklist de la rúbrica
 
@@ -354,6 +369,7 @@ Ensayo con un número que **no** esté en `[autorizados]`, con la ventana abiert
 - [ ] Callback verificado y campo `messages` suscrito.
 - [ ] `whatsapp-env.ps1` cargado en la ventana de la app.
 - [ ] Túnel arriba apuntando a `127.0.0.1:8000`.
+- [ ] Desde fuera, `https://<url-del-túnel>/health` responde y `/api/estado` responde `404`.
 - [ ] Prueba negativa con el evento apagado: número desconocido no recibe respuesta.
 - [ ] Prueba positiva: consentimiento y respuesta con fuente.
 - [ ] Ventana `desde`/`hasta` ajustada a la fecha del ensayo.
