@@ -294,6 +294,32 @@ def test_indice_y_sqlite_fuera_de_git() -> None:
         assert resultado.returncode == 0, f"{ruta} no está ignorado por Git"
 
 
+def test_ningun_archivo_versionado_lleva_el_numero_del_bot() -> None:
+    """Ningún archivo versionado lleva un enlace de WhatsApp con número (6.4).
+
+    El número del bot va solo en la tarjeta impresa del evento; el QR se genera
+    en local y no se versiona.
+    """
+    requerir_git()
+    patron = r"(wa\.me/|phone=)\+?[0-9]{7,}"
+    resultado = ejecutar_git("grep", "-l", "-E", patron)
+    assert resultado.returncode in (0, 1), resultado.stderr
+    assert resultado.returncode == 1, f"enlace con número en: {resultado.stdout}"
+
+
+def test_no_se_versiona_imagen_de_tarjeta_ni_qr() -> None:
+    """La tarjeta del invitado y su QR se generan en local y no entran al repo (6.4)."""
+    requerir_git()
+    extensiones = {"png", "jpg", "jpeg", "svg", "webp", "pdf"}
+    sospechosos: list[str] = []
+    for archivo in ejecutar_git("ls-files").stdout.splitlines():
+        nombre = archivo.rsplit("/", 1)[-1].lower()
+        base, _, extension = nombre.rpartition(".")
+        if extension in extensiones and ("tarjeta" in base or "qr" in base):
+            sospechosos.append(archivo)
+    assert sospechosos == []
+
+
 def test_guardia_de_red_bloquea_conexion_externa() -> None:
     """La guardia de ``conftest.py`` corta cualquier conexión fuera de loopback."""
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as conexion:
