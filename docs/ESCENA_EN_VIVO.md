@@ -62,6 +62,7 @@ editarla. Si hay que cambiarla, se avisa a los tres y se actualiza el contrato.
 |---|---|
 | Archivo de la lista | `data/escena/en_vivo.jsonl` (local, ignorado por Git) |
 | Interruptor | solo `ESCENA_EN_VIVO=1`; cualquier otro valor no escribe |
+| Activación de la escena | `ESCENA` + código de 4 dígitos de `$env:ESCENA_CODIGO`; sin código o con otro código no activa |
 | Una línea | un turno `TurnoEscena` por línea, JSON compacto, UTF-8, LF |
 | Orden de la pantalla | `seq` ascendente; `turno.orden` **no** ordena la lista |
 | Escritura entre procesos | bloqueo exclusivo del sistema sobre `data/escena/en_vivo.lock` |
@@ -208,6 +209,9 @@ make app
 ```
 
 - El gateway de OpenClaw no necesita la variable: solo llama al MCP.
+- El código del voluntario es otra variable de la sesión, en la ventana de la
+  app: `$env:ESCENA_CODIGO = "1965"`. No va en `config/`, no se versiona y no se
+  registra en logs (§9.1).
 - Pruebas: con la variable ausente y con `0`, el archivo no existe y la ruta
   responde vacía; con `1`, escribe; apagarla entre dos llamadas detiene la
   segunda.
@@ -383,22 +387,28 @@ un efecto lateral local, no un campo de la respuesta.
 
 ## 9. Canal (Darley)
 
-### 9.1 Activación con `ESCENA`
+### 9.1 Activación con `ESCENA` y código
 
-- El texto se normaliza (minúsculas, sin espacios sobrantes). La palabra exacta
-  **`ESCENA`** activa al invitado como voluntario.
+- El texto se normaliza (minúsculas, sin espacios sobrantes). La activación es
+  **`ESCENA` seguida de un código de 4 dígitos**, por ejemplo `ESCENA 1965`.
+- El código se fija en la sesión con `$env:ESCENA_CODIGO`
+  (`$env:ESCENA_CODIGO = "1965"`). No va en `config/` ni se versiona, solo
+  aparece en la tarjeta del voluntario y nunca se registra en logs.
 - Se reconoce **después** de la autorización y del consentimiento de la Ley
   1581, y **antes** de la entrevista, del escenario y del motor de OpenClaw. El
-  comando no se reenvía a Pana ni se publica como mensaje del invitado. Si el
-  invitado tenía una entrevista del diagnóstico a medias, `ESCENA` la deja
-  (equivale a cancelarla) para que el siguiente mensaje sea de la escena.
+  comando, cuando activa, no se reenvía a Pana ni se publica como mensaje del
+  invitado. Si el invitado tenía una entrevista del diagnóstico a medias,
+  `ESCENA` la deja (equivale a cancelarla) para que el siguiente mensaje sea de
+  la escena.
+- `ESCENA` sin código, o con un código equivocado, recibe la respuesta privada
+  normal y no publica: no activa, no confirma y no se publica.
 - Si `ESCENA_EN_VIVO` no está en `1`, el canal responde con una frase fija
   («La escena en vivo no está activada») y no publica nada. No se trata como una
   pregunta de crédito.
-- Con el interruptor encendido, Pana confirma con una frase fija («Escena en
-  vivo activada. Escribe tu primera pregunta.»), la envía por WhatsApp y
-  publica esa confirmación como un turno `pana` con `origen="canal"`. Así la
-  pantalla sabe que hay voluntario.
+- Con el interruptor encendido y el código correcto, Pana confirma con una frase
+  fija («Escena en vivo activada. Escribe tu primera pregunta.»), la envía por
+  WhatsApp y publica esa confirmación como un turno `pana` con
+  `origen="canal"`. Así la pantalla sabe que hay voluntario.
 
 ### 9.2 Memoria del voluntario (en memoria, con TTL)
 
@@ -413,12 +423,17 @@ un efecto lateral local, no un campo de la respuesta.
 escena_ttl_minutos = 180
 ```
 
-- `ESCENA` fija `vence = ahora + ttl` y, si ya había otro voluntario, lo
-  reemplaza. Cada mensaje del voluntario **renueva** el vencimiento (TTL
-  deslizante); así no se corta a mitad del recorrido.
-- Al vencer, el invitado deja de publicar; puede escribir `ESCENA` otra vez.
-- Un segundo invitado que escribe `ESCENA` reemplaza al primero de inmediato.
-  El anterior sigue recibiendo respuestas privadas, pero no se publica.
+- `ESCENA <código>` con el código correcto fija `vence = ahora + ttl`. Cada
+  mensaje del voluntario **renueva** el vencimiento (TTL deslizante); así no se
+  corta a mitad del recorrido.
+- Mientras haya un voluntario activo y no vencido, un `ESCENA <código>` desde
+  otra huella se ignora: no lo reemplaza y la escena sigue con el primero. El
+  segundo invitado sigue recibiendo respuestas privadas, pero no se publica.
+  Para cambiar de voluntario, quien facilita reinicia la app o espera el
+  vencimiento.
+- Al vencer, el invitado deja de publicar; puede escribir `ESCENA` otra vez con
+  el código y volver a activarse.
+- `ESCENA` sin código, o con un código equivocado, no activa ni publica (§9.1).
 - El acceso a la ranura se protege con un `threading.Lock`; el trabajador del
   canal es uno, pero las pruebas y un reinicio no deben dejar estados a medias.
 
@@ -481,7 +496,8 @@ conocida y como trabajo posterior si la escena se conserva.
   de Pana, que no contiene el dato.
 - Si la respuesta de Pana trae PII (por ejemplo, porque repite un nombre o un
   número), no se publica; se registra el código y la pantalla no la muestra.
-- `ESCENA` no se publica como mensaje del invitado; solo su confirmación.
+- `ESCENA <código>` no se publica como mensaje del invitado; solo su
+  confirmación.
 
 ## 10. Ruta `GET /api/escena/en-vivo` (Darley)
 
@@ -519,7 +535,7 @@ Respuesta (modelo Pydantic cerrado, `extra="forbid"`):
 | Línea inválida | Se ignora; la ruta no falla por una línea a medias o corrupta. |
 | Escritura | Ninguna: no crea archivos, no abre SQLite, no toca el bloqueo. |
 | Caché | `Cache-Control: no-store`; la pantalla pide `cache: "no-store"`. |
-| Host | La app ya escucha solo en `127.0.0.1`; la ruta no se publica en `0.0.0.0`, no se añade túnel ni CORS. |
+| Host y túnel | La app escucha en 127.0.0.1, pero el túnel de cloudflared reenvía desde 127.0.0.1, así que eso no protege la ruta. Mientras el túnel esté abierto, toda petición que llegue por él (cabecera Cf-Connecting-IP o Cf-Ray) y no vaya a /webhooks/whatsapp responde 404. Lo ideal es un listener aparte solo para el webhook (127.0.0.1:8001) con el túnel apuntando a él. |
 | Errores | 422 para `desde` inválido; 200 con lista vacía para archivo ausente o interruptor apagado. |
 
 La ruta no devuelve la ruta del archivo, ni el bloqueo, ni la huella, ni el
@@ -661,7 +677,7 @@ Sin red, sin DeepSeek, sin Ollama y sin gateway. Las pruebas usan `tmp_path` y
 |---|---|---|
 | Nayla | `test/test_escena_publicador.py` | Apagado no crea nada; encendido escribe una línea por turno; lote de 4 con `seq` consecutivos; dos hilos y dos procesos no corrompen ni repiten `seq`; turno inválido y turno con PII no se escriben; lector con `desde`, límite, línea a medias y archivo ausente; no hay texto en logs. |
 | Nayla | `test/test_herramientas_lectura.py` (ampliar) | Las cinco herramientas publican 4/3/1–4/1/1 con los personajes correctos; con el interruptor apagado no publican; un error de la herramienta no publica; la ficha es un turno de Pana; el auditor es un turno de auditor. |
-| Darley | `test/test_canal_escena_vivo.py` | `ESCENA` activa solo tras consentimiento; TTL y renovación; un segundo `ESCENA` reemplaza; otro invitado no publica; invitado → Pana en orden; PII no publica el crudo y sí la frase fija; apagado no escribe; reinicio pierde la memoria. |
+| Darley | `test/test_canal_escena_vivo.py` | `ESCENA` con el código de la sesión activa solo tras consentimiento; `ESCENA` sin código no activa; TTL y renovación; un segundo `ESCENA` desde otra huella no reemplaza; otro invitado no publica; invitado → Pana en orden; PII no publica el crudo y sí la frase fija; apagado no escribe; reinicio pierde la memoria. |
 | Darley | `test/test_escena_en_vivo_api.py` | `desde` filtra y `ultimo` avanza; máximo 200; archivo ausente; interruptor apagado; línea corrupta ignorada; la ruta no crea ni modifica archivos; `desde` inválido da 422; la app sigue en `127.0.0.1`. |
 | Yoldy | `test/test_web_escena.py` y `test/test_web_escena_en_vivo.py` | `E` está en el teclado y el botón existe; `envivo.js` se sirve; `contrato.js` incluye `invitado` y `canal`; no hay URLs externas ni `innerHTML`; no se guarda en storage; la cola se ordena y deduplica por `seq` (función pura); el invitado no pide voz. |
 | Anny | `test/test_escena_pii_en_vivo.py` y `test/test_seguridad.py` | Un teléfono, un correo y un documento falsos no aparecen en la lista, la ruta, los logs ni la tarjeta; la tarjeta/QR no lleva el número real ni datos de invitados; `data/escena/en_vivo.jsonl` y `.lock` están ignorados; el script de limpieza los nombra. |
@@ -686,7 +702,7 @@ openspec validate agente-openclaw --strict
 | 08:30 | Darley | `canal/escena_vivo.py` + ruta + pruebas base |
 | 08:30 | Yoldy | `envivo.js` + tecla E + pruebas estáticas |
 | 08:30 | Anny | tarjeta/QR + prueba de PII |
-| 10:00 | Los cuatro | integración: `ESCENA` → una herramienta → ruta → pantalla |
+| 10:00 | Los cuatro | integración: `ESCENA <código>` → una herramienta → ruta → pantalla |
 | 11:30 | Los cuatro | repaso de la lista de comprobación y ensayo cronometrado |
 | 12:00 | Los cuatro | **go / no-go**; se congela lo que pase y se apaga lo que no |
 
@@ -698,8 +714,10 @@ openspec validate agente-openclaw --strict
    variable apagada, no crea el archivo.
 4. `comparar_gota_banco`, `negociar_opcion`, `auditar_respuesta` y
    `generar_ficha_opcion` publican sus turnos con los personajes correctos.
-5. Un voluntario de prueba escribe `ESCENA` y su mensaje aparece como
-   `invitado`; otro invitado escribe y **no** aparece.
+5. Un voluntario de prueba escribe `ESCENA` con el código de la sesión
+   (`$env:ESCENA_CODIGO`) y su mensaje aparece como `invitado`; `ESCENA` sin
+   código no activa; otro invitado escribe y **no** aparece; un segundo
+   `ESCENA` desde otra huella no reemplaza al voluntario activo.
 6. La ruta devuelve los turnos en orden, `desde` filtra y `ultimo` avanza; no
    escribe nada.
 7. La pantalla en Edge entra con **E**, consulta cada 2 s, reproduce en orden,
@@ -710,10 +728,12 @@ openspec validate agente-openclaw --strict
    `en_vivo.lock`; el modo de prueba no borra.
 10. El ensayo completo dura menos de seis minutos y el facilitador puede
     explicar la limitación de §9.5 sin leer el documento.
+11. Desde la URL del túnel, `/api/escena/en-vivo`, `/escena.html` y `/`
+    responden 404; solo `/webhooks/whatsapp` responde.
 
-Si falla un punto 1, 2, 5, 6, 7 u 8, **no se enciende la escena en vivo** para
-la demo: se usa el plan B. Los puntos 3, 4 y 9 pueden quedar en rojo solo si el
-plan B ya está probado y el facilitador lo sabe.
+Si falla un punto 1, 2, 5, 6, 7, 8 u 11, **no se enciende la escena en vivo**
+para la demo: se usa el plan B. Los puntos 3, 4, 9 y 10 pueden quedar en rojo
+solo si el plan B ya está probado y el facilitador lo sabe.
 
 ### 15.3 Plan B
 
