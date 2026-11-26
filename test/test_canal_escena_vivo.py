@@ -349,6 +349,71 @@ def test_un_reinicio_pierde_la_memoria(monkeypatch: pytest.MonkeyPatch) -> None:
     assert _escena(espia, reloj).activo(usuario_id) is False
 
 
+def test_la_ranura_guarda_el_destino_solo_en_memoria(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """El número del voluntario activo no se persiste, no se muestra y vence."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    usuario_id = calcular_usuario_id(NUMERO, SAL)
+    escena = _escena(espia, reloj)
+
+    assert escena.activar(usuario_id, destino=NUMERO) is True
+    activo = escena.voluntario_activo()
+    assert activo is not None
+    assert activo.huella == usuario_id
+    assert activo.destino == NUMERO
+    assert NUMERO not in repr(activo)
+    assert NUMERO not in repr(escena)
+
+    reloj.momento = AHORA + timedelta(minutes=181)
+    assert escena.voluntario_activo() is None
+
+
+def test_hablar_usa_el_voluntario_activo_y_manda_la_respuesta(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """El texto dictado pasa por el canal, el motor y el envío al destino."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    banco = _banco(tmp_path, escena=escena)
+    _atender(banco, _mensaje(f"ESCENA {CODIGO}", id_mensaje="wamid.escena"))
+
+    respuesta = banco.despachador.hablar("¿cuál es la tasa de libre inversión?", AHORA)
+
+    assert respuesta is not None
+    assert respuesta.texto == "respuesta de Pana"
+    assert banco.enviadas[-1].texto == "respuesta de Pana"
+    assert banco.llamadas == ["¿cuál es la tasa de libre inversión?"]
+    activo = escena.voluntario_activo()
+    assert activo is not None and activo.destino == NUMERO
+
+
+def test_hablar_sin_voluntario_activo_no_envia(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sin una ranura vigente, el texto no se manda a nadie."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    banco = _banco(tmp_path, escena=_escena(espia, reloj))
+
+    assert banco.despachador.hablar("hola") is None
+    assert banco.enviadas == []
+
+
+def test_hablar_sin_destino_no_envia(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    """Una ranura activada por una ruta antigua, sin destino, no envía."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    escena.activar(calcular_usuario_id(NUMERO, SAL))
+    banco = _banco(tmp_path, escena=escena)
+
+    assert banco.despachador.hablar("hola") is None
+    assert banco.enviadas == []
+
+
 @dataclass
 class BancoCanal:
     """Piezas del despachador con dobles para la escena en vivo."""

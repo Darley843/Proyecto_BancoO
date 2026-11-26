@@ -285,6 +285,62 @@ def test_el_rechazo_del_servidor_cede_ante_la_ficha_local() -> None:
             assert f'id="{id_turno}"' in codigo, id_turno
 
 
+def test_la_ficha_local_responde_cuentame_del_proyecto() -> None:
+    """El respaldo del navegador no deja «cuéntame del proyecto» sin respuesta.
+
+    La entrada general va al final para no tapar las respuestas específicas
+    que también mencionan el proyecto.
+    """
+    bloque = re.search(r"const FICHA = Object\.freeze\(\[(.*?)\]\);", _anfitrion(), re.S)
+    assert bloque is not None
+    claves = re.findall(r"claves: \[(.*?)\]", bloque.group(1))
+    assert claves
+    ultima = claves[-1]
+    assert '"proyecto"' in ultima
+    assert '"sucursal 1965"' in ultima
+    assert "Se llama Sucursal 1965" in bloque.group(1)
+
+
+def test_el_panel_de_recursos_trae_repositorio_whatsapp_y_diagramas() -> None:
+    """El panel de la tecla G ofrece el QR del repositorio y los seis diagramas."""
+    html = (WEB / "escena.html").read_text(encoding="utf-8")
+    assert re.search(r'<aside[^>]*id="escena-recursos"[^>]*\bhidden\b', html)
+    assert 'id="escena-ver-recursos"' in html
+    assert 'id="escena-repositorio"' in html
+    assert 'id="escena-repositorio-qr"' in html
+    assert 'src="/api/escena/repositorio/qr.png"' in html
+    assert 'id="escena-whatsapp-qr"' in html
+    for nombre in (
+        "arquitectura",
+        "datos",
+        "canal",
+        "diagnostico",
+        "agente-openclaw",
+        "despliegue-openclaw",
+    ):
+        assert f'href="/diagramas/{nombre}.html"' in html, nombre
+    recurso = (ESCENA / "recursos.js").read_text(encoding="utf-8")
+    assert '"/api/escena/repositorio"' in recurso
+    assert '"/api/escena/whatsapp"' in recurso
+    assert "wa.me" not in recurso
+    assert not re.search(r"\d{10,}", recurso)
+    codigo = (ESCENA / "escena.js").read_text(encoding="utf-8")
+    assert 'tecla === "g"' in codigo
+
+
+def test_el_microfono_de_la_entrada_habla_con_la_api() -> None:
+    """La entrada del voluntario (V) manda lo que oye a /api/escena/hablar."""
+    codigo = (ESCENA / "captura.js").read_text(encoding="utf-8")
+    assert '"/api/escena/hablar"' in codigo
+    assert "void enviar();" in codigo
+    assert "JSON.stringify({ texto })" in codigo
+    assert "ESPERA_HABLAR_MS" in codigo
+    html = (WEB / "escena.html").read_text(encoding="utf-8")
+    assert 'id="captura-microfono"' in html
+    assert 'id="captura-pana"' in html
+    assert 'id="captura-pana-estado"' in html
+
+
 def test_el_microfono_escucha_en_espanol_de_colombia_con_respaldo() -> None:
     """Un solo resultado en es-CO; sin reconocimiento se escribe la pregunta."""
     codigo = (ESCENA / "microfono.js").read_text(encoding="utf-8")

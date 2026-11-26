@@ -39,11 +39,11 @@ def _ids(entradas: tuple[EntradaFija, ...]) -> list[str]:
     return [entrada.id for entrada in entradas]
 
 
-def test_se_cargan_las_17_y_ninguna_se_descarta() -> None:
-    """Las 17 preguntas de la ficha cargan: ninguna pierde su fuente al leerse."""
-    assert len(_crudas()) == 17
+def test_se_cargan_las_22_y_ninguna_se_descarta() -> None:
+    """Las 22 preguntas de la ficha cargan: ninguna pierde su fuente al leerse."""
+    assert len(_crudas()) == 22
     assert _ids(FICHA.entradas) == [str(dato["id"]) for dato in _crudas()]
-    assert len(set(_ids(FICHA.entradas))) == 17
+    assert len(set(_ids(FICHA.entradas))) == 22
 
 
 @pytest.mark.parametrize("entrada", FICHA.entradas, ids=_ids(FICHA.entradas))
@@ -73,6 +73,29 @@ def test_cada_variante_elige_su_propia_entrada(entrada: EntradaFija) -> None:
         elegida = pregunta._buscar_fija(variante, FICHA, LIMITES)
         assert elegida is not None
         assert elegida.id == entrada.id
+
+
+@pytest.mark.parametrize(
+    ("texto", "esperado"),
+    [
+        ("¿Cómo está dividido el proyecto?", "codigo"),
+        ("¿Muéstrame los PR?", "repositorio"),
+        ("¿Qué es un token?", "git_tokens"),
+        ("¿Tienen diagramas?", "diagrama"),
+        ("¿Cómo prueban?", "pruebas"),
+        ("Cuéntame del proyecto", "proyecto"),
+        ("Cuéntanos del proyecto", "proyecto"),
+        ("Háblame del proyecto", "proyecto"),
+        ("Dame un resumen del proyecto", "proyecto"),
+        ("¿En qué consiste el proyecto?", "proyecto"),
+        ("Cuéntame de la Sucursal 1965", "proyecto"),
+    ],
+)
+def test_las_preguntas_del_profesor_llegan_a_su_entrada(texto: str, esperado: str) -> None:
+    """Las formas cortas que usa el profesor no caen al rechazo."""
+    elegida = pregunta._buscar_fija(texto, FICHA, LIMITES)
+    assert elegida is not None
+    assert elegida.id == esperado
 
 
 @pytest.mark.parametrize(

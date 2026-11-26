@@ -56,6 +56,7 @@
     <button type="button" id="escena-nucleo" class="escena__boton--secundario">Núcleo (N)</button>
     <button type="button" id="escena-ver-traza" class="escena__boton--secundario" aria-expanded="false" aria-controls="escena-traza">Trazabilidad (T)</button>
     <button type="button" id="escena-ver-herramientas" class="escena__boton--secundario" aria-expanded="false" aria-controls="escena-herramientas">Herramientas (H)</button>
+    <button type="button" id="escena-ver-recursos" class="escena__boton--secundario" aria-expanded="false" aria-controls="escena-recursos">Recursos (G)</button>
     <label class="escena__casilla" for="escena-solo-subtitulos">
       <input type="checkbox" id="escena-solo-subtitulos">
       Solo subtítulos (respaldo)
@@ -64,7 +65,7 @@
     <span class="escena__estado" id="escena-modo"></span>
     <span class="escena__estado" id="escena-contador"></span>
     <span class="escena__estado" id="escena-voz"></span>
-    <span class="escena__estado">Teclas: Espacio siguiente · P reproducir/pausar · S subtítulos · Q preguntas · N núcleo · T trazabilidad · H herramientas · E en vivo · R reiniciar</span>
+    <span class="escena__estado">Teclas: Espacio siguiente · P reproducir/pausar · S subtítulos · Q preguntas · N núcleo · T trazabilidad · H herramientas · G recursos · E en vivo · R reiniciar</span>
   </div>
 
   <section class="escena__captura" id="escena-captura" aria-label="Entrada del voluntario" hidden>
@@ -84,6 +85,13 @@
       <button type="button" id="captura-enviar" class="escena__boton--secundario">Enviar</button>
       <button type="button" id="captura-seguro" class="escena__boton--secundario">Perfil seguro</button>
     </div>
+    <div class="escena__captura-fila">
+      <button type="button" id="captura-pana" aria-pressed="false">Hablar con Pana</button>
+      <span class="escena__estado" id="captura-pana-estado" aria-live="polite"></span>
+    </div>
+    <p class="escena__aviso">
+      Si eres el voluntario activo, Pana te responde por WhatsApp y también te envía la ficha.
+    </p>
     <div id="captura-confirmacion" hidden>
       <p id="captura-resumen"></p>
       <div class="escena__captura-fila">
@@ -101,6 +109,16 @@
       <button type="submit" id="escena-responder" class="escena__boton--secundario">Responder</button>
     </form>
     <span class="escena__estado" id="escena-pregunta-estado"></span>
+    <div class="escena__preguntas-recursos">
+      <button
+        type="button"
+        id="escena-preguntas-recursos"
+        class="escena__boton--secundario"
+        aria-controls="escena-recursos"
+      >
+        Recursos: repositorio, WhatsApp y diagramas (G)
+      </button>
+    </div>
   </section>
 
   <aside class="escena__traza" id="escena-traza" aria-label="Trazabilidad para quien facilita" hidden>
@@ -127,6 +145,57 @@
     <h2>Pana está usando</h2>
     <ol class="escena__herramientas-lista" id="escena-herramientas-lista"></ol>
     <p class="escena__estado" id="escena-herramientas-aviso" hidden></p>
+  </aside>
+
+  <aside class="escena__recursos" id="escena-recursos" aria-label="Recursos del proyecto" hidden>
+    <header class="escena__recursos-cabecera">
+      <h2>Recursos del proyecto</h2>
+      <button type="button" id="escena-recursos-cerrar" class="escena__boton--secundario">Cerrar (G)</button>
+    </header>
+
+    <section class="escena__recurso-bloque" id="escena-repositorio">
+      <img
+        id="escena-repositorio-qr"
+        src="/api/escena/repositorio/qr.png"
+        alt="Código QR del repositorio público en GitHub"
+        width="180"
+        height="180"
+        loading="lazy"
+      />
+      <div>
+        <h3>Repositorio</h3>
+        <p>Público en GitHub: código, pruebas y pull requests.</p>
+        <a id="escena-repositorio-enlace" class="escena__recurso" href="#" target="_blank" rel="noopener">
+          Abrir repositorio
+        </a>
+      </div>
+    </section>
+
+    <section class="escena__recurso-bloque escena__whatsapp" id="escena-whatsapp" hidden>
+      <img
+        id="escena-whatsapp-qr"
+        alt="Código QR para escribirle a Pana por WhatsApp"
+        width="180"
+        height="180"
+        loading="lazy"
+      />
+      <div>
+        <h3>WhatsApp</h3>
+        <p>Para productos y tasas, escríbeme por WhatsApp.</p>
+      </div>
+    </section>
+
+    <section class="escena__recurso-diagramas" aria-label="Diagramas de Archify">
+      <h3>Diagramas de Archify</h3>
+      <nav class="escena__diagramas-lista">
+        <a class="escena__recurso" href="/diagramas/arquitectura.html" target="_blank" rel="noopener">Arquitectura</a>
+        <a class="escena__recurso" href="/diagramas/datos.html" target="_blank" rel="noopener">Flujo de datos</a>
+        <a class="escena__recurso" href="/diagramas/canal.html" target="_blank" rel="noopener">Canal de WhatsApp</a>
+        <a class="escena__recurso" href="/diagramas/diagnostico.html" target="_blank" rel="noopener">Diagnóstico</a>
+        <a class="escena__recurso" href="/diagramas/agente-openclaw.html" target="_blank" rel="noopener">Agente OpenClaw</a>
+        <a class="escena__recurso" href="/diagramas/despliegue-openclaw.html" target="_blank" rel="noopener">Despliegue OpenClaw</a>
+      </nav>
+    </section>
   </aside>
 </body>
 </html>

@@ -190,6 +190,21 @@ es [`DESPLIEGUE_WHATSAPP.md`](./DESPLIEGUE_WHATSAPP.md), sección 8.
   make escena-proyectada
   ```
   Deja `data/escena/proyectado.json`, que no se versiona.
+- [ ] Panel de **Recursos (G)**: el QR del repositorio y los seis diagramas de
+      Archify funcionan sin configurar nada. El QR de WhatsApp es opcional: si
+      se va a mostrar, en la misma ventana de `make app` definir el número
+      (solo dígitos, sin `+` ni espacios) y reiniciar la app:
+  ```powershell
+  $env:PANA_WHATSAPP_NUMERO = "57XXXXXXXXXX"
+  ```
+  Sin la variable el bloque de WhatsApp se oculta; el número no se versiona ni
+  se pega en el chat. Se comprueba abriendo **Recursos (G)**: el QR del
+  repositorio y el enlace **Abrir repositorio** funcionan, y cada diagrama abre
+  en otra pestaña.
+- [ ] Con el voluntario activo (`ESCENA` y el código), abrir **V** y probar
+      **Hablar con Pana**: la frase pasa por los filtros del canal, la respuesta
+      llega a su WhatsApp y, si el turno produce la ficha, también llega la
+      imagen. Sin voluntario activo, el panel avisa y no envía nada.
 - [ ] **Microsoft Edge** instalado y con internet: Pana habla con
       «Microsoft Gonzalo Online (Natural)» y el agente del joven con
       «Microsoft Juan Online (Natural)». En otro navegador o sin internet

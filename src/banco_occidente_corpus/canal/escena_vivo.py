@@ -7,8 +7,11 @@ pantalla (``GET /api/escena/en-vivo``). La escritura la hace
 
 Reglas que implementa este módulo:
 
-- Solo hay **un** voluntario activo, guardado en memoria con su huella HMAC y
-  un vencimiento deslizante. No va a SQLite y no sobrevive a un reinicio.
+- Solo hay **un** voluntario activo, guardado en memoria con su huella HMAC, el
+  destino normalizado del mensaje de ``ESCENA`` y un vencimiento deslizante. No
+  va a SQLite y no sobrevive a un reinicio. El destino solo sirve para que
+  ``POST /api/escena/hablar`` envíe la respuesta y la ficha por WhatsApp; nunca
+  se registra en logs ni se envía al modelo.
 - ``ESCENA`` seguido del código de cuatro dígitos de ``ESCENA_CODIGO`` se
   reconoce después de la autorización y del consentimiento, y antes de la
   entrevista, del escenario y del motor de OpenClaw.
@@ -172,6 +175,19 @@ def sin_nombres(texto: str) -> str:
     )
 
 
+@dataclass(frozen=True, slots=True)
+class VoluntarioActivo:
+    """Huella y destino del voluntario activo, solo para el envío del canal.
+
+    ``destino`` es el número normalizado que llegó en el mensaje de ``ESCENA``.
+    Vive en memoria mientras la ranura esté vigente, no se persiste, no se
+    registra en logs y nunca se envía al modelo.
+    """
+
+    huella: str = field(repr=False)
+    destino: str = field(repr=False)
+
+
 @dataclass
 class EscenaVivo:
     """Ranura del voluntario activo y publicación de sus turnos.
@@ -189,6 +205,7 @@ class EscenaVivo:
     permitidos: tuple[str, ...] = ()
     ahora: Callable[[], datetime] = lambda: datetime.now(UTC)
     _huella: str | None = field(default=None, init=False, repr=False)
+    _destino: str | None = field(default=None, init=False, repr=False)
     _vence: datetime | None = field(default=None, init=False, repr=False)
     _candado: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
@@ -213,13 +230,13 @@ class EscenaVivo:
         if not codigo_valido(mensaje.texto):
             logger.info("comando ESCENA sin el código de la sesión")
             return None
-        if not self.activar(usuario_id):
+        if not self.activar(usuario_id, destino=mensaje.remitente):
             logger.info("comando ESCENA con otro voluntario activo: se ignora")
             return None
         self._publicar_pana(ID_ACTIVACION, TEXTO_ACTIVADA)
         return _respuesta(mensaje, usuario_id, TEXTO_ACTIVADA)
 
-    def activar(self, usuario_id: str) -> bool:
+    def activar(self, usuario_id: str, *, destino: str | None = None) -> bool:
         """Deja a esa huella como la única voluntaria activa.
 
         Si ya hay otro voluntario vigente, la ranura no se reemplaza: solo se
@@ -227,6 +244,9 @@ class EscenaVivo:
 
         Args:
             usuario_id: huella HMAC del invitado que escribió ``ESCENA``.
+            destino: número normalizado del mensaje, guardado solo en memoria
+                para enviar las respuestas y la ficha desde ``/hablar``. No se
+                persiste, no se registra y no se envía al modelo.
 
         Returns:
             ``True`` si la huella quedó activa (nueva o renovada); ``False`` si
@@ -240,6 +260,8 @@ class EscenaVivo:
             ):
                 return False
             self._huella = usuario_id
+            if destino is not None:
+                self._destino = destino
             self._vence = self._instante() + timedelta(minutes=self.ttl_minutos)
             return True
 
@@ -255,6 +277,24 @@ class EscenaVivo:
         """
         with self._candado:
             return self._vigente(usuario_id)
+
+    def voluntario_activo(self) -> VoluntarioActivo | None:
+        """Devuelve la huella y el destino del voluntario vigente, si existe.
+
+        El destino solo se usa para que ``/api/escena/hablar`` envíe la
+        respuesta y la ficha por WhatsApp. Nunca se devuelve al navegador ni se
+        escribe en un log.
+
+        Returns:
+            El voluntario activo con su destino, o ``None`` si no hay ranura
+            vigente o si se activó sin destino.
+        """
+        with self._candado:
+            if self._huella is None or not self._vigente(self._huella):
+                return None
+            if self._destino is None:
+                return None
+            return VoluntarioActivo(self._huella, self._destino)
 
     def renovar(self, usuario_id: str) -> bool:
         """Renueva el vencimiento si la huella sigue siendo la activa.
@@ -275,6 +315,7 @@ class EscenaVivo:
         """Descarta al voluntario activo (borrado del evento y pruebas)."""
         with self._candado:
             self._huella = None
+            self._destino = None
             self._vence = None
 
     def publicar_invitado(self, mensaje: MensajeEntrante, usuario_id: str) -> bool:
@@ -348,6 +389,7 @@ class EscenaVivo:
             return False
         if self._instante() >= self._vence:
             self._huella = None
+            self._destino = None
             self._vence = None
             return False
         return True

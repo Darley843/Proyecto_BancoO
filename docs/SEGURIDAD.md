@@ -448,6 +448,11 @@ token de la app en un error.
   valor en claro solo existe en memoria; el esquema no tiene columnas para
   número, nombre ni texto. El perfil (nombre y rol) vive fuera de Git y no se
   envía al modelo. El consentimiento de la Ley 1581 se pide en el primer mensaje.
+  La única copia adicional del número es el `destino` del voluntario activo de
+  la escena (`canal/escena_vivo.py`): vive en RAM con el mismo TTL que la
+  huella, solo para que `POST /api/escena/hablar` envíe la respuesta y la ficha,
+  no se registra en logs, no se persiste, no se envía al modelo y se borra al
+  vencer o con `olvidar()`.
 - **Inyección.** El texto del usuario y los fragmentos son datos: se neutralizan,
   se envuelven antes del prompt y nunca se interpretan como instrucciones del
   sistema. La ruta no se elige con su contenido.
