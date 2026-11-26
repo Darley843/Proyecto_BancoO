@@ -20,7 +20,7 @@ no queda en verde, se usa la versión B de la sección 2.
 | [`ESCENA.md`](./ESCENA.md) | La pantalla y sus teclas (E = modo en vivo) |
 | [`ESCENA_EN_VIVO.md`](./ESCENA_EN_VIVO.md) | Contrato de la escena en vivo y su plan B |
 | [`PRESENTADOR.md`](./PRESENTADOR.md) | Las 17 respuestas fijas de Pana |
-| [`PREGUNTAS_FRECUENTES.md`](./PREGUNTAS_FRECUENTES.md) | Las 30 respuestas escritas sobre el proyecto |
+| [`PREGUNTAS_FRECUENTES.md`](./PREGUNTAS_FRECUENTES.md) | Las 31 respuestas escritas sobre el proyecto |
 
 **Enlace de la demo:** `http://127.0.0.1:8000/escena.html` en el computador
 de Nayla, en Edge y en pantalla completa (F11). El número de WhatsApp va solo
@@ -41,8 +41,8 @@ en las tarjetas de los invitados, nunca en el repositorio.
 
 | Minuto | Bloque | En la pantalla | Quién opera | Qué tiene que quedar claro |
 |---|---|---|---|---|
-| 0:00 – 1:00 | **Presentación** | Los 7 turnos de `INTRODUCCION`: Pana, Don Gota, los dos agentes y el auditor se presentan | Yoldy (Espacio) | Qué es Pana, para quién es (jóvenes con su primer crédito) y que el gota a gota cobra cerca de 791 % E.A. |
-| 1:00 – 1:30 | **Invitación** | Último turno de la presentación; Yoldy pulsa **E** y la barra dice «En vivo · esperando el primer turno» | Anny (tarjetas), Darley (voluntario) | El voluntario responde **Acepto** y escribe el **código de la escena** (`ESCENA` o el código con dígitos que se decida en el #225), que va **solo en su tarjeta**: si lo tuvieran todos, cualquiera se tomaría la pantalla. Los demás invitados escriben con datos inventados y no salen en la pantalla |
+| 0:00 – 1:00 | **Presentación** | Los turnos 1 a 6 de `INTRODUCCION` (`anfitrion.js`): Pana abre, dice que el gota a gota cobra cerca de 791 % E.A. (turno 2) y se presentan Don Gota, los dos agentes y el auditor | Yoldy (Espacio) | Qué es Pana, para quién es (jóvenes con su primer crédito) y que el gota a gota cobra cerca de 791 % E.A. |
+| 1:00 – 1:30 | **Invitación** | El turno 7 de `INTRODUCCION` (Pana invita al voluntario y a escribir por WhatsApp); después Yoldy pulsa **E** y la barra dice «En vivo · esperando el primer turno» | Anny (tarjetas), Darley (voluntario) | El voluntario responde **Acepto** y escribe el **código de la escena** (`ESCENA` o el código con dígitos que se decida en el #225), que va **solo en su tarjeta**: si lo tuvieran todos, cualquiera se tomaría la pantalla. Los demás invitados inventan sus propios datos (la tarjeta no los trae) y no salen en la pantalla |
 | 1:30 – 2:30 | **El voluntario escribe** | Sus mensajes salen en subtítulo como «Invitado» y Pana le responde con voz | Darley (acompaña), Yoldy (E ya activo) | Que es una conversación real por WhatsApp, sin nombres ni números en la pantalla |
 | 2:30 – 3:30 | **Don Gota** | Los turnos de `calcular_prestamo_gota`: interés mensual, total y cuota diaria | Yoldy (P si hay que esperar) | Don Gota es un cálculo en código, nunca un modelo |
 | 3:30 – 4:30 | **Pana compara** | Los turnos de `comparar_gota_banco`: tasa E.A. frente a la usura y artículo 305 | Yoldy | **Cifras 1 y 2:** la usura (28,34 % E.A.) y la tasa del banco |
@@ -94,8 +94,11 @@ no esté, la Q responde con la ficha corta de `anfitrion.js`.
 
 ## 4. El cierre: tres cifras
 
-El público tiene que salir con estas tres cifras, y las tres quedan escritas en
-el panel de la derecha:
+El público tiene que salir con estas tres cifras. Las tres **se dicen en la
+escena** y quedan juntas en la **trazabilidad (tecla T)**; el panel de la
+derecha muestra solo las cifras del turno que se está diciendo y el veredicto
+solo mientras habla el auditor. Si el jurado pide verlas al final, Anny abre la
+trazabilidad con **T**:
 
 | Cifra | De dónde sale | Con $1.000.000 (noviembre de 2026) |
 |---|---|---|
