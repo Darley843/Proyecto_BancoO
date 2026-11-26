@@ -5,16 +5,19 @@ Es la pieza que convierte un mensaje de WhatsApp en una respuesta:
 1. Calcula ``usuario_id`` con la huella HMAC del número.
 2. Descarta números que no estén en las huellas autorizadas.
 3. Pasa por la máquina de consentimiento de la Ley 1581.
-4. Si la entrevista del diagnóstico está activa, el botón o la fila avanza la
+4. Escena en vivo: ``ESCENA`` activa al voluntario de la demo; desde ahí sus
+   mensajes y las respuestas de Pana se publican en la lista que lee la
+   pantalla. El comando no se reenvía al motor ni se publica como mensaje.
+5. Si la entrevista del diagnóstico está activa, el botón o la fila avanza la
    entrevista; un texto libre repite la pregunta. Al completar, calcula el
    diagnóstico y envía la tarjeta.
-5. Si hay un diagnóstico de las últimas 24 horas y el texto es un «¿Y si…?»
+6. Si hay un diagnóstico de las últimas 24 horas y el texto es un «¿Y si…?»
    («¿y si lo pago en 60 meses?»), responde con la tarjeta de antes y después.
-6. Si no, intenta el motor de OpenClaw con el mensaje nuevo y la huella. Un
+7. Si no, intenta el motor de OpenClaw con el mensaje nuevo y la huella. Un
    fallo (timeout, error de red, ``5xx``, cuerpo inválido) cae al grafo de la
    Sucursal con ``thread_id = wa:<usuario_id>``. Cuando el grafo devuelve la
    ruta D, arranca la entrevista en lugar de la invitación.
-7. Envía la respuesta con el enviador configurado (falso o Meta) y registra el
+8. Envía la respuesta con el enviador configurado (falso o Meta) y registra el
    motor que respondió (``openclaw``, ``grafo`` o ``canal``).
 
 Durante el modo evento el alcance es el mismo: el desconocido que acepta el
@@ -48,7 +51,8 @@ from .configuracion import ConfiguracionCanal
 from .consentimiento import MaquinaConsentimiento
 from .contratos import MensajeEntrante, RespuestaCanal
 from .entrevista import EntrevistaCanal
-from .envio import Enviador
+from .envio import Enviador, ErrorEnvio
+from .escena_vivo import EscenaVivo
 from .identidad import calcular_usuario_id
 
 logger = logging.getLogger(__name__)
@@ -144,6 +148,7 @@ class Despachador:
     responder: Callable[[str, str, str], RespuestaGrafo | str]
     motor: Motor | None = None
     entrevista: EntrevistaCanal | None = None
+    escena: EscenaVivo | None = None
 
     def recibir(self, mensaje: MensajeEntrante) -> None:
         """Registra y encola un mensaje, sin bloquear la respuesta a Meta.
@@ -180,9 +185,10 @@ class Despachador:
 
         actualizar_mensaje(self.ruta_almacen, mensaje.id_mensaje, "procesando")
         ahora = _instante(momento)
+        comando_escena = False
         try:
             if not self.config.permite(usuario_id, ahora):
-                self._enviar_texto(mensaje, usuario_id, AVISO_NO_AUTORIZADO)
+                self._avisar_no_autorizado(mensaje, usuario_id)
                 actualizar_mensaje(
                     self.ruta_almacen,
                     mensaje.id_mensaje,
@@ -208,6 +214,19 @@ class Despachador:
             # el mismo diagnóstico que un número de la lista, con el
             # consentimiento primero y las cuotas ya verificadas arriba.
             respuesta = self.maquina.decidir(mensaje, usuario_id)
+            if respuesta is None and self.escena is not None:
+                respuesta = self.escena.decidir(mensaje, usuario_id)
+                if respuesta is not None:
+                    comando_escena = True
+                    if self.entrevista is not None:
+                        # ESCENA cancela la entrevista a medias: el siguiente
+                        # mensaje ya es de la escena y no una respuesta suelta.
+                        self.entrevista.descartar(usuario_id)
+                else:
+                    # El mensaje del voluntario se publica antes del motor: la
+                    # pantalla lo muestra primero y después los turnos de las
+                    # herramientas. Los demás invitados no publican.
+                    self.escena.publicar_invitado(mensaje, usuario_id)
             if respuesta is None and self.entrevista is not None:
                 respuesta = self.entrevista.reanudar(mensaje, usuario_id)
             if respuesta is None:
@@ -239,6 +258,11 @@ class Despachador:
                     )
 
             self.crear_enviador(usuario_id, mensaje.remitente).enviar(respuesta)
+            if self.escena is not None and not comando_escena:
+                # Solo publica si el envío salió bien: la pantalla no muestra
+                # una respuesta que el invitado no recibió. La confirmación de
+                # ESCENA ya se publicó con su propio identificador.
+                self.escena.publicar_pana(usuario_id, respuesta.texto)
             actualizar_mensaje(
                 self.ruta_almacen,
                 mensaje.id_mensaje,
@@ -253,6 +277,24 @@ class Despachador:
                 self._enviar_texto(mensaje, usuario_id, TEXTO_ERROR)
             except Exception:
                 logger.warning("tampoco se pudo enviar el aviso de error")
+
+    def _avisar_no_autorizado(self, mensaje: MensajeEntrante, usuario_id: str) -> None:
+        """Intenta avisar al número no autorizado sin romper el turno.
+
+        En modo real el enviador bloquea cualquier destino que no esté en la
+        lista ni dentro de la ventana del evento, así que el aviso no sale: es
+        el comportamiento esperado de ``docs/DESPLIEGUE_WHATSAPP.md`` §7.1. El
+        mensaje queda ``ignorado`` y no ``error``, y el registro no lleva
+        traza de excepción porque no hubo falla del canal.
+
+        Args:
+            mensaje: mensaje del número no autorizado.
+            usuario_id: huella HMAC del número.
+        """
+        try:
+            self._enviar_texto(mensaje, usuario_id, AVISO_NO_AUTORIZADO)
+        except ErrorEnvio as error:
+            logger.info("aviso no enviado al número no autorizado: %s", error)
 
     def _texto_del_motor(self, texto: str, usuario_id: str) -> str | None:
         """Devuelve el texto del motor OpenClaw o ``None`` para usar el grafo.

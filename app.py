@@ -30,6 +30,7 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from banco_occidente_corpus.arqueo.latencia import con_latencia, ruta_por_defecto
+from banco_occidente_corpus.asistente.contexto_prompt import cargar_contexto
 from banco_occidente_corpus.boveda.mapa import ServicioMapa
 from banco_occidente_corpus.canal.almacen import (
     hay_mensaje_desde,
@@ -46,10 +47,12 @@ from banco_occidente_corpus.canal.envio import (
     EnviadorMeta,
     ErrorEnvio,
 )
+from banco_occidente_corpus.canal.escena_vivo import EscenaVivo
 from banco_occidente_corpus.canal.openclaw import ClienteOpenClaw, cliente_desde_entorno
 from banco_occidente_corpus.canal.webhook import crear_router_canal
 from banco_occidente_corpus.config import Config, load_config
 from banco_occidente_corpus.escena.api import crear_router_escena
+from banco_occidente_corpus.escena.api_en_vivo import crear_router_en_vivo
 from banco_occidente_corpus.herramientas.api import crear_router_herramientas
 from banco_occidente_corpus.sucursal.ajustes import (
     ConfiguracionSucursal,
@@ -127,6 +130,22 @@ async def _ciclo_de_vida(_: FastAPI) -> AsyncIterator[None]:
     """
     yield
     cerrar_transmisiones()
+
+
+def _telefonos_publicos() -> tuple[str, ...]:
+    """Teléfonos del canal oficial, para que el detector de PII no los marque.
+
+    Returns:
+        Los teléfonos públicos del bloque de atención al cliente, o ``()`` si
+        el contexto todavía no se generó (``make contexto``).
+    """
+    try:
+        contexto = cargar_contexto()
+    except Exception:
+        return ()
+    if contexto.canal is None:
+        return ()
+    return contexto.canal.telefonos
 
 
 def crear_app(
@@ -256,6 +275,10 @@ def crear_app(
             responder=responder,
             motor=motor_openclaw.responder if motor_openclaw is not None else None,
             entrevista=entrevista,
+            escena=EscenaVivo(
+                ttl_minutos=canal.escena_ttl_minutos,
+                permitidos=_telefonos_publicos(),
+            ),
         )
 
     @asynccontextmanager
@@ -293,6 +316,7 @@ def crear_app(
     )
     app.include_router(crear_router_canal(despachador.recibir if despachador is not None else None))
     app.include_router(crear_router_escena())
+    app.include_router(crear_router_en_vivo())
     app.include_router(crear_router_herramientas())
 
     @app.get("/health", response_model=SaludRespuesta, tags=["salud"])

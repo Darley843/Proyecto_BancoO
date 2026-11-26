@@ -25,6 +25,7 @@ from banco_occidente_corpus.canal.despachador import (
     TEXTO_ERROR,
     Despachador,
 )
+from banco_occidente_corpus.canal.envio import Enviador, ErrorEnvio
 from banco_occidente_corpus.canal.identidad import calcular_usuario_id
 from banco_occidente_corpus.sucursal.perfil import huella_perfil
 
@@ -59,6 +60,15 @@ class FakeOpenClaw:
 
 
 @dataclass
+class EnviadorBloqueado:
+    """Imita el modo real: rechaza los destinos fuera de la lista."""
+
+    def enviar(self, respuesta: RespuestaCanal) -> str:
+        """Rechaza el envío como ``EnviadorMeta`` sin salir a la red."""
+        raise ErrorEnvio("destino no autorizado para el modo real")
+
+
+@dataclass
 class BancoDePrueba:
     """Piezas construidas para un caso del despachador."""
 
@@ -88,6 +98,7 @@ def _banco(
     *,
     autorizado: bool = True,
     motor: Callable[[str, str], str | None] | None = None,
+    enviador: Enviador | None = None,
 ) -> BancoDePrueba:
     """Arma el despachador con enviador, grafo y motor de doble."""
     ruta = tmp_path / "whatsapp.sqlite"
@@ -107,7 +118,7 @@ def _banco(
         ruta_almacen=ruta,
         maquina=MaquinaConsentimiento(ruta),
         cola=ColaMensajes(),
-        crear_enviador=lambda _usuario, _destino: espia,
+        crear_enviador=lambda _usuario, _destino: enviador or espia,
         responder=responder,
         motor=motor,
     )
@@ -130,6 +141,21 @@ def test_numero_no_autorizado_recibe_aviso(tmp_path: Path) -> None:
     banco.despachador.procesar(mensaje)
 
     assert [respuesta.texto for respuesta in banco.enviadas] == [AVISO_NO_AUTORIZADO]
+    assert banco.llamadas == []
+    assert contar_mensajes(banco.ruta) == {"ignorado": 1}
+
+
+def test_numero_no_autorizado_queda_ignorado_si_el_envio_real_lo_bloquea(
+    tmp_path: Path,
+) -> None:
+    """El bloqueo del modo real no convierte el descarte en error."""
+    banco = _banco(tmp_path, autorizado=False, enviador=EnviadorBloqueado())
+    mensaje = _mensaje("¿cuota de manejo?")
+
+    banco.despachador.recibir(mensaje)
+    banco.despachador.procesar(mensaje)
+
+    assert banco.enviadas == []
     assert banco.llamadas == []
     assert contar_mensajes(banco.ruta) == {"ignorado": 1}
 

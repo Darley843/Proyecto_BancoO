@@ -54,6 +54,34 @@ El paso a paso de Meta, túnel, webhook y apagado está en
 [`DESPLIEGUE_WHATSAPP.md`](./DESPLIEGUE_WHATSAPP.md); las pruebas viven en
 `test/test_canal_evento.py`.
 
+### Escena en vivo (`ESCENA`)
+
+El voluntario escribe **`ESCENA`** por WhatsApp y su recorrido se publica en la
+lista que reproduce `escena.html` en modo «En vivo». El comando se reconoce
+**después** del consentimiento y **antes** de la entrevista, del escenario y del
+motor: cancela una entrevista a medias y no se reenvía a Pana.
+
+| Control | Valor | Efecto |
+|---|---|---|
+| Interruptor | `ESCENA_EN_VIVO=1` | Sin él, `ESCENA` responde «La escena en vivo no está activada» y no escribe nada |
+| Vigencia | `[evento] escena_ttl_minutos` (180) | Cada mensaje del voluntario renueva el vencimiento |
+| Voluntarios | uno solo | Otro `ESCENA` reemplaza al anterior; los demás invitados no aparecen |
+| Orden | invitado, herramientas y Pana | El mensaje del invitado se publica antes del motor; la respuesta, después del envío |
+| PII | `detectar_pii` y nombres | Un mensaje con teléfono, correo, documento o tarjeta no se publica; sí la frase fija de Pana |
+| Borrado | `scripts/limpiar_evento.ps1 -Confirmar` | Borra `data/escena/en_vivo.jsonl` y `en_vivo.lock` |
+
+El interruptor se consulta en cada publicación: apagarlo detiene la escritura
+sin reiniciar la app, y la app y el MCP lo necesitan en su propio proceso.
+
+**Limitación conocida.** El MCP no sabe qué invitado llamó a una herramienta:
+publica el turno, pero no el mensaje de quien lo provocó. Por eso, durante la
+escena solo el voluntario hace el recorrido del crédito; los demás invitados
+pueden saludar, preguntar por productos o pedir un asesor.
+
+Las pruebas viven en `test/test_canal_escena_vivo.py` y
+`test/test_escena_en_vivo_api.py`; la ruta solo responde en la app de
+`127.0.0.1` y el túnel la deja fuera.
+
 ## Puesta en marcha desde cero
 
 ### 0. Antes de empezar
@@ -140,6 +168,8 @@ $env:WHATSAPP_VERIFY_TOKEN    = "<token-alfanumerico>"
 $env:WHATSAPP_ACCESS_TOKEN    = "el-token-permanente"
 $env:WHATSAPP_ID_SALT         = "una-cadena-aleatoria-larga"
 $env:WHATSAPP_MODO            = "falso"
+# Opcional: enciende el modo evento sin editar el TOML.
+# $env:WHATSAPP_EVENTO        = "1"
 ```
 
 Cárgalo en cada ventana donde lo necesites:
@@ -158,6 +188,10 @@ Verifica que las variables existen:
 > El archivo contiene secretos: no se copia al repositorio, no se captura y no
 > se comparte. Si el proyecto se comprime, comparte solo `ProyectoAvance1`.
 
+> El detalle de cada variable, cómo generar `WHATSAPP_ID_SALT`, la precedencia
+> entre el `.ps1`, la ventana y el TOML, y dónde se pega la URL del túnel está
+> en [`DESPLIEGUE_WHATSAPP.md`](./DESPLIEGUE_WHATSAPP.md) §2 y §3.1.
+
 ### 6. Autorizar los cinco números (navegador)
 
 1. **WhatsApp → Paso 1 → Envía un mensaje desde tu número de prueba → To**.
@@ -175,7 +209,9 @@ de `config/whatsapp.toml` (sección `[autorizados]`). Para generar cada huella:
 uv run python -m banco_occidente_corpus.canal.identidad --huella "+57 300 123 4567"
 ```
 
-El comando lee `WHATSAPP_ID_SALT`, imprime solo la huella y no muestra la sal.
+El comando lee `WHATSAPP_ID_SALT` (la misma sal que carga `whatsapp-env.ps1` en
+la ventana de la app), imprime solo la huella y no muestra la sal. La sal no se
+pega en Meta ni la usa el túnel.
 
 Pega la huella en `config/whatsapp.toml`, reemplazando uno de los marcadores:
 
@@ -228,6 +264,8 @@ La consulta debe mostrar tu app en `data`. La suscripción responde
 
 ```powershell
 . "..\whatsapp-env.ps1"
+$env:WHATSAPP_MODO = "real"    # sin esto la respuesta se registra pero no sale
+$env:WHATSAPP_EVENTO = "1"     # solo para abrir el modo evento
 make app
 ```
 
@@ -251,7 +289,9 @@ dominio estático de ngrok ya no está en el plan gratuito.
 
 ### 10. Registrar el callback en Meta (navegador)
 
-En la app → **Webhooks** → objeto **`Whatsapp Business Account`** (no `User`):
+En la app → **Webhooks** → objeto **`Whatsapp Business Account`** (no `User`).
+Enlace directo, campo exacto y comprobación previa:
+[`DESPLIEGUE_WHATSAPP.md`](./DESPLIEGUE_WHATSAPP.md) §3.1.
 
 | Campo de Meta | Qué pegar |
 |---|---|
@@ -261,6 +301,9 @@ En la app → **Webhooks** → objeto **`Whatsapp Business Account`** (no `User`
 
 Pulsa **Verificar y guardar**. Meta hace un `GET` y debe responder 200 con el
 `hub.challenge`; en la ventana 1 aparece la petición.
+
+Es el **único** lugar de Meta donde se pega la URL del túnel. Si el túnel se
+reinicia y cambia el subdominio, se repite solo este paso.
 
 > Guardar la URL **no** suscribe la cuenta: son dos pasos distintos (el 8 y este).
 

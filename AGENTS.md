@@ -181,6 +181,8 @@ rol declarados, con consentimiento.
 | `.../canal/hitl.py` | `interrupt()`, botones Contactar/Descartar y caso de asesor |
 | `.../canal/envio.py` | Cliente de Meta: `timeout`, User-Agent y `From` |
 | `.../canal/openclaw.py` | Cliente del gateway OpenClaw: 45 s de techo, sin reintentos, UA, `From` y respaldo al grafo |
+| `.../canal/escena_vivo.py` | `ESCENA` activa al voluntario, TTL en memoria y publicación de invitado y Pana |
+| `.../escena/api_en_vivo.py` | `GET /api/escena/en-vivo`: solo lectura, 200 turnos y `no-store` |
 | `.../canal/almacen.py` | Mensajes, consentimientos y casos en SQLite |
 | `.../diagnostico/motor.py` | Contratos del canal → cálculo → `ResultadoDiagnostico` |
 | `.../diagnostico/calculo.py` | Tasa mensual y cuota francesa |

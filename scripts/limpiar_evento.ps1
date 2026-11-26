@@ -46,7 +46,9 @@
        archivo que viva bajo memory\ se borra. Nunca toca los .example ni los
        archivos versionados SOUL.md, AGENTS.md, USER.md e IDENTITY.md.
 
-    5. Borra en Windows data\asistente\trazas\herramientas.jsonl si existe.
+    5. Borra en Windows data\asistente\trazas\herramientas.jsonl, y la lista en
+       vivo de la escena (data\escena\en_vivo.jsonl y su archivo de bloqueo
+       en_vivo.lock) si existen.
 
     No borra data\evaluacion\inyeccion.json: es la evidencia de la tarea 3.5
     que cita docs/INYECCION.md y no guarda el texto de las respuestas ni datos
@@ -147,7 +149,9 @@ $ErrorActionPreference = 'Stop'
 
 $RaizRepo = Split-Path -Parent $PSScriptRoot
 $ArchivosWindows = @(
-    (Join-Path $RaizRepo 'data\asistente\trazas\herramientas.jsonl')
+    (Join-Path $RaizRepo 'data\asistente\trazas\herramientas.jsonl'),
+    (Join-Path $RaizRepo 'data\escena\en_vivo.jsonl'),
+    (Join-Path $RaizRepo 'data\escena\en_vivo.lock')
 )
 $ArchivosVersionados = @('SOUL.md', 'AGENTS.md', 'USER.md', 'IDENTITY.md')
 $TablasArchivadas = @(
