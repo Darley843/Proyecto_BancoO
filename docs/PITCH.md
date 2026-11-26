@@ -32,8 +32,8 @@ en las tarjetas de los invitados, nunca en el repositorio.
 |---|---|---|
 | Nayla | Computador de la demo | Lleva el reloj, vigila el gateway, el MCP y la lista en vivo, y **decide el plan B** |
 | Yoldy | Pantalla | Pasa la presentación (Espacio), entra y sale del modo en vivo (E), pausa la cola si hace falta (P), abre las herramientas (H) y las preguntas (Q); cronometra; activa solo subtítulos (S) si falla el audio |
-| Darley | Voluntario y WhatsApp | Acompaña al voluntario y su celular; vigila Meta, el túnel, el modo evento y que el voluntario haya escrito `ESCENA` |
-| Anny | Invitados y auditor | Reparte la tarjeta o el QR («responde Acepto», «escribe ESCENA» y dos sugerencias); vigila el veredicto y la trazabilidad (T) |
+| Darley | Voluntario y WhatsApp | Acompaña al voluntario y su celular; vigila Meta, el túnel, el modo evento y que el voluntario haya escrito el código de la escena |
+| Anny | Invitados y auditor | Reparte a los invitados la tarjeta o el QR («responde Acepto» y dos sugerencias) y entrega **solo al voluntario** la tarjeta con el código de la escena; vigila el veredicto y la trazabilidad (T) |
 
 ## 2. Minuto a minuto
 
@@ -42,7 +42,7 @@ en las tarjetas de los invitados, nunca en el repositorio.
 | Minuto | Bloque | En la pantalla | Quién opera | Qué tiene que quedar claro |
 |---|---|---|---|---|
 | 0:00 – 1:00 | **Presentación** | Los 7 turnos de `INTRODUCCION`: Pana, Don Gota, los dos agentes y el auditor se presentan | Yoldy (Espacio) | Qué es Pana, para quién es (jóvenes con su primer crédito) y que el gota a gota cobra cerca de 791 % E.A. |
-| 1:00 – 1:30 | **Invitación** | Último turno de la presentación; Yoldy pulsa **E** y la barra dice «En vivo · esperando el primer turno» | Anny (tarjetas), Darley (voluntario) | El voluntario responde **Acepto** y escribe **ESCENA**; los demás invitados escriben con datos inventados y no salen en la pantalla |
+| 1:00 – 1:30 | **Invitación** | Último turno de la presentación; Yoldy pulsa **E** y la barra dice «En vivo · esperando el primer turno» | Anny (tarjetas), Darley (voluntario) | El voluntario responde **Acepto** y escribe el **código de la escena** (`ESCENA` o el código con dígitos que se decida en el #225), que va **solo en su tarjeta**: si lo tuvieran todos, cualquiera se tomaría la pantalla. Los demás invitados escriben con datos inventados y no salen en la pantalla |
 | 1:30 – 2:30 | **El voluntario escribe** | Sus mensajes salen en subtítulo como «Invitado» y Pana le responde con voz | Darley (acompaña), Yoldy (E ya activo) | Que es una conversación real por WhatsApp, sin nombres ni números en la pantalla |
 | 2:30 – 3:30 | **Don Gota** | Los turnos de `calcular_prestamo_gota`: interés mensual, total y cuota diaria | Yoldy (P si hay que esperar) | Don Gota es un cálculo en código, nunca un modelo |
 | 3:30 – 4:30 | **Pana compara** | Los turnos de `comparar_gota_banco`: tasa E.A. frente a la usura y artículo 305 | Yoldy | **Cifras 1 y 2:** la usura (28,34 % E.A.) y la tasa del banco |
