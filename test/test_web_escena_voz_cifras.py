@@ -37,8 +37,12 @@ TEXTOS_VOZ = (
     "$3 a $5 millones",
     "$1 a $2 millones",
     "$20 millones",
+    "$7,5 millones",
+    "$7,5 mil",
     "Menos de $500 mil",
     "$1 millón",
+    "Son $1.234.567.",
+    "20 % al mes",
     "Más de $50 millones",
     "Entre $500 mil y $5 millones",
     "28,17 %",
@@ -174,6 +178,31 @@ def test_para_voz_nunca_deja_dolares() -> None:
         assert "$" not in salida, f"«{texto}» dejó un «$»: {salida!r}"
         assert "dólar" not in salida.lower(), f"«{texto}» dijo dólares: {salida!r}"
         assert "dolar" not in salida.lower(), f"«{texto}» dijo dolares: {salida!r}"
+
+
+@requiere_node
+def test_para_voz_conserva_el_espacio_despues_del_porcentaje_sin_sigla() -> None:
+    """El «%» sin sigla no se come el espacio: «20 % al mes» suena con pausa."""
+    assert _para_voz("20 % al mes") == "veinte por ciento al mes"
+    assert _para_voz("20 % E.A. al mes") == "veinte por ciento efectivo anual al mes"
+
+
+@requiere_node
+def test_montos_con_coma_decimal_y_escala_en_voz_y_pantalla() -> None:
+    """«$7,5 millones» se lee con «coma» y se muestra con la cifra completa."""
+    assert _para_voz("$7,5 millones") == "siete coma cinco millones de pesos"
+    assert _para_voz("$7,5 mil") == "siete coma cinco mil pesos"
+    assert _para_pantalla("$7,5 millones") == "$7.500.000"
+    assert _para_pantalla("$7,5 mil") == "$7.500"
+
+
+@requiere_node
+def test_la_voz_y_la_pantalla_conservan_el_punto_final_de_la_frase() -> None:
+    """El punto de miles solo cuenta si va seguido de dígitos."""
+    assert _para_voz("Son $1.234.567.") == (
+        "Son un millón doscientos treinta y cuatro mil quinientos sesenta y siete pesos."
+    )
+    assert _para_pantalla("Son $1.234.567.") == "Son $1.234.567."
 
 
 @pytest.mark.parametrize(

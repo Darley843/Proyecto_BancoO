@@ -241,7 +241,7 @@ function sinMarcas(texto) {
  */
 function cambiarRangos(texto) {
   const conEscala = texto.replace(
-    /\$\s*(\d[\d.]*)\s+a\s+\$\s*(\d[\d.]*)\s*(millones|millón)\b/gi,
+    /\$\s*(\d+(?:\.\d{3})*)\s+a\s+\$\s*(\d+(?:\.\d{3})*)\s*(millones|millón)\b/gi,
     (coincidencia, desde, hasta, escala) => {
       const inicio = montoEnPalabras(desde);
       const fin = montoEnPalabras(hasta);
@@ -253,7 +253,7 @@ function cambiarRangos(texto) {
     },
   );
   return conEscala.replace(
-    /\$\s*(\d[\d.]*)\s*[–—−-]\s*\$\s*(\d[\d.]*)/g,
+    /\$\s*(\d+(?:\.\d{3})*)\s*[–—−-]\s*\$\s*(\d+(?:\.\d{3})*)/g,
     (coincidencia, desde, hasta) => {
       const inicio = montoEnPalabras(desde);
       const fin = montoEnPalabras(hasta);
@@ -269,22 +269,34 @@ function cambiarRangos(texto) {
  * Convierte los montos abreviados con «mil», «millón» o «millones».
  *
  * «$20 millones» se lee «veinte millones de pesos» y «Menos de $500 mil» se
- * lee «menos de quinientos mil pesos».
+ * lee «menos de quinientos mil pesos». Los montos abreviados con coma decimal
+ * («$7,5 millones») se leen con «coma» («siete coma cinco millones de pesos»)
+ * y se resuelven antes que sus equivalentes enteros.
  *
  * @param {string} texto Texto con montos abreviados.
  * @returns {string} El texto con esos montos en palabras.
  */
 function cambiarMontosConEscala(texto) {
   return texto
-    .replace(/\$\s*(\d[\d.]*)\s*millones\b/gi, (coincidencia, crudo) => {
+    .replace(
+      /\$\s*(\d+),(\d+)\s*millones\b/gi,
+      (coincidencia, entero, fraccion) =>
+        `${palabrasEntero(Number(entero))} coma ${palabrasFraccion(fraccion)} millones de pesos`,
+    )
+    .replace(
+      /\$\s*(\d+),(\d+)\s*mil\b/gi,
+      (coincidencia, entero, fraccion) =>
+        `${palabrasEntero(Number(entero))} coma ${palabrasFraccion(fraccion)} mil pesos`,
+    )
+    .replace(/\$\s*(\d+(?:\.\d{3})*)\s*millones\b/gi, (coincidencia, crudo) => {
       const monto = montoEnPalabras(crudo);
       return monto ? `${monto.palabras} millones de pesos` : coincidencia;
     })
-    .replace(/\$\s*(\d[\d.]*)\s*(millón|millon)\b/gi, (coincidencia, crudo) => {
+    .replace(/\$\s*(\d+(?:\.\d{3})*)\s*(millón|millon)\b/gi, (coincidencia, crudo) => {
       const monto = montoEnPalabras(crudo);
       return monto ? `${apocope(monto.palabras)} millón de pesos` : coincidencia;
     })
-    .replace(/\$\s*(\d[\d.]*)\s*mil\b/gi, (coincidencia, crudo) => {
+    .replace(/\$\s*(\d+(?:\.\d{3})*)\s*mil\b/gi, (coincidencia, crudo) => {
       const monto = montoEnPalabras(crudo);
       return monto ? `${monto.palabras} mil pesos` : coincidencia;
     });
@@ -297,18 +309,23 @@ function cambiarMontosConEscala(texto) {
  * @returns {string} El texto con los montos en palabras.
  */
 function cambiarMontos(texto) {
-  return texto.replace(/\$\s*(\d[\d.]*)/g, (coincidencia, crudo) => montoConPesos(crudo));
+  return texto.replace(/\$\s*(\d+(?:\.\d{3})*)/g, (coincidencia, crudo) =>
+    montoConPesos(crudo),
+  );
 }
 
 /**
  * Convierte los porcentajes y sus siglas en palabras.
+ *
+ * El espacio que sigue al «%» solo se consume cuando viene la sigla; sin ella
+ * se conserva para no pegar la frase siguiente («20 % al mes»).
  *
  * @param {string} texto Texto con porcentajes.
  * @returns {string} El texto con porcentajes y tasas en palabras.
  */
 function cambiarPorcentajes(texto) {
   const conPorcentaje = texto.replace(
-    /(\d{1,3}(?:\.\d{3})*(?:,\d+)?|\d+(?:,\d+)?)\s*%\s*(E\.?\s*A\.?|M\.?\s*V\.?)?/gi,
+    /(\d{1,3}(?:\.\d{3})*(?:,\d+)?|\d+(?:,\d+)?)\s*%(?:\s*(E\.?\s*A\.?|M\.?\s*V\.?))?/gi,
     (coincidencia, crudo, sigla) => {
       const base = `${palabrasPorcentaje(crudo)} por ciento`;
       const limpia = String(sigla ?? "")
