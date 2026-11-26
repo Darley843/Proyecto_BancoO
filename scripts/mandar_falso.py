@@ -4,18 +4,19 @@ Ensaya la escena en vivo **sin Meta, sin túnel y sin abrir puertos**: construye
 la app con el ``TestClient`` de FastAPI, firma el cuerpo con el App Secret y
 recorre la misma cadena que en producción (firma, extracción, despachador,
 consentimiento, entrevista, motor). ``EnviadorFalso`` registra la respuesta en
-``data/asistente/whatsapp.sqlite`` y, con ``ESCENA_EN_VIVO=1``, el canal publica
-los turnos de la escena.
+``data/asistente/whatsapp.sqlite`` y, con ``ESCENA_EN_VIVO=1`` y
+``ESCENA_CODIGO`` en la sesión, el canal publica los turnos de la escena.
 
 Es el mismo mecanismo de ``make simular``, pero para un mensaje suelto.
 
-Orden para la escena: ``hola``, el botón ``Acepto`` y después ``ESCENA``.
+Orden para la escena: ``hola``, el botón ``Acepto`` y después
+``ESCENA <código de cuatro dígitos>``.
 
 Uso:
 
     uv run python scripts/mandar_falso.py "hola"
     uv run python scripts/mandar_falso.py --boton consent:acepto Acepto
-    uv run python scripts/mandar_falso.py ESCENA
+    uv run python scripts/mandar_falso.py "ESCENA 1965"
     uv run python scripts/mandar_falso.py "¿cuál es la tasa de libre inversión?"
 
 Si no hay ``WHATSAPP_APP_SECRET`` en el entorno, el script inventa uno para esta
@@ -113,7 +114,8 @@ def main(argv: list[str] | None = None) -> int:
     if respuesta.status_code != 200:
         print(
             "Revisa que el número entre por la ventana de [evento] o tenga huella, "
-            "y que ESCENA_EN_VIVO esté en 1 para publicar en la lista.",
+            "y que ESCENA_EN_VIVO esté en 1 (con ESCENA_CODIGO en la sesión) "
+            "para publicar en la lista.",
             file=sys.stderr,
         )
     return 0 if respuesta.status_code == 200 else 1

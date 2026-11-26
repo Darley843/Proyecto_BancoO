@@ -9,8 +9,11 @@ Reglas que implementa este módulo:
 
 - Solo hay **un** voluntario activo, guardado en memoria con su huella HMAC y
   un vencimiento deslizante. No va a SQLite y no sobrevive a un reinicio.
-- ``ESCENA`` se reconoce después de la autorización y del consentimiento, y
-  antes de la entrevista, del escenario y del motor de OpenClaw.
+- ``ESCENA`` seguido del código de cuatro dígitos de ``ESCENA_CODIGO`` se
+  reconoce después de la autorización y del consentimiento, y antes de la
+  entrevista, del escenario y del motor de OpenClaw.
+- Sin código, o con otro código, el comando no activa ni publica: el mensaje
+  sigue su curso privado normal.
 - El interruptor ``ESCENA_EN_VIVO=1`` se consulta en cada publicación: apagarlo
   detiene la escritura sin reiniciar la app.
 - Los demás invitados no se publican nunca; su conversación privada sigue igual.
@@ -28,6 +31,7 @@ import importlib
 import logging
 import os
 import re
+import secrets
 import threading
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
@@ -44,6 +48,8 @@ logger = logging.getLogger(__name__)
 COMANDO = "ESCENA"
 #: Variable de entorno que enciende la publicación de la lista en vivo.
 INTERRUPTOR = "ESCENA_EN_VIVO"
+#: Variable de la sesión con el código de cuatro dígitos del voluntario.
+VARIABLE_CODIGO = "ESCENA_CODIGO"
 #: Frase fija cuando el interruptor está apagado.
 TEXTO_APAGADA = "La escena en vivo no está activada."
 #: Frase fija que confirma la activación del voluntario.
@@ -56,6 +62,13 @@ LARGO_MAXIMO = 4000
 ID_INVITADO = "canal.invitado.v1"
 ID_PANA = "canal.pana.v1"
 ID_ACTIVACION = "canal.pana.escena.v1"
+
+#: Comando ``ESCENA`` con un código de cuatro dígitos opcional; se aplica al
+#: texto normalizado (sin mayúsculas de diferencia y con un solo espacio).
+_PATRON_COMANDO = re.compile(
+    rf"^{re.escape(COMANDO)}(?:\s+(\d{{4}}))?$",
+    re.IGNORECASE | re.ASCII,
+)
 
 #: Formas de presentarse cuyo nombre propio se enmascara antes de publicar.
 _FORMAS_NOMBRE = re.compile(
@@ -90,15 +103,55 @@ def activa_entorno() -> bool:
 
 
 def es_comando(texto: str) -> bool:
-    """Indica si el texto es la palabra ``ESCENA``.
+    """Indica si el texto es el comando ``ESCENA``, con código o sin él.
 
     Args:
         texto: texto del mensaje ya normalizado por el webhook.
 
     Returns:
-        ``True`` si, sin espacios ni mayúsculas de diferencia, dice ``ESCENA``.
+        ``True`` para ``ESCENA`` y para ``ESCENA <cuatro dígitos>``. Sirve para
+        no publicar el intento aunque el código no active al voluntario.
     """
-    return texto.strip().casefold() == COMANDO.casefold()
+    return _PATRON_COMANDO.match(_normalizar(texto)) is not None
+
+
+def codigo_del_comando(texto: str) -> str | None:
+    """Devuelve el código de cuatro dígitos que acompaña al comando.
+
+    Args:
+        texto: texto del mensaje.
+
+    Returns:
+        El código tal como se escribió, o ``None`` si no lo trae.
+    """
+    coincidencia = _PATRON_COMANDO.match(_normalizar(texto))
+    return coincidencia.group(1) if coincidencia is not None else None
+
+
+def codigo_valido(texto: str) -> bool:
+    """Indica si el texto trae el código de la sesión (``ESCENA_CODIGO``).
+
+    El código se compara con el de la variable de la sesión; si la variable no
+    está definida, ningún código vale y la escena no se activa.
+
+    Args:
+        texto: texto del mensaje.
+
+    Returns:
+        ``True`` solo si el comando trae el código configurado.
+    """
+    esperado = os.getenv(VARIABLE_CODIGO, "").strip()
+    if len(esperado) != 4 or not esperado.isascii() or not esperado.isdigit():
+        return False
+    recibido = codigo_del_comando(texto)
+    if recibido is None:
+        return False
+    return secrets.compare_digest(recibido, esperado)
+
+
+def _normalizar(texto: str) -> str:
+    """Une los espacios sobrantes del comando sin tocar el resto del texto."""
+    return " ".join(texto.split())
 
 
 def sin_nombres(texto: str) -> str:
@@ -140,34 +193,55 @@ class EscenaVivo:
     _candado: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
     def decidir(self, mensaje: MensajeEntrante, usuario_id: str) -> RespuestaCanal | None:
-        """Atiende el comando ``ESCENA`` si el mensaje lo es.
+        """Atiende el comando ``ESCENA`` si el mensaje lo es y el código cuadra.
 
         Args:
             mensaje: mensaje entrante ya autorizado y con consentimiento.
             usuario_id: huella HMAC del remitente.
 
         Returns:
-            La confirmación o el aviso de que la escena está apagada; ``None``
-            si el mensaje no es el comando y debe seguir su curso normal.
+            La confirmación, el aviso de que la escena está apagada, o
+            ``None`` si el mensaje debe seguir su curso normal: no es el
+            comando, no trae el código de la sesión, o ya hay otro voluntario
+            activo que no se reemplaza.
         """
         if not es_comando(mensaje.texto):
             return None
         if not activa_entorno():
             logger.info("comando ESCENA con la escena en vivo apagada")
             return _respuesta(mensaje, usuario_id, TEXTO_APAGADA)
-        self.activar(usuario_id)
+        if not codigo_valido(mensaje.texto):
+            logger.info("comando ESCENA sin el código de la sesión")
+            return None
+        if not self.activar(usuario_id):
+            logger.info("comando ESCENA con otro voluntario activo: se ignora")
+            return None
         self._publicar_pana(ID_ACTIVACION, TEXTO_ACTIVADA)
         return _respuesta(mensaje, usuario_id, TEXTO_ACTIVADA)
 
-    def activar(self, usuario_id: str) -> None:
+    def activar(self, usuario_id: str) -> bool:
         """Deja a esa huella como la única voluntaria activa.
+
+        Si ya hay otro voluntario vigente, la ranura no se reemplaza: solo se
+        cambia de voluntario reiniciando la app o esperando el vencimiento.
 
         Args:
             usuario_id: huella HMAC del invitado que escribió ``ESCENA``.
+
+        Returns:
+            ``True`` si la huella quedó activa (nueva o renovada); ``False`` si
+            otro voluntario seguía vigente y el comando se ignoró.
         """
         with self._candado:
+            if (
+                self._huella is not None
+                and self._huella != usuario_id
+                and self._vigente(self._huella)
+            ):
+                return False
             self._huella = usuario_id
             self._vence = self._instante() + timedelta(minutes=self.ttl_minutos)
+            return True
 
     def activo(self, usuario_id: str) -> bool:
         """Indica si esa huella es la voluntaria activa y no venció.

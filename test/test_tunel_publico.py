@@ -28,6 +28,7 @@ RUTAS_PRIVADAS = (
     "/openapi.json",
     "/api/estado",
     "/api/preguntar",
+    "/api/escena/en-vivo",
     "/api/herramientas/traza",
     "/api/operacion",
 )
@@ -47,6 +48,13 @@ def modulo_app() -> ModuleType:
 def cliente_tunel(modulo_app: ModuleType) -> TestClient:
     """Cliente que simula una petición que entra por el túnel de Cloudflare."""
     return TestClient(modulo_app.app, base_url=TUNEL, headers=CABECERAS_TUNEL)
+
+
+def test_la_ruta_en_vivo_solo_vive_en_loopback(cliente_tunel: TestClient) -> None:
+    """El cursor de la escena no se puede sondear desde la URL del túnel."""
+    respuesta = cliente_tunel.get("/api/escena/en-vivo?desde=0")
+
+    assert respuesta.status_code == 404
 
 
 @pytest.mark.parametrize("ruta", RUTAS_PRIVADAS)

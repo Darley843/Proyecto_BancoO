@@ -56,22 +56,25 @@ El paso a paso de Meta, túnel, webhook y apagado está en
 
 ### Escena en vivo (`ESCENA`)
 
-El voluntario escribe **`ESCENA`** por WhatsApp y su recorrido se publica en la
-lista que reproduce `escena.html` en modo «En vivo». El comando se reconoce
-**después** del consentimiento y **antes** de la entrevista, del escenario y del
-motor: cancela una entrevista a medias y no se reenvía a Pana.
+El voluntario escribe **`ESCENA` y el código de cuatro dígitos** de la sesión
+por WhatsApp y su recorrido se publica en la lista que reproduce `escena.html`
+en modo «En vivo». El comando se reconoce **después** del consentimiento y
+**antes** de la entrevista, del escenario y del motor: cancela una entrevista a
+medias y no se reenvía a Pana.
 
 | Control | Valor | Efecto |
 |---|---|---|
-| Interruptor | `ESCENA_EN_VIVO=1` | Sin él, `ESCENA` responde «La escena en vivo no está activada» y no escribe nada |
+| Interruptor | `ESCENA_EN_VIVO=1` | Sin él, el comando responde «La escena en vivo no está activada» y no escribe nada |
+| Código | `ESCENA_CODIGO` | Cuatro dígitos de la sesión, solo en la tarjeta del voluntario; sin código o con otro código el mensaje sigue su curso privado y no publica |
 | Vigencia | `[evento] escena_ttl_minutos` (180) | Cada mensaje del voluntario renueva el vencimiento |
-| Voluntarios | uno solo | Otro `ESCENA` reemplaza al anterior; los demás invitados no aparecen |
+| Voluntarios | uno solo | Otro `ESCENA` no reemplaza al activo; se cambia reiniciando la app o al vencer |
 | Orden | invitado, herramientas y Pana | El mensaje del invitado se publica antes del motor; la respuesta, después del envío |
 | PII | `detectar_pii` y nombres | Un mensaje con teléfono, correo, documento o tarjeta no se publica; sí la frase fija de Pana |
 | Borrado | `scripts/limpiar_evento.ps1 -Confirmar` | Borra `data/escena/en_vivo.jsonl` y `en_vivo.lock` |
 
 El interruptor se consulta en cada publicación: apagarlo detiene la escritura
-sin reiniciar la app, y la app y el MCP lo necesitan en su propio proceso.
+sin reiniciar la app, y la app y el MCP lo necesitan en su propio proceso. El
+código nunca va en `config/`, no se versiona y no se registra en logs.
 
 **Limitación conocida.** El MCP no sabe qué invitado llamó a una herramienta:
 publica el turno, pero no el mensaje de quien lo provocó. Por eso, durante la
@@ -433,13 +436,14 @@ puertos, con la app simulada dentro del proceso:
 ```powershell
 uv run python scripts/mandar_falso.py "hola"
 uv run python scripts/mandar_falso.py --boton consent:acepto Acepto
-uv run python scripts/mandar_falso.py "ESCENA"
+uv run python scripts/mandar_falso.py "ESCENA 1965"
 ```
 
 El script firma el cuerpo con un App Secret de la corrida, usa el
 `TestClient` de FastAPI y acepta `--numero`. Con la ventana de `[evento]`
-abierta y `ESCENA_EN_VIVO=1` sirve para ensayar la escena en vivo antes de
-conectar Meta.
+abierta, `ESCENA_EN_VIVO=1` y el código de la sesión en `ESCENA_CODIGO`, sirve
+para ensayar la escena en vivo antes de conectar Meta. `1965` es solo el
+ejemplo del contrato: usa el código que tenga la sesión.
 
 ### Ensayo con WhatsApp real (evidencia aparte)
 

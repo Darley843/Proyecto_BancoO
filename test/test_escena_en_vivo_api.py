@@ -152,9 +152,16 @@ def test_la_respuesta_no_se_cachea() -> None:
     assert respuesta.headers["cache-control"] == "no-store"
 
 
-def test_la_ruta_no_es_publica_por_el_tunel() -> None:
-    """El túnel de Cloudflare solo publica el webhook y ``/health``."""
+def test_las_unicas_rutas_publicas_son_el_webhook_y_health() -> None:
+    """La lista en vivo no entra en la superficie pública del túnel.
+
+    El ``404`` real de esta ruta desde el túnel se comprueba en
+    ``test/test_tunel_publico.py``; aquí se fija la lista que el arranque
+    declara pública.
+    """
     arranque = _arranque()
+
+    assert frozenset({"/webhooks/whatsapp", "/health"}) == arranque.RUTAS_PUBLICAS
     assert "/api/escena/en-vivo" not in arranque.RUTAS_PUBLICAS
 
 

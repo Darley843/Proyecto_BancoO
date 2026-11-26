@@ -5,9 +5,10 @@ Es la pieza que convierte un mensaje de WhatsApp en una respuesta:
 1. Calcula ``usuario_id`` con la huella HMAC del número.
 2. Descarta números que no estén en las huellas autorizadas.
 3. Pasa por la máquina de consentimiento de la Ley 1581.
-4. Escena en vivo: ``ESCENA`` activa al voluntario de la demo; desde ahí sus
-   mensajes y las respuestas de Pana se publican en la lista que lee la
-   pantalla. El comando no se reenvía al motor ni se publica como mensaje.
+4. Escena en vivo: ``ESCENA`` con el código de cuatro dígitos de la sesión
+   activa al voluntario de la demo; desde ahí sus mensajes y las respuestas de
+   Pana se publican en la lista que lee la pantalla. El comando no se reenvía
+   al motor ni se publica como mensaje.
 5. Si la entrevista del diagnóstico está activa, el botón o la fila avanza la
    entrevista; un texto libre repite la pregunta. Al completar, calcula el
    diagnóstico y envía la tarjeta.
@@ -52,7 +53,7 @@ from .consentimiento import MaquinaConsentimiento
 from .contratos import MensajeEntrante, RespuestaCanal
 from .entrevista import EntrevistaCanal
 from .envio import Enviador, ErrorEnvio
-from .escena_vivo import EscenaVivo
+from .escena_vivo import EscenaVivo, es_comando
 from .identidad import calcular_usuario_id
 
 logger = logging.getLogger(__name__)
@@ -186,6 +187,7 @@ class Despachador:
         actualizar_mensaje(self.ruta_almacen, mensaje.id_mensaje, "procesando")
         ahora = _instante(momento)
         comando_escena = False
+        intento_escena = False
         try:
             if not self.config.permite(usuario_id, ahora):
                 self._avisar_no_autorizado(mensaje, usuario_id)
@@ -215,6 +217,7 @@ class Despachador:
             # consentimiento primero y las cuotas ya verificadas arriba.
             respuesta = self.maquina.decidir(mensaje, usuario_id)
             if respuesta is None and self.escena is not None:
+                intento_escena = es_comando(mensaje.texto)
                 respuesta = self.escena.decidir(mensaje, usuario_id)
                 if respuesta is not None:
                     comando_escena = True
@@ -222,10 +225,11 @@ class Despachador:
                         # ESCENA cancela la entrevista a medias: el siguiente
                         # mensaje ya es de la escena y no una respuesta suelta.
                         self.entrevista.descartar(usuario_id)
-                else:
+                elif not intento_escena:
                     # El mensaje del voluntario se publica antes del motor: la
                     # pantalla lo muestra primero y después los turnos de las
-                    # herramientas. Los demás invitados no publican.
+                    # herramientas. Los demás invitados no publican. Un
+                    # ``ESCENA`` sin el código de la sesión tampoco publica.
                     self.escena.publicar_invitado(mensaje, usuario_id)
             if respuesta is None and self.entrevista is not None:
                 respuesta = self.entrevista.reanudar(mensaje, usuario_id)
@@ -258,10 +262,11 @@ class Despachador:
                     )
 
             self.crear_enviador(usuario_id, mensaje.remitente).enviar(respuesta)
-            if self.escena is not None and not comando_escena:
+            if self.escena is not None and not comando_escena and not intento_escena:
                 # Solo publica si el envío salió bien: la pantalla no muestra
                 # una respuesta que el invitado no recibió. La confirmación de
-                # ESCENA ya se publicó con su propio identificador.
+                # ESCENA ya se publicó con su propio identificador, y un
+                # comando con código equivocado no publica nada.
                 self.escena.publicar_pana(usuario_id, respuesta.texto)
             actualizar_mensaje(
                 self.ruta_almacen,

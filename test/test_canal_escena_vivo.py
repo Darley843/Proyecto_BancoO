@@ -24,6 +24,7 @@ from banco_occidente_corpus.canal.escena_vivo import (
     TEXTO_ACTIVADA,
     TEXTO_APAGADA,
     EscenaVivo,
+    codigo_del_comando,
     es_comando,
     sin_nombres,
 )
@@ -34,6 +35,14 @@ SAL = "sal-de-prueba"
 NUMERO = "57000000001"
 OTRO_NUMERO = "57000000002"
 AHORA = datetime(2026, 11, 26, 12, 0, tzinfo=UTC)
+#: Código de la sesión que la tarjeta entrega solo al voluntario.
+CODIGO = "1965"
+
+
+@pytest.fixture(autouse=True)
+def codigo_de_sesion(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Fija el código de la sesión como lo hace la tarjeta del voluntario."""
+    monkeypatch.setenv("ESCENA_CODIGO", CODIGO)
 
 
 @dataclass
@@ -102,7 +111,7 @@ def test_sin_interruptor_no_publica_y_avisa(monkeypatch: pytest.MonkeyPatch) -> 
     escena = _escena(espia, reloj)
     usuario_id = calcular_usuario_id(NUMERO, SAL)
 
-    respuesta = escena.decidir(_mensaje("ESCENA"), usuario_id)
+    respuesta = escena.decidir(_mensaje(f"ESCENA {CODIGO}"), usuario_id)
 
     assert respuesta is not None
     assert respuesta.texto == TEXTO_APAGADA
@@ -111,13 +120,13 @@ def test_sin_interruptor_no_publica_y_avisa(monkeypatch: pytest.MonkeyPatch) -> 
 
 
 def test_escena_activa_publica_la_confirmacion(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Con el interruptor encendido, confirma y publica el turno de Pana."""
+    """Con el interruptor encendido y el código correcto, confirma y publica."""
     monkeypatch.setenv("ESCENA_EN_VIVO", "1")
     espia, reloj = PublicadorEspia(), Reloj()
     escena = _escena(espia, reloj)
     usuario_id = calcular_usuario_id(NUMERO, SAL)
 
-    respuesta = escena.decidir(_mensaje("  escena "), usuario_id)
+    respuesta = escena.decidir(_mensaje(f"  escena   {CODIGO} "), usuario_id)
 
     assert respuesta is not None
     assert respuesta.texto == TEXTO_ACTIVADA
@@ -128,6 +137,67 @@ def test_escena_activa_publica_la_confirmacion(monkeypatch: pytest.MonkeyPatch) 
     assert turno.personaje == "pana"
     assert turno.id == "canal.pana.escena.v1"
     assert turno.texto == TEXTO_ACTIVADA
+
+
+def test_sin_codigo_no_activa_ni_publica(monkeypatch: pytest.MonkeyPatch) -> None:
+    """``ESCENA`` sin código sigue su curso privado y no activa ni publica."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    usuario_id = calcular_usuario_id(NUMERO, SAL)
+
+    respuesta = escena.decidir(_mensaje("ESCENA"), usuario_id)
+
+    assert respuesta is None
+    assert escena.activo(usuario_id) is False
+    assert espia.publicados == []
+
+
+def test_otro_codigo_no_activa_ni_publica(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Un código distinto al de la sesión tampoco activa la escena."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    usuario_id = calcular_usuario_id(NUMERO, SAL)
+
+    respuesta = escena.decidir(_mensaje("ESCENA 0000"), usuario_id)
+
+    assert respuesta is None
+    assert escena.activo(usuario_id) is False
+    assert espia.publicados == []
+
+
+def test_sin_codigo_en_la_sesion_no_activa(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Si la sesión no define ``ESCENA_CODIGO``, ningún código vale."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    monkeypatch.delenv("ESCENA_CODIGO", raising=False)
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    usuario_id = calcular_usuario_id(NUMERO, SAL)
+
+    respuesta = escena.decidir(_mensaje(f"ESCENA {CODIGO}"), usuario_id)
+
+    assert respuesta is None
+    assert escena.activo(usuario_id) is False
+    assert espia.publicados == []
+
+
+@pytest.mark.parametrize("codigo", ["", "196", "19a5", "١٩٦٥"])
+def test_un_codigo_de_sesion_invalido_no_activa(
+    monkeypatch: pytest.MonkeyPatch, codigo: str
+) -> None:
+    """El código de la sesión debe ser de cuatro dígitos ASCII; si no, no activa."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    monkeypatch.setenv("ESCENA_CODIGO", codigo)
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    usuario_id = calcular_usuario_id(NUMERO, SAL)
+
+    respuesta = escena.decidir(_mensaje(f"ESCENA {CODIGO}"), usuario_id)
+
+    assert respuesta is None
+    assert escena.activo(usuario_id) is False
+    assert espia.publicados == []
 
 
 def test_el_ttl_vence_y_se_renueva(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -150,17 +220,49 @@ def test_el_ttl_vence_y_se_renueva(monkeypatch: pytest.MonkeyPatch) -> None:
     assert escena.activo(usuario_id) is False
 
 
-def test_un_segundo_escena_reemplaza_al_primero(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Solo hay un voluntario: el segundo comando desplaza al anterior."""
+def test_un_segundo_escena_no_reemplaza_al_primero(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Solo hay un voluntario: el comando de otra huella se ignora."""
     monkeypatch.setenv("ESCENA_EN_VIVO", "1")
     espia, reloj = PublicadorEspia(), Reloj()
     escena = _escena(espia, reloj)
+    primero = calcular_usuario_id(NUMERO, SAL)
+    segundo = calcular_usuario_id(OTRO_NUMERO, SAL)
 
-    escena.activar(calcular_usuario_id(NUMERO, SAL))
-    escena.activar(calcular_usuario_id(OTRO_NUMERO, SAL))
+    assert escena.activar(primero) is True
+    assert escena.activar(segundo) is False
 
-    assert escena.activo(calcular_usuario_id(NUMERO, SAL)) is False
-    assert escena.activo(calcular_usuario_id(OTRO_NUMERO, SAL)) is True
+    assert escena.activo(primero) is True
+    assert escena.activo(segundo) is False
+
+
+def test_el_voluntario_activo_renueva_su_codigo(monkeypatch: pytest.MonkeyPatch) -> None:
+    """El mismo voluntario puede repetir ``ESCENA <código>`` y renueva el TTL."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj, ttl=10)
+    usuario_id = calcular_usuario_id(NUMERO, SAL)
+
+    assert escena.decidir(_mensaje(f"ESCENA {CODIGO}"), usuario_id) is not None
+    reloj.momento = AHORA + timedelta(minutes=8)
+    assert escena.decidir(_mensaje(f"ESCENA {CODIGO}"), usuario_id) is not None
+
+    reloj.momento = AHORA + timedelta(minutes=14)
+    assert escena.activo(usuario_id) is True
+
+
+def test_tras_el_vencimiento_otro_puede_activar(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Cuando vence el primero, otra huella sí puede tomar la ranura."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj, ttl=10)
+    primero = calcular_usuario_id(NUMERO, SAL)
+    segundo = calcular_usuario_id(OTRO_NUMERO, SAL)
+
+    escena.activar(primero)
+    reloj.momento = AHORA + timedelta(minutes=11)
+
+    assert escena.activar(segundo) is True
+    assert escena.activo(segundo) is True
 
 
 def test_otro_invitado_no_publica(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -218,12 +320,23 @@ def test_apagar_el_interruptor_detiene_la_escritura(monkeypatch: pytest.MonkeyPa
     assert len(espia.publicados) == 1
 
 
-def test_el_comando_exige_la_palabra_exacta() -> None:
-    """``ESCENA`` se reconoce solo como palabra suelta."""
+def test_el_comando_acepta_la_palabra_y_el_codigo() -> None:
+    """``ESCENA`` se reconoce sola o con un código de cuatro dígitos."""
     assert es_comando(" ESCENA ") is True
     assert es_comando("escena") is True
-    assert es_comando("escena en vivo") is False
-    assert es_comando("mi escena") is False
+    assert es_comando(f"Escena {CODIGO}") is True
+    assert es_comando(f"  ESCENA   {CODIGO}  ") is True
+    assert codigo_del_comando(f"ESCENA {CODIGO}") == CODIGO
+    assert codigo_del_comando("ESCENA") is None
+
+
+@pytest.mark.parametrize(
+    "texto",
+    ["ESCENA 196", "ESCENA 19655", "ESCENA 19a5", "escena en vivo", "mi escena", "ESCENA1965"],
+)
+def test_el_comando_no_acepta_otras_formas(texto: str) -> None:
+    """No se confunde con frases que solo contienen la palabra o un código corto."""
+    assert es_comando(texto) is False
 
 
 def test_un_reinicio_pierde_la_memoria(monkeypatch: pytest.MonkeyPatch) -> None:
@@ -252,6 +365,7 @@ def _banco(
     *,
     escena: EscenaVivo,
     entrevista: EntrevistaCanal | None = None,
+    huellas_extra: tuple[str, ...] = (),
 ) -> BancoCanal:
     """Arma el despachador con enviador, grafo y motor de doble."""
     ruta = tmp_path / "whatsapp.sqlite"
@@ -270,7 +384,7 @@ def _banco(
         return "respuesta de Pana"
 
     despachador = Despachador(
-        config=ConfiguracionCanal(huellas=(usuario_id,)),
+        config=ConfiguracionCanal(huellas=(usuario_id, *huellas_extra)),
         sal=SAL,
         ruta_almacen=ruta,
         maquina=MaquinaConsentimiento(ruta),
@@ -308,7 +422,7 @@ def test_el_invitado_va_antes_que_pana(tmp_path: Path, monkeypatch: pytest.Monke
     espia.publicados.clear()
 
     banco.despachador.maquina.aceptar(banco.usuario_id, AHORA)
-    comando = _mensaje("ESCENA", id_mensaje="wamid.escena")
+    comando = _mensaje(f"ESCENA {CODIGO}", id_mensaje="wamid.escena")
     banco.despachador.recibir(comando)
     banco.despachador.procesar(comando, AHORA)
     espia.publicados.clear()
@@ -329,11 +443,49 @@ def test_el_comando_no_se_reenvia_al_motor(tmp_path: Path, monkeypatch: pytest.M
     espia, reloj = PublicadorEspia(), Reloj()
     banco = _banco(tmp_path, escena=_escena(espia, reloj))
 
-    _atender(banco, _mensaje("ESCENA"))
+    _atender(banco, _mensaje(f"ESCENA {CODIGO}"))
 
     assert banco.enviadas[-1].texto == TEXTO_ACTIVADA
     assert banco.llamadas == []
     assert [turno.personaje for turno, _ in espia.publicados] == ["pana"]
+
+
+def test_un_codigo_equivocado_no_publica_nada(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """El comando con otro código recibe respuesta privada y no entra en la lista."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    banco = _banco(tmp_path, escena=_escena(espia, reloj))
+
+    _atender(banco, _mensaje("ESCENA 0000"))
+
+    assert banco.enviadas[-1].texto == "respuesta de Pana"
+    assert banco.llamadas == ["ESCENA 0000"]
+    assert espia.publicados == []
+
+
+def test_otro_voluntario_no_reemplaza_al_activo(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Un segundo ``ESCENA`` desde otra huella no cambia de voluntario ni publica."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    segundo = calcular_usuario_id(OTRO_NUMERO, SAL)
+    banco = _banco(tmp_path, escena=escena, huellas_extra=(segundo,))
+    primero = banco.usuario_id
+    _atender(banco, _mensaje(f"ESCENA {CODIGO}", id_mensaje="wamid.escena"))
+    espia.publicados.clear()
+
+    otro = _mensaje(f"ESCENA {CODIGO}", numero=OTRO_NUMERO, id_mensaje="wamid.otro")
+    banco.despachador.maquina.aceptar(segundo, AHORA)
+    banco.despachador.recibir(otro)
+    banco.despachador.procesar(otro, AHORA)
+
+    assert escena.activo(primero) is True
+    assert escena.activo(segundo) is False
+    assert espia.publicados == []
 
 
 def test_escena_cancela_la_entrevista_a_medias(
@@ -348,7 +500,7 @@ def test_escena_cancela_la_entrevista_a_medias(
     entrevista.iniciar(banco.usuario_id, "wamid.previo")
     assert entrevista.activa(banco.usuario_id) is True
 
-    _atender(banco, _mensaje("ESCENA", id_mensaje="wamid.escena"))
+    _atender(banco, _mensaje(f"ESCENA {CODIGO}", id_mensaje="wamid.escena"))
 
     assert entrevista.activa(banco.usuario_id) is False
 

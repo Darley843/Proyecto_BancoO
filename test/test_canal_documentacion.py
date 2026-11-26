@@ -146,3 +146,11 @@ def test_los_comandos_del_modulo_usan_uv() -> None:
 
         assert "uv run python -m banco_occidente_corpus.canal.identidad" in texto, archivo
         assert re.search(r"(?<!uv run )python -m banco_occidente_corpus", texto) is None, archivo
+
+
+def test_la_guia_documenta_el_codigo_de_la_escena() -> None:
+    """La operación explica que el comando exige el código de cuatro dígitos."""
+    texto = (RAIZ / "docs" / "OPERACION_WHATSAPP.md").read_text(encoding="utf-8")
+
+    for pieza in ("ESCENA_CODIGO", "cuatro dígitos", "ESCENA 1965"):
+        assert pieza in texto, pieza

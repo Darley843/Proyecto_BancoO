@@ -157,7 +157,8 @@ pantalla lo implementa en `app/web/escena/envivo.js`.
 - **Salir (E otra vez).** Para el sondeo, vacía la cola y devuelve la escena
   guardada al mismo turno en que estaba, en pausa.
 
-El otro extremo lo pone el canal: el voluntario escribe `ESCENA` por WhatsApp y
+El otro extremo lo pone el canal: el voluntario escribe `ESCENA` y el código de
+cuatro dígitos de la sesión por WhatsApp y
 `canal/escena_vivo.py` publica su mensaje y la respuesta de Pana con
 `ESCENA_EN_VIVO=1`; `escena/api_en_vivo.py` sirve la ruta. El detalle está en
 [`OPERACION_WHATSAPP.md`](./OPERACION_WHATSAPP.md), sección «Escena en vivo».
