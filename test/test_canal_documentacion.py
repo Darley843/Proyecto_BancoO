@@ -154,3 +154,26 @@ def test_la_guia_documenta_el_codigo_de_la_escena() -> None:
 
     for pieza in ("ESCENA_CODIGO", "cuatro dígitos", "ESCENA 1965"):
         assert pieza in texto, pieza
+
+
+def test_la_lista_de_la_demo_enciende_la_escena_en_vivo() -> None:
+    """El sábado la app arranca con la lista encendida y el código del voluntario."""
+    texto = (RAIZ / "docs" / "LISTA_DEMO.md").read_text(encoding="utf-8")
+
+    for pieza in (
+        'ESCENA_EN_VIVO = "1"',
+        'ESCENA_CODIGO = "XXXX"',
+        "cuatro dígitos",
+        "solo en la tarjeta del voluntario",
+        "En vivo — esperando el primer turno",
+        "no se versiona",
+    ):
+        assert pieza in texto, pieza
+
+
+def test_la_ficha_del_presentador_ya_confirma_la_fila_de_darley() -> None:
+    """La fila de P2 no vuelve a quedar marcada como pendiente de confirmar."""
+    texto = (RAIZ / "docs" / "PRESENTADOR.md").read_text(encoding="utf-8")
+
+    assert "Fila de Darley confirmada" in texto
+    assert "Darley confirma su fila" not in texto
