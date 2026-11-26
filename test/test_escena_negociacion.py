@@ -34,7 +34,7 @@ from banco_occidente_corpus.escena.contratos import (
 from banco_occidente_corpus.escena.negociacion import (
     CODIGOS_MESA,
     CODIGOS_OFERTABLES,
-    FRASE_ASESOR,
+    FRASE_DECISION,
     MAX_TURNOS,
     LimitesNegociacion,
     ResultadoNegociacion,
@@ -370,7 +370,7 @@ def test_el_verde_termina_en_dos_o_tres_turnos_y_recomienda(raiz_tasas: Path) ->
     assert "la cuota sería" in turnos[0].texto
     assert "sostenible" in turnos[1].texto
     assert "cabe con holgura" in turnos[1].texto
-    assert FRASE_ASESOR in turnos[1].texto
+    assert FRASE_DECISION in turnos[1].texto
     assert resultado.acuerdo is not None
     assert resultado.acuerdo.codigo == "base"
     assert resultado.acuerdo.semaforo == "verde"
@@ -423,7 +423,7 @@ def test_el_amarillo_pasa_a_una_alternativa_en_verde(raiz_tasas: Path) -> None:
     assert all(cifra.valor_legible in contrapropuesta.texto for cifra in contrapropuesta.cifras)
     assert "cuota más baja" in turnos[2].texto
     assert "sostenible" in turnos[3].texto
-    assert FRASE_ASESOR in turnos[3].texto
+    assert FRASE_DECISION in turnos[3].texto
     assert resultado.acuerdo is not None
     assert resultado.acuerdo.codigo == "plazo_mas_largo_48"
     assert resultado.acuerdo.semaforo == "verde"
@@ -443,7 +443,7 @@ def test_el_rojo_prueba_el_plazo_antes_que_el_monto(raiz_tasas: Path) -> None:
     assert resultado.decisiones[2].codigo == "plazo_mas_largo_60"
     assert "No cabe en tu capacidad" in turnos[1].texto
     assert "monto menor" in turnos[3].texto
-    assert FRASE_ASESOR in turnos[3].texto
+    assert FRASE_DECISION in turnos[3].texto
     registro = resultado.negociacion.registro
     linea_orden = next(linea for linea in registro if "pruebas en orden" in linea)
     assert linea_orden.index("plazo_mas_largo_60") < linea_orden.index("monto_40_por_ciento_menos")
@@ -464,7 +464,7 @@ def test_ningun_turno_usa_lenguaje_de_aprobacion(raiz_tasas: Path) -> None:
         for turno in resultado.negociacion.turnos:
             assert LENGUAJE_PROHIBIDO.search(turno.texto) is None
         ultimo = resultado.negociacion.turnos[-1]
-        assert FRASE_ASESOR in ultimo.texto
+        assert FRASE_DECISION in ultimo.texto
 
 
 def test_modelo_con_un_codigo_fuera_de_la_mesa_cae_a_reglas(raiz_tasas: Path) -> None:
@@ -750,7 +750,7 @@ def test_los_prompts_versionados_se_cargan() -> None:
     assert "propongo" in joven.sistema
     assert "sostenible" in banco.sistema
     assert "cabe, pero ajustado" in banco.sistema
-    assert "decisión final es de un asesor" in banco.sistema
+    assert "decisión final es del banco" in banco.sistema
     with pytest.raises(PromptNoEncontrado):
         cargar_prompt("negociacion_joven", "v9")
 

@@ -38,6 +38,10 @@ VARIABLES_DE_TRAZAS: tuple[str, ...] = (
 for _variable in VARIABLES_DE_TRAZAS:
     os.environ.pop(_variable, None)
 
+#: La escena en vivo escribe en `data/escena/`; la suite la mantiene apagada y
+#: cada prueba que la necesita la enciende con `monkeypatch`.
+os.environ.pop("ESCENA_EN_VIVO", None)
+
 
 def _es_loopback(direccion: object) -> bool:
     """Indica si una dirección de socket es un literal de loopback IPv4 o IPv6."""

@@ -435,6 +435,15 @@ herramientas, el WhatsApp de los invitados ni la seguridad.
       Al apagar el evento los consentimientos aceptados **se conservan**. Los
       perfiles, consentimientos y casos del canal de WhatsApp son de Darley y
       se borran aparte: el script no los toca.
+- [ ] Si se usó el **modo En vivo** de la escena, apagar
+      `$env:ESCENA_EN_VIVO = "0"`, salir de la pantalla con **E** y, con la app
+      y el MCP detenidos, dejar que el mismo script borre
+      `data/escena/en_vivo.jsonl` y su bloqueo
+      `data/escena/en_vivo.lock`. La carpeta `data/escena/` se conserva y la
+      escena proyectada se regenera aparte con `make escena-proyectada`. En
+      modo de prueba el script solo lista esos dos archivos; con `CONFIRMAR=1`
+      (o `-Confirmar`) los borra. Después se reinicia la app con
+      `ESCENA_EN_VIVO` apagado.
 - [ ] Ctrl + C en el túnel y quitar la URL del webhook en Meta.
 - [ ] Apagar el gateway, el MCP y la app.
 - [ ] Quitar las trazas si se encendieron:
