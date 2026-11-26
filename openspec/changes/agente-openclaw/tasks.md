@@ -53,9 +53,10 @@
 - [ ] 3.5 Anny (miércoles 25): escribir las pruebas de inyección con texto de WhatsApp que intenta cambiar reglas, con fragmentos de la Bóveda como datos y con argumentos de herramienta manipulados; verificar que ningún intento cambia el sistema, la ruta ni el catálogo, y que `auditar_respuesta` marca el intento sin filtrar el prompt.
   > Catálogo y 49 pruebas sin red en el #200; corrida contra el gateway lista en el #203 (`docs/INYECCION.md`). Falta la corrida en vivo.
 - [ ] 3.6 Anny (miércoles 25): probar el recorrido de invitados con Darley: consentimiento, tope, turnos, borrado y rechazo fuera de ventana; verificar que no se guardan números ni nombres y que el conteo por huella no se puede saltar reiniciando el proceso.
-- [x] 3.7 Anny (jueves 26): solo correcciones y documentación; armar la tabla de evidencia para la rúbrica (herramienta, prueba, archivo, resultado) y revisar que `recall@10`, `nDCG@10`, t-SNE, inyección e invitados quedan citados con su comando.
+- [ ] 3.7 Anny (jueves 26): solo correcciones y documentación; armar la tabla de evidencia para la rúbrica (herramienta, prueba, archivo, resultado) y revisar que `recall@10`, `nDCG@10`, t-SNE, inyección e invitados quedan citados con su comando.
   > Tabla en `docs/EVIDENCIA.md` (#201); se completa con los resultados del miércoles.
   > Ampliada en el #212: cita recall@10, nDCG@10, t-SNE, inyección e invitados con su comando; los pendientes de la corrida en vivo quedan marcados.
+  > Pendiente: Anny la cierra el jueves 26 junto con la 3.5.
 
 ## 4. Producto, documentación y sustentación — Yoldy (lunes 23 a jueves 26)
 
