@@ -403,13 +403,16 @@ herramientas, el WhatsApp de los invitados ni la seguridad.
       ```
       Lista y borra las sesiones del agente `pana`, olvida sus memorias
       derivadas (detiene el gateway un momento y lo vuelve a levantar), purga
-      los archivos archivados de esas sesiones, borra `MEMORY.md`, la bitácora
-      y `DREAMS.md` del workspace, y borra
-      `data/asistente/trazas/herramientas.jsonl` y
-      `data/evaluacion/inyeccion.json`. No toca los archivos versionados
-      (`SOUL`, `AGENTS`, `USER`, `IDENTITY`) ni los `.example`, no imprime el
-      token ni el contenido de las sesiones y no borra la sesión principal
-      `agent:pana:main`, que OpenClaw protege.
+      los archivos archivados de esas sesiones, borra `MEMORY.md`, `DREAMS.md`
+      y todo el contenido de `memory\` del workspace —bitácora diaria,
+      `dreaming\` y `.dreams\session-corpus\`, sin filtrar por extensión—, y
+      borra `data/asistente/trazas/herramientas.jsonl`. No toca los archivos
+      versionados (`SOUL`, `AGENTS`, `USER`, `IDENTITY`) ni los `.example`, no
+      imprime el token ni el contenido de las sesiones y no borra la sesión
+      principal `agent:pana:main`, que OpenClaw protege. **Sí conserva**
+      `data/evaluacion/inyeccion.json`: es la evidencia de la tarea 3.5 que cita
+      `docs/INYECCION.md` y no guarda el texto de las respuestas ni datos de
+      invitados, así que se versiona junto con `proyeccion.json`.
       **Archivos archivados.** `sessions delete` guarda el transcript en las
       tablas `session_transcript_archives` y
       `session_transcript_cold_archives` de `openclaw-agent.sqlite`, dentro de

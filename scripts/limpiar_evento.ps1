@@ -42,11 +42,15 @@
 
     4. Borra los archivos locales de memoria del workspace de WSL:
        MEMORY.md, DREAMS.md y todo el contenido de memory\ (bitacora diaria,
-       dreaming y .dreams\session-corpus). Nunca toca los .example ni los
+       dreaming y .dreams\session-corpus), sin filtrar por extension: cualquier
+       archivo que viva bajo memory\ se borra. Nunca toca los .example ni los
        archivos versionados SOUL.md, AGENTS.md, USER.md e IDENTITY.md.
 
-    5. Borra en Windows data\asistente\trazas\herramientas.jsonl y
-       data\evaluacion\inyeccion.json si existen.
+    5. Borra en Windows data\asistente\trazas\herramientas.jsonl si existe.
+
+    No borra data\evaluacion\inyeccion.json: es la evidencia de la tarea 3.5
+    que cita docs/INYECCION.md y no guarda el texto de las respuestas ni datos
+    de invitados, asi que se versiona con el resto de data\evaluacion\.
 
     El canal de WhatsApp no se toca: los perfiles, consentimientos y casos son
     de Darley y se borran aparte. El script tampoco lee el token ni imprime el
@@ -143,8 +147,7 @@ $ErrorActionPreference = 'Stop'
 
 $RaizRepo = Split-Path -Parent $PSScriptRoot
 $ArchivosWindows = @(
-    (Join-Path $RaizRepo 'data\asistente\trazas\herramientas.jsonl'),
-    (Join-Path $RaizRepo 'data\evaluacion\inyeccion.json')
+    (Join-Path $RaizRepo 'data\asistente\trazas\herramientas.jsonl')
 )
 $ArchivosVersionados = @('SOUL.md', 'AGENTS.md', 'USER.md', 'IDENTITY.md')
 $TablasArchivadas = @(
@@ -434,8 +437,10 @@ function Write-PurgaArchivos {
 
 function Get-ArchivosWorkspace {
     <#
-        Lista solo los archivos de memoria derivados del workspace. Protege los
-        .example y los cuatro archivos versionados.
+        Lista los archivos de memoria derivados del workspace. Borra todo el
+        contenido de memory\ sin filtrar por extension (bitacora diaria,
+        dreaming y .dreams\session-corpus). Protege los .example y los cuatro
+        archivos versionados.
     #>
     $lista = New-Object System.Collections.Generic.List[string]
 
@@ -448,11 +453,10 @@ function Get-ArchivosWorkspace {
 
     $carpetaMemoria = Join-Path $Workspace 'memory'
     if (Test-Path -LiteralPath $carpetaMemoria -PathType Container) {
+        # -Force incluye los archivos y carpetas ocultos (.dreams). No se filtra
+        # por extension: cualquier archivo bajo memory\ es memoria derivada.
         Get-ChildItem -LiteralPath $carpetaMemoria -Recurse -File -Force |
-            Where-Object {
-                $_.Name -notlike '*.example' -and
-                ($_.Extension -eq '.md' -or $_.Extension -eq '.txt')
-            } |
+            Where-Object { $_.Name -notlike '*.example' } |
             ForEach-Object { $lista.Add($_.FullName) }
     }
 

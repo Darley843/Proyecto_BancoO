@@ -298,10 +298,13 @@ Qué hace, en orden:
    otra tabla y no deja copia de respaldo de esas dos.
 5. Borra `MEMORY.md`, `DREAMS.md` y todo el contenido de
    `memory\` del workspace de WSL, incluidos `dreaming\` y
-   `.dreams\session-corpus\`. Nunca toca los `.example` ni los archivos
-   versionados `SOUL.md`, `AGENTS.md`, `USER.md` e `IDENTITY.md`.
-6. Borra en Windows `data/asistente/trazas/herramientas.jsonl` y
-   `data/evaluacion/inyeccion.json` si existen.
+   `.dreams\session-corpus\`, sin filtrar por extensión. Nunca toca los
+   `.example` ni los archivos versionados `SOUL.md`, `AGENTS.md`, `USER.md` e
+   `IDENTITY.md`.
+6. Borra en Windows `data/asistente/trazas/herramientas.jsonl` si existe.
+   **No** borra `data/evaluacion/inyeccion.json`: es la evidencia de la tarea
+   3.5 que cita [`INYECCION.md`](./INYECCION.md) y no guarda el texto de las
+   respuestas ni datos de invitados.
 
 **Archivos archivados.** `openclaw sessions delete` archiva el transcript
 dentro de la base SQLite del agente (tablas `session_transcript_archives` y
