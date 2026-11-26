@@ -10,7 +10,7 @@ arranca y cómo se demuestra cada pieza. El cambio OpenSpec vive en
 | Pieza | Dónde | Estado |
 |---|---|---|
 | Workspace `SOUL.md`, `AGENTS.md`, `USER.md`, `IDENTITY.md` | `openclaw/workspace/pana/` | Versionado (PR #190) |
-| `MEMORY.md` y bitácora diaria, fuera de Git | `openclaw/workspace/pana/` + plantillas `.example` | Versionado el ejemplo; la memoria local se ignora |
+| `MEMORY.md` y bitácora diaria, fuera de Git | `openclaw/workspace/pana/` + semillas versionadas | Versionadas las semillas; la memoria real local se ignora |
 | Configuración redactada del gateway | `openclaw/openclaw.json` | Versionada, sin secretos |
 | Servidor MCP con veinte herramientas | `src/banco_occidente_corpus/herramientas/` | Implementado y probado |
 | Entrada del servidor | `python -m banco_occidente_corpus.mcp_servidor.agente` | `make agente-mcp` |
@@ -299,8 +299,10 @@ Qué hace, en orden:
 5. Borra `MEMORY.md`, `DREAMS.md` y todo el contenido de
    `memory\` del workspace de WSL, incluidos `dreaming\` y
    `.dreams\session-corpus\`, sin filtrar por extensión. Nunca toca los
-   `.example` ni los archivos versionados `SOUL.md`, `AGENTS.md`, `USER.md` e
-   `IDENTITY.md`.
+   `.example`, las semillas (`MEMORY.semilla.md` y `memory\semilla.md`) ni los
+   archivos versionados `SOUL.md`, `AGENTS.md`, `USER.md` e `IDENTITY.md`. Los
+   archivos reales se regeneran desde las semillas con
+   `scripts\sembrar_memoria.ps1`.
 6. Borra en Windows `data/asistente/trazas/herramientas.jsonl` si existe.
    **No** borra `data/evaluacion/inyeccion.json`: es la evidencia de la tarea
    3.5 que cita [`INYECCION.md`](./INYECCION.md) y no guarda el texto de las

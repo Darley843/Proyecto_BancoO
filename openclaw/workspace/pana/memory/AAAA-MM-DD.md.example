@@ -1,7 +1,9 @@
 # Bitácora — AAAA-MM-DD
 
-> Copia esta plantilla como `memory/AAAA-MM-DD.md` (con la fecha real) al
-> empezar el día y bórrala al terminar el evento. No se versiona.
+> Plantilla vacía de la bitácora. Para dejar una bitácora con contenido se usan
+> las semillas versionadas y `scripts\sembrar_memoria.ps1` (ver
+> `openclaw/README.md`). El archivo real se llama `memory/AAAA-MM-DD.md`, no se
+> versiona y se borra al terminar el evento.
 
 ## Resumen
 

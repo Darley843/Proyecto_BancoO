@@ -72,5 +72,7 @@ data/escena/
 openclaw/workspace/pana/MEMORY.md
 openclaw/workspace/pana/memory/*.md
 !openclaw/workspace/pana/memory/*.md.example
+# La semilla de la bitacora SI se versiona: es la fuente de los archivos reales.
+!openclaw/workspace/pana/memory/semilla.md
 # Estado del gateway: sesiones y credenciales locales, fuera de Git.
 openclaw/state/

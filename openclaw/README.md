@@ -14,10 +14,12 @@ script de sincronización.
 | `AGENTS.md` | Reglas, límites, datos, herramientas y guion de la escena. | Sí |
 | `USER.md` | Público genérico de la demo, sin personas reales. | Sí |
 | `IDENTITY.md` | Nombre y emoji de Pana. | Sí |
-| `MEMORY.md.example` | Plantilla de la memoria local. | Sí |
-| `memory/AAAA-MM-DD.md.example` | Plantilla de la bitácora diaria. | Sí |
+| `MEMORY.semilla.md` | Semilla de la memoria real: aprendizajes generales y anónimos. | Sí |
+| `memory/semilla.md` | Semilla de la bitácora diaria; `{{FECHA}}` se reemplaza al sembrar. | Sí |
+| `MEMORY.md.example` | Plantilla vacía de la memoria (solo referencia). | Sí |
+| `memory/AAAA-MM-DD.md.example` | Plantilla vacía de la bitácora diaria (solo referencia). | Sí |
 | `MEMORY.md` | Memoria local de la ejecución. | No: `.gitignore` |
-| `memory/*.md` | Bitácora local por día. | No: `.gitignore` |
+| `memory/*.md` | Bitácora local por día. | No: `.gitignore` (salvo `semilla.md`) |
 | `openclaw.json` | Copia redactada de la configuración del gateway. | Sí |
 
 `SOUL.md`, `AGENTS.md`, `USER.md` e `IDENTITY.md` se envían al modelo en cada
@@ -30,10 +32,108 @@ turno: mantenlos cortos (2.500 caracteres cada uno; `AGENTS.md` hasta 4.000).
   datos de una persona real.
 - **IDENTITY.md** es la ficha mínima del personaje.
 
-`MEMORY.md` y la bitácora son locales, se crean desde las plantillas `.example`
-y se borran al terminar el evento. No guardan nombres, números, montos, deudas,
-documentos ni textos de invitados; solo aprendizajes generales y conteos
-agregados. `AGENTS.md` lo prohíbe de forma explícita.
+`MEMORY.md` y la bitácora son locales, se siembran desde las semillas
+versionadas y se borran al terminar el evento. No guardan nombres, teléfonos,
+montos, deudas, documentos ni textos de invitados; solo aprendizajes generales
+y conteos agregados. `AGENTS.md` lo prohíbe de forma explícita.
+
+## Memoria y bitácora: cómo se ven y cómo se editan
+
+Los dos archivos reales viven en el workspace de WSL:
+
+```text
+\\wsl$\OpenClawGateway\home\openclaw\.openclaw\workspaces\pana\MEMORY.md
+\\wsl$\OpenClawGateway\home\openclaw\.openclaw\workspaces\pana\memory\2026-11-26.md
+```
+
+Son Markdown en texto plano, en UTF-8 y con saltos de línea LF. Se abren con
+cualquier editor (Notepad, VS Code o el editor de WSL) y se leen como cualquier
+documento: no hay formato binario ni base de datos de por medio. Este es el
+aspecto de `MEMORY.md`:
+
+```markdown
+# MEMORY.md — Memoria de Pana
+
+## Aprendizajes generales
+
+- Las preguntas más frecuentes fueron sobre la tasa del CDT y sobre el gota a
+  gota.
+- En la entrevista conviene pedir el monto exacto aparte.
+
+## Decisiones de operación
+
+- La demo usa montos y plazos inventados; nunca datos reales.
+```
+
+Y este es el de la bitácora del día:
+
+```markdown
+# Bitácora — 2026-11-26
+
+## Pruebas hechas
+
+- `make check` y el pipeline sin red: el repositorio queda en verde.
+
+## Incidencias
+
+- Un invitado de prueba respondió con una letra de otra pregunta; se pidió
+  confirmar la opción.
+```
+
+### Editarlos a mano
+
+1. Abre el archivo en el workspace de WSL con el editor que prefieras.
+2. Escribe solo aprendizajes generales, pendientes y conteos agregados. Nada de
+   nombres, teléfonos, documentos, correos, montos ni textos de invitados.
+3. Guarda en UTF-8. El agente lo lee en el siguiente turno; no hace falta
+   reiniciar el gateway.
+4. `sincronizar_workspace.ps1` no los pisa: las ediciones sobreviven a la
+   sincronización.
+
+Si dudas de una línea, no la escribas: la memoria es un apoyo, no un registro
+de la conversación.
+
+### Regenerarlos desde las semillas
+
+Las semillas versionadas son la fuente del contenido por defecto:
+
+- `openclaw/workspace/pana/MEMORY.semilla.md` → `MEMORY.md`.
+- `openclaw/workspace/pana/memory/semilla.md` → `memory/<fecha>.md` (la semilla
+  trae `{{FECHA}}`, que el script reemplaza).
+
+Para volver a dejarlos como las semillas, por ejemplo después de
+`make limpiar-evento CONFIRMAR=1`:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts\sembrar_memoria.ps1 -Fecha 2026-11-26
+```
+
+O con el atajo del repositorio:
+
+```powershell
+make sembrar-memoria FECHA=2026-11-26
+```
+
+Sin `FECHA`, usa la fecha de hoy. Con `FORZAR=1` (o `-Forzar`) sobrescribe lo
+que ya exista.
+
+El script:
+
+1. Escribe `MEMORY.md` y `memory/<fecha>.md` en el workspace de WSL.
+2. No sobrescribe archivos existentes salvo con `-Forzar`, para no perder una
+   edición a mano.
+3. Rechaza la semilla si el texto sembrado parece tener un correo o un número
+   de siete dígitos o más (teléfono, documento o monto sin separadores).
+4. Falla con un mensaje claro si falta WSL, el destino o alguna semilla.
+
+Para usar otra ruta (por ejemplo, una copia de ensayo), pasa `-Destino`. Para
+cambiar el contenido por defecto, edita las semillas y haz el commit: los
+archivos reales se regeneran con el script.
+
+La limpieza del evento borra solo los archivos reales: `MEMORY.md`, `DREAMS.md`
+y todo el contenido de `memory/` salvo las semillas y los `.example`. Las
+semillas se quedan en el repositorio y no viajan al workspace del agente
+(`sincronizar_workspace.ps1` las omite).
 
 ## Cómo se sincroniza
 
@@ -71,9 +171,10 @@ powershell -ExecutionPolicy Bypass -File scripts\sincronizar_workspace.ps1 `
 2. Ejecuta `make check` y `uv run ruff format --check .`.
 3. Haz el commit.
 4. Sincroniza el workspace.
-5. Si es la primera vez, copia `MEMORY.md.example` a `MEMORY.md` en el destino
-   (o deja que OpenClaw lo cree al arrancar).
-6. Al terminar el evento, borra `MEMORY.md` y `memory/*.md` del destino.
+5. Si es la primera vez o después del borrado del evento, siembra la memoria y
+   la bitácora con `scripts\sembrar_memoria.ps1` (ver arriba).
+6. Al terminar el evento, borra `MEMORY.md` y `memory/*.md` del destino con
+   `make limpiar-evento CONFIRMAR=1`; las semillas no se tocan.
 
 No edites el workspace de WSL a mano: el siguiente `sincronizar_workspace.ps1`
 sobrescribe lo versionado. La única excepción son `MEMORY.md` y la bitácora,

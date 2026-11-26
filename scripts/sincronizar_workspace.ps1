@@ -8,8 +8,9 @@
 
     Copia SOUL.md, AGENTS.md, USER.md, IDENTITY.md, las plantillas .example y
     los archivos nuevos. No borra ni sobrescribe MEMORY.md ni la bitacora real
-    (memory\*.md que no sean .example). Al final elimina BOOTSTRAP.md del
-    destino.
+    (memory\*.md que no sean .example). Tampoco copia las semillas
+    (MEMORY.semilla.md ni memory\semilla.md): viven solo en el repositorio. Al
+    final elimina BOOTSTRAP.md del destino.
 
 .PARAMETER Origen
     Carpeta versionada del workspace. Por defecto, la del repositorio.
@@ -52,6 +53,12 @@ $omitidos = 0
 Get-ChildItem -LiteralPath $origenRaiz -Recurse -File | ForEach-Object {
     $archivo = $_
     $relativa = $archivo.FullName.Substring($origenRaiz.Length).TrimStart('\')
+
+    # Las semillas son del repositorio: nunca viajan al workspace del agente.
+    if ($archivo.Name -like '*.semilla.md' -or $archivo.Name -eq 'semilla.md') {
+        $omitidos++
+        return
+    }
 
     # MEMORY.md es local: nunca se copia, se pisa ni se borra.
     if ($archivo.Name -eq 'MEMORY.md') {
