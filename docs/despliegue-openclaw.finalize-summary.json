@@ -1,0 +1,69 @@
+{
+  "schemaVersion": 1,
+  "ok": true,
+  "command": "finalize",
+  "status": "pass",
+  "type": "architecture",
+  "quality": "showcase",
+  "specification": {
+    "path": "docs/despliegue-openclaw.json",
+    "sha256": "8ab318d35e5e551617c0e932d674e218a66402d0598938501a7649eeeb9a7a3c",
+    "bytes": 6361
+  },
+  "artifact": {
+    "path": "docs/despliegue-openclaw.html",
+    "sha256": "7285ad435204bb819edd380ef76a8fd09d275317cbab8a10bbc9589fa0dca6de",
+    "bytes": 851903
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "pass"
+  },
+  "diagnostics": [],
+  "diagnosticSummary": {
+    "total": 0,
+    "shown": 0,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "docs/despliegue-openclaw.finalize.json",
+    "summaryReceipt": "docs/despliegue-openclaw.finalize-summary.json",
+    "browserCheckReceipt": "docs/despliegue-openclaw.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "durationMs": 3187,
+  "browserCheck": {
+    "requested": true,
+    "ran": true
+  },
+  "visualReviewRecommendation": {
+    "action": "inspect-route-readability",
+    "signals": {
+      "routesOverSuggestedBends": 1
+    },
+    "reason": "Automated gates passed, but crossings or detours still need perceptual review before claiming visual quality.",
+    "affectedRoutes": {
+      "crossings": [],
+      "detours": [
+        {
+          "relationship": {
+            "from": "tunel",
+            "to": "fastapi",
+            "label": "127.0.0.1:8000",
+            "collectionIndex": 2,
+            "artifactIndex": 3
+          },
+          "bends": 3,
+          "stretch": 1.343
+        }
+      ],
+      "truncated": false
+    },
+    "hints": [
+      "tunel → fastapi needs 3 bends: move node tunel or fastapi so they share a row or column with matching centers, or sit diagonally with a clear corner."
+    ],
+    "repair": "Trace these relationships at the desktop viewport. For Architecture, use references/architecture-layout-repair.md: reflow a blocked main path or tangled connected scene, and repair an isolated defect locally only when the surrounding composition is accepted. Preserve all semantic content and user-fixed geometry. Rerun finalize once after the edit."
+  }
+}
