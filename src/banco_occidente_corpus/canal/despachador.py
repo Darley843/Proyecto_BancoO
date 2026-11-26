@@ -34,8 +34,10 @@ evento, en ``test/test_canal_evento.py``.
 from __future__ import annotations
 
 import logging
+import secrets
+import threading
 from collections.abc import Callable
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -53,7 +55,7 @@ from .consentimiento import MaquinaConsentimiento
 from .contratos import MensajeEntrante, RespuestaCanal
 from .entrevista import EntrevistaCanal
 from .envio import Enviador, ErrorEnvio
-from .escena_vivo import EscenaVivo, es_comando
+from .escena_vivo import EscenaVivo, activa_entorno, es_comando
 from .identidad import calcular_usuario_id
 
 logger = logging.getLogger(__name__)
@@ -150,6 +152,7 @@ class Despachador:
     motor: Motor | None = None
     entrevista: EntrevistaCanal | None = None
     escena: EscenaVivo | None = None
+    _candado_proceso: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
     def recibir(self, mensaje: MensajeEntrante) -> None:
         """Registra y encola un mensaje, sin bloquear la respuesta a Meta.
@@ -171,18 +174,32 @@ class Despachador:
         if not self.cola.encolar(mensaje):
             actualizar_mensaje(self.ruta_almacen, mensaje.id_mensaje, "error")
 
-    def procesar(self, mensaje: MensajeEntrante, momento: datetime | None = None) -> None:
-        """Procesa un mensaje ya encolado.
+    def procesar(
+        self, mensaje: MensajeEntrante, momento: datetime | None = None
+    ) -> RespuestaCanal | None:
+        """Procesa un mensaje ya encolado, serializado con ``/hablar``.
 
         Args:
             mensaje: mensaje normalizado del webhook.
             momento: instante de referencia para la ventana del evento y las
                 cuotas; por defecto, ahora. Las pruebas lo fijan.
+
+        Returns:
+            La respuesta que se envió, o ``None`` si el turno se descartó o el
+            envío falló. ``/api/escena/hablar`` usa este valor para mostrar en
+            la pantalla lo mismo que recibió el voluntario.
         """
+        with self._candado_proceso:
+            return self._procesar(mensaje, momento)
+
+    def _procesar(
+        self, mensaje: MensajeEntrante, momento: datetime | None = None
+    ) -> RespuestaCanal | None:
+        """Cuerpo de `procesar`, ya dentro del candado del canal."""
         usuario_id = self._usuario_id(mensaje)
         if usuario_id is None:
             actualizar_mensaje(self.ruta_almacen, mensaje.id_mensaje, "error")
-            return
+            return None
 
         actualizar_mensaje(self.ruta_almacen, mensaje.id_mensaje, "procesando")
         ahora = _instante(momento)
@@ -198,11 +215,11 @@ class Despachador:
                     procesado=True,
                     motor=MOTOR_CANAL,
                 )
-                return
+                return None
 
             cierre = self._motivo_cierre(usuario_id, ahora)
             if cierre is not None:
-                self._enviar_texto(mensaje, usuario_id, cierre)
+                respuesta_cierre = self._enviar_texto(mensaje, usuario_id, cierre)
                 actualizar_mensaje(
                     self.ruta_almacen,
                     mensaje.id_mensaje,
@@ -210,7 +227,7 @@ class Despachador:
                     procesado=True,
                     motor=MOTOR_CANAL,
                 )
-                return
+                return respuesta_cierre
 
             # El evento no recorta el alcance: quien vino por la ventana recorre
             # el mismo diagnóstico que un número de la lista, con el
@@ -275,6 +292,7 @@ class Despachador:
                 procesado=True,
                 motor=motor_usado or MOTOR_CANAL,
             )
+            return respuesta
         except Exception:
             logger.exception("fallo al procesar un mensaje del canal")
             actualizar_mensaje(self.ruta_almacen, mensaje.id_mensaje, "error", procesado=True)
@@ -282,6 +300,7 @@ class Despachador:
                 self._enviar_texto(mensaje, usuario_id, TEXTO_ERROR)
             except Exception:
                 logger.warning("tampoco se pudo enviar el aviso de error")
+            return None
 
     def _avisar_no_autorizado(self, mensaje: MensajeEntrante, usuario_id: str) -> None:
         """Intenta avisar al número no autorizado sin romper el turno.
@@ -384,6 +403,38 @@ class Despachador:
             return self.entrevista.completar(usuario_id, mensaje.id_mensaje, avance.respuestas)
         return avance.respuesta
 
+    def hablar(self, texto: str, momento: datetime | None = None) -> RespuestaCanal | None:
+        """Procesa el texto dictado por el voluntario activo como un mensaje más.
+
+        Reutiliza la misma puerta que el webhook (autorización, consentimiento,
+        PII, entrevista y motor) y envía la respuesta por WhatsApp al destino
+        que la ranura guardó en memoria. La ficha también sale por ese envío si
+        el turno la produce.
+
+        Args:
+            texto: lo que el navegador transcribió en la entrada por voz.
+            momento: instante de referencia para las pruebas.
+
+        Returns:
+            La respuesta enviada, o ``None`` si no hay voluntario activo con
+            destino o si el turno se descartó.
+        """
+        if self.escena is None or not activa_entorno():
+            return None
+        activo = self.escena.voluntario_activo()
+        if activo is None:
+            return None
+        limpio = texto.strip()
+        if not limpio:
+            return None
+        mensaje = MensajeEntrante(
+            id_mensaje=f"escena-voz-{secrets.token_hex(8)}",
+            remitente=activo.destino,
+            texto=limpio[:4096],
+            recibido_en=_instante(momento),
+        )
+        return self.procesar(mensaje, momento)
+
     def _usuario_id(self, mensaje: MensajeEntrante) -> str | None:
         """Calcula la huella del remitente o ``None`` si el número no es válido."""
         try:
@@ -392,11 +443,14 @@ class Despachador:
             logger.warning("número inválido en el canal; mensaje descartado")
             return None
 
-    def _enviar_texto(self, mensaje: MensajeEntrante, usuario_id: str, texto: str) -> None:
-        """Envía una respuesta de texto simple al remitente."""
+    def _enviar_texto(
+        self, mensaje: MensajeEntrante, usuario_id: str, texto: str
+    ) -> RespuestaCanal:
+        """Envía una respuesta de texto simple al remitente y la devuelve."""
         respuesta = RespuestaCanal(
             usuario_id=usuario_id,
             id_mensaje_origen=mensaje.id_mensaje,
             texto=texto,
         )
         self.crear_enviador(usuario_id, mensaje.remitente).enviar(respuesta)
+        return respuesta

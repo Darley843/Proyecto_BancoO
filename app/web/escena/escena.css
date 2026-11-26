@@ -236,6 +236,97 @@ h2 {
 .escena__form-pregunta .escena__boton--secundario { background: transparent; color: var(--texto); border: 1px solid var(--linea); }
 .escena__form-pregunta input:focus-visible, .escena__form-pregunta button:focus-visible { outline: 3px solid var(--joven); outline-offset: 2px; }
 
+/* ---------- Recursos (tecla G): repositorio, WhatsApp y diagramas ---------- */
+.escena__preguntas-recursos { display: flex; justify-content: flex-end; }
+.escena__preguntas-recursos button {
+  font: 600 14px var(--fuente-cifras);
+  color: var(--texto);
+  background: transparent;
+  border: 1px solid var(--linea);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.escena__preguntas-recursos button:hover,
+.escena__preguntas-recursos button:focus-visible { border-color: var(--pana); color: var(--pana); }
+.escena__recursos {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(760px, calc(100vw - 32px));
+  max-height: calc(100vh - 330px);
+  overflow-y: auto;
+  display: grid;
+  gap: 14px;
+  padding: 16px 18px;
+  background: var(--hundido);
+  border: 2px solid var(--pana);
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, .6);
+  z-index: 15;
+}
+.escena__recursos[hidden] { display: none; }
+.escena__recursos-cabecera { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.escena__recursos-cabecera h2 { margin: 0; color: var(--pana); }
+.escena__recursos-cabecera button {
+  font: 600 14px var(--fuente-cifras);
+  color: var(--texto);
+  background: transparent;
+  border: 1px solid var(--linea);
+  border-radius: 8px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+.escena__recursos-cabecera button:hover,
+.escena__recursos-cabecera button:focus-visible { border-color: var(--pana); color: var(--pana); }
+.escena__recurso-bloque {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px;
+  background: var(--tablero);
+  border-radius: 10px;
+}
+.escena__recurso-bloque[hidden] { display: none; }
+.escena__recurso-bloque h3,
+.escena__recurso-diagramas h3 {
+  margin: 0 0 4px;
+  font: 700 16px var(--fuente);
+  color: var(--texto);
+}
+.escena__recurso-bloque p {
+  margin: 0 0 10px;
+  font: 14px var(--fuente);
+  color: var(--tenue);
+}
+.escena__recurso-bloque img {
+  width: 160px;
+  height: 160px;
+  flex: none;
+  border-radius: 10px;
+  background: #fff;
+  padding: 6px;
+}
+.escena__recurso-diagramas { display: grid; gap: 8px; }
+.escena__diagramas-lista { display: flex; flex-wrap: wrap; gap: 8px; }
+.escena__recurso {
+  font: 600 14px var(--fuente-cifras);
+  color: var(--texto);
+  text-decoration: none;
+  border: 1px solid var(--linea);
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.escena__recurso:hover {
+  border-color: var(--pana);
+  color: var(--pana);
+}
+.escena__recurso:focus-visible {
+  outline: 3px solid var(--joven);
+  outline-offset: 2px;
+}
+
 /* ---------- Trazabilidad (solo facilitador, oculta por defecto) ---------- */
 .escena__traza {
   /* Arriba a la derecha, sobre el panel de cifras: nunca tapa los subtítulos. */

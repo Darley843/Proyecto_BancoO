@@ -643,6 +643,20 @@ def test_cargar_ficha_descarta_la_fuente_que_no_existe(tmp_path: Path) -> None:
     assert [entrada.id for entrada in ficha.entradas] == ["buena"]
 
 
+def test_las_palabras_de_codigo_y_repositorio_entran_al_paso_2() -> None:
+    """El profesor puede preguntar por código, diagramas, ramas y tokens."""
+    preguntas = (
+        "¿Cómo está organizado el código?",
+        "¿Qué es un token en git?",
+        "¿Muéstrame los pull requests?",
+        "¿Tienen un diagrama de arquitectura?",
+        "¿Usan pruebas automáticas?",
+    )
+
+    for pregunta in preguntas:
+        assert es_pregunta_del_proyecto(pregunta), pregunta
+
+
 def test_es_pregunta_del_proyecto_distingue_banco_y_proyecto() -> None:
     """La señal léxica evita que una pregunta de tasa entre al paso 2."""
     assert es_pregunta_del_proyecto("¿por qué usaron Qdrant?")

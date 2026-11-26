@@ -319,7 +319,9 @@ pestaña y, si no hay, los turnos de ejemplo, con un sello que lo dice.
 | Pieza | Estado |
 |---|---|
 | Escena proyectada (`GET /api/escena/proyectado` y `make escena-proyectada`) | Lista desde #188. Sin ella, la pantalla muestra los turnos de ejemplo con su sello |
-| Preguntas del público (tecla Q) | `POST /api/escena/pregunta`: las 17 respuestas fijas de `config/escena.toml`, la documentación del proyecto y, si el servidor no responde, la ficha local de Pana |
+| Preguntas del público (tecla Q) | `POST /api/escena/pregunta`: las 22 respuestas fijas de `config/escena.toml`, la documentación del proyecto y, si el servidor no responde, la ficha local de Pana |
+| Entrada del voluntario por voz (tecla V) | `POST /api/escena/hablar`: con `pregunta` interpreta la letra o el monto y devuelve la línea de Pana; sin `pregunta` pasa la frase libre por los filtros del canal, el motor y el envío por WhatsApp al voluntario activo, con la ficha si la hay. No recibe audio, no guarda texto y rechaza datos personales |
+| Recursos (tecla G) | `GET /api/escena/repositorio` y su QR, el QR de WhatsApp opcional y los seis diagramas de `docs/` |
 | Turnos en vivo publicados por el agente de OpenClaw | ⏳ Llegan con la integración del miércoles 25 (OpenClaw publica cada turno y la pantalla lo muestra) |
 
 ## 8. Encender todo en orden

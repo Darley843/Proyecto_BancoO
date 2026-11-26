@@ -10,6 +10,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from banco_occidente_corpus.canal.contratos import RespuestaCanal
 from banco_occidente_corpus.escena.api import (
     EscenaPeticion,
     NegociacionPeticion,
@@ -46,6 +47,27 @@ class ServicioDemo(ServicioEscenaReal):
             raiz=self.raiz,
             entorno=DEMO,
         )
+
+
+class CanalFalso:
+    """Canal de doble para el texto libre de ``/hablar``."""
+
+    def __init__(self, respuesta: RespuestaCanal | None) -> None:
+        """Guarda la respuesta y el registro de textos."""
+        self.respuesta = respuesta
+        self.textos: list[str] = []
+
+    def hablar(self, texto: str) -> RespuestaCanal | None:
+        """Registra el texto y devuelve la respuesta prefijada."""
+        self.textos.append(texto)
+        return self.respuesta
+
+
+def _cliente_canal(tmp_path: Path, canal: CanalFalso | None) -> TestClient:
+    """Cliente con el servicio de demo y un canal opcional."""
+    app = FastAPI()
+    app.include_router(crear_router_escena(ServicioDemo(salida=tmp_path), canal=canal))
+    return TestClient(app)
 
 
 @pytest.fixture(scope="module")
@@ -124,6 +146,114 @@ def test_interpretar_no_repite_datos_personales(cliente: TestClient) -> None:
     )
     assert respuesta.status_code == 422
     assert "300" not in respuesta.text
+
+
+def test_hablar_una_letra_devuelve_la_linea_de_pana(cliente: TestClient) -> None:
+    """El micrófono de la entrada (V) interpreta y Pana confirma en voz."""
+    respuesta = cliente.post(
+        "/api/escena/hablar",
+        json={"texto": "letra A", "pregunta": "monto"},
+    )
+    assert respuesta.status_code == 200
+    datos = respuesta.json()
+    assert datos["respuesta"]["letra"] == "A"
+    assert datos["turno"]["personaje"] == "pana"
+    assert datos["turno"]["origen"] == "entrada_voz"
+    assert "Listo" in datos["turno"]["texto"]
+
+
+def test_hablar_sin_entender_responde_200_con_la_linea_de_pana(cliente: TestClient) -> None:
+    """Una frase que no se entiende no avanza: Pana pide repetirla."""
+    respuesta = cliente.post(
+        "/api/escena/hablar",
+        json={"texto": "no sé", "pregunta": "ingresos"},
+    )
+    assert respuesta.status_code == 200
+    datos = respuesta.json()
+    assert datos["respuesta"] is None
+    assert datos["turno"]["texto"]
+    assert datos["turno"]["origen"] == "entrada_voz"
+
+
+def test_hablar_no_repite_datos_personales(cliente: TestClient) -> None:
+    """El micrófono tampoco guarda ni repite un teléfono."""
+    respuesta = cliente.post(
+        "/api/escena/hablar",
+        json={"texto": "mi celular es 300 123 4567", "pregunta": "ingresos"},
+    )
+    assert respuesta.status_code == 200
+    datos = respuesta.json()
+    assert datos["respuesta"] is None
+    assert "300" not in respuesta.text
+    assert "datos personales" in datos["turno"]["texto"].lower()
+
+
+def test_hablar_libre_usa_el_canal_y_devuelve_su_respuesta(tmp_path: Path) -> None:
+    """Sin pregunta de perfil, el texto pasa al canal y vuelve como turno."""
+    canal = CanalFalso(
+        RespuestaCanal(
+            usuario_id="huella",
+            id_mensaje_origen="escena-voz",
+            texto="respuesta de Pana",
+        )
+    )
+    respuesta = _cliente_canal(tmp_path, canal).post(
+        "/api/escena/hablar",
+        json={"texto": "¿qué es Pana?"},
+    )
+
+    assert respuesta.status_code == 200
+    datos = respuesta.json()
+    assert datos["turno"]["texto"] == "respuesta de Pana"
+    assert datos["turno"]["personaje"] == "pana"
+    assert datos["turno"]["origen"] == "canal"
+    assert datos["enviado"] is True
+    assert datos["ficha"] is False
+    assert canal.textos == ["¿qué es Pana?"]
+
+
+def test_hablar_libre_marca_la_ficha(tmp_path: Path) -> None:
+    """Si el canal mandó la imagen de la ficha, la respuesta lo dice."""
+    canal = CanalFalso(
+        RespuestaCanal(
+            usuario_id="huella",
+            id_mensaje_origen="escena-voz",
+            texto="Aquí está tu ficha.",
+            tipo="imagen",
+            imagen=b"\x89PNG\r\n\x1a\n" + b"ficha",
+        )
+    )
+    datos = (
+        _cliente_canal(tmp_path, canal)
+        .post(
+            "/api/escena/hablar",
+            json={"texto": "termina la entrevista"},
+        )
+        .json()
+    )
+
+    assert datos["ficha"] is True
+
+
+def test_hablar_libre_sin_voluntario_responde_409(tmp_path: Path) -> None:
+    """Sin una ranura activa no se inventa un destinatario."""
+    respuesta = _cliente_canal(tmp_path, CanalFalso(None)).post(
+        "/api/escena/hablar",
+        json={"texto": "hola"},
+    )
+
+    assert respuesta.status_code == 409
+    assert "voluntario activo" in respuesta.json()["detail"]
+
+
+def test_hablar_libre_sin_canal_responde_503(tmp_path: Path) -> None:
+    """Sin despachador configurado, la ruta no promete un envío."""
+    respuesta = _cliente_canal(tmp_path, None).post(
+        "/api/escena/hablar",
+        json={"texto": "hola"},
+    )
+
+    assert respuesta.status_code == 503
 
 
 def test_escena_con_perfil_seguro(cliente: TestClient) -> None:

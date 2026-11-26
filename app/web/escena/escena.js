@@ -31,8 +31,9 @@
  *
  * Teclado: Espacio o → pasa al siguiente turno, P reproduce o pausa, S activa
  * el modo solo subtítulos, Q abre o cierra las preguntas, N pasa al núcleo,
- * T muestra la trazabilidad, E entra o sale del modo en vivo y R vuelve al
- * inicio (en vivo: vuelve a pedir la lista desde el principio).
+ * T muestra la trazabilidad, H las herramientas, G los recursos (repositorio,
+ * WhatsApp y diagramas), E entra o sale del modo en vivo y R vuelve al inicio
+ * (en vivo: vuelve a pedir la lista desde el principio).
  */
 
 import { decirComo, detenerVoz } from "../voz.js";
@@ -59,6 +60,7 @@ import {
 } from "./contrato.js";
 import { crearSondeo, pideVoz, registrosNuevos, tiempoDeLectura } from "./envivo.js";
 import { detenerMicrofono, escuchando, escuchar, hayMicrofono } from "./microfono.js";
+import { montarRecursos } from "./recursos.js";
 import {
   CLAVE_COMPLETA,
   CLAVE_NUCLEO,
@@ -474,6 +476,33 @@ function alternarTraza() {
 }
 
 /**
+ * Abre o cierra el panel de recursos (tecla G): repositorio, WhatsApp y
+ * diagramas de Archify. Se puede abrir en cualquier paso, también en vivo.
+ *
+ * @returns {void}
+ */
+function alternarRecursos() {
+  const panel = porId("escena-recursos");
+  if (!panel.hidden) {
+    cerrarRecursos();
+    return;
+  }
+  panel.hidden = false;
+  porId("escena-ver-recursos").setAttribute("aria-expanded", "true");
+  void montarRecursos();
+}
+
+/**
+ * Cierra el panel de recursos y deja su botón en estado cerrado.
+ *
+ * @returns {void}
+ */
+function cerrarRecursos() {
+  porId("escena-recursos").hidden = true;
+  porId("escena-ver-recursos").setAttribute("aria-expanded", "false");
+}
+
+/**
  * Pasa al núcleo (Don Gota, Pana y el auditor) sin perder los turnos ya
  * dichos. Se usa con el botón Núcleo, la tecla N o el evento `escena:nucleo`.
  * Deja la escena en pausa: quien presenta sigue con «Seguir» o Espacio.
@@ -644,6 +673,7 @@ function reiniciar() {
 function prepararInicio() {
   pausar();
   cerrarPreguntas();
+  cerrarRecursos();
   estado.aperturaDicha = false;
   estado.indice = -1;
   estado.paso = -1;
@@ -857,6 +887,8 @@ function teclado(evento) {
     alternarTraza();
   } else if (tecla === "h") {
     document.dispatchEvent(new CustomEvent("escena:herramientas"));
+  } else if (tecla === "g") {
+    alternarRecursos();
   } else if (tecla === "e") {
     alternarEnVivo();
   } else if (tecla === "r") {
@@ -1176,6 +1208,9 @@ async function iniciar() {
   porId("escena-reiniciar").addEventListener("click", reiniciarSegunModo);
   porId("escena-nucleo").addEventListener("click", irAlNucleo);
   porId("escena-ver-traza").addEventListener("click", alternarTraza);
+  porId("escena-ver-recursos").addEventListener("click", alternarRecursos);
+  porId("escena-recursos-cerrar").addEventListener("click", cerrarRecursos);
+  porId("escena-preguntas-recursos").addEventListener("click", alternarRecursos);
   document.addEventListener("escena:nucleo", irAlNucleo);
   porId("escena-preguntar").addEventListener("click", alternarPreguntas);
   porId("escena-en-vivo").addEventListener("click", alternarEnVivo);

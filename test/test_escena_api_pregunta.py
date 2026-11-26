@@ -57,6 +57,27 @@ def test_la_ficha_responde_con_un_turno_de_pana(cliente: TestClient) -> None:
     assert "Fuente:" not in turno.texto
 
 
+@pytest.mark.parametrize(
+    "pregunta",
+    [
+        "Cuéntame del proyecto",
+        "Cuéntanos del proyecto",
+        "Háblame del proyecto",
+        "Dame un resumen del proyecto",
+        "¿En qué consiste el proyecto?",
+    ],
+)
+def test_cuentame_del_proyecto_no_cae_al_rechazo(cliente: TestClient, pregunta: str) -> None:
+    """La pregunta más probable del jurado se responde con la ficha del proyecto.
+
+    Antes caía a BM25 con un fragmento que no hablaba del proyecto y el modelo
+    contestaba que no encontraba información.
+    """
+    datos = cliente.post(RUTA, json={"pregunta": pregunta}).json()
+    assert datos["tema"] == "ficha"
+    assert datos["turno"]["id"] == "pana.pregunta.fija.proyecto"
+
+
 def test_por_que_deepseek_sale_de_la_ficha(cliente: TestClient) -> None:
     """Las preguntas de respaldo del pitch (docs/PITCH.md) tienen respuesta fija."""
     datos = cliente.post(RUTA, json={"pregunta": "¿Por qué DeepSeek?"}).json()

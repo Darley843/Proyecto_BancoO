@@ -413,9 +413,14 @@ un efecto lateral local, no un campo de la respuesta.
 ### 9.2 Memoria del voluntario (en memoria, con TTL)
 
 - `canal/escena_vivo.py` guarda **un solo** voluntario activo:
-  `{"huella": <usuario_id HMAC>, "vence": <datetime UTC>}`.
+  `{"huella": <usuario_id HMAC>, "destino": <número normalizado>, "vence":
+  <datetime UTC>}`.
 - Se guarda en memoria del proceso; no va a SQLite, no se versiona y se pierde
-  al reiniciar. Nunca se guarda el número en claro.
+  al reiniciar. El `destino` existe **solo en RAM** y solo para que
+  `POST /api/escena/hablar` envíe por WhatsApp la respuesta de Pana y la ficha.
+  No se persiste, no se registra en logs, no se envía al modelo y se borra al
+  vencer la ranura o al ejecutar `olvidar()`.
+- El número **no** se devuelve al navegador ni viaja en `/api/escena/en-vivo`.
 - TTL configurable en `config/whatsapp.toml [evento]`:
 
 ```toml
@@ -455,6 +460,23 @@ escena_ttl_minutos = 180
   Pana en la lista; el texto y la imagen siguen su camino por WhatsApp.
 - Si el mensaje del invitado es un botón o una lista, se publica su `texto`
   visible (nunca el `id_boton` interno).
+
+### 9.3.1 `POST /api/escena/hablar` desde la entrada por voz
+
+La pantalla puede dictar una frase del voluntario en la entrada **V** y enviarla
+sin `pregunta` a `POST /api/escena/hablar`. La ruta:
+
+1. Busca la huella y el destino del **voluntario activo** en la ranura en
+   memoria; si no hay, responde `409` y no envía nada.
+2. Construye un `MensajeEntrante` sintético con ese destino y llama a
+   `Despachador.procesar`, la misma puerta del webhook: autorización,
+   consentimiento, PII, entrevista, motor OpenClaw o grafo.
+3. El despachador envía por WhatsApp la respuesta y, si el turno la produce, la
+   ficha como imagen. La pantalla recibe el mismo texto en `turno` y los
+   indicadores `enviado` y `ficha`.
+
+Si el cliente envía `pregunta` (letra o monto), la ruta conserva el modo de
+perfil: interpreta localmente, no llama a OpenClaw y no envía por WhatsApp.
 
 ### 9.4 Los demás invitados no se publican
 

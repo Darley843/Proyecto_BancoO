@@ -159,7 +159,7 @@ class ColaInmediata(ColaMensajes):
     mismos.
     """
 
-    procesar: Callable[[MensajeEntrante], None] | None = None
+    procesar: Callable[[MensajeEntrante], object] | None = None
 
     def encolar(self, mensaje: MensajeEntrante) -> bool:
         """Procesa el mensaje de inmediato.

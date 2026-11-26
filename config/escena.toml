@@ -126,7 +126,7 @@ max_palabras = 40
 tiempo_total_segundos = 8
 tiempo_llamada_segundos = 4
 max_fragmentos = 3
-rechazo = "No tengo información sobre eso; puedo contarles del proyecto o de los productos del banco."
+rechazo = "No tengo información sobre eso; del proyecto sí les cuento. Para productos y tasas, escríbanme por WhatsApp."
 respaldo = "No puedo responder eso ahora mismo; el proyecto está documentado en docs/ y los productos y tasas del banco, en el Tablero."
 pii = "Por seguridad no proceso datos personales en este espacio (Ley 1581 de 2012). Puedo contarles del proyecto o de los productos del banco."
 
@@ -150,6 +150,15 @@ variantes = [
   "¿Qué hicieron en el proyecto?",
   "¿Qué es Pana?",
   "¿Por qué se llama Sucursal 1965?",
+  "Cuéntame del proyecto",
+  "Cuéntanos del proyecto",
+  "Cuéntame sobre el proyecto",
+  "Cuéntanos sobre el proyecto",
+  "Háblame del proyecto",
+  "Háblanos del proyecto",
+  "Dame un resumen del proyecto",
+  "¿En qué consiste el proyecto?",
+  "Cuéntame de la Sucursal 1965",
 ]
 respuesta = "Somos un asistente que responde por WhatsApp con la información pública del Banco de Occidente, siempre citando la fuente. Orienta a jóvenes antes de su primer crédito. Se llama Sucursal 1965 porque el banco nació en 1965."
 fuente = "docs/PRESENTADOR.md#p1"
@@ -352,3 +361,71 @@ variantes = [
 ]
 respuesta = "Cada pieza tiene respaldo: si OpenClaw no responde, el canal contesta con nuestro flujo anterior; sin DeepSeek, la negociación sigue con reglas fijas; y si fallan la pantalla o las voces, todo continúa por WhatsApp. Lo ensayamos antes."
 fuente = "docs/PRESENTADOR.md#p17"
+
+[[preguntas.fijas]]
+id = "repositorio"
+variantes = [
+  "¿Dónde está el repositorio?",
+  "¿El repositorio es público?",
+  "¿Puedo ver el código?",
+  "¿Muéstrame los pull requests?",
+  "¿Muéstrame los PR?",
+  "¿Qué son los pull requests?",
+  "¿Cuántos PR tienen?",
+  "¿Dónde suben el proyecto?",
+  "¿Dónde está el repositorio en GitHub?",
+]
+respuesta = "El repositorio es público y está en GitHub. Cada cambio entra por una rama y un pull request con la plantilla del proyecto, y lo aprueba alguien distinto de quien lo escribió. La tecla G muestra el QR del repositorio."
+fuente = "docs/PRESENTADOR.md#p18"
+
+[[preguntas.fijas]]
+id = "git_tokens"
+variantes = [
+  "¿Qué es un token en git?",
+  "¿Qué es un token?",
+  "¿Usan tokens de GitHub?",
+  "¿Dónde guardan las claves?",
+  "¿Cómo manejan los secretos?",
+  "¿Hay tokens en el repositorio?",
+]
+respuesta = "Un token es una credencial, no un archivo del repositorio. Las claves van por variables de entorno y nunca se versionan; el único token es el del gateway local de OpenClaw. El repositorio no guarda secretos."
+fuente = "docs/PRESENTADOR.md#p19"
+
+[[preguntas.fijas]]
+id = "codigo"
+variantes = [
+  "¿Cómo está organizado el código?",
+  "¿Cómo está dividido el proyecto?",
+  "¿Me explicas el código?",
+  "¿Qué hay en src?",
+  "¿Cómo se lee el proyecto?",
+  "¿Dónde está cada módulo?",
+]
+respuesta = "Está en capas: corpus Medallion, asistente, Bóveda, sucursal, canal, diagnóstico y escena. Cada módulo vive en su carpeta de src y tiene su prueba en test; el mapa completo está en el repositorio."
+fuente = "docs/PRESENTADOR.md#p20"
+
+[[preguntas.fijas]]
+id = "diagrama"
+variantes = [
+  "¿Tienen un diagrama de arquitectura?",
+  "¿Tienen diagramas?",
+  "¿Puedo ver los diagramas?",
+  "¿Cómo se conectan las piezas?",
+  "¿Dónde está el diagrama?",
+  "¿Cómo se ve la arquitectura?",
+]
+respuesta = "Sí. Arquitectura, flujo de datos, canal y diagnóstico son diagramas interactivos hechos con Archify, y la tecla G abre el panel con seis. El HTML sale de un JSON versionado; nadie lo edita a mano."
+fuente = "docs/PRESENTADOR.md#p21"
+
+[[preguntas.fijas]]
+id = "pruebas"
+variantes = [
+  "¿Cómo prueban el proyecto?",
+  "¿Cómo prueban?",
+  "¿Usan pruebas automáticas?",
+  "¿Qué es make check?",
+  "¿Cómo evitan romper el código?",
+  "¿Tienen integración continua?",
+]
+respuesta = "Con pruebas automáticas que corren sin red: lint, tipos y pytest. make check corre las tres y debe quedar en verde antes de cada cambio; el pipeline de GitHub las repite en cada pull request."
+fuente = "docs/PRESENTADOR.md#p22"
