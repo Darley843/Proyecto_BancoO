@@ -179,7 +179,7 @@ flowchart LR
 
 ## Versiones interactivas (Archify)
 
-Los diagramas 2 y de despliegue también están como HTML interactivo, hecho con
+El diagrama 2 (gateway) y el de despliegue también están como HTML interactivo, hecho con
 Archify (tarea 4.4 de `agente-openclaw`). Se abren con doble clic, sin red, y
 cada caja enlaza al archivo del código que la respalda. La fuente de cada uno
 es su `.json`; el HTML se genera y nunca se edita a mano.

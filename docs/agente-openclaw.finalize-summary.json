@@ -33,7 +33,7 @@
     "browserCheckReceipt": "docs/agente-openclaw.browser-check.json"
   },
   "visualReview": "not-requested",
-  "durationMs": 3069,
+  "durationMs": 4362,
   "browserCheck": {
     "requested": true,
     "ran": true

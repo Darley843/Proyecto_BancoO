@@ -33,7 +33,7 @@
     "browserCheckReceipt": "docs/despliegue-openclaw.browser-check.json"
   },
   "visualReview": "not-requested",
-  "durationMs": 2423,
+  "durationMs": 3187,
   "browserCheck": {
     "requested": true,
     "ran": true
