@@ -142,7 +142,10 @@ pantalla lo implementa en `app/web/escena/envivo.js`.
   `desde` vive solo en memoria.
 - **Cola.** Se ordena y se deduplica por `seq`, y suena un turno a la vez. Un
   turno que no cumple el contrato no se dice: la barra muestra «Turno
-  descartado» y la cola sigue.
+  descartado» y la cola sigue. El publicador tampoco repite un turno idéntico
+  al último del mismo personaje (mismo `id` y mismo texto), así que el
+  veredicto del auditor se dice una sola vez aunque Pana lo audite en cada
+  mensaje con cifras.
 - **Quién habla.** Pana, Don Gota, los dos agentes y el auditor con su voz. El
   **invitado** (el voluntario escribiendo por WhatsApp) sale **solo en
   subtítulo**, con la etiqueta «Invitado», en su propia silla, y se lee

@@ -388,8 +388,9 @@ def test_el_invitado_sigue_sujeto_a_la_regla_de_datos_personales() -> None:
 @pytest.mark.parametrize(
     "texto",
     [
-        "El escenario queda en verde. La decisión final es de un asesor.",
-        "Esta opción es sostenible y cabe con holgura. La decisión final es de un asesor.",
+        "El escenario queda en verde. La decisión final es del banco, por sus canales oficiales.",
+        "Esta opción es sostenible y cabe con holgura. La decisión final es del banco, por sus "
+        "canales oficiales.",
     ],
 )
 def test_el_banco_no_puede_cambiar_el_color_del_motor(texto: str) -> None:
@@ -412,7 +413,7 @@ def test_decir_que_un_rojo_no_cabe_no_es_un_hallazgo() -> None:
         id="negociacion.agente_banco.2.v1",
         orden=12,
         personaje="agente_banco",
-        texto="No cabe en tu capacidad. La decisión final es de un asesor.",
+        texto="No cabe en tu capacidad. La decisión final es del banco, por sus canales oficiales.",
         escenario=_escenario("rojo"),
         origen="reglas",
     )
@@ -609,14 +610,14 @@ def test_si_el_auditor_objeta_pana_ofrece_las_alternativas_formales() -> None:
         assert alternativa in cierre.texto
 
 
-def test_un_cierre_conforme_recuerda_que_decide_un_asesor() -> None:
-    """Sin alternativas, Pana recuerda que es orientativo y que decide un asesor."""
+def test_un_cierre_conforme_recuerda_que_decide_el_banco() -> None:
+    """Sin alternativas, Pana recuerda que es orientativo y que decide el banco."""
     conforme = VeredictoAuditor(veredicto="conforme", hallazgos=(), turnos_revisados=(), reglas=())
 
     cierre = cierre_pana(conforme, orden=20)
 
     assert "orientativo" in cierre.texto
-    assert "asesor" in cierre.texto
+    assert "la decisión final es del banco, por sus canales oficiales." in cierre.texto
     assert not any(alternativa in cierre.texto for alternativa in ALTERNATIVAS_FORMALES)
 
 

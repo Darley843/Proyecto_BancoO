@@ -9,7 +9,8 @@ en lugar de abrir la red por su cuenta.
 from __future__ import annotations
 
 import os
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping
+from contextlib import suppress
 from decimal import Decimal
 
 from pydantic import BaseModel, ValidationError
@@ -30,11 +31,17 @@ from ..cifras_legibles import (
 from ..diagnostico.comite import auditar_texto, construir_escenarios
 from ..diagnostico.escenarios import CambioEscenario, comparar_resultado
 from ..diagnostico.motor import calcular, entrada_desde_respuestas
-from ..escena.auditor import ETIQUETA_VEREDICTO, veredicto_desde_hallazgos
-from ..escena.comparacion import alertas_comparacion
+from ..escena.auditor import (
+    ETIQUETA_VEREDICTO,
+    turno_auditor,
+    veredicto_desde_hallazgos,
+)
+from ..escena.comparacion import alertas_comparacion, turnos_pana_comparacion
 from ..escena.comparacion import comparar_gota_banco as _comparar_gota_banco
-from ..escena.contratos import HallazgoEscena
+from ..escena.contratos import HallazgoEscena, TurnoEscena, VeredictoAuditor
+from ..escena.en_vivo import publicar_turnos
 from ..escena.gota import calcular_prestamo_gota as _calcular_gota
+from ..escena.gota import turnos_don_gota
 from ..escena.negociacion import negociar
 from ..escena.proyecto import crear_recuperador_proyecto, es_pregunta_del_proyecto
 from ..mcp_servidor import conocimiento, control
@@ -80,6 +87,20 @@ MAXIMO_PALABRAS_PROYECTO: int = 40
 MAXIMO_CIFRAS_AUDITOR: int = 40
 #: Tope de la tasa que se lee como fracción cuando no se declara la unidad.
 TOPE_FRACCION: float = 100.0
+
+
+def _publicar_escena(construir: Callable[[], Iterable[TurnoEscena]]) -> None:
+    """Publica un lote en la escena en vivo sin cambiar la respuesta.
+
+    La construcción del lote ocurre dentro del resguardo: si un módulo de la
+    escena lanza, la herramienta responde igual que hoy y no se publica nada.
+    El publicador tampoco lanza, pero el resguardo cubre las dos orillas.
+
+    Args:
+        construir: fábrica que arma los turnos ya calculados.
+    """
+    with suppress(Exception):
+        publicar_turnos(construir(), origen="herramienta")
 
 
 def _diagnostico(
@@ -507,6 +528,7 @@ def calcular_prestamo_gota(monto: int) -> SalidaHerramienta:
             ),
         ),
     )
+    _publicar_escena(lambda: turnos_don_gota(prestamo, perfil="vivo"))
     return ok("calcular_prestamo_gota", datos)
 
 
@@ -624,6 +646,7 @@ def comparar_gota_banco(monto: int, respuestas: RespuestasEntrevista) -> SalidaH
             )
         )
     anotar(detalle, cifras)
+    _publicar_escena(lambda: turnos_pana_comparacion(comparacion, orden_inicial=8))
     return ok(
         "comparar_gota_banco",
         {
@@ -665,6 +688,13 @@ def negociar_opcion(
     if isinstance(diagnostico, SalidaHerramienta):
         return diagnostico
     resultado = negociar(diagnostico.entrada, entorno=_entorno_negociacion())
+    _publicar_escena(
+        lambda: tuple(
+            turno
+            for turno in resultado.negociacion.turnos
+            if turno.personaje in {"agente_joven", "agente_banco"}
+        )
+    )
     return ok(
         "negociar_opcion",
         {
@@ -719,6 +749,20 @@ def generar_ficha_opcion(
     if isinstance(resultado, SalidaHerramienta):
         return resultado
     imagen, texto = tarjeta_y_texto(resultado)
+    ficha = texto.strip()
+    if ficha:
+        _publicar_escena(
+            lambda: (
+                TurnoEscena(
+                    id="vivo.ficha.v1",
+                    orden=91,
+                    personaje="pana",
+                    texto=texto,
+                    subtitulo="Ficha de la opción",
+                    origen="reglas",
+                ),
+            )
+        )
     return ok(
         "generar_ficha_opcion",
         {
@@ -879,6 +923,27 @@ def auditar_respuesta(
         )
     del_comite = auditar_texto(entrada.texto)
     veredicto = "objeta" if del_comite else veredicto_desde_hallazgos(hallazgos)
+    todos = tuple(hallazgos) + tuple(
+        HallazgoEscena(
+            codigo=detalle.partition(": ")[0] or "auditoria",
+            detalle=detalle,
+            gravedad="alta",
+        )
+        for detalle in del_comite
+    )
+    _publicar_escena(
+        lambda: (
+            turno_auditor(
+                VeredictoAuditor(
+                    veredicto=veredicto,
+                    hallazgos=todos,
+                    turnos_revisados=(),
+                    reglas=(),
+                ),
+                orden=90,
+            ).model_copy(update={"hallazgos": todos}),
+        )
+    )
     return ok(
         "auditar_respuesta",
         {

@@ -51,7 +51,8 @@ Respondes con el esquema `PropuestaNegociacion`:
 Reglas que no se negocian:
 
 - No digas «acepto», «cerramos», «aprobado», «aprobación» ni «me quedo con el
-  crédito». No cierras la negociación: la decisión final es de un asesor.
+  crédito». No cierras la negociación: la decisión final es del banco, por sus
+  canales oficiales.
 - No escribas números ni cifras en `argumento`: la plantilla del turno pone el
   monto, el plazo y la cuota.
 - No nombres colores del semáforo ni digas «verde», «amarillo», «rojo» o
@@ -66,4 +67,5 @@ Reglas que no se negocian:
 
 Solo `propongo`, un código de la mesa y un argumento corto, distinto de la
 plantilla o vacío, sin números, sin colores y sin lenguaje de aprobación. No
-afirmes que puedes pagar. La decisión final es de un asesor.
+afirmes que puedes pagar. La decisión final es del banco, por sus canales
+oficiales.

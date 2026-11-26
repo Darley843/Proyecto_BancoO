@@ -1,4 +1,4 @@
-"""Negociación de la escena: mesa, recomendación por color y cierre en un asesor.
+"""Negociación de la escena: mesa, recomendación por color y decisión del banco.
 
 Antes de llamar al modelo, `construir_mesa` calcula con `diagnostico.motor` los
 escenarios que los dos agentes pueden discutir: el crédito pedido, dos plazos
@@ -11,7 +11,7 @@ La mesa es la única fuente de verdad de la negociación:
 - `agente_joven` propone con «Quisiera … a … meses; la cuota sería …» y nunca
   afirma que puede pagar. `agente_banco` recomienda, contrapropone o dice que
   no cabe; nunca aprueba ni cierra un crédito. El cierre siempre incluye «la
-  decisión final es de un asesor».
+  decisión final es del banco, por sus canales oficiales».
 - En verde el banco recomienda la opción pedida como sostenible y la
   negociación termina en dos turnos. En amarillo el banco dice «cabe, pero
   ajustado» y contrapropone la alternativa en verde con el menor cambio (plazo
@@ -143,7 +143,7 @@ ORDEN_INICIAL = 11
 METODO_ESTRUCTURADO = "json_mode"
 
 #: Frase obligatoria del cierre del banco.
-FRASE_ASESOR = "La decisión final es de un asesor."
+FRASE_DECISION = "La decisión final es del banco, por sus canales oficiales."
 
 #: Cifras con dígitos; un argumento que las traiga se descarta.
 _DIGITO = re.compile(r"\d")
@@ -631,7 +631,8 @@ def negociar(
     si es sostenible —y la negociación termina—, contrapropone la alternativa
     verde con el menor cambio si la opción pedida está ajustada, o dice que no
     cabe. En rojo el joven prueba primero un plazo de 60 meses y luego el monto
-    menor. El cierre siempre dice que la decisión final es de un asesor.
+    menor. El cierre siempre dice que la decisión final es del banco, por sus
+    canales oficiales.
 
     Se hacen como máximo cuatro turnos. Cada llamada al modelo tiene su propio
     plazo y el total no pasa de 15 segundos; no hay reintentos. Una propuesta
@@ -1289,7 +1290,8 @@ def _componer_turno(
     La plantilla —nunca el modelo— pone el monto, el plazo, la cuota y el
     total, y cada cifra conserva su `FuenteCifra`. El joven nunca afirma que
     puede pagar y el banco nunca aprueba ni cierra un crédito: recomienda o
-    dice que no cabe, y el cierre remite a un asesor. En la contrapropuesta del
+    dice que no cabe, y el cierre remite a los canales oficiales del banco. En
+    la contrapropuesta del
     amarillo el banco compara la cuota y el total del escenario pedido con los
     de la alternativa, incluida la diferencia de total.
 
@@ -1337,7 +1339,7 @@ def _componer_turno(
                 "deja poco margen"
             )
         texto += f" y el total es {total}." if total is not None else "."
-        texto += f" {FRASE_ASESOR}"
+        texto += f" {FRASE_DECISION}"
     elif decision == "contrapropongo":
         if anterior is not None and anterior.cuota_mensual is not None:
             cuota_base_valor = anterior.cuota_mensual
@@ -1394,7 +1396,7 @@ def _componer_turno(
             )
         else:
             texto += " No hay acuerdo hoy."
-        texto += f" {FRASE_ASESOR}"
+        texto += f" {FRASE_DECISION}"
 
     plazo_cifra = _cifra(
         "plazo del escenario",

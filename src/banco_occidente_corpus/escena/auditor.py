@@ -121,7 +121,7 @@ PERSONAJES_SIN_AUDITORIA_DE_TEXTO: frozenset[str] = frozenset({"invitado"})
 CIFRAS_LEGALES: frozenset[str] = frozenset({"305"})
 
 #: Frase con la que Pana recuerda quién decide.
-_FRASE_ASESOR = "la decisión final es de un asesor."
+_FRASE_DECISION = "la decisión final es del banco, por sus canales oficiales."
 #: Ids de los turnos que arma este módulo.
 ID_TURNO_AUDITOR = "auditor.veredicto.v1"
 ID_TURNO_CIERRE = "pana.cierre.v1"
@@ -443,7 +443,7 @@ def cierre_pana(veredicto: VeredictoAuditor, *, orden: int) -> TurnoEscena:
 
     Con `objeta`, o cuando el veredicto trae alternativas (sin acuerdo o rojo),
     Pana nombra las alternativas formales sin prometer nada. En los demás casos
-    recuerda que el resultado es orientativo y que decide un asesor.
+    recuerda que el resultado es orientativo y que la decisión es del banco.
 
     Args:
         veredicto: veredicto de la escena.
@@ -464,9 +464,9 @@ def cierre_pana(veredicto: VeredictoAuditor, *, orden: int) -> TurnoEscena:
             f"busca alternativas formales: {alternativas}."
         )
     elif veredicto.veredicto == "con_observaciones":
-        texto = "El auditor dejó observaciones en el panel. Esto es orientativo: " + _FRASE_ASESOR
+        texto = "El auditor dejó observaciones en el panel. Esto es orientativo: " + _FRASE_DECISION
     else:
-        texto = "El auditor está conforme. Esto es orientativo: " + _FRASE_ASESOR
+        texto = "El auditor está conforme. Esto es orientativo: " + _FRASE_DECISION
     return TurnoEscena(
         id=ID_TURNO_CIERRE,
         orden=orden,
