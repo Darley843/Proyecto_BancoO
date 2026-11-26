@@ -19,13 +19,14 @@ from __future__ import annotations
 
 import os
 import threading
-from collections.abc import AsyncIterator, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from functools import partial
 from pathlib import Path
 
 import uvicorn
-from fastapi import FastAPI, Response
+from fastapi import FastAPI, Request, Response
+from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 
 from banco_occidente_corpus.arqueo.latencia import con_latencia, ruta_por_defecto
@@ -82,6 +83,31 @@ PUERTO = 8000
 ESPERA_APAGADO_SEGUNDOS = 5
 RAIZ = Path(__file__).resolve().parent
 CARPETA_WEB = RAIZ / "app" / "web"
+#: Rutas que siguen públicas cuando la petición llega por el túnel de Cloudflare.
+RUTAS_PUBLICAS = frozenset({"/webhooks/whatsapp", "/health"})
+#: Hosts que identifican una petición local, incluido el de ``TestClient``.
+HOSTS_LOCALES = frozenset({"127.0.0.1", "localhost", "::1", "testserver"})
+#: Cabeceras que añade Cloudflare a toda petición que entra por el túnel.
+CABECERAS_DE_TUNEL = ("cf-ray", "cf-connecting-ip", "x-forwarded-for")
+
+
+def _host_local(cabecera: str) -> bool:
+    """Indica si la cabecera ``Host`` nombra este equipo.
+
+    Args:
+        cabecera: valor de ``Host``, con o sin puerto.
+
+    Returns:
+        ``True`` para ``127.0.0.1``, ``localhost``, ``::1`` y ``testserver``.
+    """
+    valor = cabecera.strip().lower()
+    if valor.startswith("["):
+        nombre = valor.split("]", 1)[0][1:]
+    elif valor.count(":") == 1:
+        nombre = valor.split(":", 1)[0]
+    else:
+        nombre = valor
+    return nombre in HOSTS_LOCALES
 
 
 @asynccontextmanager
@@ -286,6 +312,34 @@ def crear_app(
         estado = salud_operativa(configuracion, parametros)
         response.status_code = 200 if estado.estado == "ok" else 503
         return estado
+
+    @app.middleware("http")
+    async def solo_webhook_por_tunel(
+        request: Request,
+        siguiente: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        """Acota la superficie pública cuando la petición llega por el túnel.
+
+        El túnel rápido de Cloudflare publica todo el origen y la API no tiene
+        autenticación. Por eso, si la petición no es local, solo pasan el
+        webhook —que ya valida token y firma— y ``/health``; el resto responde
+        ``404`` para no confirmar qué rutas existen. Se considera local una
+        petición con ``Host`` de loopback y sin cabeceras de Cloudflare, que el
+        túnel no puede quitar.
+
+        Args:
+            request: petición entrante.
+            siguiente: siguiente paso de la cadena de FastAPI.
+
+        Returns:
+            La respuesta de la ruta o un ``404`` para las rutas no públicas.
+        """
+        if request.url.path in RUTAS_PUBLICAS:
+            return await siguiente(request)
+        por_tunel = any(cabecera in request.headers for cabecera in CABECERAS_DE_TUNEL)
+        if not por_tunel and _host_local(request.headers.get("host", "")):
+            return await siguiente(request)
+        return JSONResponse({"detail": "ruta no pública"}, status_code=404)
 
     app.mount("/", StaticFiles(directory=carpeta_web, html=True), name="web")
     return app

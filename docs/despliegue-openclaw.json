@@ -1,0 +1,317 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Sucursal 1965: despliegue del agente OpenClaw",
+    "locale": "es",
+    "output": "docs/despliegue-openclaw.html",
+    "quality_profile": "showcase",
+    "repository": {
+      "url": "https://github.com/Darley843/Proyecto_BancoO",
+      "provider": "github",
+      "link_mode": "web",
+      "revision": "63f26ad3c1899df859d7e3b1e692c49958d7f1a1"
+    }
+  },
+  "components": [
+    {
+      "id": "whatsapp",
+      "type": "frontend",
+      "label": "WhatsApp",
+      "sublabel": "invitados",
+      "pos": [
+        40,
+        280
+      ],
+      "size": [
+        150,
+        66
+      ],
+      "sources": [
+        {
+          "path": "src/banco_occidente_corpus/canal/entrada.py",
+          "line": 1,
+          "label": "mensaje entrante"
+        }
+      ]
+    },
+    {
+      "id": "meta",
+      "type": "external",
+      "label": "Meta Cloud API",
+      "sublabel": "webhook firmado",
+      "pos": [
+        230,
+        280
+      ],
+      "size": [
+        150,
+        66
+      ],
+      "sources": [
+        {
+          "path": "src/banco_occidente_corpus/canal/envio.py",
+          "line": 153,
+          "label": "EnviadorMeta"
+        }
+      ]
+    },
+    {
+      "id": "tunel",
+      "type": "external",
+      "label": "Túnel",
+      "sublabel": "cloudflared",
+      "pos": [
+        420,
+        280
+      ],
+      "size": [
+        150,
+        66
+      ],
+      "sources": [
+        {
+          "path": "docs/DESPLIEGUE.md",
+          "line": 116,
+          "label": "cloudflared tunnel"
+        }
+      ]
+    },
+    {
+      "id": "fastapi",
+      "type": "backend",
+      "label": "FastAPI",
+      "sublabel": "Windows · :8000",
+      "pos": [
+        610,
+        280
+      ],
+      "size": [
+        150,
+        66
+      ],
+      "sources": [
+        {
+          "path": "app.py",
+          "line": 106,
+          "label": "crear_app"
+        }
+      ]
+    },
+    {
+      "id": "gateway",
+      "type": "backend",
+      "label": "Gateway OpenClaw",
+      "sublabel": "WSL · loopback :18789",
+      "pos": [
+        800,
+        280
+      ],
+      "size": [
+        160,
+        66
+      ],
+      "sources": [
+        {
+          "path": "openclaw/openclaw.json",
+          "line": 4,
+          "label": "puerto y bind"
+        }
+      ]
+    },
+    {
+      "id": "mcp",
+      "type": "backend",
+      "label": "MCP sucursal",
+      "sublabel": "20 herramientas · :8765",
+      "pos": [
+        1000,
+        280
+      ],
+      "size": [
+        160,
+        66
+      ],
+      "sources": [
+        {
+          "path": "src/banco_occidente_corpus/herramientas/servidor.py",
+          "line": 68,
+          "label": "crear_servidor"
+        }
+      ]
+    },
+    {
+      "id": "deepseek",
+      "type": "external",
+      "label": "DeepSeek API",
+      "sublabel": "deepseek-flash",
+      "pos": [
+        805,
+        105
+      ],
+      "size": [
+        150,
+        66
+      ],
+      "sources": [
+        {
+          "path": "openclaw/openclaw.json",
+          "line": 103,
+          "label": "modelo del agente"
+        }
+      ]
+    },
+    {
+      "id": "pantalla",
+      "type": "frontend",
+      "label": "Pantalla de la escena",
+      "sublabel": "Edge · teclas H y Q",
+      "pos": [
+        410,
+        455
+      ],
+      "size": [
+        170,
+        66
+      ],
+      "sources": [
+        {
+          "path": "app/web/escena/herramientas.js",
+          "line": 200,
+          "label": "pedirLlamadas"
+        }
+      ]
+    },
+    {
+      "id": "grafo",
+      "type": "backend",
+      "label": "Grafo LangGraph",
+      "sublabel": "respaldo",
+      "pos": [
+        610,
+        455
+      ],
+      "size": [
+        150,
+        66
+      ],
+      "sources": [
+        {
+          "path": "src/banco_occidente_corpus/sucursal/grafo.py",
+          "line": 246,
+          "label": "crear_grafo"
+        }
+      ]
+    },
+    {
+      "id": "traza",
+      "type": "database",
+      "label": "Traza local",
+      "sublabel": "herramientas.jsonl",
+      "pos": [
+        1005,
+        455
+      ],
+      "size": [
+        150,
+        66
+      ],
+      "sources": [
+        {
+          "path": "src/banco_occidente_corpus/herramientas/traza.py",
+          "line": 177,
+          "label": "con_traza"
+        }
+      ]
+    }
+  ],
+  "connections": [
+    {
+      "from": "whatsapp",
+      "to": "meta",
+      "label": "mensaje",
+      "variant": "emphasis"
+    },
+    {
+      "from": "meta",
+      "to": "tunel",
+      "label": "POST firmado",
+      "variant": "emphasis"
+    },
+    {
+      "from": "tunel",
+      "to": "fastapi",
+      "label": "127.0.0.1:8000",
+      "variant": "emphasis"
+    },
+    {
+      "from": "fastapi",
+      "to": "gateway",
+      "label": "chat/completions",
+      "variant": "security"
+    },
+    {
+      "from": "gateway",
+      "to": "mcp",
+      "label": "MCP HTTP",
+      "variant": "emphasis"
+    },
+    {
+      "from": "gateway",
+      "to": "deepseek",
+      "label": "modelo",
+      "variant": "dashed"
+    },
+    {
+      "from": "fastapi",
+      "to": "grafo",
+      "label": "respaldo",
+      "variant": "dashed",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "mcp",
+      "to": "traza",
+      "label": "cada llamada",
+      "variant": "default",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "from": "pantalla",
+      "to": "fastapi",
+      "label": "/api/escena",
+      "variant": "default"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "Dónde corre",
+      "items": [
+        "Windows: FastAPI, el servidor MCP y la pantalla en Edge",
+        "WSL OpenClawGateway: el gateway, con red espejo hacia 127.0.0.1",
+        "Fuera: Meta, el túnel cloudflared y DeepSeek"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Superficie expuesta",
+      "items": [
+        "Solo el webhook sale a internet, y por el túnel",
+        "Gateway y MCP escuchan en loopback, nunca en 0.0.0.0",
+        "El token del gateway vive en el entorno, no en el repo"
+      ]
+    },
+    {
+      "dot": "emerald",
+      "title": "Si algo cae",
+      "items": [
+        "Sin gateway, el canal responde con el grafo",
+        "Sin DeepSeek, modo demo con reglas deterministas",
+        "La pantalla sigue con las capturas de CONTINGENCIA.md"
+      ]
+    }
+  ]
+}

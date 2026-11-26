@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "443901e9-37c6-46c8-94e0-ff48603947a5",
+  "status": "current",
+  "command": "deliver",
+  "type": "architecture",
+  "input": "docs/despliegue-openclaw.json",
+  "output": "docs/despliegue-openclaw.html",
+  "specification": {
+    "sha256": "8ab318d35e5e551617c0e932d674e218a66402d0598938501a7649eeeb9a7a3c",
+    "bytes": 6361
+  },
+  "artifact": {
+    "sha256": "7285ad435204bb819edd380ef76a8fd09d275317cbab8a10bbc9589fa0dca6de",
+    "bytes": 851903
+  }
+}

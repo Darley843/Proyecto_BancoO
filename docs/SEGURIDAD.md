@@ -24,6 +24,10 @@ multiusuario, la disponibilidad bajo ataque, el cifrado en reposo y la
 protección de una máquina compartida. Cuando alguna de esas condiciones cambie,
 este documento debe revisarse.
 
+Durante los ensayos del canal se abre un túnel HTTPS público. Esa excepción es
+temporal y está acotada en §3.12: la Sucursal sigue sin ser un servicio público
+ni multiusuario.
+
 ## 2. Flujo de datos
 
 | Dato | Dónde queda | Sale de la máquina |
@@ -464,7 +468,8 @@ declara `timeout` y no desactiva TLS se añade junto con `canal/envio.py`;
 ya vigila lo segundo en todo `src/`.
 
 **Residual.** El túnel HTTPS es externo y cambia de URL; mientras esté abierto,
-la superficie pública es la de Meta. Se apaga al terminar cada ensayo.
+la superficie pública se limita a `/webhooks/whatsapp` y `/health` con la guarda
+de §3.12. Se apaga al terminar cada ensayo.
 ### 3.10 Servidor MCP de solo lectura
 
 **Qué puede pasar.** Un cliente MCP podría intentar escribir en el corpus,
@@ -576,6 +581,38 @@ configuración. El token protege el endpoint, no audita al agente. Si el gateway
 se cuelga, la cola de un trabajador espera el techo de 45 s antes de caer al
 grafo; `OPENCLAW_ACTIVO=0` o `fallback_forzado = true` lo sacan del camino.
 
+### 3.12 Túnel de ensayo: solo el webhook es público
+
+**Qué puede pasar.** Para que Meta entregue el webhook, el ensayo abre
+`cloudflared tunnel --url http://127.0.0.1:8000`, que publica **todo el
+origen**: la app web, la pantalla de la escena, `/docs` y `/openapi.json`, y
+todos los `POST` que usan modelo, como `/api/preguntar`. Como la API no tiene
+autenticación (§3.4), cualquiera que conozca la URL podría gastar saldo con la
+pregunta de la pantalla, leer la traza y el panel de operación, o escribir en el
+marcador de Roba la Bóveda. El túnel rápido no admite reglas de ingress por
+ruta: `--url` es incompatible con un `config.yaml` de ingress y un túnel con
+nombre exige cuenta y dominio.
+
+**Mitigación.** `app.py` envuelve la app con un middleware que, cuando la
+petición no es local, solo deja pasar `/webhooks/whatsapp` y `/health`; el resto
+responde `404`, incluidas `/docs` y `/openapi.json`. Una petición es local si el
+`Host` es `127.0.0.1`, `localhost` o `::1` **y** no trae cabeceras de Cloudflare
+(`CF-Ray`, `CF-Connecting-IP`, `X-Forwarded-For`), que el túnel no puede quitar.
+El webhook conserva su autenticación propia: token de verificación en el `GET` y
+`X-Hub-Signature-256` en el `POST` (§3.9).
+
+**Verificación.** `test/test_tunel_publico.py` comprueba que una petición con
+`Host` de `trycloudflare` y `CF-Ray` recibe `404` en la pantalla, `/docs`,
+`/openapi.json` y la API, que el webhook y `/health` siguen respondiendo, que un
+`Host` local falsificado con cabeceras de Cloudflare no abre la app y que una
+petición local conserva toda la Sucursal.
+
+**Residual.** La guarda depende de que Cloudflare añada esas cabeceras: si
+dejara de hacerlo, un `Host` falsificado parecería local. El túnel se abre solo
+durante el ensayo, la URL no se publica ni se proyecta y se cierra al terminar.
+Para una superficie pública permanente hace falta un túnel con nombre con
+ingress por ruta o un listener que solo monte el webhook.
+
 ## 4. Por qué no usamos `.env` ni `python-dotenv`
 
 El ejemplo de la clase usa `python-dotenv` y un archivo `.env`; este proyecto
@@ -677,6 +714,7 @@ No se activan en CI ni en la suite.
 | **La guardia de red permite loopback salvo el puerto de Ollama.** El loopback es necesario para `TestClient` en Windows, que crea su self-pipe con `socket.socketpair()` sobre `127.0.0.1`; el puerto `11434` queda bloqueado en `connect` y `connect_ex`. | No permite salir a internet y una prueba que llame a Ollama falla aunque el servicio esté encendido; los embeddings se doblan con `DeterministicFakeEmbedding`. | Ninguna: `test/test_seguridad.py::test_guardia_de_red_bloquea_ollama_local` lo comprueba. |
 | **La pregunta y los fragmentos se envían a DeepSeek.** | Es inherente al modelo externo; la PII se filtra antes y el corpus es público. | Revisar la retención del proveedor y no enviar preguntas con datos personales; el proyecto no lo hace. |
 | **El perfil local guarda nombre y empresa.** El `perfil_id` es una credencial sin autenticación: quien tenga el UUID y acceso a la API local podría consultarlo. | Solo se guarda lo que el usuario declara, en `data/asistente/perfil.sqlite` (ignorado por Git), sin caché, logs ni envío al modelo. La Sucursal escucha solo en `127.0.0.1` y el usuario puede borrarlo con «olvida mi perfil». | No hay multiusuario ni autenticación en esta fase; si se publica fuera de loopback, añadir autenticación y rotación de `perfil_id`. |
+| **El túnel de ensayo se apoya en cabeceras de Cloudflare.** `CF-Ray`, `CF-Connecting-IP` y `X-Forwarded-For` distinguen una petición del túnel de una local; si Cloudflare dejara de añadirlas, un `Host` falsificado parecería local. | La guarda solo está activa mientras el túnel está abierto, que dura el ensayo; la URL no se publica y el webhook valida token y firma. | Si el ensayo deja de ser puntual, migrar a un túnel con nombre con ingress por ruta o a un listener que solo monte `/webhooks/whatsapp` (§3.12). |
 | **Archify se usa con condiciones.** Se instala de forma global, fuera del proyecto, ejecuta código Node que no pasa por `uv.lock` ni por la CI, usa red (aviso de actualizaciones y descarga de logos) y lanza procesos. | Archify v3.2.0 (commit `a4065941`) se auditó con SkillSpector el 7 de noviembre de 2026: la nota de 99/100 se debe a falsos positivos y a cobertura parcial. Es una herramienta de documentación, no una dependencia del pipeline, y el HTML generado no se edita a mano. | La instalación ya está fijada en el commit auditado (`README.md`). Se mantiene: no pedirle logos del banco por URL y repetir la auditoría antes de actualizar; ver `docs/auditoria-skills-proyecto.md`. |
 
 ## 7. Cómo verificar
@@ -687,6 +725,9 @@ uv run pytest -q
 
 # Pruebas de seguridad y de PII
 uv run pytest test/test_seguridad.py -q
+
+# Superficie pública del túnel: solo el webhook y /health
+uv run pytest test/test_tunel_publico.py -q
 uv run pytest test/test_sucursal_preguntar.py::test_pii_no_entra_en_cache_ni_en_logs \
   test/test_sucursal_grafo.py::test_pii_se_rechaza_antes_de_la_memoria -q
 

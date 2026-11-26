@@ -398,11 +398,43 @@ herramientas, el WhatsApp de los invitados ni la seguridad.
 - [ ] Apagar el **modo evento** con `$env:WHATSAPP_EVENTO = "0"` y reiniciar
       `make app`: el canal vuelve a la lista cerrada y deja de responder a
       desconocidos.
-- [ ] ⏳ Borrar los datos de los invitados. Al apagar el evento los
-      consentimientos aceptados **se conservan**, pero el diseño de
-      `agente-openclaw` (decisión 9) pide borrar perfiles, memorias y
-      bitácoras al cerrar y dejar solo métricas agregadas. Darley confirma el
-      comando antes del jueves.
+- [ ] Borrar los datos de los invitados de OpenClaw al terminar. El script
+      corre en modo de prueba por defecto y solo borra con `CONFIRMAR=1`: se
+      corre el **viernes 27, después de los dos ensayos**, y el **sábado 28,
+      después de la sustentación**:
+      ```powershell
+      make limpiar-evento                 # solo muestra qué borraría
+      make limpiar-evento CONFIRMAR=1     # borra de verdad
+      ```
+      Lista y borra las sesiones del agente `pana`, olvida sus memorias
+      derivadas (detiene el gateway un momento y lo vuelve a levantar), purga
+      los archivos archivados de esas sesiones, borra `MEMORY.md`, `DREAMS.md`
+      y todo el contenido de `memory\` del workspace —bitácora diaria,
+      `dreaming\` y `.dreams\session-corpus\`, sin filtrar por extensión—, y
+      borra `data/asistente/trazas/herramientas.jsonl`. No toca los archivos
+      versionados (`SOUL`, `AGENTS`, `USER`, `IDENTITY`) ni los `.example`, no
+      imprime el token ni el contenido de las sesiones y no borra la sesión
+      principal `agent:pana:main`, que OpenClaw protege. **Sí conserva**
+      `data/evaluacion/inyeccion.json`: es la evidencia de la tarea 3.5 que cita
+      `docs/INYECCION.md` y no guarda el texto de las respuestas ni datos de
+      invitados, así que se versiona junto con `proyeccion.json`.
+      **Archivos archivados.** `sessions delete` guarda el transcript en las
+      tablas `session_transcript_archives` y
+      `session_transcript_cold_archives` de `openclaw-agent.sqlite`, dentro de
+      WSL. `CONFIRMAR=1` activa también `-PurgarArchivos`: en la misma ventana
+      en que el gateway está detenido para `memory forget`, python3 y el módulo
+      `sqlite3` dentro de WSL comprueban que las dos tablas existan, hacen
+      `DELETE FROM` en ellas, `PRAGMA wal_checkpoint(TRUNCATE)` y `VACUUM`, y
+      reportan las filas borradas y el tamaño de la base antes y después. **No
+      hay copia de respaldo de esas dos tablas**: una copia conservaría justo
+      los datos que el consentimiento promete borrar. No se toca ninguna otra
+      tabla. En modo de prueba solo se cuentan las filas; el conteo se ve con
+      `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\limpiar_evento.ps1 -PurgarArchivos`.
+      Esa purga **se prueba el viernes 27 después de los ensayos**, antes de
+      usarla en el evento del sábado 28.
+      Al apagar el evento los consentimientos aceptados **se conservan**. Los
+      perfiles, consentimientos y casos del canal de WhatsApp son de Darley y
+      se borran aparte: el script no los toca.
 - [ ] Ctrl + C en el túnel y quitar la URL del webhook en Meta.
 - [ ] Apagar el gateway, el MCP y la app.
 - [ ] Quitar las trazas si se encendieron:
