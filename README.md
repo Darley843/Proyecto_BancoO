@@ -153,6 +153,8 @@ make arqueo      # métricas: recuperación, filtro de dominio y latencia
 
 Para conectar el número de prueba de Meta, sigue la sección
 [Canal de WhatsApp](#canal-de-whatsapp) y [`docs/LISTA_DEMO.md`](./docs/LISTA_DEMO.md).
+Si algo falla en la sustentación, el plan B y las capturas de respaldo están en
+[`docs/CONTINGENCIA.md`](./docs/CONTINGENCIA.md).
 
 ### La presentación: «Pana vs. el gota a gota»
 
@@ -1045,6 +1047,7 @@ no forma parte de `make all`, `make gold`, `make deliver`, `make docs`, `make do
 [`docs/ROBA_BOVEDA.md`](./docs/ROBA_BOVEDA.md) (juego de ataque) ·
 [`docs/EXPERIMENTO_LLAMADA.md`](./docs/EXPERIMENTO_LLAMADA.md) (llamada por WhatsApp, aplazada) ·
 [`docs/LISTA_DEMO.md`](./docs/LISTA_DEMO.md) (lista del día de la demo) ·
+[`docs/CONTINGENCIA.md`](./docs/CONTINGENCIA.md) (plan B y capturas de respaldo) ·
 [`docs/VOZ.md`](./docs/VOZ.md) (voces de la escena) ·
 [`AGENTS.md`](./AGENTS.md).
 

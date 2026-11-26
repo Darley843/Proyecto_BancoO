@@ -27,6 +27,7 @@ from .contratos import (
     PerfilEscena,
     RespuestaEscena,
     SeleccionVoluntario,
+    TurnoEscena,
 )
 from .entrada import (
     Interpretacion,
@@ -37,6 +38,7 @@ from .entrada import (
     preguntas_escena,
 )
 from .perfiles import OpcionEscena, PerfilSeguro, cargar_perfiles, perfil_seguro
+from .respondedor import Respondedor, respondedor_compartido, tema_del_turno
 from .servicio import (
     ModoEscena,
     construir_escena,
@@ -55,6 +57,19 @@ class _ModeloApi(BaseModel):
     """Base de los cuerpos de la API: rechaza campos desconocidos."""
 
     model_config = ConfigDict(extra="forbid")
+
+
+class PreguntaPeticion(_ModeloApi):
+    """Pregunta del público. La audiencia no viaja: la fija el servidor."""
+
+    pregunta: str = Field(min_length=1, max_length=LARGO_MAXIMO_TEXTO)
+
+
+class PreguntaRespuestaPana(BaseModel):
+    """Respuesta de Pana a una pregunta del público."""
+
+    tema: str
+    turno: TurnoEscena
 
 
 class OpcionRespuesta(BaseModel):
@@ -316,11 +331,16 @@ def _error_tasa() -> JSONResponse:
     )
 
 
-def crear_router_escena(servicio: ServicioEscena | None = None) -> APIRouter:
+def crear_router_escena(
+    servicio: ServicioEscena | None = None,
+    respondedor: Respondedor | None = None,
+) -> APIRouter:
     """Crea el router de la escena para montarlo antes de los estáticos.
 
     Args:
         servicio: servicio alternativo para las pruebas; por defecto el real.
+        respondedor: respondedor de preguntas para las pruebas; por defecto el
+            real, que se construye en la primera pregunta.
 
     Returns:
         El router con todas las rutas bajo `/api/escena`.
@@ -381,6 +401,20 @@ def crear_router_escena(servicio: ServicioEscena | None = None) -> APIRouter:
             return _error_tasa()
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    @router.post("/pregunta", response_model=PreguntaRespuestaPana)
+    def pregunta(peticion: PreguntaPeticion) -> PreguntaRespuestaPana:
+        """Responde una pregunta del público con un turno de Pana.
+
+        La pregunta no se guarda. La audiencia es siempre `publico`, así que la
+        regla de datos personales no se puede saltar desde el cliente.
+        """
+        responder = respondedor if respondedor is not None else respondedor_compartido()
+        try:
+            turno = responder(peticion.pregunta)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail="pregunta vacía") from exc
+        return PreguntaRespuestaPana(tema=tema_del_turno(turno), turno=turno)
 
     @router.get("/proyectado", response_model=None)
     def proyectado(

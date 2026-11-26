@@ -319,7 +319,7 @@ pestaña y, si no hay, los turnos de ejemplo, con un sello que lo dice.
 | Pieza | Estado |
 |---|---|
 | Escena proyectada (`GET /api/escena/proyectado` y `make escena-proyectada`) | Lista desde #188. Sin ella, la pantalla muestra los turnos de ejemplo con su sello |
-| Preguntas del público (tecla Q) | Responden con la ficha local de Pana. ⏳ Falta el endpoint `POST /api/escena/pregunta` |
+| Preguntas del público (tecla Q) | `POST /api/escena/pregunta`: las 17 respuestas fijas de `config/escena.toml`, la documentación del proyecto y, si el servidor no responde, la ficha local de Pana |
 | Turnos en vivo publicados por el agente de OpenClaw | ⏳ Llegan con la integración del miércoles 25 (OpenClaw publica cada turno y la pantalla lo muestra) |
 
 ## 8. Encender todo en orden

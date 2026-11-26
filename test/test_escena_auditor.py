@@ -359,6 +359,32 @@ def test_don_gota_esta_exento_de_recomendar_el_gota_pero_no_de_lo_demas(
     assert "promesa_aprobacion" in _codigos(auditar_turno(promete))
 
 
+def test_el_texto_del_invitado_no_se_audita_como_si_fuera_pana() -> None:
+    """El invitado puede escribir cifras y preguntar por una aprobación."""
+    turno = TurnoEscena(
+        id="canal.invitado.v1",
+        orden=0,
+        personaje="invitado",
+        texto="¿Me lo aprueban? Son $2.500.000 y ya está aprobado.",
+        origen="canal",
+    )
+
+    assert auditar_turno(turno) == ()
+
+
+def test_el_invitado_sigue_sujeto_a_la_regla_de_datos_personales() -> None:
+    """Eximir el texto del invitado no desactiva la revisión de PII."""
+    turno = TurnoEscena(
+        id="canal.invitado.v1",
+        orden=0,
+        personaje="invitado",
+        texto="¿Me lo aprueban? Escríbeme a ana.prueba@ejemplo.com.",
+        origen="canal",
+    )
+
+    assert "dato_personal" in _codigos(auditar_turno(turno))
+
+
 @pytest.mark.parametrize(
     "texto",
     [

@@ -1,5 +1,5 @@
 /**
- * Sucursal 1965 · rostros de los seis personajes de la escena.
+ * Sucursal 1965 · rostros de los personajes de la escena.
  *
  * Cada rostro es un dibujo plano hecho solo con figuras SVG (círculos,
  * elipses, trazos y polígonos), sin archivos de imagen ni librerías, y se
@@ -13,6 +13,7 @@
  * - Agente del joven: robot amable con gorra al revés.
  * - Agente del banco: robot formal con diadema de atención y corbatín.
  * - Auditor: persona mayor con gafas redondas y corbata.
+ * - Invitado: el voluntario que escribe por WhatsApp, con el teléfono en la mano.
  *
  * La boca de cada rostro lleva la clase `escena__boca`: la hoja de estilos la
  * mueve mientras el personaje habla.
@@ -320,6 +321,32 @@ function auditor() {
   ];
 }
 
+/**
+ * Invitado: el voluntario que escribe por WhatsApp, con el teléfono en la mano.
+ *
+ * @returns {Array<Array>} Figuras del rostro.
+ */
+function invitado() {
+  const piel = "#b9825f";
+  const sombra = "#966548";
+  const pelo = "#241b16";
+  return [
+    f("rect", { x: 14, y: 82, width: 72, height: 38, rx: 12, fill: "#4f6b57" }),
+    f("polygon", { points: "41,82 59,82 55,100 45,100", fill: C.crema }),
+    f("rect", { x: 45, y: 68, width: 10, height: 15, rx: 2, fill: sombra }),
+    ...orejas(piel, sombra),
+    f("ellipse", { cx: 50, cy: 50, rx: 19, ry: 21, fill: piel }),
+    f("path", { d: "M31 45 Q33 31 50 30 Q67 31 69 45 Q62 39 50 39.5 Q38 39 31 45 Z", fill: pelo }),
+    ...ojos(41, 59, 50.5),
+    trazo("M47.8 56.3 Q50 58 52.2 56.3", sombra),
+    ...mejillas(),
+    f("g", { class: "escena__boca" }, [trazo("M44 62 Q50 66 56 62", C.tinta, 2)]),
+    f("rect", { x: 76, y: 72, width: 9, height: 16, rx: 2, fill: "#1f222b" }),
+    f("rect", { x: 77.5, y: 74, width: 6, height: 11, rx: 1, fill: "#9fd8ff" }),
+    trazo("M76 88 Q68 93 60 92", piel, 2.6),
+  ];
+}
+
 /** Dibujo de cada personaje del contrato. */
 const DIBUJOS = Object.freeze({
   pana,
@@ -328,6 +355,7 @@ const DIBUJOS = Object.freeze({
   agente_joven: agenteJoven,
   agente_banco: agenteBanco,
   auditor,
+  invitado,
 });
 
 /**
