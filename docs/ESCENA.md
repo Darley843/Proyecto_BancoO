@@ -164,9 +164,18 @@ Para cambiar un retrato basta con reemplazar el `.webp` con el mismo nombre
 Contrato completo: [`ESCENA_EN_VIVO.md`](./ESCENA_EN_VIVO.md), §11. La
 pantalla lo implementa en `app/web/escena/envivo.js`.
 
-- **Entrar (E o botón «En vivo»).** Pausa la escena guardada, limpia el
-  escenario y pide `GET /api/escena/en-vivo?desde=0`. Muestra los turnos que ya
-  existan y luego los nuevos.
+- **Entrar (E o botón «En vivo»).** Detiene la escena guionada, limpia el
+  escenario y empieza desde el **último turno** de la lista: el primer sondeo
+  (`desde=0`) solo mueve el cursor y los turnos viejos no se reproducen. Desde
+  ahí suenan los nuevos.
+- **Entrada del voluntario (V) en vivo.** El panel solo muestra la
+  conversación con Pana: el botón grande «Toca y habla con Pana», lo que se
+  escuchó («Escuché: …») y el aviso de que el reconocimiento puede usar un
+  servicio externo. El texto va a `POST /api/escena/hablar`. Las tarjetas A–F,
+  el campo del monto y los botones Hablar, Enviar y Perfil seguro se ocultan
+  (fuera del modo En vivo siguen igual). Después de enviar, el panel se cierra
+  solo en 1,5 s para no tapar los subtítulos; si Pana no responde, se vuelve a
+  abrir con el error.
 - **Sondeo.** Cada 2 s, una petición a la vez, con techo de 1,5 s y sin caché.
   Con la pestaña oculta se detiene y al volver pide de inmediato. El cursor
   `desde` vive solo en memoria.

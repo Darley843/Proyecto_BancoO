@@ -70,34 +70,45 @@
 
   <section class="escena__captura" id="escena-captura" aria-label="Entrada del voluntario" hidden>
     <h2>Entrada del voluntario</h2>
-    <p class="escena__aviso" id="captura-aviso">
-      El reconocimiento de voz del navegador puede usar un servicio externo.
-      Puedes escribir o usar las tarjetas A–F.
-    </p>
-    <div class="escena__captura-fila">
-      <button type="button" id="captura-voluntario">Elegir fila y silla</button>
-      <output id="captura-seleccion" aria-live="polite"></output>
-    </div>
-    <div id="captura-pregunta"></div>
-    <p class="escena__estado" id="captura-estado" aria-live="polite"></p>
-    <div class="escena__captura-fila">
-      <button type="button" id="captura-microfono" aria-pressed="false">Hablar</button>
-      <button type="button" id="captura-enviar" class="escena__boton--secundario">Enviar</button>
-      <button type="button" id="captura-seguro" class="escena__boton--secundario">Perfil seguro</button>
-    </div>
-    <div class="escena__captura-fila">
-      <button type="button" id="captura-pana" aria-pressed="false">Hablar con Pana</button>
-      <span class="escena__estado" id="captura-pana-estado" aria-live="polite"></span>
-    </div>
-    <p class="escena__aviso">
-      Si eres el voluntario activo, Pana te responde por WhatsApp y también te envía la ficha.
-    </p>
-    <div id="captura-confirmacion" hidden>
-      <p id="captura-resumen"></p>
+    <!-- Flujo guiado (tarjetas A–F y monto): fuera del modo En vivo. -->
+    <div class="escena__captura-guiada" id="captura-guiada">
+      <p class="escena__aviso" id="captura-aviso">
+        El reconocimiento de voz del navegador puede usar un servicio externo.
+        Puedes escribir o usar las tarjetas A–F.
+      </p>
       <div class="escena__captura-fila">
-        <button type="button" id="captura-si">Sí, confirmo</button>
-        <button type="button" id="captura-no" class="escena__boton--secundario">No, cambiar</button>
+        <button type="button" id="captura-voluntario">Elegir fila y silla</button>
+        <output id="captura-seleccion" aria-live="polite"></output>
       </div>
+      <div id="captura-pregunta"></div>
+      <p class="escena__estado" id="captura-estado" aria-live="polite"></p>
+      <div class="escena__captura-fila">
+        <button type="button" id="captura-microfono" aria-pressed="false">Hablar</button>
+        <button type="button" id="captura-enviar" class="escena__boton--secundario">Enviar</button>
+        <button type="button" id="captura-seguro" class="escena__boton--secundario">Perfil seguro</button>
+      </div>
+      <div id="captura-confirmacion" hidden>
+        <p id="captura-resumen"></p>
+        <div class="escena__captura-fila">
+          <button type="button" id="captura-si">Sí, confirmo</button>
+          <button type="button" id="captura-no" class="escena__boton--secundario">No, cambiar</button>
+        </div>
+      </div>
+    </div>
+    <!-- Conversación con Pana: en modo En vivo es lo único que se ve. -->
+    <div class="escena__captura-conversacion" id="captura-conversacion">
+      <p class="escena__aviso escena__aviso--vivo" id="captura-aviso-vivo">
+        El reconocimiento de voz del navegador puede usar un servicio externo.
+      </p>
+      <div class="escena__captura-fila">
+        <button type="button" id="captura-pana" class="escena__captura-hablar" aria-pressed="false"
+          data-texto-vivo="Toca y habla con Pana">Hablar con Pana</button>
+      </div>
+      <p class="escena__captura-escuche" id="captura-pana-escuche" aria-live="polite"></p>
+      <p class="escena__estado" id="captura-pana-estado" aria-live="polite"></p>
+      <p class="escena__aviso">
+        Si eres el voluntario activo, Pana te responde por WhatsApp y también te envía la ficha.
+      </p>
     </div>
   </section>
 

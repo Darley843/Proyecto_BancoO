@@ -570,8 +570,10 @@ número. Tampoco registra el texto de los turnos.
 - La tecla **E** entra y sale del modo «En vivo». También hay un botón «En
   vivo» en `escena.html` con `aria-pressed`.
 - Al entrar: se pausa la reproducción normal de la escena, se limpia la cola, se
-  fija `desde=0` y se hace el primer sondeo de inmediato. Se muestran todos los
-  turnos que ya existan, en orden, y luego los nuevos.
+  fija `desde=0` y se hace el primer sondeo de inmediato. Ese primer sondeo
+  solo mueve el cursor al último `seq`: los turnos que ya existían no se
+  reproducen (si llegan 200, el siguiente sondeo sigue saltando). Luego suenan
+  los nuevos, en orden.
 - Al salir: se detiene el sondeo, se vacía la cola y la escena normal queda en
   pausa, en el mismo punto en que estaba. El modo en vivo no borra la escena
   proyectada ni la guardada.

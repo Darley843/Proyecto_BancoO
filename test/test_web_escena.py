@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import json
 import re
+import shutil
+import subprocess
 import tomllib
 from decimal import Decimal
 from pathlib import Path
@@ -439,3 +441,120 @@ def test_cada_funcion_de_la_escena_tiene_jsdoc() -> None:
         ):
             previo = texto[: coincidencia.start()].rstrip()
             assert previo.endswith("*/"), f"{archivo.name}: {coincidencia.group(1)}"
+
+
+# --- En vivo: el voluntario solo habla con Pana ------------------------------
+
+
+def _bloque_html(html: str, inicio: str, fin: str) -> str:
+    """Devuelve el trozo del HTML entre dos marcas (la primera incluida)."""
+    desde = html.index(inicio)
+    return html[desde : html.index(fin, desde)]
+
+
+def test_en_vivo_el_panel_v_separa_el_flujo_guiado_de_la_conversacion() -> None:
+    """Las tarjetas, el monto y Hablar/Enviar/Perfil seguro van en el bloque guiado."""
+    html = (WEB / "escena.html").read_text(encoding="utf-8")
+    guiado = _bloque_html(html, 'id="captura-guiada"', 'id="captura-conversacion"')
+    for elemento in (
+        'id="captura-pregunta"',
+        'id="captura-microfono"',
+        'id="captura-enviar"',
+        'id="captura-seguro"',
+        'id="captura-confirmacion"',
+    ):
+        assert elemento in guiado, elemento
+    conversacion = _bloque_html(html, 'id="captura-conversacion"', "</section>")
+    assert 'id="captura-pana"' in conversacion
+    assert 'data-texto-vivo="Toca y habla con Pana"' in conversacion
+    assert 'id="captura-pana-escuche"' in conversacion
+    assert "servicio externo" in conversacion
+    assert 'id="captura-microfono"' not in conversacion
+
+
+def test_en_vivo_el_css_oculta_el_flujo_guiado_solo_en_ese_modo() -> None:
+    """Con `escena--en-vivo` se oculta el bloque guiado; fuera del modo sigue igual."""
+    css = (ESCENA / "escena.css").read_text(encoding="utf-8")
+    assert ".escena--en-vivo .escena__captura-guiada { display: none; }" in css
+    assert ".escena:not(.escena--en-vivo) .escena__aviso--vivo { display: none; }" in css
+    assert ".escena:not(.escena--en-vivo) .escena__captura-guiada" not in css
+
+
+def test_en_vivo_la_captura_solo_manda_texto_a_hablar_y_se_cierra_sola() -> None:
+    """En vivo no se carga el catálogo ni se valida un monto, y el panel se cierra."""
+    codigo = (ESCENA / "captura.js").read_text(encoding="utf-8")
+    alternar = codigo[codigo.index("async function alternar()") :]
+    alternar = alternar[: alternar.index("\n}\n")]
+    assert alternar.index("if (enVivo())") < alternar.index("cargarOpciones()")
+    assert "abrirConversacion();" in alternar
+    abrir = codigo[codigo.index("function abrirConversacion(") :]
+    abrir = abrir[: abrir.index("\n}\n")]
+    assert "cargarOpciones" not in abrir
+    assert "pintarPregunta" not in abrir
+    assert "Escuché: «${texto}»" in codigo
+    assert "window.setTimeout(cerrar, CIERRE_EN_VIVO_MS)" in codigo
+    assert 'classList.contains("escena--en-vivo")' in codigo
+    # Al cerrar se suelta el foco para que E, P y Espacio sigan funcionando.
+    assert "document.activeElement.blur()" in codigo
+
+
+def test_al_entrar_en_vivo_se_empieza_desde_el_ultimo_turno() -> None:
+    """E pide la lista desde el final; R sigue pidiendo desde el principio."""
+    escena = (ESCENA / "escena.js").read_text(encoding="utf-8")
+    assert "sondeo.iniciar({ desdeElFinal: true });" in escena
+    assert "sondeo.reiniciar();" in escena
+    envivo = (ESCENA / "envivo.js").read_text(encoding="utf-8")
+    assert "sondeo.saltando = desdeElFinal;" in envivo
+    assert "datos.turnos.length >= LIMITE_RUTA" in envivo
+
+
+NODE = shutil.which("node")
+
+
+@pytest.mark.skipif(NODE is None, reason="Node no está instalado")
+def test_el_sondeo_desde_el_final_no_entrega_turnos_viejos() -> None:
+    """Con `desdeElFinal`, la primera respuesta solo mueve el cursor; lo nuevo sí llega."""
+    assert NODE
+    url = (ESCENA / "envivo.js").as_uri()
+    programa = f"""
+const respuestas = [
+  {{ turnos: [{{ seq: 5 }}, {{ seq: 6 }}], ultimo: 6 }},
+  {{ turnos: [{{ seq: 7 }}], ultimo: 7 }},
+];
+const pedidas = [];
+const recibidos = [];
+let pendiente = null;
+globalThis.window = {{
+  setTimeout: (funcion) => {{ pendiente = funcion; return 1; }},
+  clearTimeout: () => {{}},
+}};
+globalThis.document = {{ hidden: false, addEventListener: () => {{}} }};
+globalThis.fetch = async (url) => {{
+  pedidas.push(url);
+  const datos = respuestas.shift() ?? {{ turnos: [], ultimo: 7 }};
+  return {{ ok: true, json: async () => datos }};
+}};
+const {{ crearSondeo }} = await import({json.dumps(url)});
+const sondeo = crearSondeo({{
+  alRecibir: (registros) => recibidos.push(...registros.map((r) => r.seq)),
+  alEstado: () => {{}},
+}});
+const esperar = () => new Promise((listo) => setImmediate(listo));
+sondeo.iniciar({{ desdeElFinal: true }});
+await esperar(); await esperar();
+const vuelta = pendiente; pendiente = null; vuelta();
+await esperar(); await esperar();
+sondeo.detener();
+console.log(JSON.stringify({{ pedidas, recibidos }}));
+"""
+    salida = subprocess.run(
+        [NODE, "--input-type=module", "-e", programa],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+    resultado = json.loads(salida.stdout)
+    assert resultado["recibidos"] == [7]
+    assert resultado["pedidas"][0].endswith("desde=0")
+    assert resultado["pedidas"][1].endswith("desde=6")

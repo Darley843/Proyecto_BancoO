@@ -490,6 +490,25 @@ h2 {
 .escena__captura [data-error="si"] { color: var(--rojo); }
 .escena__captura #captura-resumen { font-size: 16px; line-height: 1.5; }
 
+/* En vivo el voluntario solo habla con Pana: sin tarjetas, monto ni perfil seguro. */
+.escena--en-vivo .escena__captura-guiada { display: none; }
+.escena:not(.escena--en-vivo) .escena__aviso--vivo { display: none; }
+.escena__captura-escuche { margin: 6px 0; font-size: 18px; color: var(--texto); }
+.escena__captura-escuche:empty { display: none; }
+/* Arriba, sobre las sillas: los subtítulos de abajo quedan a la vista. */
+.escena--en-vivo .escena__captura { inset: 12vh 6vw auto; max-width: 760px; margin: 0 auto; text-align: center; }
+.escena--en-vivo .escena__captura-fila { justify-content: center; }
+.escena--en-vivo .escena__captura .escena__captura-hablar {
+  width: 100%;
+  padding: 22px 28px;
+  border-color: var(--pana);
+  color: var(--texto);
+  font-size: 26px;
+  font-weight: 700;
+}
+.escena--en-vivo .escena__captura .escena__captura-hablar::before { content: "🎙  "; }
+.escena--en-vivo .escena__captura .escena__captura-hablar[aria-pressed="true"] { border-color: var(--rojo); color: var(--rojo); }
+
 @media (prefers-reduced-motion: reduce) {
   .escena__ondas i { animation: none; height: 10px; }
   .escena__boca { animation: none !important; }
