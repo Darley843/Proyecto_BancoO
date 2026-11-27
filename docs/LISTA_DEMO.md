@@ -201,6 +201,21 @@ es [`DESPLIEGUE_WHATSAPP.md`](./DESPLIEGUE_WHATSAPP.md), sección 8.
   se pega en el chat. Se comprueba abriendo **Recursos (G)**: el QR del
   repositorio y el enlace **Abrir repositorio** funcionan, y cada diagrama abre
   en otra pestaña.
+- [ ] Escena en vivo encendida en la **misma ventana** de `make app`, antes de
+      arrancarla: el interruptor de la lista y el código de cuatro dígitos que
+      activa al voluntario. El código va **solo en la tarjeta del voluntario**:
+      si lo tuvieran todos, cualquiera se tomaría la pantalla.
+  ```powershell
+  $env:ESCENA_EN_VIVO = "1"
+  $env:ESCENA_CODIGO = "XXXX"
+  ```
+  El código vive solo en la sesión: no va en `config/`, no se versiona y no se
+  pega en el chat. Se lee al arrancar la app, así que un cambio de código exige
+  reiniciarla. Se comprueba con el voluntario: en Edge, **E** deja la barra en
+  «En vivo — esperando el primer turno»; el voluntario escribe `ESCENA` y los
+  cuatro dígitos desde su teléfono y la lista muestra su turno; sin el
+  interruptor, el canal responde «La escena en vivo no está activada» y no
+  publica nada.
 - [ ] Con el voluntario activo (`ESCENA` y el código), abrir **V** y probar
       **Hablar con Pana**: la frase pasa por los filtros del canal, la respuesta
       llega a su WhatsApp y, si el turno produce la ficha, también llega la
@@ -282,6 +297,8 @@ gateway, app y túnel.
 $env:WHATSAPP_MODO = "real"
 $env:WHATSAPP_EVENTO = "1"
 $env:OPENCLAW_ACTIVO = "1"
+$env:ESCENA_EN_VIVO = "1"
+$env:ESCENA_CODIGO = "XXXX"
 Get-ChildItem Env: | Where-Object Name -match 'LANGSMITH|LANGCHAIN'
 make app
 ```
@@ -289,6 +306,11 @@ make app
 - [ ] La consulta de `LANGSMITH|LANGCHAIN` no muestra nada, salvo que el grupo
       decida mostrar trazas (`docs/SEGURIDAD.md` §5.1).
 - [ ] La app queda en `http://127.0.0.1:8000` y `GET /health` responde 200.
+- [ ] `ESCENA_CODIGO` tiene los cuatro dígitos que lleva impresos la tarjeta del
+      voluntario y es el mismo que se escribió en la sección 2. El código solo
+      se dicta al voluntario: nunca se proyecta ni se pega en el chat.
+- [ ] Con **E** en la pantalla, la barra dice «En vivo — esperando el primer
+      turno» (si dice «Sin conexión», la app arrancó sin `ESCENA_EN_VIVO`).
 
 **Ventana 4: el túnel.** Si `cloudflared` no está instalado:
 `winget install --id Cloudflare.cloudflared` y abrir una ventana nueva.
@@ -485,4 +507,5 @@ herramientas, el WhatsApp de los invitados ni la seguridad.
 | Esta lista, la prueba de humo, la inyección en vivo y los invitados | Anny |
 | Computador de la demo, gateway, MCP y tasas del Tablero; decide el plan B | Nayla |
 | Meta, SIM, token, modo evento, túnel y callback | Darley |
+| Escena en vivo: interruptor, código del voluntario y su tarjeta; entrada por voz (V) y ficha por WhatsApp | Darley |
 | Pantalla, voces, solo subtítulos, cronómetro del pitch y capturas | Yoldy |

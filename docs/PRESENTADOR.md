@@ -75,8 +75,10 @@ banco nació en Cali en 1965.
 
 **Fuente:** cada quien su fila; `openspec/changes/agente-openclaw/tasks.md` y
 `openspec/changes/demo-gota-a-gota/tasks.md`.
-**⚠️ Confirmar:** Darley, su fila. La escena mantiene el voluntario por voz
-(tecla V, opción B), como anuncia la presentación de Pana (#205).
+**Fila de Darley confirmada** (26 de noviembre): la entrada por voz (tecla V), el
+voluntario y la API de la escena entran en el #232. La escena mantiene al
+voluntario por voz (tecla V, opción B), como anuncia la presentación de Pana
+(#205).
 
 <a id="p3"></a>
 
@@ -507,9 +509,8 @@ los hooks de `.pre-commit-config.yaml` lo revisan antes del commit.
 
 ## Pendiente antes de congelar (jueves 26)
 
-1. Darley confirma su fila en P2.
-2. Las voces de esta ficha pasan a `config/escena.toml [preguntas]` (tarea 6.14),
+1. Las voces de esta ficha pasan a `config/escena.toml [preguntas]` (tarea 6.14),
    con una prueba que revisa las 40 palabras, las tres frases, la fuente y las
    cifras declaradas.
-3. Leer en voz alta cada voz con la voz de Pana (Gonzalo); todas duran menos de
+2. Leer en voz alta cada voz con la voz de Pana (Gonzalo); todas duran menos de
    unos 15 segundos.

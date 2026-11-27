@@ -29,6 +29,11 @@ RUTAS_PRIVADAS = (
     "/api/estado",
     "/api/preguntar",
     "/api/escena/en-vivo",
+    "/api/escena/repositorio",
+    "/api/escena/repositorio/qr.png",
+    "/api/escena/whatsapp",
+    "/api/escena/whatsapp/qr.png",
+    "/diagramas/arquitectura",
     "/api/herramientas/traza",
     "/api/operacion",
 )
@@ -68,6 +73,13 @@ def test_el_tunel_no_puede_gastar_saldo(cliente_tunel: TestClient) -> None:
     for ruta in ("/api/preguntar", "/api/preguntar/stream"):
         respuesta = cliente_tunel.post(ruta, json={"pregunta": "hola"})
         assert respuesta.status_code == 404
+
+
+def test_el_tunel_no_puede_hablar_por_el_voluntario(cliente_tunel: TestClient) -> None:
+    """``/api/escena/hablar`` envía a WhatsApp con la huella: solo vive en loopback."""
+    respuesta = cliente_tunel.post("/api/escena/hablar", json={"texto": "hola"})
+
+    assert respuesta.status_code == 404
 
 
 def test_el_tunel_alcanza_el_webhook(cliente_tunel: TestClient) -> None:
