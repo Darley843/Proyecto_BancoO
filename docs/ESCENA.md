@@ -168,14 +168,22 @@ pantalla lo implementa en `app/web/escena/envivo.js`.
   escenario y empieza desde el **último turno** de la lista: el primer sondeo
   (`desde=0`) solo mueve el cursor y los turnos viejos no se reproducen. Desde
   ahí suenan los nuevos.
-- **Entrada del voluntario (V) en vivo.** El panel solo muestra la
-  conversación con Pana: el botón grande «Toca y habla con Pana», lo que se
-  escuchó («Escuché: …») y el aviso de que el reconocimiento puede usar un
-  servicio externo. El texto va a `POST /api/escena/hablar`. Las tarjetas A–F,
-  el campo del monto y los botones Hablar, Enviar y Perfil seguro se ocultan
-  (fuera del modo En vivo siguen igual). Después de enviar, el panel se cierra
-  solo en 1,5 s para no tapar los subtítulos; si Pana no responde, se vuelve a
-  abrir con el error.
+- **De la presentación a la conversación.** La escena guionada termina con
+  la invitación de Pana (último turno de la presentación) y deja el **QR de
+  WhatsApp** (el mismo del panel G) con «Esperando al voluntario…». No abre el
+  flujo guiado. Desde ahí la pantalla mira la lista en vivo: con el **primer
+  turno del canal** (el voluntario escribió `ESCENA` y su código) pasa sola al
+  modo conversación y reproduce desde ese turno, sin pausa. **E** sigue
+  forzando el modo por si la señal no llega. En el núcleo (**N**, plan B) la
+  escena guionada sigue completa.
+- **Modo conversación (V).** El panel se abre solo, arriba, sin tapar los
+  subtítulos: el botón grande «Toca y habla con Pana», lo que se escuchó
+  («Escuché: …»), la respuesta y el aviso de que el reconocimiento puede usar
+  un servicio externo. El texto va a `POST /api/escena/hablar`. Cuando Pana
+  termina de hablar y la cola queda vacía, **el micrófono se vuelve a abrir
+  solo**; «Detener la escucha» lo apaga hasta que se toque otra vez el botón.
+  Las tarjetas A–F, el campo del monto y los botones Hablar, Enviar y Perfil
+  seguro se ocultan: quedan solo fuera de este modo, como respaldo.
 - **Sondeo.** Cada 2 s, una petición a la vez, con techo de 1,5 s y sin caché.
   Con la pestaña oculta se detiene y al volver pide de inmediato. El cursor
   `desde` vive solo en memoria.

@@ -80,6 +80,24 @@ export async function mostrarWhatsapp() {
 }
 
 /**
+ * Pone el QR de WhatsApp en una imagen cualquiera (la espera del voluntario).
+ *
+ * @param {HTMLImageElement | null} imagen Imagen donde va el QR.
+ * @returns {Promise<boolean>} `true` si hay número y el QR quedó visible.
+ */
+export async function ponerQrWhatsapp(imagen) {
+  if (!imagen) {
+    return false;
+  }
+  const hay = await whatsappDisponible();
+  imagen.hidden = !hay;
+  if (hay && !imagen.getAttribute("src")) {
+    imagen.src = RUTA_QR;
+  }
+  return hay;
+}
+
+/**
  * Prepara el panel de recursos (tecla G) al abrirlo.
  *
  * El enlace del repositorio se pone desde aquí para no escribir una URL externa

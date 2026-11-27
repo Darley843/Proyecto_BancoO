@@ -495,11 +495,19 @@ h2 {
 .escena:not(.escena--en-vivo) .escena__aviso--vivo { display: none; }
 .escena__captura-escuche { margin: 6px 0; font-size: 18px; color: var(--texto); }
 .escena__captura-escuche:empty { display: none; }
-/* Arriba, sobre las sillas: los subtítulos de abajo quedan a la vista. */
-.escena--en-vivo .escena__captura { inset: 12vh 6vw auto; max-width: 760px; margin: 0 auto; text-align: center; }
+/* Modo conversación: una franja arriba, sobre las sillas; los subtítulos de abajo quedan a la vista. */
+.escena--en-vivo .escena__captura {
+  inset: 64px 6vw auto;
+  max-width: 700px;
+  margin: 0 auto;
+  padding: 12px 18px;
+  text-align: center;
+}
+.escena--en-vivo .escena__captura h2 { display: none; }
+.escena--en-vivo .escena__captura .escena__aviso { margin: 4px 0; font-size: 13px; }
 .escena--en-vivo .escena__captura-fila { justify-content: center; }
 .escena--en-vivo .escena__captura .escena__captura-hablar {
-  width: 100%;
+  flex: 1 1 auto;
   padding: 22px 28px;
   border-color: var(--pana);
   color: var(--texto);
@@ -508,6 +516,27 @@ h2 {
 }
 .escena--en-vivo .escena__captura .escena__captura-hablar::before { content: "🎙  "; }
 .escena--en-vivo .escena__captura .escena__captura-hablar[aria-pressed="true"] { border-color: var(--rojo); color: var(--rojo); }
+.escena:not(.escena--en-vivo) #captura-pana-detener { display: none; }
+
+/* Fin de la presentación: QR de WhatsApp y «Esperando al voluntario…». */
+.escena__espera {
+  position: fixed;
+  inset: 14vh 0 auto;
+  z-index: 15;
+  width: min(420px, 90vw);
+  margin: 0 auto;
+  padding: 22px 26px;
+  text-align: center;
+  background: var(--tablero);
+  border: 1px solid var(--pana);
+  border-radius: 14px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, .55);
+}
+.escena__espera[hidden] { display: none; }
+.escena__espera-qr { display: block; margin: 0 auto 12px; background: #fff; padding: 10px; border-radius: 10px; }
+.escena__espera-qr[hidden] { display: none; }
+.escena__espera-titulo { font-size: 26px; font-weight: 700; margin: 0 0 6px; }
+.escena__espera-pista { color: var(--tenue); margin: 0; }
 
 @media (prefers-reduced-motion: reduce) {
   .escena__ondas i { animation: none; height: 10px; }

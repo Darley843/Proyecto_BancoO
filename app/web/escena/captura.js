@@ -8,12 +8,14 @@
  * tarjetas. Al confirmar se pide `POST /api/escena` y se avisa a la pantalla con
  * el evento `escena:lista`.
  *
- * Con el modo En vivo (tecla E) activo, el panel solo muestra la conversación
- * con Pana: un botón grande de micrófono que manda lo que oye a
- * `POST /api/escena/hablar`, el texto reconocido como confirmación y el aviso de
- * servicio externo. Las tarjetas, el monto y los botones del flujo guiado se
- * ocultan (siguen igual fuera de ese modo) y el panel se cierra solo después de
- * enviar, para no tapar los subtítulos.
+ * Modo conversación (el modo En vivo: llega solo cuando el voluntario se activa
+ * con ESCENA y su código, o con la tecla E): el panel se abre solo y muestra un
+ * botón grande de micrófono que manda lo que oye a `POST /api/escena/hablar`,
+ * lo reconocido, la respuesta y el aviso de servicio externo. Cuando Pana
+ * termina de hablar (`escena:pana-termino`), el micrófono se vuelve a abrir;
+ * «Detener la escucha» lo apaga hasta que se toque otra vez el botón. Las
+ * tarjetas, el monto y los botones del flujo guiado se ocultan: quedan solo
+ * fuera de ese modo, como respaldo.
  *
  * No guarda nada: ni el perfil, ni el texto, ni la selección. Las pruebas de la
  * página viven en `test/test_web_escena.py`.
@@ -33,8 +35,6 @@ const ESPERA_MS = 8000;
 /** Espera del turno libre: el canal puede tardar lo que tarda OpenClaw. */
 const ESPERA_HABLAR_MS = 50000;
 
-/** En vivo, tiempo que se ve «Escuché: …» antes de cerrar el panel solo. */
-const CIERRE_EN_VIVO_MS = 1500;
 /** Texto del botón de Pana fuera del modo En vivo. */
 const TEXTO_HABLAR_CON_PANA = "Hablar con Pana";
 
@@ -52,6 +52,8 @@ const estado = {
   letra: null,
   montada: false,
   alTerminar: null,
+  /** En modo conversación, si el micrófono se reabre solo al terminar Pana. */
+  escuchaAutomatica: true,
 };
 
 /**
@@ -376,6 +378,7 @@ function abrirConversacion(mensaje = "") {
   const boton = porId("captura-pana");
   boton.textContent = boton.dataset.textoVivo || TEXTO_HABLAR_CON_PANA;
   porId("captura-pana-escuche").textContent = "";
+  porId("captura-pana-detener").hidden = !hayMicrofono();
   porId("captura-pana-estado").textContent = hayMicrofono()
     ? mensaje
     : "Este navegador no reconoce la voz: escríbele a Pana por WhatsApp.";
@@ -479,7 +482,7 @@ async function enviarAPana(texto) {
     linea.textContent = `${respuesta}${ficha}` || "Pana no respondió.";
   } catch (error) {
     if (enVivo() && porId("escena-captura").hidden) {
-      // El panel ya se cerró solo: se vuelve a abrir para que se vea el error.
+      // Si alguien cerró el panel, se vuelve a abrir para que se vea el error.
       abrirConversacion(error.message);
       return;
     }
@@ -488,31 +491,88 @@ async function enviarAPana(texto) {
 }
 
 /**
- * Escucha una pregunta libre y la manda al canal del voluntario activo.
+ * Botón grande «Toca y habla con Pana»: abre (o cierra) el micrófono. En modo
+ * conversación, tocarlo vuelve a encender la escucha automática.
  *
  * @returns {void}
  */
 function preguntarAPana() {
+  if (escuchando()) {
+    detenerMicrofono();
+    return;
+  }
+  estado.escuchaAutomatica = true;
+  escucharAPana();
+}
+
+/**
+ * «Detener la escucha»: apaga el micrófono y la reapertura automática hasta que
+ * se vuelva a tocar el botón grande.
+ *
+ * @returns {void}
+ */
+function detenerEscucha() {
+  estado.escuchaAutomatica = false;
+  detenerMicrofono();
+  porId("captura-pana-estado").textContent = "Escucha detenida. Toca el botón para hablar con Pana.";
+}
+
+/**
+ * Pana terminó de hablar y la cola quedó vacía: en modo conversación el
+ * micrófono se vuelve a abrir solo, salvo que se haya detenido la escucha.
+ *
+ * @returns {void}
+ */
+function reabrirMicrofono() {
+  if (!enVivo() || !estado.escuchaAutomatica || !hayMicrofono() || escuchando()) {
+    return;
+  }
+  if (porId("escena-captura").hidden) {
+    abrirConversacion();
+  }
+  escucharAPana();
+}
+
+/**
+ * Llegó el modo conversación: abre el panel con el botón grande.
+ *
+ * @returns {void}
+ */
+function empezarConversacion() {
+  estado.escuchaAutomatica = true;
+  abrirConversacion("Toca el botón y habla con Pana.");
+}
+
+/**
+ * Salió el modo conversación: apaga el micrófono y cierra el panel.
+ *
+ * @returns {void}
+ */
+function terminarConversacion() {
+  if (!porId("escena-captura").hidden) {
+    cerrar();
+  }
+}
+
+/**
+ * Escucha una frase libre y la manda al canal del voluntario activo.
+ *
+ * @returns {void}
+ */
+function escucharAPana() {
   const boton = porId("captura-pana");
   const linea = porId("captura-pana-estado");
   if (!hayMicrofono()) {
     linea.textContent = "Este navegador no tiene micrófono: escribe en WhatsApp.";
     return;
   }
-  if (escuchando()) {
-    detenerMicrofono();
-    return;
-  }
   boton.setAttribute("aria-pressed", "true");
+  linea.textContent = "Te escucho…";
   escuchar({
     alResultado: (texto) => {
       porId("captura-pana-escuche").textContent = `Escuché: «${texto}»`;
       linea.textContent = "Enviando a Pana…";
       void enviarAPana(texto);
-      if (enVivo()) {
-        // En vivo la respuesta sale en la escena: el panel no tapa los subtítulos.
-        window.setTimeout(cerrar, CIERRE_EN_VIVO_MS);
-      }
     },
     alError: (mensaje) => {
       linea.textContent = mensaje;
@@ -549,5 +609,9 @@ export function montarCaptura(opciones = {}) {
   const pana = porId("captura-pana");
   pana.hidden = !hayMicrofono();
   pana.addEventListener("click", preguntarAPana);
+  porId("captura-pana-detener").addEventListener("click", detenerEscucha);
   document.addEventListener("escena:captura", alternar);
+  document.addEventListener("escena:conversacion", empezarConversacion);
+  document.addEventListener("escena:fin-conversacion", terminarConversacion);
+  document.addEventListener("escena:pana-termino", reabrirMicrofono);
 }
