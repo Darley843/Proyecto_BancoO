@@ -76,3 +76,6 @@ openclaw/workspace/pana/memory/*.md
 !openclaw/workspace/pana/memory/semilla.md
 # Estado del gateway: sesiones y credenciales locales, fuera de Git.
 openclaw/state/
+
+# Tarjetas de la escena con el número del bot y el código del voluntario (6.4)
+data/tarjetas/

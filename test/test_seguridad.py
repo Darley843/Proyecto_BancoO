@@ -53,6 +53,8 @@ RUTAS_IGNORADAS: tuple[str, ...] = (
     "data/escena/nucleo.json",
     "data/escena/en_vivo.jsonl",
     "data/escena/en_vivo.lock",
+    "data/tarjetas/tarjeta-invitados.html",
+    "data/tarjetas/tarjeta-voluntario.html",
 )
 
 #: Patrones de claves de API que no deben aparecer en archivos versionados.
