@@ -125,6 +125,6 @@ def test_config_del_gateway_es_local_y_tiene_timeout() -> None:
     """El TOML del gateway no publica nada y declara un timeout explícito."""
     datos = tomllib.loads(Path("config/openclaw.toml").read_text(encoding="utf-8"))
     assert datos["gateway"]["base_url"] == "http://127.0.0.1:18789"
-    assert datos["gateway"]["timeout_segundos"] > 0
+    assert datos["gateway"]["timeout_segundos"] == 90.0
     assert datos["gateway"]["reintentos"] == 0
     assert datos["mcp"]["host"] == "127.0.0.1"

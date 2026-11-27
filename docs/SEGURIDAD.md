@@ -559,7 +559,7 @@ cliente a un host público.
   se registra en logs. `config/openclaw.toml` no contiene secretos.
 - La base debe ser loopback (`127.0.0.1`, `localhost` o `::1`); otra base se
   rechaza al cargar la configuración. El cliente no usa proxies del entorno.
-- `httpx` con `timeout` de 45 s de techo y 3 s para conectar, User-Agent y
+- `httpx` con `timeout` de 90 s de techo y 3 s para conectar, User-Agent y
   header `From` de `config/site.toml`; sin reintentos y sin `verify=False`. Un
   reintento repetiría el turno.
 - Ante timeout, error de red, `5xx`, `401`, cuerpo inválido o contenido vacío,
@@ -583,7 +583,7 @@ vigila lo segundo en todo `src/`.
 **Residual.** El gateway y el agente son procesos locales fuera de este
 repositorio: pueden registrar el texto que reciben según su propia
 configuración. El token protege el endpoint, no audita al agente. Si el gateway
-se cuelga, la cola de un trabajador espera el techo de 45 s antes de caer al
+se cuelga, la cola de un trabajador espera el techo de 90 s antes de caer al
 grafo; `OPENCLAW_ACTIVO=0` o `fallback_forzado = true` lo sacan del camino.
 
 ### 3.12 Túnel de ensayo: solo el webhook es público

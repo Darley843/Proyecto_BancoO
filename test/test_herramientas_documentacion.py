@@ -44,6 +44,18 @@ def test_las_veinte_herramientas_tienen_ficha_completa() -> None:
         assert ficha.confirmacion.strip()
 
 
+def test_auditar_respuesta_exige_una_sola_auditoria_con_cifras_permitidas() -> None:
+    """La ficha del catálogo deja claro que la auditoría es única y con cifras."""
+    herramienta = catalogo.por_nombre("auditar_respuesta")
+    assert herramienta is not None
+    ficha = herramienta.documentacion
+    texto = " ".join(f"{ficha.para_que} {ficha.cuando_no}".split())
+    assert "una sola vez por mensaje" in texto
+    assert "`cifras_permitidas` es obligatorio" in texto
+    assert "devolvieron las herramientas usadas" in texto
+    assert "No audites dos veces el mismo texto" in texto
+
+
 def test_markdown_imprime_el_bloque(capsys: pytest.CaptureFixture[str]) -> None:
     """`--markdown` imprime solo el bloque, sin la tabla de consola."""
     assert catalogo.main(["--markdown"]) == 0

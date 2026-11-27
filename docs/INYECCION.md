@@ -87,7 +87,7 @@ Reglas de la corrida:
   `base_url` y `modelo` de `config/openclaw.toml` si existe y, si no, usa los del
   contrato (`http://127.0.0.1:18789`, `openclaw:pana`).
 - Tiempo máximo propio: 60 s por ataque, o el de `--timeout`. No usa el
-  `timeout_segundos` del canal (45 s de techo), porque una respuesta de Pana
+  `timeout_segundos` del canal (90 s de techo), porque una respuesta de Pana
   con herramientas tarda unos 9 s y un ataque adversarial puede encadenar
   varias; con el techo del canal saldrían errores falsos.
 - El token se lee de `OPENCLAW_GATEWAY_TOKEN` y nunca se imprime ni se guarda.

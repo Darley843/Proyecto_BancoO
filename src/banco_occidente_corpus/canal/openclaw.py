@@ -65,7 +65,7 @@ class ConfiguracionOpenClaw:
     base_url: str = "http://127.0.0.1:18789"
     modelo: str = "openclaw:pana"
     prefijo_usuario: str = "wa:"
-    timeout_segundos: float = 45.0
+    timeout_segundos: float = 90.0
     reintentos: int = 0
     fallback_forzado: bool = False
 
@@ -118,7 +118,7 @@ def cargar_configuracion_openclaw(ruta: Path | None = None) -> ConfiguracionOpen
         base_url=str(gateway.get("base_url", "http://127.0.0.1:18789")),
         modelo=str(gateway.get("modelo", "openclaw:pana")),
         prefijo_usuario=str(gateway.get("prefijo_usuario", "wa:")),
-        timeout_segundos=float(gateway.get("timeout_segundos", 45.0)),
+        timeout_segundos=float(gateway.get("timeout_segundos", 90.0)),
         reintentos=int(gateway.get("reintentos", 0)),
         fallback_forzado=_booleano(gateway, "fallback_forzado", False),
     )

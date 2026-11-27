@@ -22,9 +22,11 @@
        "openclaw memory forget --agent pana --session <clave>", una clave por
        argumento y en lotes. "memory forget" es offline-only: exige propiedad
        exclusiva del estado; por eso, solo con -Confirmar, el script detiene el
-       gateway, ejecuta el olvido, limpia el indice derivado con
+       gateway con "daemon stop --force" (OpenClaw 2026.11.6 lo exige desde una
+       consola no interactiva), ejecuta el olvido, limpia el indice derivado con
        "openclaw memory reset --agent pana --yes" y vuelve a levantar el
        gateway. Si algo falla, el gateway se levanta igual (bloque finally).
+       "memory forget" y "memory reset" no piden ni aceptan ese interruptor.
 
        Se prefiere --session por clave y no --since porque borra exactamente lo
        derivado de las sesiones que se acaban de eliminar, sin arrastrar
@@ -39,6 +41,13 @@
        PRAGMA wal_checkpoint(TRUNCATE) y compacta con VACUUM. Informa cuantas
        filas borro y el tamano de la base antes y despues. No toca ninguna otra
        tabla y no hace copia de respaldo de esas dos.
+
+       En la misma ventana sin gateway compacta la base del agente
+       (~/.openclaw/agents/pana/agent/openclaw-agent.sqlite) y la base de estado
+       (~/.openclaw/state/openclaw.sqlite): solo PRAGMA
+       wal_checkpoint(TRUNCATE) y VACUUM, sin borrar filas, e imprime el tamano
+       antes y despues. En modo de prueba solo mide y muestra el paso. La base
+       de estado se omite si no existe.
 
     4. Borra los archivos locales de memoria del workspace de WSL:
        MEMORY.md, DREAMS.md y todo el contenido de memory\ (bitacora diaria,
@@ -90,6 +99,12 @@
 
     La purga corre en el mismo momento en que el gateway ya esta detenido para
     "openclaw memory forget", asi que no hay una segunda ventana sin gateway.
+
+    En esa ventana tambien se compactan la base del agente y la base de estado
+    del gateway (~/.openclaw/state/openclaw.sqlite): PRAGMA
+    wal_checkpoint(TRUNCATE) y VACUUM, sin borrar filas, con el tamano antes y
+    despues. La base de estado no se purga: solo se compacta. En modo de prueba
+    solo se mide y se muestra el paso de compactacion.
 
     NO se hace copia de respaldo de esas dos tablas: una copia conservaria
     justo los datos que el consentimiento promete borrar. El resto de la base
@@ -168,12 +183,13 @@ $Fallos = New-Object System.Collections.Generic.List[string]
 
 # Ayudante que corre dentro de WSL con python3. Solo usa el modulo sqlite3 de la
 # biblioteca estandar; imprime lineas clave=valor que el script traduce.
-$ScriptPurga = @'
+$ScriptSqlite = @'
 import os
 import sqlite3
 import sys
 
 TABLAS = ("session_transcript_archives", "session_transcript_cold_archives")
+MODOS = ("contar", "purgar", "medir", "compactar")
 
 
 def tamano(ruta):
@@ -188,44 +204,53 @@ def tamano(ruta):
 
 def main():
     if len(sys.argv) < 3:
-        print("ERROR=uso: purga.py <base> <contar|purgar>")
+        print("ERROR=uso: purga.py <base> <modo>")
         return 2
 
     ruta = sys.argv[1]
     modo = sys.argv[2]
-    if modo not in ("contar", "purgar"):
+    if modo not in MODOS:
         print("ERROR=modo invalido: %s" % modo)
         return 2
     if not os.path.isfile(ruta):
+        if modo in ("medir", "compactar"):
+            print("AUSENTE=base")
+            print("OK=1")
+            return 0
         print("ERROR=no existe la base: %s" % ruta)
         return 1
 
     print("TAMANO_ANTES=%d" % tamano(ruta))
+    if modo == "medir":
+        print("OK=1")
+        return 0
+
     conexion = sqlite3.connect(ruta, timeout=30, isolation_level=None)
     try:
-        existentes = set(
-            fila[0]
-            for fila in conexion.execute(
-                "SELECT name FROM sqlite_master WHERE type = 'table' "
-                "AND name IN (?, ?)",
-                TABLAS,
+        if modo in ("contar", "purgar"):
+            existentes = set(
+                fila[0]
+                for fila in conexion.execute(
+                    "SELECT name FROM sqlite_master WHERE type = 'table' "
+                    "AND name IN (?, ?)",
+                    TABLAS,
+                )
             )
-        )
-        for tabla in TABLAS:
-            if tabla not in existentes:
-                print("AUSENTE=%s" % tabla)
-                continue
-            filas = conexion.execute(
-                "SELECT count(*) FROM %s" % tabla
-            ).fetchone()[0]
-            print("FILAS_%s=%d" % (tabla, filas))
-            if modo != "purgar":
-                continue
-            conexion.execute("BEGIN IMMEDIATE")
-            borradas = conexion.execute("DELETE FROM %s" % tabla).rowcount
-            conexion.execute("COMMIT")
-            print("BORRADAS_%s=%d" % (tabla, borradas))
-        if modo == "purgar":
+            for tabla in TABLAS:
+                if tabla not in existentes:
+                    print("AUSENTE=%s" % tabla)
+                    continue
+                filas = conexion.execute(
+                    "SELECT count(*) FROM %s" % tabla
+                ).fetchone()[0]
+                print("FILAS_%s=%d" % (tabla, filas))
+                if modo != "purgar":
+                    continue
+                conexion.execute("BEGIN IMMEDIATE")
+                borradas = conexion.execute("DELETE FROM %s" % tabla).rowcount
+                conexion.execute("COMMIT")
+                print("BORRADAS_%s=%d" % (tabla, borradas))
+        if modo in ("purgar", "compactar"):
             conexion.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
             conexion.execute("VACUUM")
             conexion.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
@@ -244,6 +269,42 @@ except Exception as error:
     sys.exit(1)
 '@
 
+function Invoke-Wsl {
+    <#
+        Ejecuta un comando dentro de WSL y devuelve su codigo y su salida.
+
+        Un proceso nativo que escribe en stderr no es un error del script:
+        "systemctl --user is-active" imprime "inactive" y devuelve 3 cuando el
+        servicio esta apagado, y "openclaw health" escribe "OpenClaw took too
+        long to respond" cuando no hay gateway. Con ErrorActionPreference en
+        Stop eso se vuelve un error terminante, asi que aqui se baja a Continue
+        (el cambio es local a la funcion) y se apaga
+        PSNativeCommandUseErrorActionPreference cuando la version de PowerShell
+        la define (7.4+ la deja encendida por defecto).
+    #>
+    param(
+        [string[]]$Comando,
+        [switch]$DescartarError
+    )
+
+    $ErrorActionPreference = 'Continue'
+    $nativo = Get-Variable -Name 'PSNativeCommandUseErrorActionPreference' `
+        -ErrorAction SilentlyContinue
+    if ($null -ne $nativo) {
+        $PSNativeCommandUseErrorActionPreference = $false
+    }
+
+    if ($DescartarError) {
+        $lineas = & wsl -d $Distro -- @Comando 2>$null
+    } else {
+        $lineas = & wsl -d $Distro -- @Comando 2>&1
+    }
+    return [pscustomobject]@{
+        Codigo = $LASTEXITCODE
+        Texto  = (@($lineas) | ForEach-Object { [string]$_ }) -join "`n"
+    }
+}
+
 function Invoke-OpenClaw {
     <#
         Ejecuta openclaw dentro de WSL y devuelve codigo y salida estandar.
@@ -252,12 +313,9 @@ function Invoke-OpenClaw {
     #>
     param([string[]]$Argumentos)
 
-    $lineas = & wsl -d $Distro -- openclaw @Argumentos 2>$null
-    $texto = (@($lineas) | ForEach-Object { [string]$_ }) -join "`n"
-    return [pscustomobject]@{
-        Codigo = $LASTEXITCODE
-        Texto  = $texto
-    }
+    $comando = @('openclaw')
+    if ($null -ne $Argumentos) { $comando += $Argumentos }
+    return Invoke-Wsl -Comando $comando -DescartarError
 }
 
 function Get-Sesiones {
@@ -269,7 +327,7 @@ function Get-Sesiones {
         'sessions', 'list', '--agent', $Agente, '--limit', 'all', '--json'
     )
     if ($resultado.Codigo -ne 0) {
-        throw "No se pudieron listar las sesiones (codigo $($resultado.Codigo)). Revisa que el gateway responda: wsl -d $Distro -- openclaw health"
+        throw "No se pudieron listar las sesiones (codigo $($resultado.Codigo)). Revisa que el gateway responda: wsl -d $Distro -- openclaw gateway status"
     }
 
     try {
@@ -285,52 +343,109 @@ function Get-Sesiones {
     return $sesiones
 }
 
+function Get-EstadoGateway {
+    <#
+        Devuelve 'activo', 'apagando', 'inactivo' o 'desconocido'. Consulta el
+        estado del servicio dentro de WSL con "systemctl --user is-active" y,
+        si no lo reconoce, cae a "openclaw gateway status --json".
+
+        No usa "openclaw health": con el gateway apagado health tarda decenas
+        de segundos y escribe "OpenClaw took too long to respond" en stderr,
+        que con ErrorActionPreference en Stop cortaba el borrado.
+    #>
+    $servicio = Invoke-Wsl -Comando @(
+        'systemctl', '--user', 'is-active', 'openclaw-gateway'
+    ) -DescartarError
+    switch ($servicio.Texto.Trim()) {
+        'active' { return 'activo' }
+        'activating' { return 'activo' }
+        'reloading' { return 'activo' }
+        'deactivating' { return 'apagando' }
+        # is-active devuelve 4 ("unknown"/sin unidad) con el texto "inactive";
+        # solo se cree el 3, que es el apagado real. El resto cae al respaldo.
+        'inactive' { if ($servicio.Codigo -eq 3) { return 'inactivo' } }
+        'failed' { return 'inactivo' }
+    }
+
+    $respaldo = Invoke-Wsl -Comando @(
+        'openclaw', 'gateway', 'status', '--json'
+    ) -DescartarError
+    try {
+        $datos = $respaldo.Texto | ConvertFrom-Json
+        $estado = [string]$datos.service.runtime.status
+        if ($estado -eq 'running') { return 'activo' }
+        if ($estado -in @('stopped', 'inactive', 'failed')) { return 'inactivo' }
+    } catch {
+        # Sin JSON legible se responde 'desconocido' y decide quien llama.
+    }
+    return 'desconocido'
+}
+
 function Test-GatewayArriba {
     <#
-        Devuelve $true si el gateway responde. La salida se descarta.
+        Devuelve $true si el servicio del gateway esta activo.
     #>
-    $null = & wsl -d $Distro -- openclaw health 2>$null
-    return ($LASTEXITCODE -eq 0)
+    return ((Get-EstadoGateway) -eq 'activo')
 }
 
 function Esperar-Gateway {
     <#
         Espera a que el gateway este arriba o abajo, como maximo los segundos
-        indicados. Devuelve $true si llego al estado pedido.
+        indicados. Devuelve $true si llego al estado pedido. Se apoya en el
+        estado del servicio, nunca en "openclaw health".
     #>
     param(
         [bool]$Arriba,
-        [int]$Segundos = 45
+        [int]$Segundos = 45,
+        [int]$PausaInicial = 0
     )
 
+    if ($PausaInicial -gt 0) { Start-Sleep -Seconds $PausaInicial }
     for ($i = 0; $i -lt $Segundos; $i++) {
-        if ((Test-GatewayArriba) -eq $Arriba) { return $true }
+        $estado = Get-EstadoGateway
+        if ($Arriba -and $estado -eq 'activo') { return $true }
+        if (-not $Arriba -and $estado -eq 'inactivo') { return $true }
         Start-Sleep -Seconds 1
     }
     return $false
 }
 
-function Get-RutaBaseAgente {
+function Get-HomeWsl {
     <#
-        Devuelve la ruta de la base SQLite del agente dentro de WSL. Usa el HOME
-        real de la distro y cae a /home/openclaw si no lo puede leer.
+        Devuelve el HOME real de la distro y cae a /home/openclaw si no lo puede
+        leer.
     #>
-    $homeWsl = (@(& wsl -d $Distro -- printenv HOME 2>$null) |
-        ForEach-Object { [string]$_ }) -join ''
-    $homeWsl = $homeWsl.Trim()
+    $resultado = Invoke-Wsl -Comando @('printenv', 'HOME') -DescartarError
+    $homeWsl = $resultado.Texto.Trim()
     if (-not $homeWsl.StartsWith('/')) { $homeWsl = '/home/openclaw' }
-    return "$homeWsl/.openclaw/agents/$Agente/agent/openclaw-agent.sqlite"
+    return $homeWsl
 }
 
-function Invoke-PurgaArchivos {
+function Get-RutaBaseAgente {
+    <#
+        Devuelve la ruta de la base SQLite del agente dentro de WSL.
+    #>
+    return "$(Get-HomeWsl)/.openclaw/agents/$Agente/agent/openclaw-agent.sqlite"
+}
+
+function Get-RutaBaseEstado {
+    <#
+        Devuelve la ruta de la base de estado del gateway dentro de WSL. Solo se
+        compacta, nunca se borran filas.
+    #>
+    return "$(Get-HomeWsl)/.openclaw/state/openclaw.sqlite"
+}
+
+function Invoke-SqliteWsl {
     <#
         Cuenta o purga las filas de session_transcript_archives y
-        session_transcript_cold_archives en la base SQLite del agente, con
-        python3 y sqlite3 dentro de WSL. Solo toca esas dos tablas. No hace
-        copia de respaldo: una copia conservaria lo que se quiere borrar.
+        session_transcript_cold_archives, o mide/compacta una base SQLite, con
+        python3 y sqlite3 dentro de WSL. La purga solo toca esas dos tablas; la
+        compactacion solo hace wal_checkpoint(TRUNCATE) y VACUUM. No hace copia
+        de respaldo: una copia conservaria lo que se quiere borrar.
     #>
     param(
-        [ValidateSet('contar', 'purgar')]
+        [ValidateSet('contar', 'purgar', 'medir', 'compactar')]
         [string]$Modo = 'contar',
         [string]$RutaBase
     )
@@ -345,13 +460,13 @@ function Invoke-PurgaArchivos {
         Error    = $null
     }
 
-    $ayudanteWsl = "/tmp/limpiar_evento_purga_$PID.py"
-    $ayudanteWindows = "\\wsl$\$Distro\tmp\limpiar_evento_purga_$PID.py"
+    $ayudanteWsl = "/tmp/limpiar_evento_sqlite_$PID.py"
+    $ayudanteWindows = "\\wsl$\$Distro\tmp\limpiar_evento_sqlite_$PID.py"
 
     try {
         [System.IO.File]::WriteAllText(
             $ayudanteWindows,
-            $ScriptPurga,
+            $ScriptSqlite,
             (New-Object System.Text.UTF8Encoding($false))
         )
     } catch {
@@ -360,8 +475,11 @@ function Invoke-PurgaArchivos {
     }
 
     try {
-        $lineas = & wsl -d $Distro -- python3 $ayudanteWsl $RutaBase $Modo 2>$null
-        $codigo = $LASTEXITCODE
+        $resultado = Invoke-Wsl -Comando @(
+            'python3', $ayudanteWsl, $RutaBase, $Modo
+        ) -DescartarError
+        $codigo = $resultado.Codigo
+        $lineas = $resultado.Texto -split "`n"
     } finally {
         Remove-Item -LiteralPath $ayudanteWindows -Force -ErrorAction SilentlyContinue
     }
@@ -442,6 +560,69 @@ function Write-PurgaArchivos {
         }
     } else {
         Write-Host '   Solo se contaron las filas; con -Confirmar se borran.'
+    }
+}
+
+function Write-Compactacion {
+    <#
+        Imprime el tamano de una base y, si se compacto, el tamano despues.
+        Solo se compacta con wal_checkpoint(TRUNCATE) y VACUUM: no se borra
+        ninguna fila.
+    #>
+    param(
+        [pscustomobject]$Resultado,
+        [bool]$Compactar,
+        [string]$Etiqueta
+    )
+
+    if ($null -eq $Resultado) { return }
+    if ($Resultado.Error) {
+        Write-Host "   ${Etiqueta}: no se pudo compactar: $($Resultado.Error)" -ForegroundColor Red
+        return
+    }
+    if ($Resultado.Ausentes -contains 'base') {
+        Write-Host "   ${Etiqueta}: no existe (se omite)" -ForegroundColor Yellow
+        return
+    }
+    if ($null -ne $Resultado.Antes) {
+        $momento = if ($Compactar) { 'antes' } else { 'actual' }
+        Write-Host "   ${Etiqueta}: $($Resultado.Antes) bytes ($momento)"
+    }
+    if ($Compactar) {
+        if ($Resultado.Ok) {
+            Write-Host "   ${Etiqueta}: WAL truncado y VACUUM: hechos"
+        }
+        if ($null -ne $Resultado.Despues) {
+            Write-Host "   ${Etiqueta} despues: $($Resultado.Despues) bytes"
+        }
+    } else {
+        Write-Host "   ${Etiqueta}: con -Confirmar se trunca el WAL y se hace VACUUM (sin borrar filas)."
+    }
+}
+
+function Invoke-CompactacionBases {
+    <#
+        Mide o compacta la base del agente y la de estado del gateway. La base
+        del agente ya no tiene las filas archivadas; la de estado nunca pierde
+        filas: solo se trunca el WAL y se hace VACUUM. Se corre con el gateway
+        detenido para tener propiedad exclusiva.
+    #>
+    param([bool]$Compactar)
+
+    $bases = @(
+        [pscustomobject]@{ Etiqueta = 'Base del agente'; Ruta = (Get-RutaBaseAgente) }
+        [pscustomobject]@{ Etiqueta = 'Base de estado'; Ruta = (Get-RutaBaseEstado) }
+    )
+    foreach ($base in $bases) {
+        Write-Host "   $($base.Etiqueta): $($base.Ruta)"
+        $modo = if ($Compactar) { 'compactar' } else { 'medir' }
+        $resultado = Invoke-SqliteWsl -Modo $modo -RutaBase $base.Ruta
+        Write-Compactacion -Resultado $resultado -Compactar $Compactar -Etiqueta $base.Etiqueta
+        if ($resultado.Error) {
+            $Fallos.Add("compactacion: $($base.Etiqueta)")
+        } elseif ($Compactar -and $resultado.Ok) {
+            $script:BasesCompactadas = $true
+        }
     }
 }
 
@@ -601,6 +782,7 @@ Write-Host '2. Memorias derivadas y archivos archivados'
 $SesionesOlvidadas = 0
 $IndiceLimpiado = $false
 $Purga = $null
+$BasesCompactadas = $false
 $haySesiones = ($claves.Count -gt 0)
 
 if (-not $Confirmar) {
@@ -617,23 +799,42 @@ if (-not $Confirmar) {
         Write-Host ''
         Write-Host '   Archivos archivados'
         Write-Host "   Base: $rutaBase"
-        $Purga = Invoke-PurgaArchivos -Modo 'contar' -RutaBase $rutaBase
+        $Purga = Invoke-SqliteWsl -Modo 'contar' -RutaBase $rutaBase
         Write-PurgaArchivos -Resultado $Purga -Borrar $false
         if ($Purga.Error) { $Fallos.Add('purga: conteo de archivos') }
     }
-} elseif (-not $haySesiones -and -not $PurgarArchivos) {
-    Write-Host '   No hay sesiones de las que olvidar memorias.'
+
+    Write-Host ''
+    Write-Host '   Compactacion de las bases (con -Confirmar y el gateway detenido)'
+    Invoke-CompactacionBases -Compactar $false
 } else {
     Write-Host '   Deteniendo el gateway para tener propiedad exclusiva del estado...'
-    $parada = Invoke-OpenClaw -Argumentos @('daemon', 'stop')
+    # OpenClaw 2026.11.6 pide --force para detener el gateway desde una consola
+    # no interactiva. Solo se usa aqui, dentro de -Confirmar; memory forget y
+    # memory reset no aceptan ese interruptor.
+    $parada = Invoke-OpenClaw -Argumentos @('daemon', 'stop', '--force')
     if ($parada.Codigo -ne 0) {
         Write-Host '   No se pudo detener el gateway.' -ForegroundColor Red
         $Fallos.Add('daemon stop')
-    } elseif (-not (Esperar-Gateway -Arriba $false -Segundos 45)) {
-        Write-Host '   El gateway sigue respondiendo; no se toca la memoria.' -ForegroundColor Red
+    }
+
+    # La parada se confirma con el estado del servicio, no con "openclaw
+    # health": con el gateway apagado health tarda decenas de segundos y escribe
+    # "OpenClaw took too long to respond" en stderr, que cortaba el borrado.
+    $detenido = $false
+    if ($parada.Codigo -eq 0) {
+        $detenido = Esperar-Gateway -Arriba $false -Segundos 25 -PausaInicial 5
+    }
+    if ($parada.Codigo -eq 0 -and -not $detenido) {
+        Write-Host '   El gateway no confirmo el apagado; no se toca la memoria.' -ForegroundColor Red
         $Fallos.Add('gateway no se detuvo')
-    } else {
-        try {
+    }
+
+    # El finally corre con o sin $detenido: si el apagado no llego a ocurrir y
+    # el servicio sigue activo no se toca; si quedo apagado (o el estado es
+    # desconocido) se vuelve a encender con daemon start.
+    try {
+        if ($detenido) {
             if ($haySesiones) {
                 for ($inicio = 0; $inicio -lt $claves.Count; $inicio += $LoteMemorias) {
                     $fin = [Math]::Min($inicio + $LoteMemorias, $claves.Count) - 1
@@ -672,17 +873,25 @@ if (-not $Confirmar) {
                 Write-Host ''
                 Write-Host '   Archivos archivados'
                 Write-Host "   Base: $rutaBase"
-                $Purga = Invoke-PurgaArchivos -Modo 'purgar' -RutaBase $rutaBase
+                $Purga = Invoke-SqliteWsl -Modo 'purgar' -RutaBase $rutaBase
                 Write-PurgaArchivos -Resultado $Purga -Borrar $true
                 if ($Purga.Error) { $Fallos.Add('purga: archivos archivados') }
             }
-        } finally {
-            Write-Host '   Volviendo a levantar el gateway...'
+
+            Write-Host ''
+            Write-Host '   Compactacion de las bases'
+            Invoke-CompactacionBases -Compactar $true
+        }
+    } finally {
+        Write-Host '   Asegurando que el gateway quede arriba...'
+        if ((Get-EstadoGateway) -eq 'activo') {
+            Write-Host '   Gateway arriba.'
+        } else {
             $arranque = Invoke-OpenClaw -Argumentos @('daemon', 'start')
             if ($arranque.Codigo -ne 0) {
                 Write-Host '   No se pudo arrancar el gateway: revisalo a mano.' -ForegroundColor Red
                 $Fallos.Add('daemon start')
-            } elseif (-not (Esperar-Gateway -Arriba $true -Segundos 60)) {
+            } elseif (-not (Esperar-Gateway -Arriba $true -Segundos 60 -PausaInicial 3)) {
                 Write-Host '   El gateway no responde todavia: revisalo a mano.' -ForegroundColor Red
                 $Fallos.Add('gateway no volvio')
             } else {
@@ -780,11 +989,13 @@ if ($Confirmar) {
             Write-Host "  Base del agente:                $($Purga.Antes) -> $($Purga.Despues) bytes"
         }
     }
+    Write-Host "  Bases compactadas:              $(if ($BasesCompactadas) { 'si (WAL truncado + VACUUM)' } else { 'no' })"
     Write-Host "  Archivos borrados en WSL:       $ArchivosWorkspaceBorrados"
     Write-Host "  Archivos borrados en Windows:   $ArchivosWindowsBorrados"
 } else {
     Write-Host "  Sesiones que se borrarian:      $SesionesBorradas de $($claves.Count)"
     Write-Host "  Memorias que se olvidarian:     $($claves.Count) sesiones"
+    Write-Host '  Bases que se compactarian:      base del agente y base de estado'
     if ($PurgarArchivos) {
         Write-Host "  Filas archivadas que se borrarian: $PurgaFilas"
     }
