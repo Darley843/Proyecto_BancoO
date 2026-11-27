@@ -8,6 +8,13 @@
  * tarjetas. Al confirmar se pide `POST /api/escena` y se avisa a la pantalla con
  * el evento `escena:lista`.
  *
+ * Con el modo En vivo (tecla E) activo, el panel solo muestra la conversación
+ * con Pana: un botón grande de micrófono que manda lo que oye a
+ * `POST /api/escena/hablar`, el texto reconocido como confirmación y el aviso de
+ * servicio externo. Las tarjetas, el monto y los botones del flujo guiado se
+ * ocultan (siguen igual fuera de ese modo) y el panel se cierra solo después de
+ * enviar, para no tapar los subtítulos.
+ *
  * No guarda nada: ni el perfil, ni el texto, ni la selección. Las pruebas de la
  * página viven en `test/test_web_escena.py`.
  */
@@ -25,6 +32,11 @@ const RUTA_ESCENA = "/api/escena";
 const ESPERA_MS = 8000;
 /** Espera del turno libre: el canal puede tardar lo que tarda OpenClaw. */
 const ESPERA_HABLAR_MS = 50000;
+
+/** En vivo, tiempo que se ve «Escuché: …» antes de cerrar el panel solo. */
+const CIERRE_EN_VIVO_MS = 1500;
+/** Texto del botón de Pana fuera del modo En vivo. */
+const TEXTO_HABLAR_CON_PANA = "Hablar con Pana";
 
 /** Intentos por pregunta antes de ofrecer el perfil seguro. */
 const INTENTOS_MAXIMOS = 2;
@@ -341,7 +353,42 @@ function cambiar() {
 }
 
 /**
+ * Indica si la pantalla está en modo En vivo (lo marca `escena.js` en el body).
+ *
+ * @returns {boolean} `true` con el modo En vivo activo.
+ */
+function enVivo() {
+  return document.body.classList.contains("escena--en-vivo");
+}
+
+/**
+ * Abre el panel solo con la conversación con Pana (modo En vivo).
+ *
+ * No carga el catálogo de preguntas ni toca el flujo guiado: el voluntario no
+ * declara monto ni elige tarjetas, solo habla.
+ *
+ * @param {string} [mensaje] Línea de estado que se muestra al abrir.
+ * @returns {void}
+ */
+function abrirConversacion(mensaje = "") {
+  porId("escena-captura").hidden = false;
+  porId("escena-captura-abrir").setAttribute("aria-expanded", "true");
+  const boton = porId("captura-pana");
+  boton.textContent = boton.dataset.textoVivo || TEXTO_HABLAR_CON_PANA;
+  porId("captura-pana-escuche").textContent = "";
+  porId("captura-pana-estado").textContent = hayMicrofono()
+    ? mensaje
+    : "Este navegador no reconoce la voz: escríbele a Pana por WhatsApp.";
+  // Al reabrir por un error no se roba el foco: E y V siguen funcionando.
+  if (!boton.hidden && !mensaje) {
+    boton.focus();
+  }
+}
+
+/**
  * Abre o cierra la captura y carga el catálogo al abrir.
+ *
+ * En modo En vivo abre solo la conversación con Pana.
  *
  * @returns {Promise<void>} Se resuelve cuando el panel quedó visible.
  */
@@ -351,6 +398,11 @@ async function alternar() {
     cerrar();
     return;
   }
+  if (enVivo()) {
+    abrirConversacion();
+    return;
+  }
+  porId("captura-pana").textContent = TEXTO_HABLAR_CON_PANA;
   panel.hidden = false;
   porId("escena-captura-abrir").setAttribute("aria-expanded", "true");
   try {
@@ -375,6 +427,10 @@ function cerrar() {
   detenerMicrofono();
   porId("escena-captura").hidden = true;
   porId("escena-captura-abrir").setAttribute("aria-expanded", "false");
+  // Un botón con foco se come los atajos (E, P, Espacio) de quien presenta.
+  if (document.activeElement instanceof HTMLElement) {
+    document.activeElement.blur();
+  }
 }
 
 /**
@@ -422,6 +478,11 @@ async function enviarAPana(texto) {
     const ficha = datos?.ficha ? " También te envié la ficha por WhatsApp." : "";
     linea.textContent = `${respuesta}${ficha}` || "Pana no respondió.";
   } catch (error) {
+    if (enVivo() && porId("escena-captura").hidden) {
+      // El panel ya se cerró solo: se vuelve a abrir para que se vea el error.
+      abrirConversacion(error.message);
+      return;
+    }
     linea.textContent = error.message;
   }
 }
@@ -445,8 +506,13 @@ function preguntarAPana() {
   boton.setAttribute("aria-pressed", "true");
   escuchar({
     alResultado: (texto) => {
-      linea.textContent = `Escuché: «${texto}». Enviando a Pana…`;
+      porId("captura-pana-escuche").textContent = `Escuché: «${texto}»`;
+      linea.textContent = "Enviando a Pana…";
       void enviarAPana(texto);
+      if (enVivo()) {
+        // En vivo la respuesta sale en la escena: el panel no tapa los subtítulos.
+        window.setTimeout(cerrar, CIERRE_EN_VIVO_MS);
+      }
     },
     alError: (mensaje) => {
       linea.textContent = mensaje;

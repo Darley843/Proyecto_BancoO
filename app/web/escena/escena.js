@@ -989,8 +989,8 @@ function limpiarParaEnVivo() {
 }
 
 /**
- * Entra al modo en vivo: guarda el punto de la escena, limpia y empieza a
- * pedir la lista desde `desde=0`.
+ * Entra al modo en vivo: detiene la escena guionada, guarda su punto, limpia y
+ * empieza desde el último turno de la lista (los viejos no se reproducen).
  *
  * @returns {void}
  */
@@ -1026,7 +1026,7 @@ function entrarEnVivo() {
   porId("escena-envivo-estado").hidden = false;
   pintarEstadoEnVivo();
   actualizarBotones();
-  sondeo.iniciar();
+  sondeo.iniciar({ desdeElFinal: true });
 }
 
 /**

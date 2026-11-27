@@ -16,6 +16,9 @@
  * - La cola se ordena y se deduplica por `seq`; `seq` es opaco (no se hace
  *   aritmética con él) y el cursor `desde` vive solo en memoria: nada se guarda
  *   en el almacenamiento del navegador.
+ * - Al entrar con E se empieza desde el último turno de la lista: los turnos
+ *   viejos solo mueven el cursor y no se reproducen. **R** sí vuelve a pedir
+ *   desde `desde=0`.
  * - Un turno que no cumple el contrato no se dice: se cuenta como descartado.
  * - El invitado (el voluntario escribiendo por WhatsApp) nunca pide voz.
  */
@@ -26,6 +29,8 @@ import { erroresDelTurno } from "./contrato.js";
 export const RUTA_EN_VIVO = "/api/escena/en-vivo";
 /** Espera entre un sondeo y el siguiente, en milisegundos. */
 export const INTERVALO_MS = 2000;
+/** Turnos máximos que devuelve la ruta en una respuesta (contrato §10). */
+export const LIMITE_RUTA = 200;
 /** Techo de cada petición antes de darla por perdida. */
 export const ESPERA_MS = 1500;
 /** Personajes que solo salen en subtítulo, sin voz. */
@@ -162,11 +167,19 @@ export function siguienteCursor(desde, ultimo) {
  *   alRecibir: (registros: object[], ultimo: number | string) => void,
  *   alEstado: (estado: {conectado: boolean, desde: number | string}) => void,
  * }} avisos Funciones que reciben los registros y el estado de la conexión.
- * @returns {{iniciar: () => void, detener: () => void, reiniciar: () => void,
- *   activo: () => boolean}} Controles del sondeo.
+ * @returns {{iniciar: (opciones?: {desdeElFinal?: boolean}) => void,
+ *   detener: () => void, reiniciar: () => void, activo: () => boolean}}
+ *   Controles del sondeo. Con `desdeElFinal`, los turnos que ya existían no se
+ *   entregan: solo los que lleguen después.
  */
 export function crearSondeo({ alRecibir, alEstado }) {
-  const sondeo = { activo: false, desde: 0, temporizador: null, controlador: null };
+  const sondeo = {
+    activo: false,
+    desde: 0,
+    temporizador: null,
+    controlador: null,
+    saltando: false,
+  };
 
   /**
    * Agenda la siguiente vuelta si el modo sigue abierto y la pestaña visible.
@@ -214,7 +227,13 @@ export function crearSondeo({ alRecibir, alEstado }) {
     const conectado = datos !== null && Array.isArray(datos.turnos);
     if (conectado) {
       sondeo.desde = siguienteCursor(sondeo.desde, datos.ultimo);
-      alRecibir(datos.turnos, sondeo.desde);
+      if (sondeo.saltando) {
+        // Lo que ya estaba en la lista solo mueve el cursor; con la página
+        // llena (200) quedan más viejos y la próxima vuelta sigue saltando.
+        sondeo.saltando = datos.turnos.length >= LIMITE_RUTA;
+      } else {
+        alRecibir(datos.turnos, sondeo.desde);
+      }
     }
     alEstado({ conectado, desde: sondeo.desde });
     agendar();
@@ -252,10 +271,11 @@ export function crearSondeo({ alRecibir, alEstado }) {
   }
 
   return {
-    iniciar() {
+    iniciar({ desdeElFinal = false } = {}) {
       cortar();
       sondeo.activo = true;
       sondeo.desde = 0;
+      sondeo.saltando = desdeElFinal;
       vuelta();
     },
     detener() {
@@ -265,6 +285,7 @@ export function crearSondeo({ alRecibir, alEstado }) {
     reiniciar() {
       cortar();
       sondeo.desde = 0;
+      sondeo.saltando = false;
       if (sondeo.activo) {
         vuelta();
       }
