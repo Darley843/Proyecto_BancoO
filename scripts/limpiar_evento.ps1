@@ -269,6 +269,42 @@ except Exception as error:
     sys.exit(1)
 '@
 
+function Invoke-Wsl {
+    <#
+        Ejecuta un comando dentro de WSL y devuelve su codigo y su salida.
+
+        Un proceso nativo que escribe en stderr no es un error del script:
+        "systemctl --user is-active" imprime "inactive" y devuelve 3 cuando el
+        servicio esta apagado, y "openclaw health" escribe "OpenClaw took too
+        long to respond" cuando no hay gateway. Con ErrorActionPreference en
+        Stop eso se vuelve un error terminante, asi que aqui se baja a Continue
+        (el cambio es local a la funcion) y se apaga
+        PSNativeCommandUseErrorActionPreference cuando la version de PowerShell
+        la define (7.4+ la deja encendida por defecto).
+    #>
+    param(
+        [string[]]$Comando,
+        [switch]$DescartarError
+    )
+
+    $ErrorActionPreference = 'Continue'
+    $nativo = Get-Variable -Name 'PSNativeCommandUseErrorActionPreference' `
+        -ErrorAction SilentlyContinue
+    if ($null -ne $nativo) {
+        $PSNativeCommandUseErrorActionPreference = $false
+    }
+
+    if ($DescartarError) {
+        $lineas = & wsl -d $Distro -- @Comando 2>$null
+    } else {
+        $lineas = & wsl -d $Distro -- @Comando 2>&1
+    }
+    return [pscustomobject]@{
+        Codigo = $LASTEXITCODE
+        Texto  = (@($lineas) | ForEach-Object { [string]$_ }) -join "`n"
+    }
+}
+
 function Invoke-OpenClaw {
     <#
         Ejecuta openclaw dentro de WSL y devuelve codigo y salida estandar.
@@ -277,12 +313,9 @@ function Invoke-OpenClaw {
     #>
     param([string[]]$Argumentos)
 
-    $lineas = & wsl -d $Distro -- openclaw @Argumentos 2>$null
-    $texto = (@($lineas) | ForEach-Object { [string]$_ }) -join "`n"
-    return [pscustomobject]@{
-        Codigo = $LASTEXITCODE
-        Texto  = $texto
-    }
+    $comando = @('openclaw')
+    if ($null -ne $Argumentos) { $comando += $Argumentos }
+    return Invoke-Wsl -Comando $comando -DescartarError
 }
 
 function Get-Sesiones {
@@ -294,7 +327,7 @@ function Get-Sesiones {
         'sessions', 'list', '--agent', $Agente, '--limit', 'all', '--json'
     )
     if ($resultado.Codigo -ne 0) {
-        throw "No se pudieron listar las sesiones (codigo $($resultado.Codigo)). Revisa que el gateway responda: wsl -d $Distro -- openclaw health"
+        throw "No se pudieron listar las sesiones (codigo $($resultado.Codigo)). Revisa que el gateway responda: wsl -d $Distro -- openclaw gateway status"
     }
 
     try {
@@ -310,26 +343,68 @@ function Get-Sesiones {
     return $sesiones
 }
 
+function Get-EstadoGateway {
+    <#
+        Devuelve 'activo', 'apagando', 'inactivo' o 'desconocido'. Consulta el
+        estado del servicio dentro de WSL con "systemctl --user is-active" y,
+        si no lo reconoce, cae a "openclaw gateway status --json".
+
+        No usa "openclaw health": con el gateway apagado health tarda decenas
+        de segundos y escribe "OpenClaw took too long to respond" en stderr,
+        que con ErrorActionPreference en Stop cortaba el borrado.
+    #>
+    $servicio = Invoke-Wsl -Comando @(
+        'systemctl', '--user', 'is-active', 'openclaw-gateway'
+    ) -DescartarError
+    switch ($servicio.Texto.Trim()) {
+        'active' { return 'activo' }
+        'activating' { return 'activo' }
+        'reloading' { return 'activo' }
+        'deactivating' { return 'apagando' }
+        # is-active devuelve 4 ("unknown"/sin unidad) con el texto "inactive";
+        # solo se cree el 3, que es el apagado real. El resto cae al respaldo.
+        'inactive' { if ($servicio.Codigo -eq 3) { return 'inactivo' } }
+        'failed' { return 'inactivo' }
+    }
+
+    $respaldo = Invoke-Wsl -Comando @(
+        'openclaw', 'gateway', 'status', '--json'
+    ) -DescartarError
+    try {
+        $datos = $respaldo.Texto | ConvertFrom-Json
+        $estado = [string]$datos.service.runtime.status
+        if ($estado -eq 'running') { return 'activo' }
+        if ($estado -in @('stopped', 'inactive', 'failed')) { return 'inactivo' }
+    } catch {
+        # Sin JSON legible se responde 'desconocido' y decide quien llama.
+    }
+    return 'desconocido'
+}
+
 function Test-GatewayArriba {
     <#
-        Devuelve $true si el gateway responde. La salida se descarta.
+        Devuelve $true si el servicio del gateway esta activo.
     #>
-    $null = & wsl -d $Distro -- openclaw health 2>$null
-    return ($LASTEXITCODE -eq 0)
+    return ((Get-EstadoGateway) -eq 'activo')
 }
 
 function Esperar-Gateway {
     <#
         Espera a que el gateway este arriba o abajo, como maximo los segundos
-        indicados. Devuelve $true si llego al estado pedido.
+        indicados. Devuelve $true si llego al estado pedido. Se apoya en el
+        estado del servicio, nunca en "openclaw health".
     #>
     param(
         [bool]$Arriba,
-        [int]$Segundos = 45
+        [int]$Segundos = 45,
+        [int]$PausaInicial = 0
     )
 
+    if ($PausaInicial -gt 0) { Start-Sleep -Seconds $PausaInicial }
     for ($i = 0; $i -lt $Segundos; $i++) {
-        if ((Test-GatewayArriba) -eq $Arriba) { return $true }
+        $estado = Get-EstadoGateway
+        if ($Arriba -and $estado -eq 'activo') { return $true }
+        if (-not $Arriba -and $estado -eq 'inactivo') { return $true }
         Start-Sleep -Seconds 1
     }
     return $false
@@ -340,9 +415,8 @@ function Get-HomeWsl {
         Devuelve el HOME real de la distro y cae a /home/openclaw si no lo puede
         leer.
     #>
-    $homeWsl = (@(& wsl -d $Distro -- printenv HOME 2>$null) |
-        ForEach-Object { [string]$_ }) -join ''
-    $homeWsl = $homeWsl.Trim()
+    $resultado = Invoke-Wsl -Comando @('printenv', 'HOME') -DescartarError
+    $homeWsl = $resultado.Texto.Trim()
     if (-not $homeWsl.StartsWith('/')) { $homeWsl = '/home/openclaw' }
     return $homeWsl
 }
@@ -401,8 +475,11 @@ function Invoke-SqliteWsl {
     }
 
     try {
-        $lineas = & wsl -d $Distro -- python3 $ayudanteWsl $RutaBase $Modo 2>$null
-        $codigo = $LASTEXITCODE
+        $resultado = Invoke-Wsl -Comando @(
+            'python3', $ayudanteWsl, $RutaBase, $Modo
+        ) -DescartarError
+        $codigo = $resultado.Codigo
+        $lineas = $resultado.Texto -split "`n"
     } finally {
         Remove-Item -LiteralPath $ayudanteWindows -Force -ErrorAction SilentlyContinue
     }
@@ -739,11 +816,25 @@ if (-not $Confirmar) {
     if ($parada.Codigo -ne 0) {
         Write-Host '   No se pudo detener el gateway.' -ForegroundColor Red
         $Fallos.Add('daemon stop')
-    } elseif (-not (Esperar-Gateway -Arriba $false -Segundos 45)) {
-        Write-Host '   El gateway sigue respondiendo; no se toca la memoria.' -ForegroundColor Red
+    }
+
+    # La parada se confirma con el estado del servicio, no con "openclaw
+    # health": con el gateway apagado health tarda decenas de segundos y escribe
+    # "OpenClaw took too long to respond" en stderr, que cortaba el borrado.
+    $detenido = $false
+    if ($parada.Codigo -eq 0) {
+        $detenido = Esperar-Gateway -Arriba $false -Segundos 25 -PausaInicial 5
+    }
+    if ($parada.Codigo -eq 0 -and -not $detenido) {
+        Write-Host '   El gateway no confirmo el apagado; no se toca la memoria.' -ForegroundColor Red
         $Fallos.Add('gateway no se detuvo')
-    } else {
-        try {
+    }
+
+    # El finally corre con o sin $detenido: si el apagado no llego a ocurrir y
+    # el servicio sigue activo no se toca; si quedo apagado (o el estado es
+    # desconocido) se vuelve a encender con daemon start.
+    try {
+        if ($detenido) {
             if ($haySesiones) {
                 for ($inicio = 0; $inicio -lt $claves.Count; $inicio += $LoteMemorias) {
                     $fin = [Math]::Min($inicio + $LoteMemorias, $claves.Count) - 1
@@ -790,13 +881,17 @@ if (-not $Confirmar) {
             Write-Host ''
             Write-Host '   Compactacion de las bases'
             Invoke-CompactacionBases -Compactar $true
-        } finally {
-            Write-Host '   Volviendo a levantar el gateway...'
+        }
+    } finally {
+        Write-Host '   Asegurando que el gateway quede arriba...'
+        if ((Get-EstadoGateway) -eq 'activo') {
+            Write-Host '   Gateway arriba.'
+        } else {
             $arranque = Invoke-OpenClaw -Argumentos @('daemon', 'start')
             if ($arranque.Codigo -ne 0) {
                 Write-Host '   No se pudo arrancar el gateway: revisalo a mano.' -ForegroundColor Red
                 $Fallos.Add('daemon start')
-            } elseif (-not (Esperar-Gateway -Arriba $true -Segundos 60)) {
+            } elseif (-not (Esperar-Gateway -Arriba $true -Segundos 60 -PausaInicial 3)) {
                 Write-Host '   El gateway no responde todavia: revisalo a mano.' -ForegroundColor Red
                 $Fallos.Add('gateway no volvio')
             } else {
