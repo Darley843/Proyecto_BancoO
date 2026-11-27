@@ -15,7 +15,8 @@
  *   de Piper como respaldo en vez de otra voz cualquiera.
  *
  * Si la API no responde, todos usan el navegador con los valores de
- * `RESPALDO_NAVEGADOR`. Nunca guarda los textos.
+ * `RESPALDO_NAVEGADOR`. Nunca guarda los textos en el navegador: el audio
+ * adelantado (`adelantarVoz`) vive solo en memoria y se descarta al usarse.
  */
 
 /** Personajes del contrato del turno de escena, en el orden de la escena. */
@@ -49,6 +50,12 @@ const LARGO_MAXIMO_VOZ = 900;
 
 /** Tiempo límite para recibir el audio de Pana antes de usar el navegador. */
 const ESPERA_VOZ_MS = 20000;
+
+/** Máximo de audios pedidos por adelantado que se guardan en memoria. */
+const MAXIMO_ADELANTADOS = 4;
+
+/** Audios de Piper pedidos antes de su turno: `personaje + texto` → promesa del audio. */
+const adelantados = new Map();
 
 /** Audio de Pana que suena ahora, si hay uno. */
 let audioActual = null;
@@ -116,11 +123,8 @@ export async function decirComo(personaje, texto, opciones = {}) {
   if (lectura !== lecturaActual) {
     return "cancelada";
   }
-  const usarPiper =
-    ajuste.motor === "piper" ||
-    (ajuste.motor === "navegador" && !tieneVozDelNavegador(ajuste.navegador?.voz ?? ""));
-  if (usarPiper && limpio.length <= LARGO_MAXIMO_VOZ) {
-    const audio = await pedirAudio(quien, limpio);
+  if (usaPiper(ajuste, limpio)) {
+    const audio = await (tomarAdelantado(quien, limpio) ?? pedirAudio(quien, limpio));
     if (lectura !== lecturaActual) {
       return "cancelada";
     }
@@ -136,6 +140,74 @@ export async function decirComo(personaje, texto, opciones = {}) {
   }
   alTerminar();
   return "ninguna";
+}
+
+/**
+ * Pide ya el audio de Piper de un turno que viene, para que suene sin espera.
+ *
+ * La escena lo llama mientras suena el turno actual: Piper tarda en generar
+ * cada audio y, sin esto, entre un personaje y otro queda un silencio. Si el
+ * personaje no usa Piper no hace nada. Guarda como máximo
+ * `MAXIMO_ADELANTADOS` audios, solo en memoria.
+ *
+ * @param {string} personaje Personaje que hablará.
+ * @param {string} texto Texto que dirá (el mismo que recibirá `decirComo`).
+ * @returns {Promise<void>} Se resuelve cuando el pedido quedó hecho (no espera el audio).
+ */
+export async function adelantarVoz(personaje, texto) {
+  const quien = PERSONAJES.includes(personaje) ? personaje : "pana";
+  const limpio = String(texto ?? "").trim();
+  const clave = claveAdelantado(quien, limpio);
+  if (!limpio || adelantados.has(clave)) {
+    return;
+  }
+  const ajuste = await configuracionDe(quien);
+  if (!usaPiper(ajuste, limpio) || adelantados.has(clave)) {
+    return;
+  }
+  while (adelantados.size >= MAXIMO_ADELANTADOS) {
+    adelantados.delete(adelantados.keys().next().value);
+  }
+  adelantados.set(clave, pedirAudio(quien, limpio));
+}
+
+/**
+ * Saca el audio adelantado de un turno, si se pidió antes.
+ *
+ * @param {string} personaje Personaje que habla.
+ * @param {string} texto Texto ya limpio.
+ * @returns {Promise<Blob | null> | null} La promesa del audio, o `null` si no se adelantó.
+ */
+function tomarAdelantado(personaje, texto) {
+  const clave = claveAdelantado(personaje, texto);
+  const audio = adelantados.get(clave) ?? null;
+  adelantados.delete(clave);
+  return audio;
+}
+
+/**
+ * Arma la clave de un audio adelantado.
+ *
+ * @param {string} personaje Personaje que habla.
+ * @param {string} texto Texto ya limpio.
+ * @returns {string} Clave única para ese personaje y ese texto.
+ */
+function claveAdelantado(personaje, texto) {
+  return `${personaje}\n${texto}`;
+}
+
+/**
+ * Indica si un texto de un personaje se dice con Piper.
+ *
+ * @param {{motor: string, navegador?: {voz?: string}}} ajuste Ajuste del personaje.
+ * @param {string} texto Texto ya limpio.
+ * @returns {boolean} `true` si se pide el audio a `POST /api/voz`.
+ */
+function usaPiper(ajuste, texto) {
+  const porMotor =
+    ajuste.motor === "piper" ||
+    (ajuste.motor === "navegador" && !tieneVozDelNavegador(ajuste.navegador?.voz ?? ""));
+  return porMotor && texto.length <= LARGO_MAXIMO_VOZ;
 }
 
 /**

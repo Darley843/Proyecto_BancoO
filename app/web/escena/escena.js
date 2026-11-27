@@ -36,7 +36,7 @@
  * (en vivo: vuelve a pedir la lista desde el principio).
  */
 
-import { decirComo, detenerVoz } from "../voz.js";
+import { adelantarVoz, decirComo, detenerVoz } from "../voz.js";
 import {
   APERTURA_PREGUNTAS,
   LARGO_MAXIMO,
@@ -553,6 +553,7 @@ function decir(turno) {
   const lectura = estado.vivo.activo
     ? tiempoDeLectura(texto)
     : Math.max(LECTURA_MINIMA_MS, turno.texto.length * MS_POR_LETRA);
+  adelantarSiguiente(casilla);
   return new Promise((listo) => {
     if (soloSubtitulos) {
       window.setTimeout(listo, lectura);
@@ -568,6 +569,26 @@ function decir(turno) {
         porId("escena-voz").textContent = estado.vivo.activo ? "Voz bloqueada: solo subtítulos" : "Voz: falló";
         window.setTimeout(listo, estado.vivo.activo ? lectura : 0);
       });
+  });
+}
+
+/**
+ * Pide por adelantado la voz del turno que sigue, mientras suena el actual.
+ *
+ * Así el siguiente personaje empieza sin el silencio que tarda Piper en
+ * generar su audio. No adelanta turnos sin voz (el joven, el invitado o
+ * con «solo subtítulos»).
+ *
+ * @param {boolean} casilla Si está marcada la casilla «solo subtítulos».
+ * @returns {void}
+ */
+function adelantarSiguiente(casilla) {
+  const siguiente = estado.turnos[estado.indice + 1];
+  if (!siguiente || siguiente.personaje === "joven" || !pideVoz(siguiente.personaje, casilla)) {
+    return;
+  }
+  adelantarVoz(siguiente.personaje, paraVoz(siguiente.texto)).catch(() => {
+    // Si falla, el turno pedirá su audio cuando le toque, como antes.
   });
 }
 
