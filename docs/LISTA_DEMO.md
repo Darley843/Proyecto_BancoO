@@ -202,21 +202,27 @@ es [`DESPLIEGUE_WHATSAPP.md`](./DESPLIEGUE_WHATSAPP.md), sección 8.
   repositorio y el enlace **Abrir repositorio** funcionan, y cada diagrama abre
   en otra pestaña.
 - [ ] Escena en vivo encendida en la **misma ventana** de `make app`, antes de
-      arrancarla: el interruptor de la lista y el código de cuatro dígitos que
-      activa al voluntario. El código va **solo en la tarjeta del voluntario**:
-      si lo tuvieran todos, cualquiera se tomaría la pantalla.
+      arrancarla: el interruptor de la lista. El código de cuatro dígitos queda
+      como **respaldo** y va **solo en la tarjeta del voluntario**; con la
+      convocatoria ya no hace falta escribirlo.
   ```powershell
   $env:ESCENA_EN_VIVO = "1"
   $env:ESCENA_CODIGO = "XXXX"
   ```
   El código vive solo en la sesión: no va en `config/`, no se versiona y no se
   pega en el chat. Se lee al arrancar la app, así que un cambio de código exige
-  reiniciarla. Se comprueba con el voluntario: en Edge, **E** deja la barra en
-  «En vivo — esperando el primer turno»; el voluntario escribe `ESCENA` y los
-  cuatro dígitos desde su teléfono y la lista muestra su turno; sin el
-  interruptor, el canal responde «La escena en vivo no está activada» y no
-  publica nada.
-- [ ] Con el voluntario activo (`ESCENA` y el código), abrir **V** y probar
+  reiniciarla. Se comprueba con el voluntario: al terminar la presentación, la
+  pantalla deja el QR y, debajo, «El primero en escanear y escribir "Acepto"
+  será nuestro voluntario». El voluntario escanea, escribe **Acepto** (o
+  cualquier mensaje si ya había aceptado la Ley 1581) y la pantalla pasa sola
+  al modo conversación; sin el interruptor, el canal responde «La escena en
+  vivo no está activada» y no publica nada.
+- [ ] **L** libera al voluntario y vuelve a la espera con el QR y una
+      convocatoria nueva. Se usa si se adelantó la persona equivocada: la
+      siguiente en escribir queda como voluntaria. La persona liberada sigue
+      conversando por WhatsApp como invitada, y los demás invitados reciben una
+      sola vez el aviso de que el voluntario ya está en el escenario.
+- [ ] Con el voluntario activo, abrir **V** y probar
       **Hablar con Pana**: la frase pasa por los filtros del canal, la respuesta
       llega a su WhatsApp y, si el turno produce la ficha, también llega la
       imagen. Sin voluntario activo, el panel avisa y no envía nada.
@@ -307,10 +313,15 @@ make app
       decida mostrar trazas (`docs/SEGURIDAD.md` §5.1).
 - [ ] La app queda en `http://127.0.0.1:8000` y `GET /health` responde 200.
 - [ ] `ESCENA_CODIGO` tiene los cuatro dígitos que lleva impresos la tarjeta del
-      voluntario y es el mismo que se escribió en la sección 2. El código solo
-      se dicta al voluntario: nunca se proyecta ni se pega en el chat.
-- [ ] Con **E** en la pantalla, la barra dice «En vivo — esperando el primer
-      turno» (si dice «Sin conexión», la app arrancó sin `ESCENA_EN_VIVO`).
+      voluntario y es el mismo que se escribió en la sección 2. Es el **respaldo**
+      si la convocatoria falla: el código solo se dicta al voluntario, nunca se
+      proyecta ni se pega en el chat.
+- [ ] Al terminar la presentación, la pantalla muestra el QR y la convocatoria.
+      Con **E** manual, la barra dice «En vivo — esperando el primer turno» (si
+      dice «Sin conexión», la app arrancó sin `ESCENA_EN_VIVO`).
+- [ ] **L** deja la pantalla otra vez en el QR con una convocatoria nueva y
+      libera al voluntario anterior; se usa si se adelantó la persona
+      equivocada.
 
 **Ventana 4: el túnel.** Si `cloudflared` no está instalado:
 `winget install --id Cloudflare.cloudflared` y abrir una ventana nueva.
@@ -422,6 +433,7 @@ las teclas están en [`ESCENA.md`](./ESCENA.md).
 | Perfil seguro | El voluntario no responde, no completa su perfil o falla el micrófono de la entrada por voz (tecla **V**) | Se usa un perfil ficticio preparado (`config/escena.toml`); el auditor se ejecuta igual |
 | Escena proyectada | Falla la API o el plan B no se recupera | `GET /api/escena/proyectado` lee `data/escena/proyectado.json`; si la app se cayó, `make app` otra vez y recargar |
 | Simulador o escena proyectada | Último recurso, todo en vivo | `make simular` o la escena proyectada; **sin video** |
+| Voluntario equivocado | Se adelantó otra persona en la convocatoria | Tecla **L**: libera la ranura, vuelve al QR y abre otra convocatoria; la persona anterior sigue por WhatsApp como invitada |
 
 ### 6.3 Si el tiempo no alcanza
 

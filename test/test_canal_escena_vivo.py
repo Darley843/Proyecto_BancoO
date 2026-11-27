@@ -7,6 +7,7 @@ publicador y el motor se sustituyen por dobles: nada sale del proceso.
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
@@ -23,6 +24,8 @@ from banco_occidente_corpus.canal.entrevista import EntrevistaCanal
 from banco_occidente_corpus.canal.escena_vivo import (
     TEXTO_ACTIVADA,
     TEXTO_APAGADA,
+    TEXTO_VOLUNTARIO,
+    TEXTO_YA_HAY_VOLUNTARIO,
     EscenaVivo,
     codigo_del_comando,
     es_comando,
@@ -586,3 +589,156 @@ def test_otro_invitado_no_publica_en_el_despachador(
     banco.despachador.procesar(otro, AHORA)
 
     assert espia.publicados == []
+
+
+def test_la_primera_huella_que_acepta_es_la_voluntaria(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Abierta la convocatoria, «Acepto» ocupa la ranura sin código."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    banco = _banco(tmp_path, escena=escena)
+    escena.abrir_convocatoria()
+
+    mensaje = _mensaje("Acepto", id_mensaje="wamid.acepto")
+    banco.despachador.recibir(mensaje)
+    banco.despachador.procesar(mensaje, AHORA)
+
+    assert escena.activo(banco.usuario_id) is True
+    assert escena.convocatoria_abierta() is False
+    assert banco.enviadas[-1].texto == TEXTO_VOLUNTARIO
+    assert [turno.texto for turno, _ in espia.publicados] == [TEXTO_VOLUNTARIO]
+    assert banco.llamadas == []
+    activo = escena.voluntario_activo()
+    assert activo is not None and activo.destino == NUMERO
+
+
+def test_quien_acepto_antes_no_activa_hasta_escribir_despues(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """El consentimiento previo no basta: la activación ocurre tras la apertura."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    banco = _banco(tmp_path, escena=escena)
+    banco.despachador.maquina.aceptar(banco.usuario_id, AHORA)
+
+    antes = _mensaje("hola antes", id_mensaje="wamid.antes")
+    banco.despachador.recibir(antes)
+    banco.despachador.procesar(antes, AHORA)
+    assert escena.activo(banco.usuario_id) is False
+
+    escena.abrir_convocatoria()
+    despues = _mensaje("hola después", id_mensaje="wamid.despues")
+    banco.despachador.recibir(despues)
+    banco.despachador.procesar(despues, AHORA)
+
+    assert escena.activo(banco.usuario_id) is True
+    assert banco.enviadas[-1].texto == TEXTO_VOLUNTARIO
+
+
+def test_la_segunda_persona_no_reemplaza_y_recibe_el_aviso_una_vez(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Con voluntario activo, el invitado sigue por WhatsApp y se le avisa una vez."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    segundo = calcular_usuario_id(OTRO_NUMERO, SAL)
+    banco = _banco(tmp_path, escena=escena, huellas_extra=(segundo,))
+    escena.abrir_convocatoria()
+
+    primero = _mensaje("Acepto", id_mensaje="wamid.primero")
+    banco.despachador.recibir(primero)
+    banco.despachador.procesar(primero, AHORA)
+    espia.publicados.clear()
+
+    banco.despachador.maquina.aceptar(segundo, AHORA)
+    otro = _mensaje("hola", numero=OTRO_NUMERO, id_mensaje="wamid.otro1")
+    banco.despachador.recibir(otro)
+    banco.despachador.procesar(otro, AHORA)
+
+    assert escena.activo(banco.usuario_id) is True
+    assert escena.activo(segundo) is False
+    assert "respuesta de Pana" in banco.enviadas[-1].texto
+    assert TEXTO_YA_HAY_VOLUNTARIO in banco.enviadas[-1].texto
+    assert espia.publicados == []
+
+    segundo_mensaje = _mensaje("otra vez", numero=OTRO_NUMERO, id_mensaje="wamid.otro2")
+    banco.despachador.recibir(segundo_mensaje)
+    banco.despachador.procesar(segundo_mensaje, AHORA)
+
+    avisos = [r for r in banco.enviadas if TEXTO_YA_HAY_VOLUNTARIO in r.texto]
+    assert len(avisos) == 1
+
+
+def test_liberar_la_convocatoria_deja_la_ranura_para_otra_persona(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """DELETE libera al voluntario y la siguiente apertura vuelve a elegir."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    segundo = calcular_usuario_id(OTRO_NUMERO, SAL)
+    banco = _banco(tmp_path, escena=escena, huellas_extra=(segundo,))
+    escena.abrir_convocatoria()
+
+    primero = _mensaje("Acepto", id_mensaje="wamid.primero")
+    banco.despachador.recibir(primero)
+    banco.despachador.procesar(primero, AHORA)
+    assert escena.activo(banco.usuario_id) is True
+
+    escena.liberar_convocatoria()
+    assert escena.activo(banco.usuario_id) is False
+    assert escena.convocatoria_abierta() is False
+
+    escena.abrir_convocatoria()
+    banco.despachador.maquina.aceptar(segundo, AHORA)
+    otro = _mensaje("hola", numero=OTRO_NUMERO, id_mensaje="wamid.otro")
+    banco.despachador.recibir(otro)
+    banco.despachador.procesar(otro, AHORA)
+
+    assert escena.activo(segundo) is True
+    assert escena.activo(banco.usuario_id) is False
+
+
+def test_sin_convocatoria_todo_sigue_como_hoy(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Sin POST de la pantalla no hay activación ni aviso de convocatoria."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    banco = _banco(tmp_path, escena=escena)
+    banco.despachador.maquina.aceptar(banco.usuario_id, AHORA)
+
+    saludo = _mensaje("hola", id_mensaje="wamid.hola")
+    banco.despachador.recibir(saludo)
+    banco.despachador.procesar(saludo, AHORA)
+
+    assert escena.activo(banco.usuario_id) is False
+    assert banco.enviadas[-1].texto == "respuesta de Pana"
+    assert all(TEXTO_YA_HAY_VOLUNTARIO not in r.texto for r in banco.enviadas)
+    assert espia.publicados == []
+
+
+def test_la_convocatoria_no_pone_el_numero_en_logs_ni_en_la_lista(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
+) -> None:
+    """Solo vive la huella en memoria: el número no se registra ni se publica."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    caplog.set_level(logging.DEBUG)
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    banco = _banco(tmp_path, escena=escena)
+    escena.abrir_convocatoria()
+
+    mensaje = _mensaje("Acepto", id_mensaje="wamid.acepto")
+    banco.despachador.recibir(mensaje)
+    banco.despachador.procesar(mensaje, AHORA)
+
+    assert NUMERO not in caplog.text
+    assert all(NUMERO not in turno.texto for turno, _ in espia.publicados)
+    assert NUMERO not in repr(escena)
+    assert NUMERO not in repr(escena.voluntario_activo())

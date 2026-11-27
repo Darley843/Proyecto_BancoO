@@ -570,13 +570,15 @@ def _funcion(codigo: str, firma: str) -> str:
 
 
 def test_la_presentacion_termina_en_el_qr_de_whatsapp() -> None:
-    """Tras la invitación de Pana queda el QR con «Esperando al voluntario…»."""
+    """Tras la invitación de Pana queda el QR y la convocatoria del voluntario."""
     html = (WEB / "escena.html").read_text(encoding="utf-8")
     espera = _bloque_html(html, 'id="escena-espera"', "</section>")
     assert 'id="escena-espera-qr"' in espera
     assert "Esperando al voluntario…" in espera
-    assert "ESCENA" in espera
+    assert "El primero en escanear y escribir «Acepto»" in espera
+    assert 'id="escena-espera-pista"' in espera
     codigo = (ESCENA / "escena.js").read_text(encoding="utf-8")
+    assert 'const RUTA_CONVOCATORIA = "/api/escena/convocatoria";' in codigo
     termino = _funcion(codigo, "function terminoLaPresentacion()")
     assert "estado.largoIntroduccion - 1" in termino
     assert 'estado.modo !== "nucleo"' in termino
@@ -587,11 +589,34 @@ def test_la_presentacion_termina_en_el_qr_de_whatsapp() -> None:
     assert "mostrarEspera();" in siguiente
     espera_js = _funcion(codigo, "function mostrarEspera()")
     assert 'ponerQrWhatsapp(porId("escena-espera-qr"))' in espera_js
+    assert "void abrirConvocatoria();" in espera_js
     assert "vigia?.iniciar({ desdeElFinal: true });" in espera_js
     # La espera no abre el flujo guiado.
     assert "escena:captura" not in espera_js
     recursos = (ESCENA / "recursos.js").read_text(encoding="utf-8")
     assert "export async function ponerQrWhatsapp(imagen)" in recursos
+
+
+def test_la_tecla_l_libera_al_voluntario_y_vuelve_a_la_espera() -> None:
+    """L hace DELETE de la convocatoria, sale del modo vivo y vuelve al QR."""
+    codigo = (ESCENA / "escena.js").read_text(encoding="utf-8")
+    assert 'tecla === "l"' in codigo
+    liberar = _funcion(codigo, "async function liberarConvocatoria()")
+    assert 'method: "DELETE"' in liberar
+    assert "salirEnVivo();" in liberar
+    assert "mostrarEspera();" in liberar
+    html = (WEB / "escena.html").read_text(encoding="utf-8")
+    assert "L liberar voluntario" in html
+
+
+def test_la_convocatoria_se_abre_al_mostrar_la_espera() -> None:
+    """La pantalla pide POST /api/escena/convocatoria y muestra la pista."""
+    codigo = (ESCENA / "escena.js").read_text(encoding="utf-8")
+    abrir = _funcion(codigo, "async function abrirConvocatoria()")
+    assert 'method: "POST"' in abrir
+    assert "RUTA_CONVOCATORIA" in abrir
+    assert "TEXTO_CONVOCATORIA" in abrir
+    assert "El primero en escanear y escribir «Acepto»" in codigo
 
 
 def test_el_primer_turno_del_canal_activa_el_modo_conversacion() -> None:

@@ -32,6 +32,28 @@ usar la respuesta en vivo.
 
 ---
 
+## Cómo abrir la actividad
+
+Al terminar la presentación, la pantalla deja el QR y la convocatoria. Quien
+presenta dice:
+
+> **«Primero escanea nuestro voluntario; los demás, en un momento.»**
+
+El primero que escanee y escriba **Acepto** (o cualquier mensaje, si ya aceptó
+la Ley 1581) queda como voluntario sin código y sale en la pantalla. Los demás
+siguen conversando con Pana por WhatsApp como invitados: sus mensajes no se
+publican y reciben una sola vez el aviso de que el voluntario ya está en el
+escenario.
+
+**Riesgo de que alguien se adelante.** Si la persona que escanea primero no es
+la que debe salir, quien presenta pulsa **L**: la pantalla libera al voluntario,
+vuelve al QR y abre una convocatoria nueva. La persona liberada sigue
+conversando por WhatsApp como invitada. No se pide un nombre ni se dicta ningún
+código; el respaldo con `ESCENA` y el código de la tarjeta queda solo para el
+voluntario si la API de la convocatoria falla.
+
+---
+
 ## A. El proyecto
 
 <a id="p1"></a>
