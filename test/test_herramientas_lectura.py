@@ -389,3 +389,89 @@ def test_si_la_publicacion_falla_la_herramienta_responde_igual(
 
     assert salida.ok
     assert salida.datos["cuota_diaria_legible"] == "$40.000"
+
+
+# --- El diagnóstico completo sigue solo con la escena ---------------------------
+
+
+def test_diagnostico_completo_publica_la_escena_en_orden_y_devuelve_el_resumen(
+    escena_viva: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """La misma llamada deja la escena en orden y las opciones A y B en el resumen."""
+    monkeypatch.setenv("SUCURSAL_DEMO", "1")
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+
+    salida = lectura.diagnosticar_capacidad(RESPUESTAS, monto=7_500_000)
+    assert salida.ok
+    assert "resultado" in salida.datos
+
+    resumen = salida.datos["resumen_escena"]
+    assert resumen["avisos"] == []
+    assert resumen["gota"]["monto_legible"] == "$7.500.000"
+    assert resumen["gota"]["tasa_ea_legible"] == "791,61 % E.A."
+    assert resumen["gota"]["total_legible"] == "$61.500.000"
+    assert resumen["comparacion"]["tasa_ea_banco_legible"].endswith("% E.A.")
+    assert resumen["comparacion"]["total_banco_legible"].startswith("$")
+    assert [opcion["letra"] for opcion in resumen["opciones"]] == ["A", "B"]
+    for opcion in resumen["opciones"]:
+        assert opcion["cuota_mensual_legible"].startswith("$")
+        assert opcion["plazo_legible"].endswith("meses")
+        assert opcion["total_pagado_legible"].startswith("$")
+
+    registros = _publicados(escena_viva)
+    turnos = _turnos(registros)
+    assert [registro["origen"] for registro in registros] == ["herramienta"] * len(registros)
+    seqs = [int(registro["seq"]) for registro in registros]
+    assert seqs == sorted(seqs)
+
+    assert turnos[0]["personaje"] == "pana"
+    assert turnos[0]["id"] == "pana.diagnostico.v1"
+    assert [turno["personaje"] for turno in turnos[1:5]] == ["don_gota"] * 4
+    assert [turno["personaje"] for turno in turnos[5:8]] == ["pana"] * 3
+    assert turnos[8:]
+    assert {turno["personaje"] for turno in turnos[8:]} <= {"agente_joven", "agente_banco"}
+
+
+def test_diagnostico_incompleto_no_publica_la_escena_continua(escena_viva: Path) -> None:
+    """Sin monto exacto o con respuestas parciales no se publica nada de la escena."""
+    sin_monto = lectura.diagnosticar_capacidad(RESPUESTAS)
+    assert sin_monto.ok
+    assert sin_monto.datos["estado"] == "faltan_datos"
+    assert "resumen_escena" not in sin_monto.datos
+    assert _publicados(escena_viva) == []
+
+    parcial = lectura.diagnosticar_capacidad(["objetivo.libre_inversion"])
+    assert parcial.ok
+    assert parcial.datos["estado"] == "faltan_datos"
+    assert "resumen_escena" not in parcial.datos
+    assert _publicados(escena_viva) == []
+
+
+def test_si_la_negociacion_falla_el_diagnostico_se_devuelve_igual(
+    escena_viva: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    caplog: pytest.LogCaptureFixture,
+) -> None:
+    """Un fallo de la negociación deja el diagnóstico, Don Gota y la comparación."""
+    monkeypatch.setenv("SUCURSAL_DEMO", "1")
+    monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
+
+    def fallar(*_args: object, **_kwargs: object) -> object:
+        raise RuntimeError("fallo simulado de la negociación")
+
+    monkeypatch.setattr(lectura, "negociar_opcion", fallar)
+    with caplog.at_level("WARNING"):
+        salida = lectura.diagnosticar_capacidad(RESPUESTAS, monto=7_500_000)
+
+    assert salida.ok
+    assert "resultado" in salida.datos
+    resumen = salida.datos["resumen_escena"]
+    assert lectura.AVISO_NEGOCIACION in resumen["avisos"]
+    assert "opciones" not in resumen
+    assert "gota" in resumen and "comparacion" in resumen
+    assert "aviso negociacion" in caplog.text
+
+    turnos = _turnos(_publicados(escena_viva))
+    assert turnos[0]["id"] == "pana.diagnostico.v1"
+    assert [turno["personaje"] for turno in turnos[1:5]] == ["don_gota"] * 4

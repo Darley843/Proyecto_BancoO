@@ -8,10 +8,12 @@ en lugar de abrir la red por su cuenta.
 
 from __future__ import annotations
 
+import logging
 import os
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import suppress
 from decimal import Decimal
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 
@@ -87,6 +89,16 @@ MAXIMO_PALABRAS_PROYECTO: int = 40
 MAXIMO_CIFRAS_AUDITOR: int = 40
 #: Tope de la tasa que se lee como fracción cuando no se declara la unidad.
 TOPE_FRACCION: float = 100.0
+#: Id del turno de Pana que abre la escena con el diagnóstico completo.
+ID_TURNO_DIAGNOSTICO: str = "pana.diagnostico.v1"
+#: Orden del turno del diagnóstico: antes de Don Gota (1) y de la comparación (8).
+ORDEN_TURNO_DIAGNOSTICO: int = 0
+#: Avisos de la escena continua; se registran por código, sin textos ni cifras.
+AVISO_GOTA: str = "no se pudo calcular la oferta de Don Gota"
+AVISO_COMPARACION: str = "no se pudo comparar con el banco"
+AVISO_NEGOCIACION: str = "no se pudo negociar la opción"
+
+logger = logging.getLogger(__name__)
 
 
 def _publicar_escena(construir: Callable[[], Iterable[TurnoEscena]]) -> None:
@@ -292,6 +304,267 @@ def verificar_usura(
     return ok("verificar_usura", datos)
 
 
+def _diagnostico_completo(resultado: ResultadoDiagnostico) -> bool:
+    """Indica si el diagnóstico ya tiene producto, monto y plazo.
+
+    Args:
+        resultado: resultado del motor del diagnóstico.
+
+    Returns:
+        `True` cuando el crédito se puede prolongar con Don Gota, la comparación
+        y la negociación.
+    """
+    entrada = resultado.entrada
+    return entrada.monto_credito is not None and entrada.plazo_meses is not None
+
+
+def _turno_diagnostico(resultado: ResultadoDiagnostico) -> TurnoEscena:
+    """Arma el turno de Pana que presenta el diagnóstico completo.
+
+    Args:
+        resultado: resultado del motor con monto y plazo.
+
+    Returns:
+        El turno determinista que abre la escena, antes de Don Gota.
+
+    Raises:
+        ValueError: si el resultado no trae monto o plazo.
+    """
+    entrada = resultado.entrada
+    monto = entrada.monto_credito
+    plazo = entrada.plazo_meses
+    if monto is None or plazo is None:
+        raise ValueError("el diagnóstico no tiene monto y plazo")
+    partes = [f"por {formatear_pesos(monto)} a {formatear_meses(plazo)}"]
+    cuota = resultado.cuota_mensual
+    if cuota is not None:
+        desde = formatear_pesos(cuota.desde)
+        hasta = formatear_pesos(cuota.hasta)
+        if desde == hasta:
+            partes.append(f"con una cuota de {desde} al mes")
+        else:
+            partes.append(f"con una cuota de {desde} a {hasta} al mes")
+    return TurnoEscena(
+        id=ID_TURNO_DIAGNOSTICO,
+        orden=ORDEN_TURNO_DIAGNOSTICO,
+        personaje="pana",
+        texto="Tu diagnóstico: " + " ".join(partes) + ".",
+        subtitulo="Diagnóstico",
+        origen="motor",
+    )
+
+
+def _agregar_cifras(destino: list[str], valores: object) -> None:
+    """Suma las cifras legibles de una salida, sin repetirlas.
+
+    Args:
+        destino: lista de cifras permitidas que se completa en el sitio.
+        valores: lista o tupla de textos legibles de una herramienta.
+    """
+    if not isinstance(valores, (list, tuple)):
+        return
+    for valor in valores:
+        texto = str(valor).strip()
+        if texto and texto not in destino:
+            destino.append(texto)
+
+
+def _opciones_negociacion(
+    escenarios: object,
+    monto: int,
+    producto: str,
+) -> list[dict[str, Any]]:
+    """Elige la opción de cuota más baja (A) y la de menor total (B).
+
+    Solo entran escenarios ofertables del mismo monto y producto que pidió el
+    invitado: así A y B cambian el plazo, no el capital ni el producto. Si la
+    opción más barata al mes es también la de menor total, B toma el siguiente
+    total distinto; si no hay otro, repite la misma opción.
+
+    Args:
+        escenarios: `escenarios` de `negociar_opcion`, ya serializados.
+        monto: monto solicitado, en pesos.
+        producto: producto del diagnóstico.
+
+    Returns:
+        Las dos opciones con su cuota, su plazo y su total legibles.
+    """
+    if not isinstance(escenarios, (list, tuple)):
+        return []
+    capital = Decimal(monto)
+    candidatas = [
+        escenario
+        for escenario in escenarios
+        if isinstance(escenario, Mapping)
+        and escenario.get("ofertable") is True
+        and escenario.get("producto") == producto
+        and escenario.get("monto") is not None
+        and Decimal(str(escenario["monto"])) == capital
+        and escenario.get("cuota_mensual") is not None
+        and escenario.get("total_pagado") is not None
+        and escenario.get("plazo_meses") is not None
+    ]
+    if not candidatas:
+        return []
+    cuota_baja = min(candidatas, key=lambda escenario: Decimal(str(escenario["cuota_mensual"])))
+    total_bajo = min(candidatas, key=lambda escenario: Decimal(str(escenario["total_pagado"])))
+    if total_bajo["codigo"] == cuota_baja["codigo"]:
+        otros = sorted(
+            (escenario for escenario in candidatas if escenario["codigo"] != cuota_baja["codigo"]),
+            key=lambda escenario: Decimal(str(escenario["total_pagado"])),
+        )
+        if otros:
+            total_bajo = otros[0]
+    return [_opcion("A", cuota_baja), _opcion("B", total_bajo)]
+
+
+def _opcion(letra: str, escenario: Mapping[str, Any]) -> dict[str, Any]:
+    """Da forma a una opción de la negociación para el resumen de Pana.
+
+    Args:
+        letra: `A` o `B`.
+        escenario: escenario ofertable serializado.
+
+    Returns:
+        La opción con sus cifras de máquina y sus textos legibles.
+    """
+    cuota = Decimal(str(escenario["cuota_mensual"]))
+    total = Decimal(str(escenario["total_pagado"]))
+    plazo = int(str(escenario["plazo_meses"]))
+    return {
+        "letra": letra,
+        "codigo": escenario["codigo"],
+        "descripcion": escenario["descripcion"],
+        "cuota_mensual": str(cuota),
+        "cuota_mensual_legible": formatear_pesos(cuota),
+        "plazo_meses": plazo,
+        "plazo_legible": formatear_meses(plazo),
+        "total_pagado": str(total),
+        "total_pagado_legible": formatear_pesos(total),
+    }
+
+
+def _continuar_escena(
+    resultado: ResultadoDiagnostico,
+    respuestas: list[str],
+) -> dict[str, Any]:
+    """Prolonga la escena con Don Gota, la comparación y la negociación.
+
+    Reutiliza las mismas herramientas del recorrido (`calcular_prestamo_gota`,
+    `comparar_gota_banco` y `negociar_opcion`), de modo que cada una publica sus
+    turnos en la escena en vivo en orden. Si un paso falla, el diagnóstico sigue
+    y el aviso queda en el resumen y en el registro, sin cifras ni textos.
+
+    Args:
+        resultado: diagnóstico completo del motor.
+        respuestas: ids canónicos de la entrevista.
+
+    Returns:
+        El resumen corto para Pana: oferta de Don Gota, comparación con el banco
+        y las opciones A y B, con las `cifras_permitidas` y los avisos.
+
+    Raises:
+        ValueError: si el diagnóstico no trae monto, aunque el llamador ya lo
+            comprobó con `_diagnostico_completo`.
+    """
+    entrada = resultado.entrada
+    monto_credito = entrada.monto_credito
+    if monto_credito is None:
+        raise ValueError("el diagnóstico no tiene monto para continuar la escena")
+    monto = int(monto_credito)
+    resumen: dict[str, Any] = {}
+    avisos: list[str] = []
+    cifras: list[str] = []
+
+    _publicar_escena(lambda: (_turno_diagnostico(resultado),))
+    cuota = resultado.cuota_mensual
+    diagnostico: dict[str, Any] = {
+        "semaforo": resultado.semaforo,
+        "monto_legible": formatear_pesos(monto_credito),
+        "plazo_legible": formatear_meses(entrada.plazo_meses or 0),
+    }
+    _agregar_cifras(cifras, [diagnostico["monto_legible"], diagnostico["plazo_legible"]])
+    if cuota is not None:
+        diagnostico["cuota_desde_legible"] = formatear_pesos(cuota.desde)
+        diagnostico["cuota_hasta_legible"] = formatear_pesos(cuota.hasta)
+        _agregar_cifras(
+            cifras,
+            [diagnostico["cuota_desde_legible"], diagnostico["cuota_hasta_legible"]],
+        )
+    resumen["diagnostico"] = diagnostico
+
+    try:
+        gota = calcular_prestamo_gota(monto)
+    except Exception:  # noqa: BLE001 - la escena no rompe el diagnóstico
+        gota = None
+    if gota is None or not gota.ok:
+        avisos.append(AVISO_GOTA)
+        logger.warning("diagnosticar_capacidad escena_continua aviso gota")
+    else:
+        datos = gota.datos
+        resumen["gota"] = {
+            "monto_legible": datos.get("monto_legible"),
+            "tasa_ea_legible": datos.get("tasa_ea_legible"),
+            "total_legible": datos.get("total_pagado_horizonte_legible"),
+            "resumen": datos.get("resumen"),
+        }
+        _agregar_cifras(cifras, datos.get("cifras_permitidas"))
+
+    try:
+        comparacion = comparar_gota_banco(monto, respuestas)
+    except Exception:  # noqa: BLE001 - la escena no rompe el diagnóstico
+        comparacion = None
+    if comparacion is None or not comparacion.ok:
+        avisos.append(AVISO_COMPARACION)
+        logger.warning("diagnosticar_capacidad escena_continua aviso comparacion")
+    else:
+        detalle = comparacion.datos.get("comparacion")
+        campos = (
+            "tasa_ea_gota_legible",
+            "tasa_ea_banco_legible",
+            "total_gota_legible",
+            "total_banco_legible",
+            "diferencia_legible",
+            "veces_total_legible",
+        )
+        if isinstance(detalle, Mapping):
+            resumen["comparacion"] = {campo: detalle.get(campo) for campo in campos}
+        _agregar_cifras(cifras, comparacion.datos.get("cifras_permitidas"))
+
+    try:
+        negociacion = negociar_opcion(respuestas, monto=monto)
+    except Exception:  # noqa: BLE001 - la escena no rompe el diagnóstico
+        negociacion = None
+    if negociacion is None or not negociacion.ok:
+        avisos.append(AVISO_NEGOCIACION)
+        logger.warning("diagnosticar_capacidad escena_continua aviso negociacion")
+    else:
+        try:
+            opciones = _opciones_negociacion(
+                negociacion.datos.get("escenarios"),
+                monto,
+                entrada.producto,
+            )
+        except Exception:  # noqa: BLE001 - la escena no rompe el diagnóstico
+            opciones = []
+            avisos.append(AVISO_NEGOCIACION)
+            logger.warning("diagnosticar_capacidad escena_continua aviso opciones")
+        resumen["opciones"] = opciones
+        for opcion in opciones:
+            _agregar_cifras(
+                cifras,
+                [
+                    opcion["cuota_mensual_legible"],
+                    opcion["plazo_legible"],
+                    opcion["total_pagado_legible"],
+                ],
+            )
+
+    resumen["avisos"] = avisos
+    resumen["cifras_permitidas"] = cifras[:MAXIMO_CIFRAS_AUDITOR]
+    return resumen
+
+
 def diagnosticar_capacidad(
     respuestas: RespuestasEntrevista,
     monto: MontoExactoEntrada = None,
@@ -305,6 +578,12 @@ def diagnosticar_capacidad(
     producto: pregunta «¿Qué quieres hacer?» con las opciones del esquema
     (libre inversión, vehículo, vivienda, etc.).
 
+    Cuando el diagnóstico queda completo —producto, monto y plazo—, la misma
+    llamada calcula la oferta de Don Gota, la comparación con el banco y la
+    negociación con las funciones del recorrido, publica sus turnos en la
+    escena en vivo (si está encendida) y devuelve además el `resumen_escena`
+    con las opciones A y B y las `cifras_permitidas` para `auditar_respuesta`.
+
     Args:
         respuestas: ids canónicos de la entrevista en la forma bloque.valor:
             objetivo.* y vinculacion.* (uno de cada lista), ingresos.*,
@@ -315,7 +594,9 @@ def diagnosticar_capacidad(
 
     Returns:
         El paso `faltan_datos` con la pregunta y sus opciones, o el resultado
-        determinista con cuota, semáforo, alertas y trazabilidad.
+        determinista con cuota, semáforo, alertas y trazabilidad. Con el
+        diagnóstico completo añade `resumen_escena`; si un paso de la escena
+        falla, el diagnóstico se devuelve igual y el aviso queda en `avisos`.
     """
     fallo = respuestas_o_error("diagnosticar_capacidad", respuestas, parcial=True)
     if fallo is not None:
@@ -327,7 +608,13 @@ def diagnosticar_capacidad(
     resultado = _diagnostico("diagnosticar_capacidad", entrada.respuestas, monto=entrada.monto)
     if isinstance(resultado, SalidaHerramienta):
         return resultado
-    return ok("diagnosticar_capacidad", {"resultado": como_json(resultado)})
+    datos: dict[str, Any] = {"resultado": como_json(resultado)}
+    if _diagnostico_completo(resultado):
+        try:
+            datos["resumen_escena"] = _continuar_escena(resultado, entrada.respuestas)
+        except Exception:  # noqa: BLE001 - el diagnóstico nunca se pierde
+            logger.warning("diagnosticar_capacidad escena_continua aviso resumen")
+    return ok("diagnosticar_capacidad", datos)
 
 
 def comparar_escenario(
