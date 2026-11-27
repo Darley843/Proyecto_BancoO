@@ -92,9 +92,9 @@ es [`DESPLIEGUE_WHATSAPP.md`](./DESPLIEGUE_WHATSAPP.md), sección 8.
 
 ### Meta, número y modo evento (Darley)
 
-- [ ] SIM nueva registrada y verificada en la cuenta de WhatsApp Business, con
-      el nombre visible del bot aprobado. Mientras Meta no lo apruebe, el
-      número de prueba sigue como respaldo.
+- [x] SIM nueva registrada y verificada en la cuenta de WhatsApp Business, con
+      el nombre visible del bot aprobado. El número de prueba queda como
+      respaldo.
 - [ ] Token permanente del usuario del sistema en `..\whatsapp-env.ps1`, fuera
       del repositorio.
 - [ ] App publicada (*Live*) y cuenta de WhatsApp suscrita a la app
