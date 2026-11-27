@@ -92,6 +92,10 @@ Si nada suena, la escena se presenta en solo subtítulos.
 - `decirComo(personaje, texto, {alTerminar, soloSubtitulos})`: pide el audio a
   la API y, si no hay, usa la voz del navegador con un tono y una velocidad por
   personaje. Con `soloSubtitulos: true` no suena nada (modo de respaldo en vivo).
+- Todo texto que llega a la voz pasa una sola vez por `paraVoz`
+  (`app/web/escena/voz_cifras.js`), venga de la escena guionada o de la lista en
+  vivo: quita emojis, anuncia las letras de las opciones sin leer su texto y dice
+  las cifras en pesos. Los subtítulos no cambian.
 - `detenerVoz()` corta lo que esté sonando.
 - `decirComoPana(texto)` es lo mismo con `personaje = "pana"`.
 

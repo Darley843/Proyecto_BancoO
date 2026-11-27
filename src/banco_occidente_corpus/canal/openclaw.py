@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import logging
 import os
+import threading
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -49,6 +50,12 @@ HOSTS_LOOPBACK: frozenset[str] = frozenset({"127.0.0.1", "localhost", "::1"})
 
 #: Valores que encienden el motor desde el entorno.
 VALORES_ACTIVO: frozenset[str] = frozenset({"1", "true", "on", "si", "sí"})
+
+#: Usuario fijo del turno de calentamiento; no es una huella de una persona.
+USUARIO_CALENTAMIENTO: str = "calentamiento"
+
+#: Texto mínimo para abrir la conexión con el gateway al arrancar.
+TEXTO_CALENTAMIENTO: str = "hola"
 
 
 @dataclass(frozen=True, slots=True)
@@ -276,6 +283,40 @@ def cliente_desde_entorno(
         logger.warning("OpenClaw deshabilitado: falta site.contact para el header From")
         return None
     return ClienteOpenClaw(config, token, user_agent, remitente)
+
+
+def calentar_en_segundo_plano(cliente: ClienteOpenClaw | None) -> threading.Thread | None:
+    """Abre la conexión con el gateway sin bloquear el arranque de la app.
+
+    Lanza un hilo daemon que pide un turno corto con el usuario fijo
+    ``calentamiento``. Ese turno no pasa por el despachador ni por la escena, así
+    que no se publica en la lista en vivo. Si el gateway falla, el arranque sigue
+    igual y solo queda un aviso en el registro.
+
+    Args:
+        cliente: cliente ya creado por el canal, o ``None`` si OpenClaw está
+            apagado o no hay token.
+
+    Returns:
+        El hilo de calentamiento, o ``None`` si no hay cliente disponible.
+    """
+    if cliente is None or not cliente.disponible:
+        return None
+
+    def calentar() -> None:
+        """Pide el turno corto sin propagar ningún fallo al arranque."""
+        try:
+            respuesta = cliente.responder(TEXTO_CALENTAMIENTO, USUARIO_CALENTAMIENTO)
+            if respuesta is None:
+                logger.info(
+                    "openclaw: el calentamiento no obtuvo respuesta; el canal sigue con el grafo"
+                )
+        except Exception:  # el arranque nunca depende del gateway
+            logger.warning("openclaw: el calentamiento falló; el canal sigue", exc_info=True)
+
+    hilo = threading.Thread(target=calentar, name="openclaw-calentamiento", daemon=True)
+    hilo.start()
+    return hilo
 
 
 def _booleano(datos: dict[str, Any], clave: str, defecto: bool) -> bool:

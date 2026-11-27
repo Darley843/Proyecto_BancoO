@@ -9,7 +9,7 @@
  *
  * Reglas del contrato que cumple aquí:
  *
- * - Sondeo cada 2 s con `setTimeout` después de cada respuesta (nunca un
+ * - Sondeo cada 1 s con `setTimeout` después de cada respuesta (nunca un
  *   temporizador fijo que solape peticiones), `AbortController` con techo de
  *   1,5 s y `cache: "no-store"`.
  * - Se detiene con la pestaña oculta y vuelve con un sondeo inmediato.
@@ -28,7 +28,7 @@ import { erroresDelTurno } from "./contrato.js";
 /** Ruta de la lista en vivo en la app local. */
 export const RUTA_EN_VIVO = "/api/escena/en-vivo";
 /** Espera entre un sondeo y el siguiente, en milisegundos. */
-export const INTERVALO_MS = 2000;
+export const INTERVALO_MS = 1000;
 /** Turnos máximos que devuelve la ruta en una respuesta (contrato §10). */
 export const LIMITE_RUTA = 200;
 /** Techo de cada petición antes de darla por perdida. */

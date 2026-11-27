@@ -206,6 +206,11 @@ gateway responde, 1 si el gateway falla (el canal usaría el grafo) y 2 si falta
 el interruptor, el token o `site.contact`. No imprime el token y usa una huella
 de prueba de 64 hexadecimales.
 
+Al arrancar la app con `OPENCLAW_ACTIVO=1`, el canal lanza en segundo plano un
+turno corto de calentamiento (`hola`, usuario fijo `calentamiento`) para abrir la
+conexión con el MCP. No bloquea el arranque, no se publica en la escena y un
+fallo solo deja un aviso: el canal sigue con el grafo si el gateway no responde.
+
 ## 5. Traza visible
 
 Cada llamada deja una línea JSON en `data/asistente/trazas/herramientas.jsonl`

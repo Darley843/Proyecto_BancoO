@@ -249,29 +249,72 @@ function sinEmojis(texto) {
 const PATRON_OPCION = /(^|\s)([A-Z])\s*[.)·]\s+(?=\S)/gu;
 
 /**
- * Corta una lista de opciones con letra antes de que la voz la lea.
+ * Recoge las marcas de una lista que empieza en «A» y sigue «B», «C»…
  *
- * Solo actúa cuando hay al menos dos marcas y la lista empieza en «A.» y
- * «B.». Así una letra suelta o una sigla como «E.A.» o «M.V.» no se confunde
- * con una lista. La voz dice lo que va antes de la primera opción y una
- * instrucción corta.
+ * Las marcas que rompen la secuencia, como la «E» de «E. A.» o la «M» de
+ * «M. V.», no son opciones: antes de empezar se ignoran y, cuando la lista ya
+ * empezó, la cierran. Solo hay lista si llegan al menos «A» y «B», así una
+ * letra suelta tampoco se confunde con una opción.
  *
  * @param {string} texto Texto original.
- * @returns {string} El texto sin la lista de opciones, o el mismo texto.
+ * @returns {Array<{letra: string, inicio: number, fin: number}>} Marcas de la
+ *   lista, en orden, o una lista vacía si no hay opciones.
  */
-function sinOpciones(texto) {
+function marcasDeLista(texto) {
   const marcas = [];
+  let esperada = "A";
   for (const coincidencia of texto.matchAll(PATRON_OPCION)) {
+    const letra = coincidencia[2];
+    if (letra !== esperada) {
+      if (marcas.length > 0) {
+        break;
+      }
+      continue;
+    }
     marcas.push({
-      letra: coincidencia[2],
-      posicion: coincidencia.index + coincidencia[1].length,
+      letra,
+      inicio: coincidencia.index + coincidencia[1].length,
+      fin: coincidencia.index + coincidencia[0].length,
     });
+    esperada = String.fromCharCode(esperada.charCodeAt(0) + 1);
   }
-  if (marcas.length < 2 || marcas[0].letra !== "A" || marcas[1].letra !== "B") {
+  return marcas.length >= 2 ? marcas : [];
+}
+
+/**
+ * Escribe las letras de una lista en la forma que pide la voz.
+ *
+ * Con dos letras usa «A o B»; con tres o más, comas y «o» antes de la última
+ * («A, B o C», «A, B, C, D, E o F»).
+ *
+ * @param {Array<{letra: string}>} marcas Marcas de la lista, en orden.
+ * @returns {string} Las letras listas para leer.
+ */
+function letrasDeLaLista(marcas) {
+  const letras = marcas.map((marca) => marca.letra);
+  if (letras.length === 1) {
+    return letras[0];
+  }
+  return `${letras.slice(0, -1).join(", ")} o ${letras[letras.length - 1]}`;
+}
+
+/**
+ * Anuncia las opciones de una lista sin leer su texto.
+ *
+ * La voz dice lo que va antes de la primera opción y luego pide responder con
+ * las letras que existan en la lista («Responde A, B o C.»). Los subtítulos y
+ * WhatsApp conservan el texto completo de cada opción.
+ *
+ * @param {string} texto Texto original.
+ * @returns {string} El texto con el anuncio de letras, o el mismo texto.
+ */
+function leerOpciones(texto) {
+  const marcas = marcasDeLista(texto);
+  if (marcas.length < 2) {
     return texto;
   }
-  const prefijo = texto.slice(0, marcas[0].posicion).trim();
-  return `${prefijo} Elige la opción que mejor te describa.`.trim();
+  const prefijo = texto.slice(0, marcas[0].inicio).trim();
+  return [prefijo, `Responde ${letrasDeLaLista(marcas)}.`].filter(Boolean).join(" ");
 }
 
 /**
@@ -413,17 +456,19 @@ function sinDolares(texto) {
  * Prepara un texto para que la voz lo lea en español claro.
  *
  * Los subtítulos no pasan por aquí: esta función se llama únicamente justo
- * antes de entregar el texto a `decirComo`.
+ * antes de entregar el texto a la voz. También anuncia las listas de opciones
+ * con sus letras, sin leer el texto de cada opción.
  *
  * @param {string} texto Texto del turno tal como aparece en pantalla.
- * @returns {string} El texto solo para la voz, con cifras y siglas en palabras.
+ * @returns {string} El texto solo para la voz, con cifras, siglas y opciones
+ *   listas para el oído.
  */
 export function paraVoz(texto) {
   let limpio = String(texto ?? "");
   limpio = sinUrls(limpio);
   limpio = sinMarcas(limpio);
   limpio = sinEmojis(limpio);
-  limpio = sinOpciones(limpio);
+  limpio = leerOpciones(limpio);
   limpio = cambiarRangos(limpio);
   limpio = cambiarMontosConEscala(limpio);
   limpio = cambiarMontos(limpio);

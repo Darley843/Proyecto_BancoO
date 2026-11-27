@@ -62,7 +62,6 @@ import {
 import { crearSondeo, pideVoz, registrosNuevos, tiempoDeLectura } from "./envivo.js";
 import { detenerMicrofono, escuchando, escuchar, hayMicrofono } from "./microfono.js";
 import { montarRecursos, ponerQrWhatsapp } from "./recursos.js";
-import { paraVoz } from "./voz_cifras.js";
 import { paraPantalla } from "./pantalla_cifras.js";
 import {
   CLAVE_COMPLETA,
@@ -573,7 +572,7 @@ function decir(turno) {
       window.setTimeout(listo, lectura);
       return;
     }
-    decirComo(turno.personaje, paraVoz(turno.texto), { alTerminar: listo })
+    decirComo(turno.personaje, turno.texto, { alTerminar: listo })
       .then((voz) => {
         porId("escena-voz").textContent = voz === "piper" ? "Voz: Piper" : voz === "navegador" ? "Voz: navegador" : "";
       })
@@ -601,7 +600,7 @@ function adelantarSiguiente(casilla) {
   if (!siguiente || siguiente.personaje === "joven" || !pideVoz(siguiente.personaje, casilla)) {
     return;
   }
-  adelantarVoz(siguiente.personaje, paraVoz(siguiente.texto)).catch(() => {
+  adelantarVoz(siguiente.personaje, siguiente.texto).catch(() => {
     // Si falla, el turno pedirá su audio cuando le toque, como antes.
   });
 }
