@@ -1063,6 +1063,7 @@ no forma parte de `make all`, `make gold`, `make deliver`, `make docs`, `make do
 [`docs/COMITE.md`](./docs/COMITE.md) (comité de crédito) ·
 [`docs/ROBA_BOVEDA.md`](./docs/ROBA_BOVEDA.md) (juego de ataque) ·
 [`docs/EXPERIMENTO_LLAMADA.md`](./docs/EXPERIMENTO_LLAMADA.md) (llamada por WhatsApp, aplazada) ·
+[`docs/MANUAL_DE_USO.md`](./docs/MANUAL_DE_USO.md) (manual de uso de Pana) ·
 [`docs/LISTA_DEMO.md`](./docs/LISTA_DEMO.md) (lista del día de la demo) ·
 [`docs/CONTINGENCIA.md`](./docs/CONTINGENCIA.md) (plan B y capturas de respaldo) ·
 [`docs/VOZ.md`](./docs/VOZ.md) (voces de la escena) ·
