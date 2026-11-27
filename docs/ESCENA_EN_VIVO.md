@@ -69,7 +69,7 @@ editarla. Si hay que cambiarla, se avisa a los tres y se actualiza el contrato.
 | `seq` | entero creciente basado en época en ms × 1000 + contador, corregido con el último del archivo (§6) |
 | Ruta | `GET /api/escena/en-vivo?desde=<seq>`; solo en la app que escucha en `127.0.0.1` |
 | Tecla de la pantalla | **E** (libre; ya están P, S, Q, V, N, T, H, R, Espacio y →) |
-| Frecuencia | cada 2 s, solo con el modo en vivo abierto y la pestaña visible |
+| Frecuencia | cada 1 s, solo con el modo en vivo abierto y la pestaña visible |
 | Borrado | `scripts/limpiar_evento.ps1` borra `en_vivo.jsonl` (y `en_vivo.lock`) |
 | Punto de control | jueves 26 a las **12:00**; si no está verde, la escena en vivo queda apagada (§15) |
 
@@ -421,9 +421,9 @@ apertura y, desde ese momento:
   destino en RAM que `ESCENA <código>`. Vale tanto el mensaje «Acepto» (que
   registra el consentimiento) como cualquier mensaje de quien ya lo había
   aceptado. La confirmación es la frase fija «¡Eres nuestro voluntario! 🎬
-  Habla con Pana frente a la pantalla, o escríbele aquí.», que se envía por
-  WhatsApp y se publica como turno `pana` (`canal.pana.convocatoria.v1`,
-  `origen="canal"`).
+  Habla con Pana frente a la pantalla, o escríbele aquí.», que se envía de
+  inmediato, antes de llamar al modelo, por WhatsApp y se publica como turno
+  `pana` (`canal.pana.convocatoria.v1`, `origen="canal"`).
 - La convocatoria deja de aceptar voluntarios en cuanto el primero se activa;
   el canal sigue en curso para avisar a los demás.
 - La segunda persona que escriba (o acepte) después de la apertura sigue como
@@ -640,14 +640,14 @@ DELETE /api/escena/convocatoria   → 200 {"abierta": false}
 
 ### 11.2 Sondeo
 
-- Cada **2 s**, con `setTimeout` después de cada respuesta (nunca `setInterval`),
+- Cada **1 s**, con `setTimeout` después de cada respuesta (nunca `setInterval`),
   para que no se solapen dos peticiones.
 - `fetch("/api/escena/en-vivo?desde=" + encodeURIComponent(desde), {cache:
   "no-store", signal})` con `AbortController` y techo de 1,5 s.
 - Se detiene con la pestaña oculta (`document.hidden`) y se reanuda con un
   sondeo inmediato al volver. Se detiene al salir del modo.
 - Si la ruta falla, el estado dice «Sin conexión (reintentando)» y se vuelve a
-  intentar a los 2 s; no se pierde la cola.
+  intentar al siguiente segundo; no se pierde la cola.
 - El estado muestra «En vivo», «Esperando el primer turno», el último `seq` y
   cuántos turnos hay en cola. No muestra datos personales.
 
@@ -799,7 +799,7 @@ openspec validate agente-openclaw --strict
    `ESCENA` desde otra huella no reemplaza al voluntario activo.
 6. La ruta devuelve los turnos en orden, `desde` filtra y `ultimo` avanza; no
    escribe nada.
-7. La pantalla en Edge entra con **E**, consulta cada 2 s, reproduce en orden,
+7. La pantalla en Edge entra con **E**, consulta cada 1 s, reproduce en orden,
    el invitado va solo en subtítulo y el resto con voz.
 8. Un teléfono, un correo y un documento falsos no aparecen en la lista, la
    ruta, los logs ni la tarjeta.

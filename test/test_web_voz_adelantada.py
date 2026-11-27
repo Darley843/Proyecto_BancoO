@@ -141,7 +141,7 @@ def test_adelantar_voz_y_decir_como_pasan_por_para_voz() -> None:
     assert json.loads(salida.stdout) == {
         "pedidas": [
             "Hola, la tasa es veintiocho coma diecisiete por ciento efectivo anual",
-            "Elige: A: Uno. B: Dos. Dime la letra de tu opción.",
+            "Elige: Responde A o B.",
         ],
         "sono": "piper",
         "opciones": "piper",

@@ -48,7 +48,11 @@ from banco_occidente_corpus.canal.envio import (
     ErrorEnvio,
 )
 from banco_occidente_corpus.canal.escena_vivo import EscenaVivo
-from banco_occidente_corpus.canal.openclaw import ClienteOpenClaw, cliente_desde_entorno
+from banco_occidente_corpus.canal.openclaw import (
+    ClienteOpenClaw,
+    calentar_en_segundo_plano,
+    cliente_desde_entorno,
+)
 from banco_occidente_corpus.canal.webhook import crear_router_canal
 from banco_occidente_corpus.config import Config, load_config
 from banco_occidente_corpus.escena.api import crear_router_escena
@@ -189,6 +193,7 @@ def crear_app(
             user_agent=configuracion.site.user_agent,
             remitente=configuracion.site.contact,
         )
+        calentar_en_segundo_plano(motor_openclaw)
         maquina = MaquinaConsentimiento(
             ruta_canal,
             version=canal.version_aviso,

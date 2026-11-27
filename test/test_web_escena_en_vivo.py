@@ -75,10 +75,10 @@ def test_sin_urls_externas_ni_innerhtml_ni_storage(archivo: str) -> None:
 
 
 def test_el_sondeo_cumple_el_contrato() -> None:
-    """Cada 2 s con setTimeout, techo de 1,5 s, sin caché y parado si la pestaña se oculta."""
+    """Cada 1 s con setTimeout, techo de 1,5 s, sin caché y parado si la pestaña se oculta."""
     codigo = _leer("envivo.js")
     assert "setInterval" not in codigo
-    assert "INTERVALO_MS = 2000" in codigo
+    assert "INTERVALO_MS = 1000" in codigo
     assert "ESPERA_MS = 1500" in codigo
     assert 'cache: "no-store"' in codigo
     assert "AbortController" in codigo

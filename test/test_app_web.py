@@ -311,3 +311,49 @@ def test_la_pantalla_de_la_escena_se_sirve_aparte(cliente: TestClient) -> None:
     respuesta = cliente.get("/escena.html")
     assert respuesta.status_code == 200
     assert "Pana vs. el gota a gota" in respuesta.text
+
+
+def test_el_arranque_calienta_openclaw_solo_con_el_interruptor(
+    modulo_app: ModuleType,
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con OPENCLAW_ACTIVO=1 se calienta una vez; sin él, nunca se llama."""
+
+    class ClienteFalso:
+        """Cliente mínimo: el arranque solo necesita responder y cerrar."""
+
+        def responder(self, texto: str, usuario_id: str) -> None:
+            """No hace red; el calentamiento está interceptado."""
+
+        def cerrar(self) -> None:
+            """No hay conexiones que cerrar."""
+
+    monkeypatch.setenv("WHATSAPP_ID_SALT", "sal-de-prueba")
+    monkeypatch.setenv("OPENCLAW_ACTIVO", "1")
+    monkeypatch.setenv("OPENCLAW_GATEWAY_TOKEN", "token-de-prueba")
+    cliente = ClienteFalso()
+    llamadas: list[object] = []
+    activo = {"valor": True}
+
+    def cliente_si_activo(**_: object) -> ClienteFalso | None:
+        """Imita al cliente real: sin interruptor, no hay cliente."""
+        return cliente if activo["valor"] else None
+
+    def calentar_si_hay(actual: object) -> None:
+        """Anota solo los calentamientos con cliente disponible."""
+        if actual is not None:
+            llamadas.append(actual)
+
+    monkeypatch.setattr(modulo_app, "cliente_desde_entorno", cliente_si_activo)
+    monkeypatch.setattr(modulo_app, "calentar_en_segundo_plano", calentar_si_hay)
+
+    modulo_app.crear_app(tmp_path)
+
+    assert llamadas == [cliente]
+
+    activo["valor"] = False
+    monkeypatch.delenv("OPENCLAW_ACTIVO")
+    modulo_app.crear_app(tmp_path)
+
+    assert llamadas == [cliente]

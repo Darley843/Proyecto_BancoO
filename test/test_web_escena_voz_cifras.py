@@ -167,17 +167,15 @@ def test_la_conversion_a_voz_vive_en_voz_js_y_no_se_repite_en_escena() -> None:
             "créditos o tarjetas? A. No tengo cuotas B. Menos de $500.000 "
             "C. Entre $500.000 y $1.000.000",
             "Listo, gastos menos de un millón de pesos. ¿Cuánto pagas hoy en cuotas "
-            "de créditos o tarjetas? A: No tengo cuotas. B: Menos de quinientos mil "
-            "pesos. C: Entre quinientos mil pesos y un millón de pesos. "
-            "Dime la letra de tu opción.",
+            "de créditos o tarjetas? Responde A, B o C.",
         ),
         (
             "¿Cuánto pagas?\nA · Nada\nB · Poco\nC · Mucho",
-            "¿Cuánto pagas? A: Nada. B: Poco. C: Mucho. Dime la letra de tu opción.",
+            "¿Cuánto pagas? Responde A, B o C.",
         ),
         (
             "Elige una: A) Uno B) Dos",
-            "Elige una: A: Uno. B: Dos. Dime la letra de tu opción.",
+            "Elige una: Responde A o B.",
         ),
         (
             "La tasa es 28,17 % E.A. y la mensual 2,09 % M.V.",
@@ -200,19 +198,39 @@ def test_para_voz_deja_igual_un_texto_sin_opciones_ni_emojis() -> None:
 
 
 @requiere_node
-def test_un_turno_en_vivo_quita_el_emoji_y_lee_las_opciones_una_por_una() -> None:
-    """El texto que llega por la lista en vivo también queda listo para la voz."""
+def test_un_turno_en_vivo_quita_el_emoji_y_anuncia_las_letras() -> None:
+    """El texto que llega por la lista en vivo anuncia las letras, no las opciones."""
     turno = (
         "💚 ¿Cuánto pagas hoy en cuotas? "
         "A. No tengo cuotas B. Menos de $500.000 C. Entre $500.000 y $1.000.000"
     )
-    assert _para_voz(turno) == (
-        "¿Cuánto pagas hoy en cuotas? "
-        "A: No tengo cuotas. "
-        "B: Menos de quinientos mil pesos. "
-        "C: Entre quinientos mil pesos y un millón de pesos. "
-        "Dime la letra de tu opción."
+    salida = _para_voz(turno)
+    assert salida == "¿Cuánto pagas hoy en cuotas? Responde A, B o C."
+    assert "No tengo cuotas" not in salida
+
+
+@requiere_node
+def test_las_opciones_de_seis_letras_se_anuncian_sin_leer_su_texto() -> None:
+    """Seis opciones producen «Responde A, B, C, D, E o F.» y no leen el texto."""
+    texto = (
+        "Elige tu producto: "
+        "A. Libre inversión B. Vehículo nuevo C. Vehículo usado "
+        "D. Vivienda E. Libranza F. Compra de cartera"
     )
+    salida = _para_voz(texto)
+
+    assert salida == "Elige tu producto: Responde A, B, C, D, E o F."
+    for opcion in ("Libre inversión", "Vehículo", "Vivienda", "Libranza", "cartera"):
+        assert opcion not in salida
+
+
+@requiere_node
+def test_las_opciones_de_tres_letras_usan_o_antes_de_la_ultima() -> None:
+    """Tres opciones producen «Responde A, B o C.» sin leer su texto."""
+    salida = _para_voz("¿Cuánto pagas? A. Nada B. Poco C. Mucho")
+
+    assert salida == "¿Cuánto pagas? Responde A, B o C."
+    assert "Nada" not in salida and "Poco" not in salida and "Mucho" not in salida
 
 
 @requiere_node
@@ -222,15 +240,13 @@ def test_las_siglas_no_se_confunden_con_una_lista_de_opciones() -> None:
     assert _para_voz("La tasa es 28,17 % E.A.") == (
         "La tasa es veintiocho coma diecisiete por ciento efectivo anual"
     )
-    assert "Dime la letra de tu opción." not in _para_voz("E.A. y M.V. sin lista")
+    assert "Responde A" not in _para_voz("E.A. y M.V. sin lista")
 
 
 @requiere_node
-def test_las_opciones_tambien_se_leen_en_lineas_separadas() -> None:
-    """«A. …» en renglones distintos produce la misma lectura con pausas."""
-    assert _para_voz("Elige:\nA. Uno\nB. Dos\nC. Tres") == (
-        "Elige: A: Uno. B: Dos. C: Tres. Dime la letra de tu opción."
-    )
+def test_las_opciones_tambien_se_anuncian_en_lineas_separadas() -> None:
+    """«A. …» en renglones distintos produce el mismo anuncio de letras."""
+    assert _para_voz("Elige:\nA. Uno\nB. Dos\nC. Tres") == ("Elige: Responde A, B o C.")
 
 
 @requiere_node

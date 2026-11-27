@@ -184,7 +184,7 @@ pantalla lo implementa en `app/web/escena/envivo.js`.
   solo**; «Detener la escucha» lo apaga hasta que se toque otra vez el botón.
   Las tarjetas A–F, el campo del monto y los botones Hablar, Enviar y Perfil
   seguro se ocultan: quedan solo fuera de este modo, como respaldo.
-- **Sondeo.** Cada 2 s, una petición a la vez, con techo de 1,5 s y sin caché.
+- **Sondeo.** Cada 1 s, una petición a la vez, con techo de 1,5 s y sin caché.
   Con la pestaña oculta se detiene y al volver pide de inmediato. El cursor
   `desde` vive solo en memoria.
 - **Cola.** Se ordena y se deduplica por `seq`, y suena un turno a la vez. Un

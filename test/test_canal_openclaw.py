@@ -15,10 +15,13 @@ import httpx
 import pytest
 
 from banco_occidente_corpus.canal.openclaw import (
+    TEXTO_CALENTAMIENTO,
+    USUARIO_CALENTAMIENTO,
     VARIABLE_ACTIVO,
     VARIABLE_TOKEN,
     ClienteOpenClaw,
     ConfiguracionOpenClaw,
+    calentar_en_segundo_plano,
     cargar_configuracion_openclaw,
     cliente_desde_entorno,
 )
@@ -286,3 +289,43 @@ def test_cliente_desde_entorno_activo(monkeypatch: pytest.MonkeyPatch, tmp_path:
     assert cliente is not None
     assert cliente.disponible is True
     cliente.cerrar()
+
+
+def test_el_calentamiento_usa_usuario_fijo_y_texto_corto() -> None:
+    """El arranque pide un turno corto con el usuario fijo, fuera de la escena."""
+    visto: dict[str, object] = {}
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        """Guarda el cuerpo del turno de calentamiento."""
+        visto["cuerpo"] = json.loads(request.content)
+        return _respuesta("listo")
+
+    hilo = calentar_en_segundo_plano(_cliente(handler))
+
+    assert hilo is not None
+    hilo.join(5)
+    assert not hilo.is_alive()
+    assert visto["cuerpo"] == {
+        "model": "openclaw:pana",
+        "user": f"wa:{USUARIO_CALENTAMIENTO}",
+        "messages": [{"role": "user", "content": TEXTO_CALENTAMIENTO}],
+    }
+
+
+def test_el_calentamiento_sin_cliente_no_abre_hilo() -> None:
+    """Sin cliente disponible no se calienta nada."""
+    assert calentar_en_segundo_plano(None) is None
+
+
+def test_el_calentamiento_falla_sin_romper_el_arranque() -> None:
+    """Un gateway caído solo deja el aviso; la app puede arrancar igual."""
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        """Simula que el gateway no está escuchando."""
+        raise httpx.ConnectError("sin conexión", request=request)
+
+    hilo = calentar_en_segundo_plano(_cliente(handler))
+
+    assert hilo is not None
+    hilo.join(5)
+    assert not hilo.is_alive()

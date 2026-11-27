@@ -251,9 +251,10 @@ const PATRON_OPCION = /(^|\s)([A-Z])\s*[.)·]\s+(?=\S)/gu;
 /**
  * Recoge las marcas de una lista que empieza en «A» y sigue «B», «C»…
  *
- * Se ignoran las marcas que rompen la secuencia, como la «E» de «E. A.» o la
- * «M» de «M. V.»: no son opciones. Solo hay lista si llegan al menos «A» y
- * «B», así una letra suelta tampoco se confunde con una opción.
+ * Las marcas que rompen la secuencia, como la «E» de «E. A.» o la «M» de
+ * «M. V.», no son opciones: antes de empezar se ignoran y, cuando la lista ya
+ * empezó, la cierran. Solo hay lista si llegan al menos «A» y «B», así una
+ * letra suelta tampoco se confunde con una opción.
  *
  * @param {string} texto Texto original.
  * @returns {Array<{letra: string, inicio: number, fin: number}>} Marcas de la
@@ -265,6 +266,9 @@ function marcasDeLista(texto) {
   for (const coincidencia of texto.matchAll(PATRON_OPCION)) {
     const letra = coincidencia[2];
     if (letra !== esperada) {
+      if (marcas.length > 0) {
+        break;
+      }
       continue;
     }
     marcas.push({
@@ -278,30 +282,31 @@ function marcasDeLista(texto) {
 }
 
 /**
- * Extrae el texto de una opción y le deja una sola frase terminada.
+ * Escribe las letras de una lista en la forma que pide la voz.
  *
- * @param {string} texto Texto original.
- * @param {{fin: number}} marca Marca que abre la opción.
- * @param {{inicio: number} | undefined} siguiente Marca que la cierra.
- * @returns {string} El texto de la opción, sin espacios de más y con su punto.
+ * Con dos letras usa «A o B»; con tres o más, comas y «o» antes de la última
+ * («A, B o C», «A, B, C, D, E o F»).
+ *
+ * @param {Array<{letra: string}>} marcas Marcas de la lista, en orden.
+ * @returns {string} Las letras listas para leer.
  */
-function cuerpoDeOpcion(texto, marca, siguiente) {
-  const hasta = siguiente ? siguiente.inicio : texto.length;
-  const cuerpo = texto.slice(marca.fin, hasta).replace(/\s+/g, " ").trim();
-  const limpio = cuerpo.replace(/[.;:]$/, "").trim();
-  return /[.!?]$/.test(limpio) ? limpio : `${limpio}.`;
+function letrasDeLaLista(marcas) {
+  const letras = marcas.map((marca) => marca.letra);
+  if (letras.length === 1) {
+    return letras[0];
+  }
+  return `${letras.slice(0, -1).join(", ")} o ${letras[letras.length - 1]}`;
 }
 
 /**
- * Lee una lista de opciones antes de que la voz la pronuncie.
+ * Anuncia las opciones de una lista sin leer su texto.
  *
- * En vez de omitir las opciones, la voz dice lo que va antes de la lista, cada
- * opción con su letra y una pausa de punto entre ellas, y cierra pidiendo la
- * letra elegida. Funciona con «A. …», «A) …» y «A · …», en la misma línea o en
- * líneas separadas.
+ * La voz dice lo que va antes de la primera opción y luego pide responder con
+ * las letras que existan en la lista («Responde A, B o C.»). Los subtítulos y
+ * WhatsApp conservan el texto completo de cada opción.
  *
  * @param {string} texto Texto original.
- * @returns {string} El texto con las opciones una por una, o el mismo texto.
+ * @returns {string} El texto con el anuncio de letras, o el mismo texto.
  */
 function leerOpciones(texto) {
   const marcas = marcasDeLista(texto);
@@ -309,10 +314,7 @@ function leerOpciones(texto) {
     return texto;
   }
   const prefijo = texto.slice(0, marcas[0].inicio).trim();
-  const opciones = marcas
-    .map((marca, indice) => `${marca.letra}: ${cuerpoDeOpcion(texto, marca, marcas[indice + 1])}`)
-    .join(" ");
-  return [prefijo, opciones, "Dime la letra de tu opción."].filter(Boolean).join(" ");
+  return [prefijo, `Responde ${letrasDeLaLista(marcas)}.`].filter(Boolean).join(" ");
 }
 
 /**
@@ -454,8 +456,8 @@ function sinDolares(texto) {
  * Prepara un texto para que la voz lo lea en español claro.
  *
  * Los subtítulos no pasan por aquí: esta función se llama únicamente justo
- * antes de entregar el texto a la voz. También lee las listas de opciones una
- * por una, con su letra y una pausa entre ellas.
+ * antes de entregar el texto a la voz. También anuncia las listas de opciones
+ * con sus letras, sin leer el texto de cada opción.
  *
  * @param {string} texto Texto del turno tal como aparece en pantalla.
  * @returns {string} El texto solo para la voz, con cifras, siglas y opciones
