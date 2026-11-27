@@ -480,8 +480,8 @@ def test_en_vivo_el_css_oculta_el_flujo_guiado_solo_en_ese_modo() -> None:
     assert ".escena:not(.escena--en-vivo) .escena__captura-guiada" not in css
 
 
-def test_en_vivo_la_captura_solo_manda_texto_a_hablar_y_se_cierra_sola() -> None:
-    """En vivo no se carga el catálogo ni se valida un monto, y el panel se cierra."""
+def test_en_vivo_la_captura_solo_manda_texto_a_hablar() -> None:
+    """En vivo no se carga el catálogo ni se valida un monto: solo se habla con Pana."""
     codigo = (ESCENA / "captura.js").read_text(encoding="utf-8")
     alternar = codigo[codigo.index("async function alternar()") :]
     alternar = alternar[: alternar.index("\n}\n")]
@@ -492,7 +492,7 @@ def test_en_vivo_la_captura_solo_manda_texto_a_hablar_y_se_cierra_sola() -> None
     assert "cargarOpciones" not in abrir
     assert "pintarPregunta" not in abrir
     assert "Escuché: «${texto}»" in codigo
-    assert "window.setTimeout(cerrar, CIERRE_EN_VIVO_MS)" in codigo
+    assert "JSON.stringify({ texto })" in codigo
     assert 'classList.contains("escena--en-vivo")' in codigo
     # Al cerrar se suelta el foco para que E, P y Espacio sigan funcionando.
     assert "document.activeElement.blur()" in codigo
@@ -558,3 +558,117 @@ console.log(JSON.stringify({{ pedidas, recibidos }}));
     assert resultado["recibidos"] == [7]
     assert resultado["pedidas"][0].endswith("desde=0")
     assert resultado["pedidas"][1].endswith("desde=6")
+
+
+# --- De la presentación a la conversación por voz con Pana -------------------
+
+
+def _funcion(codigo: str, firma: str) -> str:
+    """Devuelve el cuerpo de una función de un módulo JS, hasta su cierre."""
+    cuerpo = codigo[codigo.index(firma) :]
+    return cuerpo[: cuerpo.index("\n}\n")]
+
+
+def test_la_presentacion_termina_en_el_qr_de_whatsapp() -> None:
+    """Tras la invitación de Pana queda el QR con «Esperando al voluntario…»."""
+    html = (WEB / "escena.html").read_text(encoding="utf-8")
+    espera = _bloque_html(html, 'id="escena-espera"', "</section>")
+    assert 'id="escena-espera-qr"' in espera
+    assert "Esperando al voluntario…" in espera
+    assert "ESCENA" in espera
+    codigo = (ESCENA / "escena.js").read_text(encoding="utf-8")
+    termino = _funcion(codigo, "function terminoLaPresentacion()")
+    assert "estado.largoIntroduccion - 1" in termino
+    assert 'estado.modo !== "nucleo"' in termino
+    reproducir = _funcion(codigo, "async function reproducir()")
+    assert "terminoLaPresentacion()" in reproducir
+    assert "mostrarEspera();" in reproducir
+    siguiente = _funcion(codigo, "function siguiente()")
+    assert "mostrarEspera();" in siguiente
+    espera_js = _funcion(codigo, "function mostrarEspera()")
+    assert 'ponerQrWhatsapp(porId("escena-espera-qr"))' in espera_js
+    assert "vigia?.iniciar({ desdeElFinal: true });" in espera_js
+    # La espera no abre el flujo guiado.
+    assert "escena:captura" not in espera_js
+    recursos = (ESCENA / "recursos.js").read_text(encoding="utf-8")
+    assert "export async function ponerQrWhatsapp(imagen)" in recursos
+
+
+def test_el_primer_turno_del_canal_activa_el_modo_conversacion() -> None:
+    """El vigía de la espera pasa solo al modo conversación con un turno del canal."""
+    codigo = (ESCENA / "escena.js").read_text(encoding="utf-8")
+    assert "vigia = crearSondeo({ alRecibir: alVigilar" in codigo
+    vigilar = _funcion(codigo, "function alVigilar(registros, ultimo)")
+    assert 'registro?.origen === "canal"' in vigilar
+    assert "entrarEnVivo({ registros, ultimo });" in vigilar
+    entrar = _funcion(codigo, "function entrarEnVivo(")
+    assert "ocultarEspera();" in entrar
+    assert 'new CustomEvent("escena:conversacion")' in entrar
+    assert "sondeo.iniciar({ desde: ultimo });" in entrar
+    assert "recibirEnVivo(registros);" in entrar
+    # La tecla E sigue forzando el modo, desde el último turno.
+    assert "sondeo.iniciar({ desdeElFinal: true });" in entrar
+    assert 'tecla === "e"' in codigo
+
+
+def test_en_modo_conversacion_solo_se_ve_el_boton_de_pana() -> None:
+    """Botón grande y «Detener la escucha»; los controles guiados quedan ocultos."""
+    html = (WEB / "escena.html").read_text(encoding="utf-8")
+    conversacion = _bloque_html(html, 'id="captura-conversacion"', "</section>")
+    assert 'id="captura-pana-detener"' in conversacion
+    css = (ESCENA / "escena.css").read_text(encoding="utf-8")
+    assert ".escena--en-vivo .escena__captura-guiada { display: none; }" in css
+    assert ".escena:not(.escena--en-vivo) #captura-pana-detener { display: none; }" in css
+    codigo = (ESCENA / "captura.js").read_text(encoding="utf-8")
+    assert 'addEventListener("escena:conversacion", empezarConversacion)' in codigo
+    assert 'addEventListener("escena:fin-conversacion", terminarConversacion)' in codigo
+
+
+def test_el_microfono_se_reabre_cuando_pana_termina_la_cola() -> None:
+    """Al vaciarse la cola tras un turno de Pana, la captura vuelve a escuchar."""
+    escena = (ESCENA / "escena.js").read_text(encoding="utf-8")
+    reproducir = _funcion(escena, "async function reproducir()")
+    assert "avisarColaTerminada();" in reproducir
+    aviso = _funcion(escena, "function avisarColaTerminada()")
+    assert "estado.indice === estado.turnos.length - 1" in aviso
+    assert 'ultimo?.personaje === "pana"' in aviso
+    assert 'new CustomEvent("escena:pana-termino")' in aviso
+    captura = (ESCENA / "captura.js").read_text(encoding="utf-8")
+    assert 'addEventListener("escena:pana-termino", reabrirMicrofono)' in captura
+    reabrir = _funcion(captura, "function reabrirMicrofono()")
+    assert "estado.escuchaAutomatica" in reabrir
+    assert "escuchando()" in reabrir
+    assert "escucharAPana();" in reabrir
+    detener = _funcion(captura, "function detenerEscucha()")
+    assert "estado.escuchaAutomatica = false;" in detener
+    assert "detenerMicrofono();" in detener
+
+
+@pytest.mark.skipif(NODE is None, reason="Node no está instalado")
+def test_el_sondeo_sigue_desde_el_cursor_de_la_espera() -> None:
+    """`iniciar({desde})` pide desde ese cursor y entrega lo nuevo."""
+    assert NODE
+    url = (ESCENA / "envivo.js").as_uri()
+    programa = f"""
+const pedidas = [];
+globalThis.window = {{ setTimeout: () => 1, clearTimeout: () => {{}} }};
+globalThis.document = {{ hidden: false, addEventListener: () => {{}} }};
+globalThis.fetch = async (url) => {{
+  pedidas.push(url);
+  return {{ ok: true, json: async () => ({{ turnos: [], ultimo: 42 }}) }};
+}};
+const {{ crearSondeo }} = await import({json.dumps(url)});
+const sondeo = crearSondeo({{ alRecibir: () => {{}}, alEstado: () => {{}} }});
+sondeo.iniciar({{ desde: 42 }});
+await new Promise((listo) => setImmediate(listo));
+sondeo.detener();
+console.log(JSON.stringify(pedidas));
+"""
+    salida = subprocess.run(
+        [NODE, "--input-type=module", "-e", programa],
+        capture_output=True,
+        text=True,
+        timeout=30,
+        check=True,
+    )
+    assert json.loads(salida.stdout)[0].endswith("desde=42")

@@ -167,10 +167,11 @@ export function siguienteCursor(desde, ultimo) {
  *   alRecibir: (registros: object[], ultimo: number | string) => void,
  *   alEstado: (estado: {conectado: boolean, desde: number | string}) => void,
  * }} avisos Funciones que reciben los registros y el estado de la conexión.
- * @returns {{iniciar: (opciones?: {desdeElFinal?: boolean}) => void,
+ * @returns {{iniciar: (opciones?: {desdeElFinal?: boolean, desde?: number | string}) => void,
  *   detener: () => void, reiniciar: () => void, activo: () => boolean}}
  *   Controles del sondeo. Con `desdeElFinal`, los turnos que ya existían no se
- *   entregan: solo los que lleguen después.
+ *   entregan: solo los que lleguen después. Con `desde`, se sigue desde ese
+ *   cursor (lo usa el paso de la espera al modo conversación).
  */
 export function crearSondeo({ alRecibir, alEstado }) {
   const sondeo = {
@@ -271,10 +272,10 @@ export function crearSondeo({ alRecibir, alEstado }) {
   }
 
   return {
-    iniciar({ desdeElFinal = false } = {}) {
+    iniciar({ desdeElFinal = false, desde = 0 } = {}) {
       cortar();
       sondeo.activo = true;
-      sondeo.desde = 0;
+      sondeo.desde = siguienteCursor(0, desde);
       sondeo.saltando = desdeElFinal;
       vuelta();
     },

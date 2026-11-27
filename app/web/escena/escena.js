@@ -60,7 +60,7 @@ import {
 } from "./contrato.js";
 import { crearSondeo, pideVoz, registrosNuevos, tiempoDeLectura } from "./envivo.js";
 import { detenerMicrofono, escuchando, escuchar, hayMicrofono } from "./microfono.js";
-import { montarRecursos } from "./recursos.js";
+import { montarRecursos, ponerQrWhatsapp } from "./recursos.js";
 import { paraVoz } from "./voz_cifras.js";
 import { paraPantalla } from "./pantalla_cifras.js";
 import {
@@ -142,6 +142,11 @@ const estado = {
 
 /** Sondeo de la lista en vivo (se crea al iniciar la pantalla). */
 let sondeo = null;
+/**
+ * Sondeo de la espera: mira la lista en vivo desde el final de la
+ * presentación y avisa cuando llega el primer turno del canal del voluntario.
+ */
+let vigia = null;
 
 /**
  * Atajo para buscar un elemento por id.
@@ -516,6 +521,7 @@ async function cambiarANucleo() {
     return;
   }
   pausar();
+  ocultarEspera();
   const boton = porId("escena-nucleo");
   boton.disabled = true;
   porId("escena-modo").textContent = "Buscando el núcleo…";
@@ -628,6 +634,12 @@ async function reproducir() {
     if (mostrar(estado.indice)) {
       await decir(estado.turnos[estado.indice]);
     }
+    if (terminoLaPresentacion() && generacion === estado.generacion) {
+      // La escena guionada termina con la invitación de Pana: queda el QR.
+      estado.reproduciendo = false;
+      mostrarEspera();
+      return;
+    }
     if (porId("escena-solo-subtitulos").checked && !estado.vivo.activo) {
       break;
     }
@@ -635,8 +647,82 @@ async function reproducir() {
   }
   if (generacion === estado.generacion) {
     estado.reproduciendo = false;
+    if (estado.vivo.activo && !estado.vivo.pausado) {
+      avisarColaTerminada();
+    }
   }
   actualizarBotones();
+}
+
+/**
+ * Indica si el turno actual es el último de la presentación (la invitación de
+ * Pana) en la escena completa. En el núcleo (plan B) la escena sigue.
+ *
+ * @returns {boolean} `true` justo al terminar la presentación.
+ */
+function terminoLaPresentacion() {
+  return (
+    !estado.vivo.activo &&
+    estado.modo !== "nucleo" &&
+    estado.largoIntroduccion > 0 &&
+    estado.indice === estado.largoIntroduccion - 1
+  );
+}
+
+/**
+ * Avisa que la cola en vivo se vació después de un turno de Pana: la captura
+ * vuelve a abrir el micrófono para que el voluntario siga la conversación.
+ *
+ * @returns {void}
+ */
+function avisarColaTerminada() {
+  const ultimo = estado.turnos[estado.indice];
+  if (estado.indice === estado.turnos.length - 1 && ultimo?.personaje === "pana") {
+    document.dispatchEvent(new CustomEvent("escena:pana-termino"));
+  }
+}
+
+/**
+ * Muestra el QR de WhatsApp con «Esperando al voluntario…» y empieza a mirar la
+ * lista en vivo: el primer turno del canal pasa solo al modo conversación.
+ *
+ * @returns {void}
+ */
+function mostrarEspera() {
+  pausar();
+  porId("escena-espera").hidden = false;
+  estado.paso = PASO_PRESENTACION + 1;
+  marcarPasos();
+  void ponerQrWhatsapp(porId("escena-espera-qr"));
+  vigia?.iniciar({ desdeElFinal: true });
+  actualizarBotones();
+}
+
+/**
+ * Oculta la espera y deja de mirar la lista.
+ *
+ * @returns {void}
+ */
+function ocultarEspera() {
+  vigia?.detener();
+  porId("escena-espera").hidden = true;
+}
+
+/**
+ * Recibe lo que ve la espera: con el primer turno del canal (el voluntario ya
+ * escribió ESCENA y su código), la pantalla pasa sola al modo conversación y
+ * reproduce desde ese turno, sin pausa.
+ *
+ * @param {object[]} registros Registros `{seq, ts, origen, turno}` nuevos.
+ * @param {number | string} ultimo Cursor de la lista tras estos registros.
+ * @returns {void}
+ */
+function alVigilar(registros, ultimo) {
+  if (!registros.some((registro) => registro?.origen === "canal")) {
+    return;
+  }
+  ocultarEspera();
+  entrarEnVivo({ registros, ultimo });
 }
 
 /**
@@ -662,6 +748,10 @@ function siguiente() {
   if (estado.vivo.activo && !estado.vivo.pausado) {
     // En vivo, Espacio corta el turno actual y la cola sigue sola.
     reproducir();
+    return;
+  }
+  if (terminoLaPresentacion()) {
+    mostrarEspera();
     return;
   }
   if (estado.indice < estado.turnos.length - 1) {
@@ -695,6 +785,7 @@ function reiniciar() {
  */
 function prepararInicio() {
   pausar();
+  ocultarEspera();
   cerrarPreguntas();
   cerrarRecursos();
   estado.aperturaDicha = false;
@@ -1010,15 +1101,20 @@ function limpiarParaEnVivo() {
 }
 
 /**
- * Entra al modo en vivo: detiene la escena guionada, guarda su punto, limpia y
- * empieza desde el último turno de la lista (los viejos no se reproducen).
+ * Entra al modo en vivo (modo conversación): detiene la escena guionada,
+ * guarda su punto, limpia y empieza desde el último turno de la lista (los
+ * viejos no se reproducen). Si viene de la espera, trae los registros que ya
+ * vio el vigía y sigue desde su cursor. Abre la conversación con Pana.
  *
+ * @param {{registros?: object[], ultimo?: number | string}} [desdeLaEspera]
+ *   Registros nuevos y cursor de la espera; vacío con la tecla E.
  * @returns {void}
  */
-function entrarEnVivo() {
+function entrarEnVivo({ registros = [], ultimo = null } = {}) {
   if (estado.vivo.activo) {
     return;
   }
+  ocultarEspera();
   cerrarPreguntas();
   pausar();
   estado.vivo.guardado = {
@@ -1047,7 +1143,13 @@ function entrarEnVivo() {
   porId("escena-envivo-estado").hidden = false;
   pintarEstadoEnVivo();
   actualizarBotones();
-  sondeo.iniciar({ desdeElFinal: true });
+  document.dispatchEvent(new CustomEvent("escena:conversacion"));
+  if (ultimo === null) {
+    sondeo.iniciar({ desdeElFinal: true });
+    return;
+  }
+  sondeo.iniciar({ desde: ultimo });
+  recibirEnVivo(registros);
 }
 
 /**
@@ -1062,6 +1164,7 @@ function salirEnVivo() {
   }
   sondeo.detener();
   pausar();
+  document.dispatchEvent(new CustomEvent("escena:fin-conversacion"));
   const guardado = estado.vivo.guardado;
   estado.vivo.activo = false;
   estado.vivo.pausado = false;
@@ -1238,6 +1341,7 @@ async function iniciar() {
   porId("escena-preguntar").addEventListener("click", alternarPreguntas);
   porId("escena-en-vivo").addEventListener("click", alternarEnVivo);
   sondeo = crearSondeo({ alRecibir: recibirEnVivo, alEstado: cambioDeConexion });
+  vigia = crearSondeo({ alRecibir: alVigilar, alEstado: () => {} });
   porId("escena-form-pregunta").addEventListener("submit", (evento) => {
     evento.preventDefault();
     contestar(porId("escena-pregunta-texto").value);

@@ -17,6 +17,13 @@
 
     <section class="escena__personajes" id="escena-personajes" aria-label="Personajes"></section>
 
+    <!-- Fin de la presentación: el QR de WhatsApp mientras se activa el voluntario. -->
+    <section class="escena__espera" id="escena-espera" aria-label="Esperando al voluntario" hidden>
+      <img id="escena-espera-qr" class="escena__espera-qr" alt="QR del WhatsApp de Pana" width="220" height="220" hidden>
+      <p class="escena__espera-titulo">Esperando al voluntario…</p>
+      <p class="escena__espera-pista">Escanea el QR y escribe ESCENA con el código de tu tarjeta.</p>
+    </section>
+
     <aside class="escena__panel" aria-label="Cifras de la escena">
       <h2>Escenario</h2>
       <div class="escena__chips" id="escena-escenario"></div>
@@ -103,6 +110,7 @@
       <div class="escena__captura-fila">
         <button type="button" id="captura-pana" class="escena__captura-hablar" aria-pressed="false"
           data-texto-vivo="Toca y habla con Pana">Hablar con Pana</button>
+        <button type="button" id="captura-pana-detener" class="escena__boton--secundario" hidden>Detener la escucha</button>
       </div>
       <p class="escena__captura-escuche" id="captura-pana-escuche" aria-live="polite"></p>
       <p class="escena__estado" id="captura-pana-estado" aria-live="polite"></p>
