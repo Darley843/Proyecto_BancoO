@@ -136,7 +136,7 @@ descarga masiva de PDF, transcripción de vídeo.
 >
 > **Gateway local de OpenClaw:** las llamadas del canal al gateway
 > (`http://127.0.0.1:18789/v1/chat/completions`, desde `canal/openclaw.py`)
-> usan `httpx` con `timeout` explícito de `gateway.timeout_segundos` (45 s de
+> usan `httpx` con `timeout` explícito de `gateway.timeout_segundos` (90 s de
 > techo, 3 s para conectar), el User-Agent y el header `From` de
 > `config/site.toml`, sin reintentos y sin `verify=False`. El destino es loopback y no es scraping del sitio del banco,
 > así que no pasan por `net.py` ni les aplican `robots.txt`/1,5 s. El token vive

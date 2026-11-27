@@ -419,12 +419,16 @@ CATALOGO: tuple[Herramienta, ...] = (
         lectura.auditar_respuesta,
         AuditarRespuestaEntrada,
         _doc(
-            "Revisa un texto antes de enviarlo: cifras contra "
-            "`cifras_permitidas`, promesas, gota a gota, datos personales y fuga "
-            "de instrucciones.",
-            "No es un corrector de estilo ni una aprobación del crédito. Sin "
-            "`cifras_permitidas`, cualquier cifra es inventada. Úsala antes de "
-            "cada mensaje con cifras.",
+            "Revisa una sola vez por mensaje el texto con cifras contra "
+            "`cifras_permitidas` (obligatorias y con todas las cifras de las "
+            "herramientas del turno), promesas, gota a gota, datos personales y "
+            "fuga de instrucciones.",
+            "No es un corrector de estilo ni una aprobación del crédito. "
+            "`cifras_permitidas` es obligatorio cuando el texto trae cifras y "
+            "debe incluir las cifras que devolvieron las herramientas usadas; "
+            "sin ellas, cualquier cifra es inventada. No audites dos veces el "
+            "mismo texto: solo repite la auditoría si hubo hallazgos reales y "
+            "cambiaste el texto.",
             "`conforme`, el `veredicto`, su `etiqueta`, `permite_enviar`, los "
             "`hallazgos` y el `detalle`.",
             "`mcp_servidor/control.py` y "

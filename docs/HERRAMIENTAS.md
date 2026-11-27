@@ -454,9 +454,9 @@ Total: **20 herramientas**.
 
 **Confirmación.** No
 
-**Para qué sirve.** Revisa un texto antes de enviarlo: cifras contra `cifras_permitidas`, promesas, gota a gota, datos personales y fuga de instrucciones.
+**Para qué sirve.** Revisa una sola vez por mensaje el texto con cifras contra `cifras_permitidas` (obligatorias y con todas las cifras de las herramientas del turno), promesas, gota a gota, datos personales y fuga de instrucciones.
 
-**Cuándo NO usarla.** No es un corrector de estilo ni una aprobación del crédito. Sin `cifras_permitidas`, cualquier cifra es inventada. Úsala antes de cada mensaje con cifras.
+**Cuándo NO usarla.** No es un corrector de estilo ni una aprobación del crédito. `cifras_permitidas` es obligatorio cuando el texto trae cifras y debe incluir las cifras que devolvieron las herramientas usadas; sin ellas, cualquier cifra es inventada. No audites dos veces el mismo texto: solo repite la auditoría si hubo hallazgos reales y cambiaste el texto.
 
 **Entrada** (`AuditarRespuestaEntrada`, `extra="forbid"`):
 
@@ -581,9 +581,10 @@ alucinaciones observadas y el control que quedó en el código.
 2. **Cifras legibles para copiar.** Las herramientas devuelven `valor_legible`
    en formato colombiano y `cifras_permitidas`; el workspace ordena copiar ese
    texto y no hacer cuentas propias ni convertir unidades.
-3. **`auditar_respuesta` antes de cada mensaje con cifras.** El auditor de
+3. **`auditar_respuesta` una sola vez por mensaje con cifras.** El auditor de
    código revisa cifras, promesas, gota a gota, datos personales y fuga de
-   instrucciones. Sin `cifras_permitidas`, cualquier cifra es inventada.
+   instrucciones. `cifras_permitidas` es obligatorio y lleva todas las cifras
+   que devolvieron las herramientas; sin ellas, cualquier cifra es inventada.
 4. **Monto exacto en todo el recorrido.** El monto que dijo el invitado
    reemplaza el valor del rango en todas las herramientas de la escena; el
    rango queda como respaldo y sus límites se validan.

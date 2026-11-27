@@ -179,7 +179,7 @@ Dos detalles de OpenClaw que importan:
   con el grafo; no hay token por defecto.
 - El cuerpo lleva `model = openclaw:pana`, `user = wa:<huella>` y **un solo**
   mensaje. No viajan el número, el historial, el perfil ni los fragmentos.
-- Usa `httpx` con `timeout` de `gateway.timeout_segundos` (45 s de techo, 3 s
+- Usa `httpx` con `timeout` de `gateway.timeout_segundos` (90 s de techo, 3 s
   para conectar), el User-Agent y el header `From` de `config/site.toml`; el
   host debe ser loopback, no hay reintentos y nunca se usa `verify=False`.
 - Ante timeout, error de red, `5xx`, `401`, cuerpo inválido o contenido vacío,

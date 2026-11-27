@@ -234,7 +234,7 @@ def test_configuracion_por_defecto_sin_archivo(tmp_path: Path) -> None:
     config = cargar_configuracion_openclaw(tmp_path / "no-existe.toml")
 
     assert config.url_chat == "http://127.0.0.1:18789/v1/chat/completions"
-    assert config.timeout_segundos == 45.0
+    assert config.timeout_segundos == 90.0
     assert config.reintentos == 0
 
 
