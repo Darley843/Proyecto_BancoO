@@ -430,6 +430,22 @@ pantalla (la escena sigue completa por WhatsApp) y después DeepSeek en la
 negociación (política determinista). **Nunca** se recortan OpenClaw, las 20
 herramientas, el WhatsApp de los invitados ni la seguridad.
 
+### 6.4 Contingencias técnicas
+
+Si algo falla en el encendido, esta tabla va del síntoma a la causa y al
+comando. No se sube `config/whatsapp.toml` con los ajustes locales, y ningún
+comando imprime tokens, números ni direcciones de túnel.
+
+| Síntoma | Causa | Qué hacer |
+|---|---|---|
+| El gateway no arranca después de apagar WSL; `openclaw health` falla y habla de un candado o *lock* | El proceso anterior no se detuvo antes de cerrar Ubuntu y quedó un bloqueo huérfano | Detener, recuperar el candado y volver a arrancar. `recover-lock` imprime una línea `--confirm`; se copia **completa**, sin recortarla:<br>`wsl -d OpenClawGateway -- openclaw daemon stop`<br>`wsl -d OpenClawGateway -- openclaw gateway recover-lock`<br>`wsl -d OpenClawGateway -- openclaw gateway recover-lock --confirm <lo-que-imprime>`<br>`wsl -d OpenClawGateway -- openclaw daemon start`<br>No se borra el archivo de bloqueo a mano. Prevención: `wsl -d OpenClawGateway -- openclaw daemon stop` antes de cerrar Ubuntu |
+| La consola de la app no recibe mensajes y el túnel muestra una dirección nueva | El túnel rápido cambia de subdominio al reiniciarse y Meta conserva el callback anterior, así que entrega el webhook a otro túnel | Reiniciar `cloudflared`, copiar la URL nueva y actualizarla en Meta → Webhooks → **Verificar y guardar**. Para confirmar qué callback tiene Meta, consultar `webhook_configuration` en la API de Graph y comparar `callback_url` con la URL vigente:<br>`$base = "https://graph.facebook.com/v23.0"`<br>`$tok = $env:WHATSAPP_ACCESS_TOKEN`<br>`Invoke-RestMethod "$base/<APP_ID>?fields=webhook_configuration&access_token=$tok" \| ConvertTo-Json -Depth 6`<br>Si la WABA tiene su propio callback, revisar también `subscribed_apps`. El token no se imprime |
+| La app o el MCP no arrancan: puerto ocupado (`WinError 10048`, «address already in use») | Otro proceso, o una instancia anterior del proyecto, sigue escuchando en `8000` u `8765` | Ver quién tiene el puerto y cerrarlo solo si es del proyecto:<br>`Get-NetTCPConnection -LocalPort 8000,8765 -State Listen \| Select-Object LocalAddress,LocalPort,OwningProcess`<br>`Get-Process -Id <PID> \| Select-Object Id,ProcessName`<br>`Stop-Process -Id <PID>`<br>No se cambia el puerto: `openclaw.json` y `config/openclaw.toml` apuntan a `8765` |
+| La pantalla queda en «En vivo — esperando el primer turno», aunque las herramientas responden | El MCP o la app arrancaron sin `ESCENA_EN_VIVO=1`; la variable se lee al arrancar cada proceso | Definirla en las dos ventanas y reiniciar **ambas** (`make agente-mcp` y `make app`):<br>`$env:ESCENA_EN_VIVO = "1"`<br>Sin el interruptor, el canal responde «La escena en vivo no está activada» y no publica |
+| Un número desconocido no recibe respuesta, o recibe el aviso de cuota | La ventana `desde`/`hasta` no cubre la hora, `WHATSAPP_EVENTO` está apagado, o la persona agotó su cuota (30 por hora y 40 en total; 300 en el evento) | El webhook igual registra `POST 200`. Ajustar la ventana en `config/whatsapp.toml` **solo en el computador de la demo** (con `-05:00`) y reiniciar `make app`; `WHATSAPP_EVENTO` no mueve las fechas. Si es la cuota, es lo esperado: seguir con el teléfono del equipo. No se suben las cuotas en plena demo |
+| `whatsapp-env.ps1` no carga: «la ejecución de scripts está deshabilitada» o el archivo «no tiene firma digital» | Windows marcó el archivo descargado o la política del proceso es restrictiva | Quitar la marca y habilitar *Bypass* **solo en esa ventana**:<br>`Unblock-File ..\whatsapp-env.ps1`<br>`Set-ExecutionPolicy -Scope Process -ExecutionPolicy Bypass`<br>`. "..\whatsapp-env.ps1"`<br>No se cambia la política de la máquina |
+| El webhook procesa pero el teléfono no recibe nada | `WHATSAPP_MODO` quedó en `"falso"`: el canal usa el enviador de prueba y no llama a Meta | Poner `$env:WHATSAPP_MODO = "real"`, comprobar `[bool]$env:WHATSAPP_ACCESS_TOKEN` y reiniciar `make app` |
+
 ## 7. Al terminar
 
 - [ ] Apagar el **modo evento** con `$env:WHATSAPP_EVENTO = "0"` y reiniciar

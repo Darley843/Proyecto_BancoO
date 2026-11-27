@@ -16,7 +16,16 @@ arranca y cómo se demuestra cada pieza. El cambio OpenSpec vive en
 | Entrada del servidor | `python -m banco_occidente_corpus.mcp_servidor.agente` | `make agente-mcp` |
 | Cliente del gateway y respaldo al grafo | `src/banco_occidente_corpus/canal/openclaw.py` | Implementado y probado (25-nov) |
 | Traza local de herramientas | `data/asistente/trazas/herramientas.jsonl` | `make traza` |
-| Gateway, token y auditoría | WSL + `OPENCLAW_GATEWAY_TOKEN` | Pendiente de la operación en el equipo de la demo |
+| Gateway, token y auditoría | WSL + `OPENCLAW_GATEWAY_TOKEN` | Operativo (26-nov): 0 críticas y 2 advertencias justificadas |
+| WhatsApp real de punta a punta | Meta + despachador + gateway + MCP | Verificado el 26-nov; evidencia en [`EVIDENCIA.md`](./EVIDENCIA.md) |
+
+**Estado final (26 de noviembre de 2026).** Todas las piezas están en `main` y
+la operación real quedó verificada en el computador de la demo: un invitado
+escribió por WhatsApp, aceptó el aviso de la Ley 1581, recorrió la escena con
+las herramientas y Pana retomó la conversación después de reiniciar WSL, el
+gateway, el MCP y la app. La tabla de evidencia, con fecha, comando y archivo de
+cada afirmación, está en [`EVIDENCIA.md`](./EVIDENCIA.md) («Evidencia de Nayla —
+semana del 24 al 26 de noviembre de 2026»).
 
 El servidor **stdio** `boveda-occidente` (`make` no lo arranca; se invoca con
 `python -m banco_occidente_corpus.mcp_servidor`) conserva sus tres herramientas
@@ -45,6 +54,22 @@ Meta Cloud API ──► webhook (firma) ──► cola ──► despachador
 
 WhatsApp va **solo** por Meta. OpenClaw no tiene canal de WhatsApp en este
 cambio: es el motor del agente detrás del despachador.
+
+Tres fronteras separan la arquitectura de la red y se comprueban por separado:
+
+- **Antes del motor manda el canal.** Autorización, consentimiento, ventana del
+  evento, cuota, comandos que empiezan por «/» y datos personales se resuelven
+  en el despachador; lo que no pasa esas puertas no llega al gateway (§4.1 y
+  [`SEGURIDAD.md`](./SEGURIDAD.md) §3.9).
+- **El gateway no ejecuta ni sale del workspace.** `exec.security: "deny"`,
+  `tools.deny`, `tools.fs.workspaceOnly` y permisos elevados apagados; además
+  los comandos del gateway están desactivados, así que «/think high» es texto
+  normal (§6 y [`openclaw/README.md`](../openclaw/README.md), «Defensa en
+  profundidad»).
+- **El túnel solo publica el webhook.** `/webhooks/whatsapp` y `/health`
+  responden desde fuera; la pantalla, `/docs`, la API y la ruta en vivo dan
+  `404` y solo existen en `127.0.0.1:8000` ([`SEGURIDAD.md`](./SEGURIDAD.md)
+  §3.12).
 
 ## 3. Catálogo de veinte herramientas
 
@@ -245,18 +270,30 @@ Todas corren sin red, sin `DEEPSEEK_API_KEY` y con Ollama apagado. La prueba de
 El cliente del gateway usa `httpx.MockTransport`: no necesita el gateway
 encendido ni `OPENCLAW_GATEWAY_TOKEN`.
 
-## 8. Pendientes de la operación
+## 8. Cómo se verifica que todo funciona
 
-1. Replicar el bloque `mcp` y `alsoAllow: ["bundle-mcp"]` en el
-   `openclaw.json` de WSL y reexportar la copia redactada.
-2. Confirmar con `openclaw mcp doctor sucursal --probe` que el gateway ve las
-   veinte.
-3. `openclaw security audit` sin hallazgos altos antes de la etiqueta
-   `entrega-final`.
-4. Recorrido real por WhatsApp con un invitado y `OPENCLAW_ACTIVO=1`:
-   consentimiento, turno con al menos una herramienta, respuesta y borrado;
-   latencia p95 por debajo de 8 s y respaldo probado apagando el gateway.
-5. Borrar `MEMORY.md`, la bitácora y las trazas al terminar el evento.
+La verificación tiene dos capas: lo que corre sin red en `make check` (§7) y lo
+que solo se ve con las piezas encendidas. Esta es la segunda, con el resultado de
+la semana del 24 al 26 de noviembre; el detalle, la fecha y el archivo de cada
+afirmación están en [`EVIDENCIA.md`](./EVIDENCIA.md).
+
+| # | Qué se comprueba | Cómo | Resultado del 26-nov |
+|---|---|---|---|
+| 1 | El repositorio queda en verde sin red, sin clave y con Ollama apagado | `make check` y `openspec validate agente-openclaw --strict` | En verde; es la compuerta de cada commit |
+| 2 | El gateway responde y ve las veinte herramientas | `wsl -d OpenClawGateway -- openclaw health`; después `openclaw daemon stop`, `openclaw mcp doctor sucursal --probe` y `openclaw daemon start` | Health correcto y `sucursal: ok` con la lista cerrada |
+| 3 | No hay hallazgos críticos ni altos | `openclaw security audit` | 0 críticas y 2 advertencias justificadas (#209) |
+| 4 | El gateway contesta y usa herramientas | `make probar-openclaw PREGUNTA="¿Cuál es la tasa de libre inversión?"` y `make traza` | Respondió y la traza mostró la herramienta elegida |
+| 5 | El recorrido real por WhatsApp | Un teléfono de la lista escribe «hola», acepta el aviso y pide una tasa o un diagnóstico; luego `make traza` | Consentimiento, `consultar_tasa` y la escena completa con `motor="openclaw"` |
+| 6 | Un invitado fuera de la lista entra con el modo evento | `WHATSAPP_EVENTO=1` con la ventana vigente y un número que no está en `[autorizados]` | Recibió el aviso, aceptó y conversó con Pana; la cuota se respetó |
+| 7 | La memoria sobrevive al reinicio | Reiniciar WSL, el gateway, el MCP y la app; la misma persona hace una pregunta de seguimiento | Pana retomó el hilo («¿seguimos con lo de la moto?») sin guardar PII |
+| 8 | La escena en vivo publica y se ve | `ESCENA_EN_VIVO=1` en el MCP y en la app, `ESCENA` y el código del voluntario, pantalla en **E** | Turnos de Don Gota, Pana, los dos agentes y el auditor, con voz y cifras en pesos |
+| 9 | El túnel no abre nada más que el webhook | Desde fuera, `/health` y `/api/estado`; `uv run pytest test/test_tunel_publico.py` | `/health` responde `200`; `/api/estado` y `/escena.html`, `404` (#229) |
+
+**Lo que queda.** Dos piezas no se presentan como hechas: responder a las notas
+de voz y cerrar por WhatsApp el recorrido de «olvida mis datos» con su
+confirmación. El borrado del evento (`make limpiar-evento CONFIRMAR=1`) se corre
+igual el viernes después de los ensayos y el sábado después de la sustentación
+(§9).
 
 ## 9. Limpieza al terminar el evento
 
