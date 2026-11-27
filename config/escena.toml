@@ -46,6 +46,19 @@ cierre = [
   "Cierro contigo ahora: {monto} y {cuota_diaria} diarios. Sin papeleo y sin espera.",
 ]
 
+[voces]
+# Preferencia de la voz del navegador para Don Gota, en orden. `app/web/voz.js`
+# busca cada fragmento dentro del nombre de las voces en español, sin
+# distinguir mayúsculas ni tildes. En este computador existen «Microsoft Jorge
+# Online (Natural) - Spanish (Mexico)» y «Microsoft Raul - Spanish (Mexico)»
+# (local, funciona sin internet). Nunca se usa una voz de mujer (Salome, Dalia,
+# Sabina, Elena, Sofia, Beatriz, Elvira, entre otras) ni la de Pana.
+don_gota = ["Jorge", "Raul"]
+# Modelo masculino de Piper que ya trae `config/voz.toml`. Solo se usa si está
+# descargado en `data/modelos/voz/`; si no, Don Gota habla con la voz del
+# navegador y no se descarga nada nuevo.
+piper_don_gota = "es_ES-davefx-medium"
+
 [negociacion]
 # Límites de la negociación de la escena. El código recorta estos valores
 # contra los máximos del diseño y no los supera aunque el TOML traiga más:
