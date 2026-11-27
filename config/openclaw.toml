@@ -8,11 +8,12 @@
 base_url = "http://127.0.0.1:18789"
 modelo = "openclaw:pana"
 prefijo_usuario = "wa:"
-# 45 s es el techo de un turno con varias herramientas (la corrida de inyección
-# mide unos 9 s por respuesta); la conexión se corta a los 3 s. La cola del canal
-# tiene un solo trabajador: si el gateway se cuelga, ese turno espera el techo y
-# luego cae al grafo. Sin reintentos: un reintento repetiría el turno.
-timeout_segundos = 45.0
+# 90 s es el techo de un turno con varias herramientas: una respuesta con cifras
+# puede encadenar entrevista, gota a gota, negociación y ficha, y la base del
+# agente tarda en preparar el turno; la conexión se corta a los 3 s. La cola del
+# canal tiene un solo trabajador: si el gateway se cuelga, ese turno espera el
+# techo y luego cae al grafo. Sin reintentos: un reintento repetiría el turno.
+timeout_segundos = 90.0
 reintentos = 0
 fallback_forzado = false
 

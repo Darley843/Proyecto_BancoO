@@ -497,6 +497,17 @@ comando imprime tokens, números ni direcciones de túnel.
       `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\limpiar_evento.ps1 -PurgarArchivos`.
       Esa purga **se prueba el viernes 27 después de los ensayos**, antes de
       usarla en el evento del sábado 28.
+      **Compactación.** En la misma ventana sin gateway, el script compacta la
+      base del agente `openclaw-agent.sqlite` y la base de estado
+      `~/.openclaw/state/openclaw.sqlite` con `PRAGMA wal_checkpoint(TRUNCATE)`
+      y `VACUUM` (sin borrar filas), e imprime el tamaño antes y después. En
+      modo de prueba solo mide y muestra el paso. Es lo que evita los avisos
+      «slow SQLite session write» y «session-sqlite slow agent database
+      reservation» de OpenClaw. `sembrar_memoria.ps1` falla si `MEMORY.md` ya
+      existe; después de limpiar, siembra de nuevo con `FORZAR=1`:
+      ```powershell
+      make sembrar-memoria FECHA=2026-11-28 FORZAR=1
+      ```
       Al apagar el evento los consentimientos aceptados **se conservan**. Los
       perfiles, consentimientos y casos del canal de WhatsApp son de Darley y
       se borran aparte: el script no los toca.
