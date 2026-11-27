@@ -85,7 +85,7 @@ export const INTRODUCCION = Object.freeze(
     ),
     turnoSimple(
       "pana",
-      "Los protagonistas son ustedes: elegiré a un voluntario y los demás pueden escribirme por WhatsApp, siempre con datos inventados. Uso las tasas que publica el Banco de Occidente, pero soy un proyecto académico. Al final, háganme preguntas.",
+      "Los protagonistas son ustedes. ¿Hay alguien que se anime a ser mi voluntario? Solo tiene que escanear el código y escribirme por WhatsApp, con datos inventados: nada de su información real. Los demás también pueden escribirme; si tienen alguna duda sobre su primer crédito, con gusto los oriento. Uso las tasas que publica el Banco de Occidente, pero soy un proyecto académico. Al final, háganme preguntas.",
       "guion_fijo",
     ),
   ].map((turno, orden) => Object.freeze({ ...turno, id: `anfitrion.presentacion.${orden + 1}`, orden })),
