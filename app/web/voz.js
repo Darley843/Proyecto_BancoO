@@ -14,6 +14,11 @@
  *   hay internet (Edge la cambiaría por una voz local de Windows), usa su voz
  *   de Piper como respaldo en vez de otra voz cualquiera.
  *
+ * Don Gota siempre busca una voz de hombre (`config/escena.toml [voces]`:
+ * «Jorge» y luego «Raul»), nunca una de mujer y nunca la de Pana. La lista de
+ * `getVoices()` puede llegar vacía al cargar: se espera `voiceschanged` antes
+ * de elegir.
+ *
  * Si la API no responde, todos usan el navegador con los valores de
  * `RESPALDO_NAVEGADOR`. Nunca guarda los textos en el navegador: el audio
  * adelantado (`adelantarVoz`) vive solo en memoria y se descarta al usarse.
@@ -27,6 +32,153 @@ export const PERSONAJES = Object.freeze([
   "agente_joven",
   "agente_banco",
   "auditor",
+]);
+
+/**
+ * Voz de Pana, según `config/voz.toml`: solo se usa para que Don Gota no la
+ * repita cuando el navegador no trae ninguna voz masculina.
+ */
+const VOZ_PANA = "Gonzalo";
+
+/**
+ * Preferencia de Don Gota, en orden: se busca cada fragmento dentro del nombre
+ * de las voces en español, sin distinguir mayúsculas ni tildes. Es la misma
+ * lista de `config/escena.toml [voces] don_gota`; una prueba comprueba que no
+ * se separen.
+ */
+const PREFERENCIA_DON_GOTA = Object.freeze(["Jorge", "Raul"]);
+
+/**
+ * Nombres que identifican una voz de mujer. Se comparan como palabras
+ * completas del nombre de la voz, para no confundir «Julia» con «Julián».
+ */
+const VOCES_FEMENINAS = Object.freeze([
+  "salome",
+  "dalia",
+  "sabina",
+  "elena",
+  "sofia",
+  "beatriz",
+  "elvira",
+  "daniela",
+  "paulina",
+  "monica",
+  "lucia",
+  "maria",
+  "laura",
+  "isabel",
+  "carmen",
+  "andrea",
+  "camila",
+  "valentina",
+  "ximena",
+  "renata",
+  "esperanza",
+  "paloma",
+  "teresa",
+  "rosa",
+  "julia",
+  "irene",
+  "nuria",
+  "laia",
+  "abril",
+  "alba",
+  "clara",
+  "celia",
+  "eva",
+  "lola",
+  "marta",
+  "natalia",
+  "patricia",
+  "silvia",
+  "victoria",
+  "carolina",
+  "catalina",
+  "gabriela",
+  "mariana",
+  "alejandra",
+  "ana",
+  "sara",
+  "paula",
+  "noelia",
+  "alicia",
+  "cecilia",
+  "gloria",
+  "susana",
+  "veronica",
+  "lorena",
+  "adriana",
+  "marcela",
+  "claudia",
+  "diana",
+  "liliana",
+  "sandra",
+  "angela",
+  "rocio",
+  "pilar",
+  "mercedes",
+  "guadalupe",
+  "lupita",
+  "amparo",
+  "consuelo",
+  "soledad",
+  "piedad",
+  "milagros",
+  "dolores",
+]);
+
+/** Nombres que identifican una voz de hombre en las voces de Windows/Edge. */
+const VOCES_MASCULINAS = Object.freeze([
+  "jorge",
+  "raul",
+  "gonzalo",
+  "juan",
+  "pablo",
+  "diego",
+  "carlos",
+  "miguel",
+  "alvaro",
+  "dario",
+  "enrique",
+  "alejandro",
+  "andres",
+  "felipe",
+  "santiago",
+  "mateo",
+  "luis",
+  "javier",
+  "manuel",
+  "pedro",
+  "ramon",
+  "tomas",
+  "vicente",
+  "arturo",
+  "roberto",
+  "ricardo",
+  "fernando",
+  "sergio",
+  "mauricio",
+  "camilo",
+  "sebastian",
+  "david",
+  "daniel",
+  "gabriel",
+  "adrian",
+  "hector",
+  "hugo",
+  "ivan",
+  "joaquin",
+  "julio",
+  "mario",
+  "martin",
+  "nicolas",
+  "oscar",
+  "rafael",
+  "ruben",
+  "salvador",
+  "victor",
+  "jose",
+  "antonio",
 ]);
 
 /**
@@ -51,6 +203,9 @@ const LARGO_MAXIMO_VOZ = 900;
 /** Tiempo límite para recibir el audio de Pana antes de usar el navegador. */
 const ESPERA_VOZ_MS = 20000;
 
+/** Tope de espera de `voiceschanged` cuando la lista de voces llega vacía. */
+const ESPERA_VOCES_MS = 2000;
+
 /** Máximo de audios pedidos por adelantado que se guardan en memoria. */
 const MAXIMO_ADELANTADOS = 4;
 
@@ -65,6 +220,9 @@ let urlActual = null;
 
 /** Cuenta cada lectura: una respuesta que llega tarde no pisa a la siguiente. */
 let lecturaActual = 0;
+
+/** `true` si el navegador no avisó nunca de sus voces: no se vuelve a esperar. */
+let vocesSinAviso = false;
 
 /**
  * Indica si el navegador puede leer en voz alta por su cuenta.
@@ -123,7 +281,7 @@ export async function decirComo(personaje, texto, opciones = {}) {
   if (lectura !== lecturaActual) {
     return "cancelada";
   }
-  if (usaPiper(ajuste, limpio)) {
+  if (usaPiper(ajuste, limpio) && piperMasculinoDisponible(quien, ajuste)) {
     const audio = await (tomarAdelantado(quien, limpio) ?? pedirAudio(quien, limpio));
     if (lectura !== lecturaActual) {
       return "cancelada";
@@ -132,6 +290,10 @@ export async function decirComo(personaje, texto, opciones = {}) {
       return "piper";
     }
   }
+  if (lectura !== lecturaActual) {
+    return "cancelada";
+  }
+  await esperarVoces();
   if (lectura !== lecturaActual) {
     return "cancelada";
   }
@@ -162,7 +324,11 @@ export async function adelantarVoz(personaje, texto) {
     return;
   }
   const ajuste = await configuracionDe(quien);
-  if (!usaPiper(ajuste, limpio) || adelantados.has(clave)) {
+  if (
+    !usaPiper(ajuste, limpio) ||
+    !piperMasculinoDisponible(quien, ajuste) ||
+    adelantados.has(clave)
+  ) {
     return;
   }
   while (adelantados.size >= MAXIMO_ADELANTADOS) {
@@ -208,6 +374,25 @@ function usaPiper(ajuste, texto) {
     ajuste.motor === "piper" ||
     (ajuste.motor === "navegador" && !tieneVozDelNavegador(ajuste.navegador?.voz ?? ""));
   return porMotor && texto.length <= LARGO_MAXIMO_VOZ;
+}
+
+/**
+ * Indica si Don Gota puede usar su modelo masculino de Piper en este equipo.
+ *
+ * El modelo ya viene en `config/voz.toml` (`es_ES-davefx-medium`, una voz de
+ * hombre); si no está descargado, la API responde `piper: false` y Don Gota
+ * pasa a la voz del navegador en vez de esperar un 503. Los demás personajes
+ * conservan el comportamiento de siempre.
+ *
+ * @param {string} personaje Personaje que hablará.
+ * @param {{motor: string, piper?: boolean}} ajuste Ajuste del personaje.
+ * @returns {boolean} `true` si puede pedir el audio de Piper.
+ */
+function piperMasculinoDisponible(personaje, ajuste) {
+  if (personaje !== "don_gota" || ajuste.motor !== "piper") {
+    return true;
+  }
+  return ajuste.piper !== false;
 }
 
 /**
@@ -374,13 +559,15 @@ export function decirConElNavegador(texto, ajuste, personaje = "pana", alTermina
   }
   try {
     const locucion = new window.SpeechSynthesisUtterance(texto);
-    const voz = elegirVoz(ajuste?.voz ?? "", personaje);
-    if (voz) {
-      locucion.voice = voz;
+    const eleccion = elegirVoz(ajuste?.voz ?? "", personaje);
+    if (eleccion.voz) {
+      locucion.voice = eleccion.voz;
     }
-    locucion.lang = voz?.lang ?? "es-CO";
-    locucion.pitch = ajuste?.tono ?? 1;
-    locucion.rate = ajuste?.velocidad ?? 1;
+    locucion.lang = eleccion.voz?.lang ?? "es-CO";
+    const tono = ajuste?.tono ?? 1;
+    const velocidad = ajuste?.velocidad ?? 1;
+    locucion.pitch = eleccion.grave ? Math.max(0.1, tono * 0.75) : tono;
+    locucion.rate = eleccion.grave ? Math.max(0.1, velocidad * 0.9) : velocidad;
     locucion.onend = alTerminar;
     locucion.onerror = alTerminar;
     window.speechSynthesis.speak(locucion);
@@ -436,41 +623,222 @@ function hayInternet() {
 }
 
 /**
+ * Normaliza el nombre de una voz: minúsculas, sin tildes y sin espacios de más.
+ *
+ * @param {string} texto Nombre de la voz o fragmento buscado.
+ * @returns {string} Texto comparable.
+ */
+function normalizarNombreVoz(texto) {
+  return String(texto ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/**
+ * Separa el nombre de una voz en palabras comparables.
+ *
+ * @param {{name?: string}} voz Voz del navegador.
+ * @returns {Set<string>} Palabras normalizadas del nombre.
+ */
+function palabrasDeVoz(voz) {
+  return new Set(
+    normalizarNombreVoz(voz?.name)
+      .split(/[^a-z0-9]+/)
+      .filter(Boolean),
+  );
+}
+
+/**
+ * Indica si una voz tiene nombre de mujer.
+ *
+ * Se comparan palabras completas, no fragmentos: así «Julia» no marca como
+ * femenina una voz llamada «Julián».
+ *
+ * @param {{name?: string}} voz Voz del navegador.
+ * @returns {boolean} `true` si es una voz de mujer conocida.
+ */
+function esVozFemenina(voz) {
+  const palabras = palabrasDeVoz(voz);
+  return VOCES_FEMENINAS.some((nombre) => palabras.has(normalizarNombreVoz(nombre)));
+}
+
+/**
+ * Indica si una voz tiene nombre de hombre.
+ *
+ * @param {{name?: string}} voz Voz del navegador.
+ * @returns {boolean} `true` si es una voz de hombre conocida.
+ */
+function esVozMasculina(voz) {
+  const palabras = palabrasDeVoz(voz);
+  return VOCES_MASCULINAS.some((nombre) => palabras.has(normalizarNombreVoz(nombre)));
+}
+
+/**
+ * Indica si una voz es la de Pana, que Don Gota no debe repetir.
+ *
+ * @param {{name?: string}} voz Voz del navegador.
+ * @returns {boolean} `true` si coincide con la voz configurada de Pana.
+ */
+function esVozPana(voz) {
+  return palabrasDeVoz(voz).has(normalizarNombreVoz(VOZ_PANA));
+}
+
+/**
+ * Busca una voz por un fragmento de su nombre, sin mayúsculas ni tildes.
+ *
+ * @param {Array<{name: string}>} voces Voces donde buscar.
+ * @param {string} fragmento Parte del nombre que se busca.
+ * @returns {SpeechSynthesisVoice | null} La primera voz que coincide o `null`.
+ */
+function buscarVozPorFragmento(voces, fragmento) {
+  const buscado = normalizarNombreVoz(fragmento);
+  if (!buscado) {
+    return null;
+  }
+  return voces.find((voz) => normalizarNombreVoz(voz.name).includes(buscado)) ?? null;
+}
+
+/**
+ * Elige la voz de Don Gota: hombre, distinta de Pana y nunca de mujer.
+ *
+ * Primero busca «Jorge» y luego «Raul» por fragmento del nombre. Si no están,
+ * usa otra voz de hombre conocida. Si no hay ninguna voz masculina, toma la
+ * primera voz en español que no sea de mujer ni de Pana y pide bajarle el tono.
+ * Si solo quedan voces de mujer, devuelve `null` antes que usar una.
+ *
+ * @param {Array<SpeechSynthesisVoice>} espanolas Voces en español del navegador.
+ * @returns {{voz: SpeechSynthesisVoice | null, grave: boolean}} Voz y si hay que hacerla más grave.
+ */
+function elegirVozDonGota(espanolas) {
+  const candidatas = espanolas.filter((voz) => !esVozFemenina(voz) && !esVozPana(voz));
+  for (const fragmento of PREFERENCIA_DON_GOTA) {
+    const voz = buscarVozPorFragmento(candidatas, fragmento);
+    if (voz) {
+      return { voz, grave: false };
+    }
+  }
+  const masculina = candidatas.find((voz) => esVozMasculina(voz));
+  if (masculina) {
+    return { voz: masculina, grave: false };
+  }
+  if (candidatas.length > 0) {
+    return { voz: candidatas[0], grave: true };
+  }
+  return { voz: null, grave: true };
+}
+
+/**
  * Elige la voz del navegador para un personaje.
  *
  * Si `nombre` no está vacío, toma la primera voz cuyo nombre lo contenga (sin
- * importar mayúsculas). Si no, Pana prefiere `es-CO` y los demás reparten las
- * voces en español en orden, para que dos personajes seguidos no suenen igual.
+ * importar mayúsculas ni tildes). Si no, Pana prefiere `es-CO` y los demás
+ * reparten las voces en español en orden, para que dos personajes seguidos no
+ * suenen igual. Don Gota tiene su propia regla masculina.
  *
  * @param {string} nombre Parte del nombre de la voz, o vacío.
  * @param {string} personaje Personaje que habla.
- * @returns {SpeechSynthesisVoice | null} Voz elegida o `null`.
+ * @returns {{voz: SpeechSynthesisVoice | null, grave: boolean}} Voz elegida y si hay que bajarla.
  */
 function elegirVoz(nombre, personaje) {
   try {
     const todas = window.speechSynthesis.getVoices();
-    const buscado = nombre.trim().toLowerCase();
+    if (personaje === "don_gota") {
+      const espanolas = todas.filter((voz) => voz.lang?.toLowerCase().startsWith("es"));
+      return elegirVozDonGota(espanolas);
+    }
+    const buscado = normalizarNombreVoz(nombre);
     if (buscado) {
-      const exacta = todas.find((voz) => voz.name.toLowerCase().includes(buscado));
+      const exacta = todas.find((voz) =>
+        normalizarNombreVoz(voz.name).includes(buscado),
+      );
       if (exacta) {
-        return exacta;
+        return { voz: exacta, grave: false };
       }
     }
     const espanolas = todas.filter((voz) => voz.lang?.toLowerCase().startsWith("es"));
     if (espanolas.length === 0) {
-      return null;
+      return { voz: null, grave: false };
     }
     if (personaje === "pana") {
-      return (
-        espanolas.find((voz) => voz.lang.toLowerCase().startsWith("es-co")) ??
-        espanolas[0]
-      );
+      return {
+        voz:
+          espanolas.find((voz) => voz.lang.toLowerCase().startsWith("es-co")) ??
+          espanolas[0],
+        grave: false,
+      };
     }
     const posicion = Math.max(0, PERSONAJES.indexOf(personaje));
-    return espanolas[posicion % espanolas.length];
+    return { voz: espanolas[posicion % espanolas.length], grave: false };
   } catch {
-    return null;
+    return { voz: null, grave: false };
   }
+}
+
+/**
+ * Devuelve las voces que el navegador ya conoce.
+ *
+ * @returns {Array<SpeechSynthesisVoice>} Voces disponibles; vacía si todavía no hay.
+ */
+function vocesDelNavegador() {
+  try {
+    return window.speechSynthesis.getVoices() ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Espera a que el navegador llene la lista de voces antes de elegir.
+ *
+ * Edge y Chrome pueden devolver `getVoices()` vacía justo al cargar y avisar
+ * después con `voiceschanged`. Se espera como máximo `ESPERA_VOCES_MS` para no
+ * dejar la escena en silencio si el navegador no avisa.
+ *
+ * @returns {Promise<void>} Se resuelve cuando hay voces o vence el plazo.
+ */
+function esperarVoces() {
+  if (
+    !hayVozDelNavegador() ||
+    vocesSinAviso ||
+    vocesDelNavegador().length > 0
+  ) {
+    return Promise.resolve();
+  }
+  return new Promise((resolver) => {
+    let termino = false;
+    let temporizador = null;
+    const terminar = (sinAviso) => {
+      if (termino) {
+        return;
+      }
+      termino = true;
+      if (sinAviso) {
+        vocesSinAviso = true;
+      }
+      if (temporizador !== null) {
+        clearTimeout(temporizador);
+      }
+      try {
+        window.speechSynthesis.removeEventListener("voiceschanged", alCambiarVoces);
+      } catch {
+        // El navegador no permite quitar el aviso; ya quedó resuelto.
+      }
+      resolver();
+    };
+    const alCambiarVoces = () => terminar(false);
+    temporizador = setTimeout(() => terminar(true), ESPERA_VOCES_MS);
+    try {
+      window.speechSynthesis.addEventListener("voiceschanged", alCambiarVoces);
+      if (vocesDelNavegador().length > 0) {
+        terminar(false);
+      }
+    } catch {
+      terminar(true);
+    }
+  });
 }
 
 /**
