@@ -98,15 +98,22 @@ Resumen:
 4. Cuenta de WhatsApp suscrita a la app y callback
    `https://<url-del-túnel>/webhooks/whatsapp` registrado en Meta.
 
-### ⏳ Número nuevo y modo evento (por completar)
+### ✅ Número nuevo y modo evento
 
-Lo completa Darley cuando el número esté verificado:
+La SIM nueva quedó insertada, registrada y verificada en la cuenta de WhatsApp
+Business (WABA), con el nombre visible del bot aprobado. El número que usa el
+canal se toma de `WHATSAPP_PHONE_NUMBER_ID`, que se actualiza en
+`..\whatsapp-env.ps1`; el código no trae valores por defecto. La suscripción de
+la cuenta a la app y el callback del túnel se verifican con la sección 4 y
+[`OPERACION_WHATSAPP.md`](./OPERACION_WHATSAPP.md) §9.
 
-- Cómo se agregó la SIM nueva a la cuenta de WhatsApp Business y se verificó.
-- Qué valor cambia en la configuración para usar ese número.
-- **Modo evento**: los números que no están registrados pueden escribir, pero
-  primero aceptan el consentimiento (Ley 1581); límite de mensajes por número y
-  tope diario de DeepSeek. Cómo se activa y cómo se apaga al terminar.
+**Modo evento**: los números que no están registrados pueden escribir, pero
+primero aceptan el consentimiento (Ley 1581); hay límite de mensajes por número
+y por hora, y tope global del evento. En el repositorio queda `activo = false`:
+se enciende con `$env:WHATSAPP_EVENTO = "1"` antes de `make app` y se apaga con
+`"0"`; al terminar, `scripts/limpiar_evento.ps1 -Confirmar` borra perfiles,
+memorias y bitácoras ([`DESPLIEGUE_WHATSAPP.md`](./DESPLIEGUE_WHATSAPP.md) §8,
+[`AGENTE_OPENCLAW.md`](./AGENTE_OPENCLAW.md) §9).
 
 ## 4. Túnel
 
