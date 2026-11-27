@@ -230,6 +230,51 @@ function sinMarcas(texto) {
 }
 
 /**
+ * Quita emojis, banderas y los selectores de variación o unión (U+FE0F,
+ * U+200D) sin tocar los saltos de línea.
+ *
+ * @param {string} texto Texto original.
+ * @returns {string} El texto sin pictogramas y sin espacios dobles.
+ */
+function sinEmojis(texto) {
+  return texto
+    .replace(
+      /[\p{Extended_Pictographic}\p{Emoji_Modifier}\u{1F1E6}-\u{1F1FF}\u200D\uFE0F\u20E3]/gu,
+      "",
+    )
+    .replace(/[^\S\n]{2,}/g, " ");
+}
+
+/** Marca de una opción: letra A–Z, punto, paréntesis o punto medio y espacio. */
+const PATRON_OPCION = /(^|\s)([A-Z])\s*[.)·]\s+(?=\S)/gu;
+
+/**
+ * Corta una lista de opciones con letra antes de que la voz la lea.
+ *
+ * Solo actúa cuando hay al menos dos marcas y la lista empieza en «A.» y
+ * «B.». Así una letra suelta o una sigla como «E.A.» o «M.V.» no se confunde
+ * con una lista. La voz dice lo que va antes de la primera opción y una
+ * instrucción corta.
+ *
+ * @param {string} texto Texto original.
+ * @returns {string} El texto sin la lista de opciones, o el mismo texto.
+ */
+function sinOpciones(texto) {
+  const marcas = [];
+  for (const coincidencia of texto.matchAll(PATRON_OPCION)) {
+    marcas.push({
+      letra: coincidencia[2],
+      posicion: coincidencia.index + coincidencia[1].length,
+    });
+  }
+  if (marcas.length < 2 || marcas[0].letra !== "A" || marcas[1].letra !== "B") {
+    return texto;
+  }
+  const prefijo = texto.slice(0, marcas[0].posicion).trim();
+  return `${prefijo} Elige la opción que mejor te describa.`.trim();
+}
+
+/**
  * Convierte los rangos de montos en «entre … y … pesos».
  *
  * Los rangos pueden venir con la escala al final («$20 a $50 millones»): la
@@ -377,6 +422,8 @@ export function paraVoz(texto) {
   let limpio = String(texto ?? "");
   limpio = sinUrls(limpio);
   limpio = sinMarcas(limpio);
+  limpio = sinEmojis(limpio);
+  limpio = sinOpciones(limpio);
   limpio = cambiarRangos(limpio);
   limpio = cambiarMontosConEscala(limpio);
   limpio = cambiarMontos(limpio);

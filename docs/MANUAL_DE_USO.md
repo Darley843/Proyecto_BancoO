@@ -53,6 +53,12 @@ encendido.
    acepto». **Sin aceptar, Pana no procesa nada** y no responde a tus preguntas.
    Si pulsas **Ahora no**, la conversación termina ahí.
 
+Cuando la pantalla abre la convocatoria del voluntario, la **primera** persona
+que escanee y escriba «Acepto» sale en el escenario; las demás siguen
+conversando con Pana por WhatsApp como invitadas, sin que sus mensajes se
+publiquen. Reciben una sola vez el aviso de que el voluntario ya está en el
+escenario.
+
 ### Qué puedes preguntar
 
 | Tema | Ejemplos |
@@ -103,22 +109,26 @@ dices de qué producto hablas: te pide el producto y te muestra las opciones.
 El voluntario es la persona que hace el recorrido completo frente al público,
 con su propio teléfono, mientras la pantalla muestra su conversación.
 
-### Tu tarjeta y el código
+### Solo escanea y acepta
 
-- Tu tarjeta trae el número o el QR del bot y un **código de cuatro dígitos**.
-  Ese código es solo tuyo: no lo dictes ni lo muestres al público.
-- Primero escribe «hola» y acepta el aviso de la Ley 1581, igual que cualquier
-  invitado.
-- Después escribe **`ESCENA` seguido de tu código de cuatro dígitos**, en un
-  solo mensaje. Pana confirma con «Escena en vivo activada. Escribe tu primera
-  pregunta.» y desde ese momento tu conversación y las respuestas de Pana se
-  ven en la pantalla.
-- Solo se publica **tu** conversación. Los demás invitados siguen hablando en
-  privado: sus mensajes no salen en la pantalla.
-- La activación dura **180 minutos** y cada mensaje tuyo renueva el plazo. Si
-  vence, vuelve a escribir `ESCENA` con tu código.
-- Solo hay **un voluntario activo** a la vez. Si otra persona escribe el
-  comando, no te reemplaza.
+- Al terminar la presentación, la pantalla deja el **QR de WhatsApp** y el
+  aviso: «El primero en escanear y escribir "Acepto" será nuestro voluntario».
+- Escanea el QR con tu teléfono, escribe **Acepto** y acepta el aviso de la Ley
+  1581 si es la primera vez. No necesitas ningún código: la pantalla te elige y
+  Pana te responde «¡Eres nuestro voluntario! Habla con Pana frente a la
+  pantalla, o escríbele aquí.».
+- Desde ese momento tu conversación y las respuestas de Pana se ven en la
+  pantalla. **Los demás invitados siguen conversando por WhatsApp como
+  siempre**: Pana les responde en privado y sus mensajes no salen en la
+  pantalla. Reciben una sola vez el aviso de que el voluntario ya está en el
+  escenario.
+- La activación dura **180 minutos** y cada mensaje tuyo renueva el plazo.
+- Solo hay **un voluntario activo** a la vez. Si otra persona se adelanta,
+  quien presenta pulsa **L** en la pantalla: libera la ranura y abre otra
+  convocatoria para que la siguiente persona que escriba sea la voluntaria.
+- Respaldo: si la convocatoria no está disponible, la tarjeta del voluntario
+  trae un código de cuatro dígitos y se activa con `ESCENA` y ese código. El
+  código es solo del voluntario: no se dicta ni se proyecta.
 
 ### Cómo hablar con Pana frente a la pantalla
 
@@ -172,6 +182,7 @@ escena.
 | **Espacio** | Pasa al siguiente turno sin esperar a que termine el actual. |
 | **P** | Empezar o pausar la escena completa. |
 | **E** | Entra o sale del **modo en vivo**: muestra en orden lo que el voluntario escribe por WhatsApp y lo que responde Pana. |
+| **L** | **Libera al voluntario** y vuelve al QR con una convocatoria nueva: se usa si se adelantó la persona equivocada. La anterior sigue por WhatsApp como invitada. |
 | **V** | Abre la entrada por voz: captura el perfil del voluntario o dicta una frase para «Hablar con Pana». |
 | **H** | Muestra u oculta, a la vista del público, las últimas herramientas que usó Pana (nombre, si salió bien y cuánto tardó). No muestra argumentos ni datos personales. |
 | **G** | Abre el panel de **Recursos**: QR del repositorio, enlace para abrirlo, QR de WhatsApp (si está configurado) y los diagramas del proyecto. |
@@ -185,9 +196,12 @@ escena.
 1. **Apertura.** Pana se presenta y presenta a los agentes (botón «Empezar» o
    tecla **P**). Deja que hable; **Espacio** solo si te estás quedando sin
    tiempo.
-2. **Voluntario.** El voluntario ya escribió `ESCENA` con su código. Pulsa
-   **E** para entrar en modo en vivo: la barra debe decir «En vivo — esperando
-   el primer turno». Desde ahí la pantalla reproduce sola lo que llega.
+2. **Voluntario.** Al terminar la presentación, la pantalla deja el QR y la
+   convocatoria. El primero que escanee y escriba **Acepto** queda como
+   voluntario: la pantalla pasa sola al modo en vivo y reproduce lo que llega.
+   Si se adelanta la persona equivocada, pulsa **L**, vuelve al QR y abre otra
+   convocatoria. El respaldo manual sigue siendo **E** más `ESCENA` y el código
+   de la tarjeta.
 3. **Preguntas del público.** **Q** abre el cuadro. La primera vez Pana invita
    a preguntar y avisa que el micrófono usa el reconocimiento de voz de Edge.
    Con «Hablar» se dicta una frase en español; si el micrófono falla, se escribe

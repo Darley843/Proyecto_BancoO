@@ -62,7 +62,7 @@ editarla. Si hay que cambiarla, se avisa a los tres y se actualiza el contrato.
 |---|---|
 | Archivo de la lista | `data/escena/en_vivo.jsonl` (local, ignorado por Git) |
 | Interruptor | solo `ESCENA_EN_VIVO=1`; cualquier otro valor no escribe |
-| Activación de la escena | `ESCENA` + código de 4 dígitos de `$env:ESCENA_CODIGO`; sin código o con otro código no activa |
+| Activación de la escena | **Convocatoria** abierta por la pantalla (la primera huella que escribe después de la apertura, sin código), o `ESCENA` + código de 4 dígitos de `$env:ESCENA_CODIGO` como respaldo; sin ninguno de los dos, no activa |
 | Una línea | un turno `TurnoEscena` por línea, JSON compacto, UTF-8, LF |
 | Orden de la pantalla | `seq` ascendente; `turno.orden` **no** ordena la lista |
 | Escritura entre procesos | bloqueo exclusivo del sistema sobre `data/escena/en_vivo.lock` |
@@ -410,6 +410,38 @@ un efecto lateral local, no un campo de la respuesta.
   WhatsApp y publica esa confirmación como un turno `pana` con
   `origen="canal"`. Así la pantalla sabe que hay voluntario.
 
+### 9.1.1 Convocatoria desde la pantalla (sin código)
+
+Al terminar la presentación, la pantalla abre la convocatoria con
+`POST /api/escena/convocatoria`. El canal guarda en memoria el instante de
+apertura y, desde ese momento:
+
+- La **primera huella** que escriba después de la apertura y tenga el
+  consentimiento vigente queda como voluntaria, con el mismo TTL y el mismo
+  destino en RAM que `ESCENA <código>`. Vale tanto el mensaje «Acepto» (que
+  registra el consentimiento) como cualquier mensaje de quien ya lo había
+  aceptado. La confirmación es la frase fija «¡Eres nuestro voluntario! 🎬
+  Habla con Pana frente a la pantalla, o escríbele aquí.», que se envía por
+  WhatsApp y se publica como turno `pana` (`canal.pana.convocatoria.v1`,
+  `origen="canal"`).
+- La convocatoria deja de aceptar voluntarios en cuanto el primero se activa;
+  el canal sigue en curso para avisar a los demás.
+- La segunda persona que escriba (o acepte) después de la apertura sigue como
+  **invitada normal**: Pana le responde con sus herramientas por WhatsApp y sus
+  mensajes no se publican. Además de la bienvenida normal recibe **una sola
+  vez** el aviso «El voluntario de la escena ya está en el escenario. Puedes
+  seguir conversando conmigo por aquí: pregúntame por un crédito, las tasas o
+  el proyecto.».
+- Si alguien se adelanta y no es la persona que debe salir en el escenario,
+  quien presenta pulsa **L** en la pantalla: `DELETE /api/escena/convocatoria`
+  libera al voluntario activo, cierra la convocatoria y vuelve al QR con una
+  convocatoria nueva. La persona liberada sigue conversando como invitada.
+- Sin convocatoria abierta, el canal funciona como antes y `ESCENA` +
+  `ESCENA_CODIGO` sigue disponible como respaldo.
+- El número nunca se registra en logs ni se publica: solo la huella y el
+  destino viven en memoria, y el destino se borra al vencer la ranura o al
+  liberar la convocatoria.
+
 ### 9.2 Memoria del voluntario (en memoria, con TTL)
 
 - `canal/escena_vivo.py` guarda **un solo** voluntario activo:
@@ -434,8 +466,8 @@ escena_ttl_minutos = 180
 - Mientras haya un voluntario activo y no vencido, un `ESCENA <código>` desde
   otra huella se ignora: no lo reemplaza y la escena sigue con el primero. El
   segundo invitado sigue recibiendo respuestas privadas, pero no se publica.
-  Para cambiar de voluntario, quien facilita reinicia la app o espera el
-  vencimiento.
+  Para cambiar de voluntario, quien facilita pulsa **L** (libera y abre otra
+  convocatoria), reinicia la app o espera el vencimiento.
 - Al vencer, el invitado deja de publicar; puede escribir `ESCENA` otra vez con
   el código y volver a activarse.
 - `ESCENA` sin código, o con un código equivocado, no activa ni publica (§9.1).
@@ -563,6 +595,23 @@ Respuesta (modelo Pydantic cerrado, `extra="forbid"`):
 La ruta no devuelve la ruta del archivo, ni el bloqueo, ni la huella, ni el
 número. Tampoco registra el texto de los turnos.
 
+### 10.1 Convocatoria `POST` y `DELETE /api/escena/convocatoria`
+
+```http
+POST   /api/escena/convocatoria   → 200 {"abierta": true}
+DELETE /api/escena/convocatoria   → 200 {"abierta": false}
+```
+
+- Solo loopback: la app escucha en `127.0.0.1` y el middleware del túnel
+  responde `404`, igual que a `/api/escena/en-vivo` (§3.12 de `SEGURIDAD.md`).
+- `POST` guarda el instante de apertura en la memoria del canal; no escribe en
+  disco, no crea SQLite y no publica un turno por sí mismo.
+- `DELETE` libera al voluntario activo y cierra la convocatoria; la siguiente
+  `POST` empieza con la ranura y los avisos limpios.
+- Sin la ranura del canal (por ejemplo, si falta `WHATSAPP_ID_SALT`), ambas
+  responden `409` y la pantalla cae al texto de respaldo con `ESCENA`.
+- Ninguna de las dos devuelve ni registra el número del voluntario.
+
 ## 11. Pantalla (Yoldy)
 
 ### 11.1 Tecla y modo
@@ -579,9 +628,15 @@ número. Tampoco registra el texto de los turnos.
   proyectada ni la guardada.
 - **R** en modo en vivo reinicia la lista (`desde=0`, cola vacía) y vuelve a
   reproducir. **P** pausa o reanuda la cola; **Espacio** salta al siguiente
-  turno; **S** sigue alternando solo subtítulos. Las demás teclas conservan su
-  comportamiento, pero **N** y **Q** no deben mezclar la escena normal con la
-  lista en vivo: si se usan, primero se sale del modo en vivo.
+  turno; **S** sigue alternando solo subtítulos. **L** libera al voluntario
+  activo, sale del modo en vivo y vuelve a la espera con el QR y una
+  convocatoria nueva. Las demás teclas conservan su comportamiento, pero **N**
+  y **Q** no deben mezclar la escena normal con la lista en vivo: si se usan,
+  primero se sale del modo en vivo.
+- Al terminar la presentación, la espera llama a `POST
+  /api/escena/convocatoria` y muestra, debajo del QR, «El primero en escanear y
+  escribir "Acepto" será nuestro voluntario». El primer turno del canal
+  (la confirmación de Pana) pasa solo al modo conversación.
 
 ### 11.2 Sondeo
 

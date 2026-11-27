@@ -317,7 +317,9 @@ def crear_app(
     )
     app.include_router(crear_router_canal(despachador.recibir if despachador is not None else None))
     app.include_router(crear_router_escena(canal=despachador))
-    app.include_router(crear_router_en_vivo())
+    app.include_router(
+        crear_router_en_vivo(escena=despachador.escena if despachador is not None else None)
+    )
     app.include_router(crear_router_recursos())
     app.include_router(crear_router_herramientas())
 

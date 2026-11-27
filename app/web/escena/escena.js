@@ -32,8 +32,9 @@
  * Teclado: Espacio o → pasa al siguiente turno, P reproduce o pausa, S activa
  * el modo solo subtítulos, Q abre o cierra las preguntas, N pasa al núcleo,
  * T muestra la trazabilidad, H las herramientas, G los recursos (repositorio,
- * WhatsApp y diagramas), E entra o sale del modo en vivo y R vuelve al inicio
- * (en vivo: vuelve a pedir la lista desde el principio).
+ * WhatsApp y diagramas), E entra o sale del modo en vivo, L libera al
+ * voluntario y abre otra convocatoria, y R vuelve al inicio (en vivo: vuelve a
+ * pedir la lista desde el principio).
  */
 
 import { adelantarVoz, decirComo, detenerVoz } from "../voz.js";
@@ -90,6 +91,13 @@ const FICHAS = Object.freeze({
 const RUTA_PROYECTADO = "/api/escena/proyectado";
 const RUTA_NUCLEO = `${RUTA_PROYECTADO}?modo=nucleo`;
 const RUTA_EJEMPLO = "escena/turnos-ejemplo.json";
+/** Convocatoria del voluntario: POST la abre y DELETE la libera (tecla L). */
+const RUTA_CONVOCATORIA = "/api/escena/convocatoria";
+const ESPERA_CONVOCATORIA_MS = 4000;
+const TEXTO_CONVOCATORIA =
+  "El primero en escanear y escribir «Acepto» será nuestro voluntario.";
+const TEXTO_CONVOCATORIA_FALLO =
+  "No pude abrir la convocatoria. Escribe ESCENA con el código de tu tarjeta.";
 
 /** Espera máxima por la escena (al cargar) y por el núcleo (en vivo). */
 const ESPERA_ESCENA_MS = 8000;
@@ -683,8 +691,57 @@ function avisarColaTerminada() {
 }
 
 /**
- * Muestra el QR de WhatsApp con «Esperando al voluntario…» y empieza a mirar la
- * lista en vivo: el primer turno del canal pasa solo al modo conversación.
+ * Abre la convocatoria del voluntario en el canal y muestra la pista del QR.
+ *
+ * La primera persona que escanee y escriba «Acepto» (o cualquier mensaje, si
+ * ya había aceptado la Ley 1581) queda como voluntaria sin código.
+ *
+ * @returns {Promise<void>} Se resuelve cuando la pista quedó actualizada.
+ */
+async function abrirConvocatoria() {
+  const pista = porId("escena-espera-pista");
+  pista.textContent = TEXTO_CONVOCATORIA;
+  try {
+    const respuesta = await fetch(RUTA_CONVOCATORIA, {
+      method: "POST",
+      signal: AbortSignal.timeout(ESPERA_CONVOCATORIA_MS),
+    });
+    if (!respuesta.ok) {
+      throw new Error(`Error ${respuesta.status}`);
+    }
+  } catch {
+    pista.textContent = TEXTO_CONVOCATORIA_FALLO;
+  }
+}
+
+/**
+ * L o el botón de liberar: cierra la convocatoria, libera al voluntario activo
+ * y vuelve a la espera con el QR y una convocatoria nueva.
+ *
+ * Sirve cuando se adelantó la persona equivocada: la siguiente en escribir
+ * queda como voluntaria.
+ *
+ * @returns {Promise<void>} Se resuelve cuando la espera quedó abierta.
+ */
+async function liberarConvocatoria() {
+  try {
+    await fetch(RUTA_CONVOCATORIA, {
+      method: "DELETE",
+      signal: AbortSignal.timeout(ESPERA_CONVOCATORIA_MS),
+    });
+  } catch {
+    // La espera se reabre igual: el canal conservará la ranura hasta el TTL.
+  }
+  if (estado.vivo.activo) {
+    salirEnVivo();
+  }
+  mostrarEspera();
+}
+
+/**
+ * Muestra el QR de WhatsApp con «Esperando al voluntario…», abre la
+ * convocatoria y empieza a mirar la lista en vivo: el primer turno del canal
+ * pasa solo al modo conversación.
  *
  * @returns {void}
  */
@@ -694,6 +751,7 @@ function mostrarEspera() {
   estado.paso = PASO_PRESENTACION + 1;
   marcarPasos();
   void ponerQrWhatsapp(porId("escena-espera-qr"));
+  void abrirConvocatoria();
   vigia?.iniciar({ desdeElFinal: true });
   actualizarBotones();
 }
@@ -710,8 +768,8 @@ function ocultarEspera() {
 
 /**
  * Recibe lo que ve la espera: con el primer turno del canal (el voluntario ya
- * escribió ESCENA y su código), la pantalla pasa sola al modo conversación y
- * reproduce desde ese turno, sin pausa.
+ * aceptó la convocatoria y Pana lo confirmó), la pantalla pasa sola al modo
+ * conversación y reproduce desde ese turno, sin pausa.
  *
  * @param {object[]} registros Registros `{seq, ts, origen, turno}` nuevos.
  * @param {number | string} ultimo Cursor de la lista tras estos registros.
@@ -1005,6 +1063,8 @@ function teclado(evento) {
     alternarRecursos();
   } else if (tecla === "e") {
     alternarEnVivo();
+  } else if (tecla === "l") {
+    void liberarConvocatoria();
   } else if (tecla === "r") {
     reiniciarSegunModo();
   }

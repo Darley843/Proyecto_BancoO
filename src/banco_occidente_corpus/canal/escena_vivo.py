@@ -17,6 +17,11 @@ Reglas que implementa este módulo:
   entrevista, del escenario y del motor de OpenClaw.
 - Sin código, o con otro código, el comando no activa ni publica: el mensaje
   sigue su curso privado normal.
+- La **convocatoria** de la pantalla reemplaza el comando: al terminar la
+  presentación, la primera huella con consentimiento que escriba después de la
+  apertura queda como voluntaria sin código. Las demás siguen como invitadas y
+  reciben una sola vez el aviso de que el voluntario ya está en el escenario.
+  ``DELETE /api/escena/convocatoria`` libera la ranura para la tecla L.
 - El interruptor ``ESCENA_EN_VIVO=1`` se consulta en cada publicación: apagarlo
   detiene la escritura sin reiniciar la app.
 - Los demás invitados no se publican nunca; su conversación privada sigue igual.
@@ -57,6 +62,15 @@ VARIABLE_CODIGO = "ESCENA_CODIGO"
 TEXTO_APAGADA = "La escena en vivo no está activada."
 #: Frase fija que confirma la activación del voluntario.
 TEXTO_ACTIVADA = "Escena en vivo activada. Escribe tu primera pregunta."
+#: Frase fija para la primera huella que acepta la convocatoria de la pantalla.
+TEXTO_VOLUNTARIO = (
+    "¡Eres nuestro voluntario! 🎬 Habla con Pana frente a la pantalla, o escríbele aquí."
+)
+#: Aviso para quien llega después de que la convocatoria ya tiene voluntario.
+TEXTO_YA_HAY_VOLUNTARIO = (
+    "El voluntario de la escena ya está en el escenario. Puedes seguir conversando "
+    "conmigo por aquí: pregúntame por un crédito, las tasas o el proyecto."
+)
 #: Minutos que el voluntario queda activo si el TOML no dice otra cosa.
 TTL_POR_DEFECTO = 180
 #: Largo máximo del texto de un turno; el contrato de la lista pide 4.000.
@@ -65,6 +79,7 @@ LARGO_MAXIMO = 4000
 ID_INVITADO = "canal.invitado.v1"
 ID_PANA = "canal.pana.v1"
 ID_ACTIVACION = "canal.pana.escena.v1"
+ID_CONVOCATORIA = "canal.pana.convocatoria.v1"
 
 #: Comando ``ESCENA`` con un código de cuatro dígitos opcional; se aplica al
 #: texto normalizado (sin mayúsculas de diferencia y con un solo espacio).
@@ -188,6 +203,19 @@ class VoluntarioActivo:
     destino: str = field(repr=False)
 
 
+@dataclass(frozen=True, slots=True)
+class ResultadoConvocatoria:
+    """Resultado de una huella que escribe con la convocatoria abierta.
+
+    ``voluntario`` distingue a la persona que ocupa la ranura de la que llega
+    después. ``texto`` es la frase que el canal debe enviar; en la activación
+    ya se publicó como turno de Pana para que la pantalla abra la conversación.
+    """
+
+    voluntario: bool
+    texto: str | None = None
+
+
 @dataclass
 class EscenaVivo:
     """Ranura del voluntario activo y publicación de sus turnos.
@@ -207,6 +235,9 @@ class EscenaVivo:
     _huella: str | None = field(default=None, init=False, repr=False)
     _destino: str | None = field(default=None, init=False, repr=False)
     _vence: datetime | None = field(default=None, init=False, repr=False)
+    _apertura: datetime | None = field(default=None, init=False, repr=False)
+    _abierta: bool = field(default=False, init=False, repr=False)
+    _avisados: set[str] = field(default_factory=set, init=False, repr=False)
     _candado: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
     def decidir(self, mensaje: MensajeEntrante, usuario_id: str) -> RespuestaCanal | None:
@@ -264,6 +295,95 @@ class EscenaVivo:
                 self._destino = destino
             self._vence = self._instante() + timedelta(minutes=self.ttl_minutos)
             return True
+
+    def abrir_convocatoria(self) -> None:
+        """Abre la convocatoria y guarda el instante de apertura.
+
+        Desde aquí, la primera huella con el consentimiento vigente que escriba
+        ocupa la ranura y cierra la aceptación. La convocatoria sigue en curso
+        para avisar a los demás invitados hasta que se libere con
+        :meth:`liberar_convocatoria`.
+        """
+        with self._candado:
+            self._apertura = self._instante()
+            self._abierta = True
+            self._avisados.clear()
+            if self._huella is not None:
+                # Si el voluntario anterior venció, la ranura queda libre.
+                self._vigente(self._huella)
+
+    def liberar_convocatoria(self) -> None:
+        """Libera al voluntario activo y cierra la convocatoria.
+
+        Se usa con la tecla L de la pantalla cuando la persona que se adelantó
+        no es la que debe salir en el escenario. La siguiente apertura empieza
+        con la ranura y los avisos limpios.
+        """
+        with self._candado:
+            self._huella = None
+            self._destino = None
+            self._vence = None
+            self._apertura = None
+            self._abierta = False
+            self._avisados.clear()
+
+    def convocatoria_abierta(self) -> bool:
+        """Indica si la convocatoria todavía acepta voluntarios.
+
+        Returns:
+            ``True`` entre la apertura y la primera activación; ``False`` si no
+            hay convocatoria, si ya eligió voluntario o si se liberó.
+        """
+        with self._candado:
+            return self._abierta and self._apertura is not None
+
+    def convocar(
+        self, usuario_id: str, *, destino: str | None = None
+    ) -> ResultadoConvocatoria | None:
+        """Atiende a una huella que escribe después de abrir la convocatoria.
+
+        Sin convocatoria no hace nada y el turno sigue como hoy. Con la
+        aceptación abierta y la ranura libre, la primera huella queda como
+        voluntaria, con el mismo TTL y destino que ``ESCENA <código>``. Si ya
+        hay voluntario, la primera vez que esa huella escribe recibe el aviso
+        para seguir como invitada; las siguientes no lo repiten.
+
+        Args:
+            usuario_id: huella HMAC del remitente.
+            destino: número normalizado del mensaje, guardado solo en memoria
+                para que el canal envíe la respuesta y la ficha. No se
+                persiste, no se registra y no se envía al modelo.
+
+        Returns:
+            ``None`` si no hay convocatoria, si la huella ya es la voluntaria
+            o si el aviso ya se dio; si no, el resultado con la frase que el
+            canal debe enviar.
+        """
+        activado = False
+        with self._candado:
+            if self._apertura is None:
+                return None
+            if self._huella is not None and not self._vigente(self._huella):
+                pass  # ``_vigente`` ya dejó la ranura libre al vencer.
+            if self._huella == usuario_id:
+                return None
+            if self._huella is None:
+                if not self._abierta:
+                    return None
+                self._huella = usuario_id
+                if destino is not None:
+                    self._destino = destino
+                self._vence = self._instante() + timedelta(minutes=self.ttl_minutos)
+                self._abierta = False
+                activado = True
+            else:
+                if usuario_id in self._avisados:
+                    return None
+                self._avisados.add(usuario_id)
+        if activado:
+            self._publicar_pana(ID_CONVOCATORIA, TEXTO_VOLUNTARIO)
+            return ResultadoConvocatoria(voluntario=True, texto=TEXTO_VOLUNTARIO)
+        return ResultadoConvocatoria(voluntario=False, texto=TEXTO_YA_HAY_VOLUNTARIO)
 
     def activo(self, usuario_id: str) -> bool:
         """Indica si esa huella es la voluntaria activa y no venció.

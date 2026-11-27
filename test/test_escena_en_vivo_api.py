@@ -18,6 +18,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from banco_occidente_corpus.canal.escena_vivo import EscenaVivo
 from banco_occidente_corpus.config import PROJECT_ROOT
 from banco_occidente_corpus.escena.api_en_vivo import LIMITE, crear_router_en_vivo
 from banco_occidente_corpus.escena.contratos import OrigenTurno, PersonajeEscena, TurnoEscena
@@ -72,10 +73,10 @@ def _registro(
     }
 
 
-def _cliente(lector: LectorEspia | None = None) -> TestClient:
-    """Monta la ruta con el lector indicado."""
+def _cliente(lector: LectorEspia | None = None, escena: EscenaVivo | None = None) -> TestClient:
+    """Monta la ruta con el lector y la ranura indicados."""
     app = FastAPI()
-    app.include_router(crear_router_en_vivo(lector))
+    app.include_router(crear_router_en_vivo(lector, escena))
     return TestClient(app)
 
 
@@ -199,3 +200,31 @@ def test_el_lector_recibe_una_ruta_de_la_lista() -> None:
     assert RUTA_LISTA.parent.name == "escena"
     assert RUTA_LISTA.name == "en_vivo.jsonl"
     assert isinstance(RUTA_LISTA, Path)
+
+
+def test_la_convocatoria_abre_y_libera_la_ranura() -> None:
+    """POST abre la convocatoria y DELETE libera al voluntario activo."""
+    escena = EscenaVivo()
+    cliente = _cliente(escena=escena)
+
+    abierta = cliente.post("/api/escena/convocatoria")
+    assert abierta.status_code == 200
+    assert abierta.json() == {"abierta": True}
+    assert escena.convocatoria_abierta() is True
+
+    escena.activar("huella-de-prueba", destino="57000000001")
+    assert escena.voluntario_activo() is not None
+
+    liberada = cliente.delete("/api/escena/convocatoria")
+    assert liberada.status_code == 200
+    assert liberada.json() == {"abierta": False}
+    assert escena.voluntario_activo() is None
+    assert escena.convocatoria_abierta() is False
+
+
+def test_sin_la_ranura_del_canal_la_convocatoria_responde_409() -> None:
+    """Si el canal no arrancó, la pantalla no puede abrir la convocatoria."""
+    cliente = _cliente()
+
+    assert cliente.post("/api/escena/convocatoria").status_code == 409
+    assert cliente.delete("/api/escena/convocatoria").status_code == 409

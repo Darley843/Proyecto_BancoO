@@ -156,12 +156,49 @@ def test_escena_js_pinta_las_cifras_completas_y_llama_a_para_voz() -> None:
         ("texto *en negrita* y _cursiva_", "texto en negrita y cursiva"),
         ("36 meses y 4 turnos", "36 meses y 4 turnos"),
         ("mira https://ejemplo.com/pagina ahora", "mira ahora"),
+        ("👋 ✅ 🎙 Hola", "Hola"),
+        (
+            "Listo, gastos menos de $1.000.000. 💚 ¿Cuánto pagas hoy en cuotas de "
+            "créditos o tarjetas? A. No tengo cuotas B. Menos de $500.000 "
+            "C. Entre $500.000 y $1.000.000",
+            "Listo, gastos menos de un millón de pesos. ¿Cuánto pagas hoy en cuotas "
+            "de créditos o tarjetas? Elige la opción que mejor te describa.",
+        ),
+        (
+            "¿Cuánto pagas?\nA · Nada\nB · Poco\nC · Mucho",
+            "¿Cuánto pagas? Elige la opción que mejor te describa.",
+        ),
+        (
+            "Elige una: A) Uno B) Dos",
+            "Elige una: Elige la opción que mejor te describa.",
+        ),
+        (
+            "La tasa es 28,17 % E.A. y la mensual 2,09 % M.V.",
+            "La tasa es veintiocho coma diecisiete por ciento efectivo anual y la "
+            "mensual dos coma cero nueve por ciento mes vencido",
+        ),
     ],
 )
 @requiere_node
 def test_para_voz_traduce_cifras_y_deja_el_resto(texto: str, esperado: str) -> None:
     """Montos, rangos, porcentajes y marcas de WhatsApp quedan listos para la voz."""
     assert _para_voz(texto) == esperado
+
+
+@requiere_node
+def test_para_voz_deja_igual_un_texto_sin_opciones_ni_emojis() -> None:
+    """Una frase normal no cambia y el texto sin listas conserva su sentido."""
+    assert _para_voz("Hola, ¿cómo estás?") == "Hola, ¿cómo estás?"
+    assert _para_voz("Marca A. y sigue") == "Marca A. y sigue"
+
+
+@requiere_node
+def test_para_voz_no_deja_espacios_dobles_al_quitar_emojis() -> None:
+    """Los emojis se van sin dejar huecos entre las palabras."""
+    salida = _para_voz("Hola 👋  💚 mundo 🎬")
+
+    assert salida == "Hola mundo"
+    assert "  " not in salida
 
 
 @requiere_node

@@ -29,6 +29,7 @@ RUTAS_PRIVADAS = (
     "/api/estado",
     "/api/preguntar",
     "/api/escena/en-vivo",
+    "/api/escena/convocatoria",
     "/api/escena/repositorio",
     "/api/escena/repositorio/qr.png",
     "/api/escena/whatsapp",
@@ -73,6 +74,14 @@ def test_el_tunel_no_puede_gastar_saldo(cliente_tunel: TestClient) -> None:
     for ruta in ("/api/preguntar", "/api/preguntar/stream"):
         respuesta = cliente_tunel.post(ruta, json={"pregunta": "hola"})
         assert respuesta.status_code == 404
+
+
+def test_el_tunel_no_puede_abrir_ni_liberar_la_convocatoria(
+    cliente_tunel: TestClient,
+) -> None:
+    """La convocatoria del voluntario solo se maneja desde loopback."""
+    assert cliente_tunel.post("/api/escena/convocatoria").status_code == 404
+    assert cliente_tunel.delete("/api/escena/convocatoria").status_code == 404
 
 
 def test_el_tunel_no_puede_hablar_por_el_voluntario(cliente_tunel: TestClient) -> None:

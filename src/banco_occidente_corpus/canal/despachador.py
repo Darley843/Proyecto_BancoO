@@ -51,11 +51,11 @@ from .almacen import (
 )
 from .cola import ColaMensajes
 from .configuracion import ConfiguracionCanal
-from .consentimiento import MaquinaConsentimiento
+from .consentimiento import ESTADO_ACEPTADO, MaquinaConsentimiento
 from .contratos import MensajeEntrante, RespuestaCanal
 from .entrevista import EntrevistaCanal
 from .envio import Enviador, ErrorEnvio
-from .escena_vivo import EscenaVivo, activa_entorno, es_comando
+from .escena_vivo import TEXTO_VOLUNTARIO, EscenaVivo, activa_entorno, es_comando
 from .identidad import calcular_usuario_id
 
 logger = logging.getLogger(__name__)
@@ -233,6 +233,29 @@ class Despachador:
             # el mismo diagnóstico que un número de la lista, con el
             # consentimiento primero y las cuotas ya verificadas arriba.
             respuesta = self.maquina.decidir(mensaje, usuario_id)
+            aviso_convocatoria: str | None = None
+            if self.escena is not None and (
+                respuesta is None
+                or (respuesta is not None and self.maquina.estado(usuario_id) == ESTADO_ACEPTADO)
+            ):
+                # La convocatoria de la pantalla va antes del comando ESCENA:
+                # la primera huella que escribe después de la apertura (o que
+                # acaba de aceptar) queda como voluntaria sin código.
+                convocatoria = self.escena.convocar(usuario_id, destino=mensaje.remitente)
+                if convocatoria is not None and convocatoria.voluntario:
+                    respuesta_voluntario = self._enviar_texto(
+                        mensaje, usuario_id, convocatoria.texto or TEXTO_VOLUNTARIO
+                    )
+                    actualizar_mensaje(
+                        self.ruta_almacen,
+                        mensaje.id_mensaje,
+                        "respondido",
+                        procesado=True,
+                        motor=MOTOR_CANAL,
+                    )
+                    return respuesta_voluntario
+                if convocatoria is not None:
+                    aviso_convocatoria = convocatoria.texto
             if respuesta is None and self.escena is not None:
                 intento_escena = es_comando(mensaje.texto)
                 respuesta = self.escena.decidir(mensaje, usuario_id)
@@ -278,6 +301,14 @@ class Despachador:
                         texto=(resultado.texto or TEXTO_ERROR)[:4096],
                     )
 
+            if aviso_convocatoria is not None:
+                # El invitado que llega después del voluntario recibe el aviso
+                # una sola vez, junto con la bienvenida normal de Pana.
+                respuesta = respuesta.model_copy(
+                    update={
+                        "texto": f"{respuesta.texto}\n\n{aviso_convocatoria}"[:4096],
+                    }
+                )
             self.crear_enviador(usuario_id, mensaje.remitente).enviar(respuesta)
             if self.escena is not None and not comando_escena and not intento_escena:
                 # Solo publica si el envío salió bien: la pantalla no muestra
