@@ -301,7 +301,9 @@ def diagnosticar_capacidad(
     Con respuestas parciales no falla: devuelve `faltan_datos` con la siguiente
     pregunta de la entrevista del canal y sus opciones exactas. Después del
     bloque de monto pide el monto exacto en un paso aparte; cuando llega, lo usa
-    si cae dentro de los límites del rango.
+    si cae dentro de los límites del rango. Si falta `objetivo.*` no supone el
+    producto: pregunta «¿Qué quieres hacer?» con las opciones del esquema
+    (libre inversión, vehículo, vivienda, etc.).
 
     Args:
         respuestas: ids canónicos de la entrevista en la forma bloque.valor:

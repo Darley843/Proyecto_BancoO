@@ -35,7 +35,7 @@ def test_la_escena_adelanta_la_voz_del_turno_siguiente() -> None:
     assert "estado.turnos[estado.indice + 1]" in adelantar
     assert 'siguiente.personaje === "joven"' in adelantar
     assert "pideVoz(siguiente.personaje, casilla)" in adelantar
-    assert "adelantarVoz(siguiente.personaje, paraVoz(siguiente.texto))" in adelantar
+    assert "adelantarVoz(siguiente.personaje, siguiente.texto)" in adelantar
 
 
 def test_el_adelanto_vive_solo_en_memoria_y_tiene_tope() -> None:
@@ -94,4 +94,55 @@ def test_el_audio_adelantado_se_usa_y_no_se_pide_dos_veces() -> None:
         "pedidas": ["Yo le presto ya mismo.", "Sin papeles."],
         "sono": "piper",
         "otra": "piper",
+    }
+
+
+_PROGRAMA_PARA_VOZ = """
+const pedidas = [];
+class AudioFalso {
+  pause() {}
+  play() { setTimeout(() => this.onended?.(), 0); return Promise.resolve(); }
+}
+globalThis.window = { Audio: AudioFalso, setTimeout, clearTimeout };
+URL.createObjectURL = () => "blob:falso";
+URL.revokeObjectURL = () => {};
+globalThis.fetch = async (url, opciones) => {
+  if (url === "/api/voz/personajes") {
+    const navegador = { voz: "", tono: 1, velocidad: 1 };
+    return { ok: true, json: async () => ({ personajes: {
+      pana: { motor: "piper", piper: true, navegador },
+    } }) };
+  }
+  pedidas.push(JSON.parse(opciones.body).texto);
+  return { ok: true, blob: async () => new Blob(["ogg"]) };
+};
+const voz = await import(URL_VOZ);
+const adelantado = "💚 Hola, la tasa es 28,17 % E.A.";
+await voz.adelantarVoz("pana", adelantado);
+const sono = await voz.decirComo("pana", adelantado);
+const opciones = await voz.decirComo("pana", "💚 Elige: A. Uno B. Dos");
+console.log(JSON.stringify({ pedidas, sono, opciones }));
+"""
+
+
+@pytest.mark.skipif(NODE is None, reason="Node no está instalado")
+def test_adelantar_voz_y_decir_como_pasan_por_para_voz() -> None:
+    """La voz adelantada y la del navegador reciben el texto sin emojis ni opciones crudas."""
+    assert NODE
+    programa = _PROGRAMA_PARA_VOZ.replace("URL_VOZ", json.dumps((WEB / "voz.js").as_uri()))
+    salida = subprocess.run(
+        [NODE, "--input-type=module", "-e", programa],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        timeout=30,
+        check=True,
+    )
+    assert json.loads(salida.stdout) == {
+        "pedidas": [
+            "Hola, la tasa es veintiocho coma diecisiete por ciento efectivo anual",
+            "Elige: A: Uno. B: Dos. Dime la letra de tu opción.",
+        ],
+        "sono": "piper",
+        "opciones": "piper",
     }

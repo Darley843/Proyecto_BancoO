@@ -22,7 +22,14 @@
  * Si la API no responde, todos usan el navegador con los valores de
  * `RESPALDO_NAVEGADOR`. Nunca guarda los textos en el navegador: el audio
  * adelantado (`adelantarVoz`) vive solo en memoria y se descarta al usarse.
+ *
+ * Todo texto que llega a la voz pasa una sola vez por `paraVoz`
+ * (`escena/voz_cifras.js`), venga de la escena guionada, de la lista en vivo o
+ * de la voz de respaldo: emojis, listas de opciones y cifras quedan listos para
+ * el oído. Los subtítulos no pasan por aquí.
  */
+
+import { paraVoz } from "./escena/voz_cifras.js";
 
 /** Personajes del contrato del turno de escena, en el orden de la escena. */
 export const PERSONAJES = Object.freeze([
@@ -272,7 +279,7 @@ export async function decirComo(personaje, texto, opciones = {}) {
   const quien = PERSONAJES.includes(personaje) ? personaje : "pana";
   detenerVoz();
   const lectura = ++lecturaActual;
-  const limpio = String(texto ?? "").trim();
+  const limpio = paraVoz(texto);
   if (!limpio || opciones.soloSubtitulos) {
     alTerminar();
     return "ninguna";
@@ -297,7 +304,7 @@ export async function decirComo(personaje, texto, opciones = {}) {
   if (lectura !== lecturaActual) {
     return "cancelada";
   }
-  if (decirConElNavegador(limpio, ajuste.navegador, quien, alTerminar)) {
+  if (hablarConElNavegador(limpio, ajuste.navegador, quien, alTerminar)) {
     return "navegador";
   }
   alTerminar();
@@ -318,7 +325,7 @@ export async function decirComo(personaje, texto, opciones = {}) {
  */
 export async function adelantarVoz(personaje, texto) {
   const quien = PERSONAJES.includes(personaje) ? personaje : "pana";
-  const limpio = String(texto ?? "").trim();
+  const limpio = paraVoz(texto);
   const clave = claveAdelantado(quien, limpio);
   if (!limpio || adelantados.has(clave)) {
     return;
@@ -545,15 +552,18 @@ function liberarAudio() {
 }
 
 /**
- * Lee un texto con una voz del navegador, su tono y su velocidad.
+ * Lee un texto ya preparado con una voz del navegador, su tono y su velocidad.
  *
- * @param {string} texto Texto que se leerá.
+ * Es la ruta interna de `decirComo`: recibe el texto que ya pasó por
+ * `paraVoz`, así la conversión no se repite.
+ *
+ * @param {string} texto Texto ya preparado para la voz.
  * @param {{voz?: string, tono?: number, velocidad?: number}} ajuste `voz` es parte del nombre de la voz.
  * @param {string} [personaje] Personaje, para repartir voces si `voz` está vacío.
  * @param {() => void} [alTerminar] Se llama al acabar o al fallar.
  * @returns {boolean} `true` si empezó a leer.
  */
-export function decirConElNavegador(texto, ajuste, personaje = "pana", alTerminar = () => {}) {
+function hablarConElNavegador(texto, ajuste, personaje = "pana", alTerminar = () => {}) {
   if (!hayVozDelNavegador()) {
     return false;
   }
@@ -575,6 +585,22 @@ export function decirConElNavegador(texto, ajuste, personaje = "pana", alTermina
   } catch {
     return false;
   }
+}
+
+/**
+ * Lee un texto con una voz del navegador, su tono y su velocidad.
+ *
+ * Es la entrada pública para quien no pasa por `decirComo` (por ejemplo, el
+ * probador de voces): el texto se prepara con `paraVoz` antes de hablarlo.
+ *
+ * @param {string} texto Texto que se leerá.
+ * @param {{voz?: string, tono?: number, velocidad?: number}} ajuste `voz` es parte del nombre de la voz.
+ * @param {string} [personaje] Personaje, para repartir voces si `voz` está vacío.
+ * @param {() => void} [alTerminar] Se llama al acabar o al fallar.
+ * @returns {boolean} `true` si empezó a leer.
+ */
+export function decirConElNavegador(texto, ajuste, personaje = "pana", alTerminar = () => {}) {
+  return hablarConElNavegador(paraVoz(texto), ajuste, personaje, alTerminar);
 }
 
 /**

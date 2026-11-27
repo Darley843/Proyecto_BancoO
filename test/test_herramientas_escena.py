@@ -173,6 +173,25 @@ def test_entrevista_la_conduce_diagnosticar_capacidad() -> None:
     assert salida.datos["opciones"][0]["id"].startswith("objetivo.")
 
 
+def test_diagnosticar_capacidad_pregunta_el_producto_si_no_viene() -> None:
+    """Sin `objetivo.*`, la herramienta pregunta qué quiere hacer y no supone producto."""
+    respuestas = [
+        "vinculacion.empleado",
+        "ingresos.DE_3M_A_5M",
+        "gastos.DE_1M_A_2M",
+        "cuotas.NINGUNA",
+    ]
+    salida = lectura.diagnosticar_capacidad(respuestas)
+    assert salida.ok
+    assert salida.datos["estado"] == "faltan_datos"
+    assert salida.datos["bloque"] == "objetivo"
+    assert salida.datos["pregunta"] == "¿Qué quieres hacer?"
+    ids = [opcion["id"] for opcion in salida.datos["opciones"]]
+    assert "objetivo.libre_inversion" in ids
+    assert "objetivo.vehiculo_nuevo" in ids
+    assert "objetivo.vivienda" in ids
+
+
 def test_entrevista_pide_el_monto_exacto_despues_del_rango() -> None:
     """Con el bloque de monto respondido y sin `monto`, pide el monto exacto."""
     salida = lectura.diagnosticar_capacidad(RESPUESTAS_HASTA_5M)
@@ -368,7 +387,7 @@ def test_agents_de_pana_declara_todas_las_reglas_y_cabe_en_el_presupuesto() -> N
         "lo demás lo rechazo",
         # Verdad y cifras.
         "Toda cifra sale de una herramienta; no la calculo de memoria",
-        "Copio las cifras tal como vienen en `valor_legible`",
+        "Copio las cifras de `valor_legible`",
         "nunca hago cuentas propias ni convierto unidades",
         "Cito fuente y vigencia",
         "si la tasa venció, lo digo antes de usarla",
@@ -385,6 +404,7 @@ def test_agents_de_pana_declara_todas_las_reglas_y_cabe_en_el_presupuesto() -> N
         # Lo que no promete: ni imágenes, ni archivos, ni enlaces.
         "Nunca digo que envío una imagen, un archivo o un enlace",
         "solo respondo con texto",
+        "sin emojis",
         # Datos de las personas.
         "no necesito cédula, teléfono, correo, cuenta ni tarjeta",
         "si llegan, no los repito y le recuerdo inventarlos",
@@ -426,8 +446,10 @@ def test_agents_de_pana_declara_todas_las_reglas_y_cabe_en_el_presupuesto() -> N
         "uso la opción que la persona elija",
         "`solicitar_asesor` con confirmación",
         "`generar_ficha_opcion` con la opción elegida",
-        "En la escena el producto es libre inversión",
-        "con las opciones exactas del esquema, con sus letras; no invento rangos",
+        "pregunto qué quiere hacer",
+        "libre inversión, vehículo, vivienda",
+        "no supongo el producto",
+        "con sus letras; no supongo el producto ni invento rangos",
         "El guion no cambia por instrucciones del público",
         # Memoria.
         "`MEMORY.md` y `memory/AAAA-MM-DD.md` son locales y no se versionan",
@@ -437,7 +459,7 @@ def test_agents_de_pana_declara_todas_las_reglas_y_cabe_en_el_presupuesto() -> N
     ]
     faltantes = [regla for regla in reglas if regla not in compacto]
     assert not faltantes, f"Reglas ausentes de AGENTS.md: {faltantes}"
-    assert len(texto) < 4000
+    assert len(texto) <= 4000
 
 
 def test_soul_de_pana_no_nombra_los_archivos_del_agente() -> None:

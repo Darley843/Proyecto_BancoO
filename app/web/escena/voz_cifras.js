@@ -249,29 +249,70 @@ function sinEmojis(texto) {
 const PATRON_OPCION = /(^|\s)([A-Z])\s*[.)·]\s+(?=\S)/gu;
 
 /**
- * Corta una lista de opciones con letra antes de que la voz la lea.
+ * Recoge las marcas de una lista que empieza en «A» y sigue «B», «C»…
  *
- * Solo actúa cuando hay al menos dos marcas y la lista empieza en «A.» y
- * «B.». Así una letra suelta o una sigla como «E.A.» o «M.V.» no se confunde
- * con una lista. La voz dice lo que va antes de la primera opción y una
- * instrucción corta.
+ * Se ignoran las marcas que rompen la secuencia, como la «E» de «E. A.» o la
+ * «M» de «M. V.»: no son opciones. Solo hay lista si llegan al menos «A» y
+ * «B», así una letra suelta tampoco se confunde con una opción.
  *
  * @param {string} texto Texto original.
- * @returns {string} El texto sin la lista de opciones, o el mismo texto.
+ * @returns {Array<{letra: string, inicio: number, fin: number}>} Marcas de la
+ *   lista, en orden, o una lista vacía si no hay opciones.
  */
-function sinOpciones(texto) {
+function marcasDeLista(texto) {
   const marcas = [];
+  let esperada = "A";
   for (const coincidencia of texto.matchAll(PATRON_OPCION)) {
+    const letra = coincidencia[2];
+    if (letra !== esperada) {
+      continue;
+    }
     marcas.push({
-      letra: coincidencia[2],
-      posicion: coincidencia.index + coincidencia[1].length,
+      letra,
+      inicio: coincidencia.index + coincidencia[1].length,
+      fin: coincidencia.index + coincidencia[0].length,
     });
+    esperada = String.fromCharCode(esperada.charCodeAt(0) + 1);
   }
-  if (marcas.length < 2 || marcas[0].letra !== "A" || marcas[1].letra !== "B") {
+  return marcas.length >= 2 ? marcas : [];
+}
+
+/**
+ * Extrae el texto de una opción y le deja una sola frase terminada.
+ *
+ * @param {string} texto Texto original.
+ * @param {{fin: number}} marca Marca que abre la opción.
+ * @param {{inicio: number} | undefined} siguiente Marca que la cierra.
+ * @returns {string} El texto de la opción, sin espacios de más y con su punto.
+ */
+function cuerpoDeOpcion(texto, marca, siguiente) {
+  const hasta = siguiente ? siguiente.inicio : texto.length;
+  const cuerpo = texto.slice(marca.fin, hasta).replace(/\s+/g, " ").trim();
+  const limpio = cuerpo.replace(/[.;:]$/, "").trim();
+  return /[.!?]$/.test(limpio) ? limpio : `${limpio}.`;
+}
+
+/**
+ * Lee una lista de opciones antes de que la voz la pronuncie.
+ *
+ * En vez de omitir las opciones, la voz dice lo que va antes de la lista, cada
+ * opción con su letra y una pausa de punto entre ellas, y cierra pidiendo la
+ * letra elegida. Funciona con «A. …», «A) …» y «A · …», en la misma línea o en
+ * líneas separadas.
+ *
+ * @param {string} texto Texto original.
+ * @returns {string} El texto con las opciones una por una, o el mismo texto.
+ */
+function leerOpciones(texto) {
+  const marcas = marcasDeLista(texto);
+  if (marcas.length < 2) {
     return texto;
   }
-  const prefijo = texto.slice(0, marcas[0].posicion).trim();
-  return `${prefijo} Elige la opción que mejor te describa.`.trim();
+  const prefijo = texto.slice(0, marcas[0].inicio).trim();
+  const opciones = marcas
+    .map((marca, indice) => `${marca.letra}: ${cuerpoDeOpcion(texto, marca, marcas[indice + 1])}`)
+    .join(" ");
+  return [prefijo, opciones, "Dime la letra de tu opción."].filter(Boolean).join(" ");
 }
 
 /**
@@ -413,17 +454,19 @@ function sinDolares(texto) {
  * Prepara un texto para que la voz lo lea en español claro.
  *
  * Los subtítulos no pasan por aquí: esta función se llama únicamente justo
- * antes de entregar el texto a `decirComo`.
+ * antes de entregar el texto a la voz. También lee las listas de opciones una
+ * por una, con su letra y una pausa entre ellas.
  *
  * @param {string} texto Texto del turno tal como aparece en pantalla.
- * @returns {string} El texto solo para la voz, con cifras y siglas en palabras.
+ * @returns {string} El texto solo para la voz, con cifras, siglas y opciones
+ *   listas para el oído.
  */
 export function paraVoz(texto) {
   let limpio = String(texto ?? "");
   limpio = sinUrls(limpio);
   limpio = sinMarcas(limpio);
   limpio = sinEmojis(limpio);
-  limpio = sinOpciones(limpio);
+  limpio = leerOpciones(limpio);
   limpio = cambiarRangos(limpio);
   limpio = cambiarMontosConEscala(limpio);
   limpio = cambiarMontos(limpio);

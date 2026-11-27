@@ -1,12 +1,13 @@
 """Pruebas de la voz y la pantalla de la escena: las cifras se leen en pesos.
 
 La pantalla conserva el formato colombiano en los subtítulos y traduce solo el
-texto que va a la voz con ``paraVoz`` (``app/web/escena/voz_cifras.js``). Las
-etiquetas cortas de la entrevista se expanden a cifras completas para la escena
-con ``paraPantalla`` (``app/web/escena/pantalla_cifras.js``). Las pruebas
-ejecutan esas funciones puras con Node, si está instalado, y comprueban que
-``escena.js`` las llama en el punto donde pinta el subtítulo y donde entrega el
-texto a la voz.
+texto que va a la voz con ``paraVoz`` (``app/web/escena/voz_cifras.js``). Esa
+conversión vive una sola vez en ``app/web/voz.js``, así la escena guionada, la
+lista en vivo, Piper y la voz del navegador reciben el mismo texto. Las etiquetas
+cortas de la entrevista se expanden a cifras completas para la escena con
+``paraPantalla`` (``app/web/escena/pantalla_cifras.js``). Las pruebas ejecutan
+esas funciones puras con Node, si está instalado, y comprueban que ``escena.js``
+no repite la conversión.
 """
 
 from __future__ import annotations
@@ -116,14 +117,18 @@ def test_el_modulo_de_pantalla_se_sirve_y_no_toca_el_dom() -> None:
     assert "https://" not in codigo
 
 
-def test_escena_js_pinta_las_cifras_completas_y_llama_a_para_voz() -> None:
-    """El subtítulo usa paraPantalla; la conversión a voz sigue en decirComo."""
-    codigo = _leer("escena.js")
-    assert 'import { paraVoz } from "./voz_cifras.js";' in codigo
-    assert 'import { paraPantalla } from "./pantalla_cifras.js";' in codigo
-    assert "decirComo(turno.personaje, paraVoz(turno.texto)" in codigo
-    assert "subtitulo.textContent = paraPantalla(turno.subtitulo || turno.texto);" in codigo
-    assert 'porId("escena-texto").textContent = paraPantalla(turno.texto);' in codigo
+def test_la_conversion_a_voz_vive_en_voz_js_y_no_se_repite_en_escena() -> None:
+    """El subtítulo usa paraPantalla; la voz convierte una sola vez en voz.js."""
+    escena = _leer("escena.js")
+    voz = (WEB / "voz.js").read_text(encoding="utf-8")
+    assert 'import { paraVoz } from "./escena/voz_cifras.js";' in voz
+    assert 'import { paraVoz } from "./voz_cifras.js";' not in escena
+    assert "paraVoz(" not in escena
+    assert "decirComo(turno.personaje, turno.texto" in escena
+    assert "adelantarVoz(siguiente.personaje, siguiente.texto)" in escena
+    assert "const limpio = paraVoz(texto);" in voz
+    assert "subtitulo.textContent = paraPantalla(turno.subtitulo || turno.texto);" in escena
+    assert 'porId("escena-texto").textContent = paraPantalla(turno.texto);' in escena
 
 
 @pytest.mark.parametrize(
@@ -162,15 +167,17 @@ def test_escena_js_pinta_las_cifras_completas_y_llama_a_para_voz() -> None:
             "créditos o tarjetas? A. No tengo cuotas B. Menos de $500.000 "
             "C. Entre $500.000 y $1.000.000",
             "Listo, gastos menos de un millón de pesos. ¿Cuánto pagas hoy en cuotas "
-            "de créditos o tarjetas? Elige la opción que mejor te describa.",
+            "de créditos o tarjetas? A: No tengo cuotas. B: Menos de quinientos mil "
+            "pesos. C: Entre quinientos mil pesos y un millón de pesos. "
+            "Dime la letra de tu opción.",
         ),
         (
             "¿Cuánto pagas?\nA · Nada\nB · Poco\nC · Mucho",
-            "¿Cuánto pagas? Elige la opción que mejor te describa.",
+            "¿Cuánto pagas? A: Nada. B: Poco. C: Mucho. Dime la letra de tu opción.",
         ),
         (
             "Elige una: A) Uno B) Dos",
-            "Elige una: Elige la opción que mejor te describa.",
+            "Elige una: A: Uno. B: Dos. Dime la letra de tu opción.",
         ),
         (
             "La tasa es 28,17 % E.A. y la mensual 2,09 % M.V.",
@@ -190,6 +197,40 @@ def test_para_voz_deja_igual_un_texto_sin_opciones_ni_emojis() -> None:
     """Una frase normal no cambia y el texto sin listas conserva su sentido."""
     assert _para_voz("Hola, ¿cómo estás?") == "Hola, ¿cómo estás?"
     assert _para_voz("Marca A. y sigue") == "Marca A. y sigue"
+
+
+@requiere_node
+def test_un_turno_en_vivo_quita_el_emoji_y_lee_las_opciones_una_por_una() -> None:
+    """El texto que llega por la lista en vivo también queda listo para la voz."""
+    turno = (
+        "💚 ¿Cuánto pagas hoy en cuotas? "
+        "A. No tengo cuotas B. Menos de $500.000 C. Entre $500.000 y $1.000.000"
+    )
+    assert _para_voz(turno) == (
+        "¿Cuánto pagas hoy en cuotas? "
+        "A: No tengo cuotas. "
+        "B: Menos de quinientos mil pesos. "
+        "C: Entre quinientos mil pesos y un millón de pesos. "
+        "Dime la letra de tu opción."
+    )
+
+
+@requiere_node
+def test_las_siglas_no_se_confunden_con_una_lista_de_opciones() -> None:
+    """«E.A.» y «M.V.» no son opciones: sin lista, el texto sigue su curso."""
+    assert _para_voz("E.A. y M.V. sin lista") == "efectivo anual. y mes vencido. sin lista"
+    assert _para_voz("La tasa es 28,17 % E.A.") == (
+        "La tasa es veintiocho coma diecisiete por ciento efectivo anual"
+    )
+    assert "Dime la letra de tu opción." not in _para_voz("E.A. y M.V. sin lista")
+
+
+@requiere_node
+def test_las_opciones_tambien_se_leen_en_lineas_separadas() -> None:
+    """«A. …» en renglones distintos produce la misma lectura con pausas."""
+    assert _para_voz("Elige:\nA. Uno\nB. Dos\nC. Tres") == (
+        "Elige: A: Uno. B: Dos. C: Tres. Dime la letra de tu opción."
+    )
 
 
 @requiere_node
