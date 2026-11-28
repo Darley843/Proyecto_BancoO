@@ -8,6 +8,7 @@ en lugar de abrir la red por su cuenta.
 
 from __future__ import annotations
 
+import base64
 import logging
 import os
 from collections.abc import Callable, Iterable, Mapping
@@ -113,7 +114,11 @@ logger = logging.getLogger(__name__)
 _ULTIMA_FICHA_PUBLICADA: str | None = None
 
 
-def _publicar_escena(construir: Callable[[], Iterable[TurnoEscena]]) -> None:
+def _publicar_escena(
+    construir: Callable[[], Iterable[TurnoEscena]],
+    *,
+    publicar: bool = False,
+) -> None:
     """Publica un lote en la escena en vivo sin cambiar la respuesta.
 
     La construcción del lote ocurre dentro del resguardo: si un módulo de la
@@ -122,23 +127,28 @@ def _publicar_escena(construir: Callable[[], Iterable[TurnoEscena]]) -> None:
 
     Args:
         construir: fábrica que arma los turnos ya calculados.
+        publicar: ``True`` solo cuando el canal conduce la escena y llama a la
+            herramienta directo. Pana, por el MCP, nunca publica.
     """
+    if not publicar:
+        return
     with suppress(Exception):
         publicar_turnos(construir(), origen="herramienta")
 
 
-def _publicar_ficha(turno: TurnoEscena) -> None:
+def _publicar_ficha(turno: TurnoEscena, *, publicar: bool) -> None:
     """Publica la ficha una sola vez, aunque la herramienta se repita.
 
     Args:
         turno: turno `vivo.ficha.v1` ya armado.
+        publicar: ``True`` solo en la llamada directa del canal.
     """
     global _ULTIMA_FICHA_PUBLICADA
-    if os.environ.get("ESCENA_EN_VIVO", "").strip() != "1":
+    if not publicar or os.environ.get("ESCENA_EN_VIVO", "").strip() != "1":
         return
     if turno.texto == _ULTIMA_FICHA_PUBLICADA:
         return
-    _publicar_escena(lambda: (turno,))
+    _publicar_escena(lambda: (turno,), publicar=True)
     _ULTIMA_FICHA_PUBLICADA = turno.texto
 
 
@@ -811,6 +821,8 @@ def _escenario_de_la_opcion(
 def _continuar_escena(
     resultado: ResultadoDiagnostico,
     respuestas: list[str],
+    *,
+    publicar: bool,
 ) -> dict[str, Any]:
     """Prolonga la escena con Don Gota, la comparación y la negociación.
 
@@ -822,6 +834,7 @@ def _continuar_escena(
     Args:
         resultado: diagnóstico completo del motor.
         respuestas: ids canónicos de la entrevista.
+        publicar: ``True`` solo en la llamada directa del canal.
 
     Returns:
         El resumen corto para Pana: oferta de Don Gota, comparación con el banco
@@ -840,7 +853,7 @@ def _continuar_escena(
     avisos: list[str] = []
     cifras: list[str] = []
 
-    _publicar_escena(lambda: (_turno_diagnostico(resultado),))
+    _publicar_escena(lambda: (_turno_diagnostico(resultado),), publicar=publicar)
     cuota = resultado.cuota_mensual
     diagnostico: dict[str, Any] = {
         "semaforo": resultado.semaforo,
@@ -867,7 +880,7 @@ def _continuar_escena(
     resumen["diagnostico"] = diagnostico
 
     try:
-        gota = calcular_prestamo_gota(monto)
+        gota = calcular_prestamo_gota(monto, publicar=publicar)
     except Exception:  # noqa: BLE001 - la escena no rompe el diagnóstico
         gota = None
     if gota is None or not gota.ok:
@@ -884,7 +897,7 @@ def _continuar_escena(
         _agregar_cifras(cifras, datos.get("cifras_permitidas"))
 
     try:
-        comparacion = comparar_gota_banco(monto, respuestas)
+        comparacion = comparar_gota_banco(monto, respuestas, publicar=publicar)
     except Exception:  # noqa: BLE001 - la escena no rompe el diagnóstico
         comparacion = None
     if comparacion is None or not comparacion.ok:
@@ -905,7 +918,7 @@ def _continuar_escena(
         _agregar_cifras(cifras, comparacion.datos.get("cifras_permitidas"))
 
     try:
-        negociacion = negociar_opcion(respuestas, monto=monto)
+        negociacion = negociar_opcion(respuestas, monto=monto, publicar=publicar)
     except Exception:  # noqa: BLE001 - la escena no rompe el diagnóstico
         negociacion = None
     if negociacion is None or not negociacion.ok:
@@ -943,6 +956,8 @@ def _continuar_escena(
 def diagnosticar_capacidad(
     respuestas: RespuestasEntrevista,
     monto: MontoExactoEntrada = None,
+    *,
+    publicar: bool = False,
 ) -> SalidaHerramienta:
     """Conduce la entrevista y calcula el diagnóstico completo.
 
@@ -956,8 +971,9 @@ def diagnosticar_capacidad(
     Cuando el diagnóstico queda completo —producto, monto y plazo—, la misma
     llamada calcula la oferta de Don Gota, la comparación con el banco y la
     negociación con las funciones del recorrido, publica sus turnos en la
-    escena en vivo (si está encendida) y devuelve además el `resumen_escena`
-    con las opciones A y B y las `cifras_permitidas` para `auditar_respuesta`.
+    escena en vivo (si está encendida y `publicar`) y devuelve además el
+    `resumen_escena` con las opciones A y B y las `cifras_permitidas` para
+    `auditar_respuesta`.
 
     Args:
         respuestas: ids canónicos de la entrevista en la forma bloque.valor:
@@ -966,6 +982,8 @@ def diagnosticar_capacidad(
             cuota_trasladar.* (solo en compra de cartera). Puede venir vacía o
             incompleta: la herramienta indica qué preguntar.
         monto: monto exacto que dijo el invitado, en pesos.
+        publicar: ``True`` solo cuando el canal conduce la entrevista directo.
+            Pana, por el MCP, no publica nada en la pantalla.
 
     Returns:
         El paso `faltan_datos` con la pregunta y sus opciones, o el resultado
@@ -986,7 +1004,7 @@ def diagnosticar_capacidad(
     datos: dict[str, Any] = {"resultado": como_json(resultado)}
     if _diagnostico_completo(resultado):
         try:
-            resumen = _continuar_escena(resultado, entrada.respuestas)
+            resumen = _continuar_escena(resultado, entrada.respuestas, publicar=publicar)
             datos["resumen_escena"] = resumen
             datos["mensaje_listo"] = resumen.get("mensaje_listo")
             datos["cifras_permitidas"] = resumen.get("cifras_permitidas", [])
@@ -1089,7 +1107,7 @@ def convocar_comite(
     return ok("convocar_comite", {"deliberacion": como_json(deliberacion)})
 
 
-def calcular_prestamo_gota(monto: int) -> SalidaHerramienta:
+def calcular_prestamo_gota(monto: int, *, publicar: bool = False) -> SalidaHerramienta:
     """Calcula el préstamo de Don Gota con la aritmética de la escena.
 
     Cada cifra viaja con su ``valor_legible`` en formato colombiano y con
@@ -1099,6 +1117,7 @@ def calcular_prestamo_gota(monto: int) -> SalidaHerramienta:
 
     Args:
         monto: capital en pesos.
+        publicar: ``True`` solo en la llamada directa del canal; Pana no publica.
 
     Returns:
         Interés, cuota diaria, totales y tasa E.A. equivalente, con su fuente,
@@ -1195,11 +1214,16 @@ def calcular_prestamo_gota(monto: int) -> SalidaHerramienta:
             ),
         ),
     )
-    _publicar_escena(lambda: turnos_don_gota(prestamo, perfil="vivo"))
+    _publicar_escena(lambda: turnos_don_gota(prestamo, perfil="vivo"), publicar=publicar)
     return ok("calcular_prestamo_gota", datos)
 
 
-def comparar_gota_banco(monto: int, respuestas: RespuestasEntrevista) -> SalidaHerramienta:
+def comparar_gota_banco(
+    monto: int,
+    respuestas: RespuestasEntrevista,
+    *,
+    publicar: bool = False,
+) -> SalidaHerramienta:
     """Compara el gota a gota con el banco y con la usura vigente.
 
     La comparación es siempre contra **libre inversión a la tasa máxima del
@@ -1216,6 +1240,7 @@ def comparar_gota_banco(monto: int, respuestas: RespuestasEntrevista) -> SalidaH
             monto y plazo, como en ``diagnosticar_capacidad``. El producto de
             estas respuestas no cambia el lado del banco: siempre es libre
             inversión a la tasa máxima.
+        publicar: ``True`` solo en la llamada directa del canal; Pana no publica.
 
     Returns:
         La comparación con los totales, la usura y los supuestos, con sus cifras
@@ -1313,7 +1338,9 @@ def comparar_gota_banco(monto: int, respuestas: RespuestasEntrevista) -> SalidaH
             )
         )
     anotar(detalle, cifras)
-    _publicar_escena(lambda: turnos_pana_comparacion(comparacion, orden_inicial=8))
+    _publicar_escena(
+        lambda: turnos_pana_comparacion(comparacion, orden_inicial=8), publicar=publicar
+    )
     return ok(
         "comparar_gota_banco",
         {
@@ -1328,6 +1355,8 @@ def comparar_gota_banco(monto: int, respuestas: RespuestasEntrevista) -> SalidaH
 def negociar_opcion(
     respuestas: RespuestasEntrevista,
     monto: MontoExactoEntrada = None,
+    *,
+    publicar: bool = False,
 ) -> SalidaHerramienta:
     """Negocia la opción del joven y del banco sobre la mesa precalculada.
 
@@ -1343,6 +1372,7 @@ def negociar_opcion(
             cálculo del rango solo si cae dentro de sus límites y, si no, la
             herramienta devuelve `entrada_invalida` con los límites. Sin este
             campo se usa el valor del rango.
+        publicar: ``True`` solo en la llamada directa del canal; Pana no publica.
 
     Returns:
         Los turnos, el acuerdo o `None`, el veredicto y el registro de validaciones.
@@ -1360,7 +1390,8 @@ def negociar_opcion(
             turno
             for turno in resultado.negociacion.turnos
             if turno.personaje in {"agente_joven", "agente_banco"}
-        )
+        ),
+        publicar=publicar,
     )
     return ok(
         "negociar_opcion",
@@ -1394,6 +1425,9 @@ def generar_ficha_opcion(
     respuestas: RespuestasEntrevista,
     monto: MontoExactoEntrada = None,
     opcion: Literal["A", "B"] | None = None,
+    *,
+    publicar: bool = False,
+    devolver_imagen: bool = False,
 ) -> SalidaHerramienta:
     """Genera la ficha de la opción elegida y su cierre corto para WhatsApp.
 
@@ -1412,6 +1446,10 @@ def generar_ficha_opcion(
             campo se usa el valor del rango.
         opcion: letra de la opción que eligió el invitado (`A` o `B`); sin ella
             se usa el plazo de la entrevista.
+        publicar: ``True`` solo cuando el canal conduce la escena directo.
+        devolver_imagen: ``True`` cuando el canal, que ya tiene el número del
+            voluntario, envía la ficha en el mismo turno: devuelve el PNG en
+            `png_base64` y no deja `data/escena/ficha_entrega.json`.
 
     Returns:
         El texto de la ficha, su cierre corto (`mensaje_listo`), las cifras que
@@ -1540,24 +1578,26 @@ def generar_ficha_opcion(
                 cifras=cifras_turno,
                 escenario=escenario,
                 origen="reglas",
-            )
+            ),
+            publicar=publicar,
         )
-        dejar_ficha(texto, imagen)
-    return ok(
-        "generar_ficha_opcion",
-        {
-            "texto": texto,
-            "mensaje_listo": mensaje_listo,
-            "cifras_permitidas": cifras_permitidas,
-            "opcion": entrada.opcion,
-            "escenario": como_json(escenario),
-            "png_bytes": len(imagen),
-            "semaforo": resultado.semaforo,
-            "cuota_mensual": como_json(resultado.cuota_mensual),
-            "tasa_ea": como_json(resultado.tasa_ea),
-            "aviso": resultado.aviso,
-        },
-    )
+        if not devolver_imagen:
+            dejar_ficha(texto, imagen)
+    salida: dict[str, Any] = {
+        "texto": texto,
+        "mensaje_listo": mensaje_listo,
+        "cifras_permitidas": cifras_permitidas,
+        "opcion": entrada.opcion,
+        "escenario": como_json(escenario),
+        "png_bytes": len(imagen),
+        "semaforo": resultado.semaforo,
+        "cuota_mensual": como_json(resultado.cuota_mensual),
+        "tasa_ea": como_json(resultado.tasa_ea),
+        "aviso": resultado.aviso,
+    }
+    if devolver_imagen and imagen:
+        salida["png_base64"] = base64.b64encode(imagen).decode("ascii")
+    return ok("generar_ficha_opcion", salida)
 
 
 def responder_sobre_proyecto(pregunta: PreguntaProyecto, k: int = 3) -> SalidaHerramienta:
@@ -1669,6 +1709,8 @@ def auditar_respuesta(
     texto: str,
     cifras_permitidas: list[str] | None = None,
     personaje: Personaje = "pana",
+    *,
+    publicar: bool = False,
 ) -> SalidaHerramienta:
     """Revisa un texto antes de enviarlo, con el auditor de la escena y el del comité.
 
@@ -1684,6 +1726,8 @@ def auditar_respuesta(
             el `cifras_permitidas` que devuelve la herramienta. Acepta el texto
             legible («791,61 % E.A.») y también los dígitos de máquina.
         personaje: quién envía el texto.
+        publicar: ``True`` solo cuando el canal conduce la escena directo; el
+            turno del auditor no se publica desde el MCP.
 
     Returns:
         `conforme`, el veredicto, si se puede enviar y los hallazgos en español.
@@ -1726,7 +1770,8 @@ def auditar_respuesta(
                 ),
                 orden=90,
             ).model_copy(update={"hallazgos": todos}),
-        )
+        ),
+        publicar=publicar,
     )
     return ok(
         "auditar_respuesta",

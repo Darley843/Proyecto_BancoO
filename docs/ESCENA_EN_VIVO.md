@@ -7,6 +7,11 @@ demuestra. Si una implementación necesita un campo, un archivo o un valor
 distinto, primero se actualiza este documento, `escena/contratos.py`,
 `app/web/escena/contrato.js` y sus pruebas en el mismo commit.
 
+**Cambio del viernes 27:** el canal conduce la entrevista del voluntario
+llamando a las herramientas del diagnóstico directo y con `publicar=True`
+(§9.3.2). Las llamadas de Pana por el MCP ya no publican (§8), así que la
+pantalla solo muestra lo del voluntario activo.
+
 El objetivo es que el voluntario escriba por WhatsApp a Pana (el agente de
 OpenClaw) y que `app/web/escena.html` muestre **su escena**, en vivo y con voces:
 sus mensajes, Don Gota, la comparación de Pana, la negociación entre el agente
@@ -332,9 +337,13 @@ leer_turnos(
 
 ## 8. Herramientas (Nayla)
 
-Las cinco herramientas publican **después** de calcular y **solo** si su
-resultado es correcto. El sobre de la herramienta no cambia: la publicación es
-un efecto lateral local, no un campo de la respuesta.
+Las cinco herramientas publican **después** de calcular, **solo** si su
+resultado es correcto y **solo** cuando el canal las llama directo con
+`publicar=True`. Una llamada de Pana por el MCP usa el valor por defecto
+(`publicar=False`) y no escribe nada en la lista: el modelo no puede publicar
+turnos de otro invitado. El sobre de la herramienta no cambia: la publicación
+es un efecto lateral local, no un campo de la respuesta, y `publicar` no viaja
+en el esquema del MCP.
 
 | Herramienta | Fuente de los turnos | Cuántos | `personaje` | `turno.origen` | `orden` sugerido |
 |---|---|---|---|---|---|
@@ -371,7 +380,9 @@ un efecto lateral local, no un campo de la respuesta.
   pantalla se actualice. El PNG no viaja en la lista: solo su texto equivalente.
   La herramienta devuelve además el `mensaje_listo` del cierre corto y deja la
   ficha para que el canal la envíe como mensaje aparte por WhatsApp. Si `texto`
-  viene vacío, no se publica.
+  viene vacío, no se publica. Con `devolver_imagen=True` —solo lo usa el canal,
+  que ya tiene el número del voluntario— la ficha vuelve en `png_base64` y no
+  se deja `data/escena/ficha_entrega.json`.
 
 ### 8.2 Fallos y bordes
 
@@ -382,11 +393,15 @@ un efecto lateral local, no un campo de la respuesta.
   demás del lote siguen.
 - Si el interruptor está apagado, no se publica y la herramienta responde
   exactamente igual que hoy.
+- Si el canal no pasa `publicar=True`, no se publica aunque el interruptor esté
+  encendido: es el caso de todas las llamadas del MCP.
 - Las demás herramientas del catálogo **no** publican: `consultar_tasa`,
   `simular_cuota`, `verificar_usura`, `diagnosticar_capacidad`,
   `comparar_escenario`, `convocar_comite`, `responder_sobre_proyecto`,
   `buscar_en_documentos`, `consultar_tarifas`, `clasificar_pregunta` y las de
-  estado. La escena en vivo no cambia su contrato.
+  estado. La escena en vivo no cambia su contrato. `diagnosticar_capacidad`
+  publica solo cuando el diagnóstico queda completo y el canal la llama con
+  `publicar=True`.
 
 ## 9. Canal (Darley)
 
@@ -513,6 +528,44 @@ sin `pregunta` a `POST /api/escena/hablar`. La ruta:
 Si el cliente envía `pregunta` (letra o monto), la ruta conserva el modo de
 perfil: interpreta localmente, no llama a OpenClaw y no envía por WhatsApp.
 
+### 9.3.2 La entrevista del voluntario la conduce el canal
+
+Con el voluntario activo, el canal llama a las herramientas del diagnóstico
+directo (`publicar=True`) y no pasa por OpenClaw. El estado de la entrevista
+(ids elegidos, monto exacto y pregunta pendiente) vive en la misma memoria del
+voluntario y se borra con el TTL, al liberar la convocatoria y al olvidar al
+voluntario.
+
+1. **Activación.** Con la convocatoria («Acepto») o con `ESCENA <código>`, el
+   canal llama a `diagnosticar_capacidad([], publicar=True)` y envía de
+   inmediato la bienvenida con el `mensaje_listo` de la primera pregunta y sus
+   opciones. La pregunta se publica como turno `pana` para que la pantalla abra
+   la conversación.
+2. **Letra o monto.** Si el mensaje es una letra válida de la pregunta
+   pendiente (o un monto, cuando la pregunta es el monto exacto y cae en el
+   rango), se agrega a las respuestas, se llama a
+   `diagnosticar_capacidad(respuestas, monto, publicar=True)` y se envía su
+   `mensaje_listo`. El mensaje del voluntario se sigue publicando como turno
+   `invitado` antes del turno de las herramientas.
+3. **Diagnóstico completo.** La misma herramienta publica en la pantalla el
+   diagnóstico, Don Gota, la comparación y la negociación, y el voluntario
+   recibe el `mensaje_listo` con las opciones A y B.
+4. **A o B.** El canal llama a `generar_ficha_opcion(..., opcion, publicar=True,
+   devolver_imagen=True)` y a `auditar_respuesta(cierre,
+   cifras_permitidas=ficha, publicar=True)`; envía el cierre corto
+   (`mensaje_listo`) y la ficha como mensaje aparte, directo al número del
+   voluntario, sin `data/escena/ficha_entrega.json`.
+5. **Pregunta libre.** Un texto que no es una opción válida se manda a OpenClaw
+   como hoy, con una línea de contexto con las respuestas del voluntario hasta
+   ese momento («Contexto de la entrevista en vivo: …»), y la entrevista sigue
+   donde quedó: la siguiente letra válida avanza.
+6. **Los demás invitados** siguen igual: hablan con Pana por WhatsApp y nada de
+   lo suyo se publica ni recibe la ficha del voluntario.
+
+La memoria vive en `canal/escena_vivo.py` (`iniciar_entrevista`,
+`atender_entrevista`, `contexto_entrevista`) y el despachador solo enruta el
+turno y envía.
+
 ### 9.4 Los demás invitados no se publican
 
 Solo la huella activa publica. Para cualquier otro invitado:
@@ -524,24 +577,19 @@ Solo la huella activa publica. Para cualquier otro invitado:
 Esto es deliberado: el público no debe ver los datos ni las preguntas de otros
 invitados.
 
-### 9.5 Limitación documentada: el MCP no sabe quién llamó
+### 9.5 El MCP no publica: la escena la conduce el canal
 
-El MCP recibe la llamada de OpenClaw, no del invitado. No hay forma de saber si
-quien provocó `calcular_prestamo_gota` fue el voluntario u otro invitado. Por
-eso:
+El MCP recibe la llamada de OpenClaw, no del invitado, así que no puede saber
+quién provocó una herramienta. Por eso la publicación ya no depende del MCP: las
+herramientas solo escriben en la lista cuando el canal las llama directo con
+`publicar=True` (§8), y el canal solo lo hace para la huella del voluntario
+activo (§9.3.2). Una herramienta que dispare otro invitado por Pana no publica
+nada, y su conversación privada sigue igual.
 
-- **Durante la escena solo el voluntario hace el recorrido del crédito.**
-- Los demás invitados pueden saludar, preguntar por productos o pedir un
-  asesor, pero no deben pedir el préstamo de Don Gota, la comparación, la
-  negociación, la auditoría ni la ficha.
-- Si otro invitado dispara una herramienta, sus turnos sí se publican (no
-  llevan PII), pero su mensaje no; la escena puede saltar. Es un riesgo
-  operativo, no de privacidad. Quien facilita lo evita con la tarjeta y con la
-  frase de apertura.
-
-No se añade `usuario_id` a las herramientas para arreglarlo: cambiaría el
-catálogo y el contrato del MCP a un día del evento. Queda como limitación
-conocida y como trabajo posterior si la escena se conserva.
+Con esto la limitación anterior —«durante la escena solo el voluntario hace el
+recorrido»— deja de ser un riesgo operativo: el invitado puede pedir lo que
+quiera sin saltar la escena. No se añade `usuario_id` a las herramientas ni
+cambia el catálogo del MCP.
 
 ### 9.6 PII en el canal
 
@@ -759,7 +807,7 @@ Sin red, sin DeepSeek, sin Ollama y sin gateway. Las pruebas usan `tmp_path` y
 |---|---|---|
 | Nayla | `test/test_escena_publicador.py` | Apagado no crea nada; encendido escribe una línea por turno; lote de 4 con `seq` consecutivos; dos hilos y dos procesos no corrompen ni repiten `seq`; turno inválido y turno con PII no se escriben; lector con `desde`, límite, línea a medias y archivo ausente; no hay texto en logs. |
 | Nayla | `test/test_herramientas_lectura.py` (ampliar) | Las cinco herramientas publican 4/3/1–4/1/1 con los personajes correctos; con el interruptor apagado no publican; un error de la herramienta no publica; la ficha es un turno de Pana; el auditor es un turno de auditor. |
-| Darley | `test/test_canal_escena_vivo.py` | `ESCENA` con el código de la sesión activa solo tras consentimiento; `ESCENA` sin código no activa; TTL y renovación; un segundo `ESCENA` desde otra huella no reemplaza; otro invitado no publica; invitado → Pana en orden; PII no publica el crudo y sí la frase fija; apagado no escribe; reinicio pierde la memoria. |
+| Darley | `test/test_canal_escena_vivo.py` | `ESCENA` con el código de la sesión activa solo tras consentimiento; `ESCENA` sin código no activa; TTL y renovación; un segundo `ESCENA` desde otra huella no reemplaza; otro invitado no publica; invitado → Pana en orden; PII no publica el crudo y sí la frase fija; apagado no escribe; reinicio pierde la memoria; la entrevista avanza sin OpenClaw y cada letra válida produce la siguiente pregunta; el diagnóstico completo publica la escena y envía A o B; A envía el cierre y la ficha al voluntario sin archivo intermedio; un texto libre va a OpenClaw con contexto y la entrevista sigue; otro invitado simultáneo no publica ni recibe la ficha. |
 | Darley | `test/test_escena_en_vivo_api.py` | `desde` filtra y `ultimo` avanza; máximo 200; archivo ausente; interruptor apagado; línea corrupta ignorada; la ruta no crea ni modifica archivos; `desde` inválido da 422; la app sigue en `127.0.0.1`. |
 | Yoldy | `test/test_web_escena.py` y `test/test_web_escena_en_vivo.py` | `E` está en el teclado y el botón existe; `envivo.js` se sirve; `contrato.js` incluye `invitado` y `canal`; no hay URLs externas ni `innerHTML`; no se guarda en storage; la cola se ordena y deduplica por `seq` (función pura); el invitado no pide voz. |
 | Anny | `test/test_escena_pii_en_vivo.py` y `test/test_seguridad.py` | Un teléfono, un correo y un documento falsos no aparecen en la lista, la ruta, los logs ni la tarjeta; la tarjeta/QR no lleva el número real ni datos de invitados; `data/escena/en_vivo.jsonl` y `.lock` están ignorados; el script de limpieza los nombra. |
@@ -843,6 +891,9 @@ las 18:00 se aplica el congelamiento de la tarea 5.3.
 ## 16. Lo que este contrato no cambia
 
 - No cambia el contrato de las veinte herramientas ni sus esquemas de entrada.
+  `publicar` y `devolver_imagen` son ajustes internos que solo pasa el canal:
+  la firma que ve el MCP se recorta a los campos de la entrada Pydantic, así
+  que el modelo no puede publicar en la pantalla.
 - No cambia `TurnoEscena` en sus campos: solo añade dos valores a dos `Literal`.
 - No añade dependencias, `pip`, `requirements.txt` ni toca `uv.lock`.
 - No toca Bronze, Silver ni Gold.

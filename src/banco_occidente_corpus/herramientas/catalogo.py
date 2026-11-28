@@ -11,8 +11,9 @@ from __future__ import annotations
 import json
 from collections.abc import Callable, Sequence
 from dataclasses import dataclass
+from inspect import Signature, signature
 from pathlib import Path
-from typing import Literal
+from typing import Any, Literal, cast, get_type_hints
 
 from pydantic import BaseModel
 
@@ -453,6 +454,60 @@ def nombres() -> tuple[str, ...]:
         Las veinte claves que ve el agente.
     """
     return tuple(herramienta.nombre for herramienta in CATALOGO)
+
+
+def firma_de_entrada(
+    funcion: Callable[..., SalidaHerramienta],
+    entrada: type[BaseModel],
+) -> Signature:
+    """Recorta la firma pública de una herramienta a los campos de su entrada.
+
+    El servidor MCP arma el esquema de cada herramienta con la firma de la
+    función. Los ajustes internos que solo usa el canal (`publicar`,
+    `devolver_imagen`) no deben viajar al modelo —si viajaran, Pana podría
+    publicar en la pantalla turnos de otro invitado—, así que la firma expuesta
+    conserva únicamente los parámetros que declara la entrada Pydantic.
+
+    Args:
+        funcion: herramienta tal como está declarada en el catálogo.
+        entrada: modelo Pydantic de su entrada.
+
+    Returns:
+        La firma con los mismos parámetros, anotaciones y valores por defecto
+        que el contrato de la herramienta.
+    """
+    publica = signature(funcion)
+    campos = set(entrada.model_fields)
+    # Las anotaciones del catálogo son cadenas (`from __future__ import
+    # annotations`); se resuelven aquí, con los globals de la herramienta,
+    # porque el envoltorio del servidor vive en otro módulo.
+    pistas = get_type_hints(funcion, include_extras=True)
+    parametros = [
+        parametro.replace(annotation=pistas.get(nombre, parametro.annotation))
+        for nombre, parametro in publica.parameters.items()
+        if nombre in campos
+    ]
+    retorno = pistas.get("return", publica.return_annotation)
+    return publica.replace(parameters=parametros, return_annotation=retorno)
+
+
+def con_firma_publica(
+    funcion: Callable[..., SalidaHerramienta],
+    entrada: type[BaseModel],
+) -> Callable[..., SalidaHerramienta]:
+    """Devuelve la herramienta con la firma pública que ve el modelo.
+
+    Args:
+        funcion: herramienta tal como está declarada en el catálogo.
+        entrada: modelo Pydantic de su entrada.
+
+    Returns:
+        La misma función, con ``__signature__`` recortada a los campos de la
+        entrada; el servidor MCP arma el esquema con esa firma.
+    """
+    expuesta = cast(Any, funcion)
+    expuesta.__signature__ = firma_de_entrada(funcion, entrada)
+    return funcion
 
 
 def por_nombre(nombre: str) -> Herramienta | None:

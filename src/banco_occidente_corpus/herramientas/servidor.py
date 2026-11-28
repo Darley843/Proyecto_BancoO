@@ -15,7 +15,7 @@ from pathlib import Path
 from mcp.server.mcpserver import MCPServer
 
 from ..config import PROJECT_ROOT
-from .catalogo import CATALOGO
+from .catalogo import CATALOGO, con_firma_publica
 from .traza import con_traza
 
 #: Ruta del TOML que comparten el gateway y este servidor.
@@ -84,9 +84,10 @@ def crear_servidor() -> MCPServer:
         ),
     )
     for herramienta in CATALOGO:
-        servidor.add_tool(
-            con_traza(herramienta.nombre, herramienta.funcion), name=herramienta.nombre
-        )
+        envuelta = con_traza(herramienta.nombre, herramienta.funcion)
+        # El modelo ve solo los campos de la entrada; `publicar` y
+        # `devolver_imagen` los pasa el canal cuando conduce la escena.
+        servidor.add_tool(con_firma_publica(envuelta, herramienta.entrada), name=herramienta.nombre)
     return servidor
 
 

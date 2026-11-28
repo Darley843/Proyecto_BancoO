@@ -32,6 +32,7 @@ from banco_occidente_corpus.canal.escena_vivo import (
     sin_nombres,
 )
 from banco_occidente_corpus.canal.identidad import calcular_usuario_id
+from banco_occidente_corpus.escena import en_vivo, ficha_entrega
 from banco_occidente_corpus.escena.contratos import TurnoEscena
 
 SAL = "sal-de-prueba"
@@ -83,10 +84,13 @@ class EnviadorEspia:
     """Enviador que guarda las respuestas en memoria."""
 
     enviadas: list[RespuestaCanal] = field(default_factory=list)
+    destino: str = ""
+    destinos: list[tuple[str, RespuestaCanal]] = field(default_factory=list)
 
     def enviar(self, respuesta: RespuestaCanal) -> str:
         """Registra la respuesta y devuelve un id ficticio."""
         self.enviadas.append(respuesta)
+        self.destinos.append((self.destino, respuesta))
         return "fake:espia"
 
 
@@ -388,7 +392,8 @@ def test_hablar_usa_el_voluntario_activo_y_manda_la_respuesta(
     assert respuesta is not None
     assert respuesta.texto == "respuesta de Pana"
     assert banco.enviadas[-1].texto == "respuesta de Pana"
-    assert banco.llamadas == ["¿cuál es la tasa de libre inversión?"]
+    assert len(banco.llamadas) == 1
+    assert banco.llamadas[0].endswith("¿cuál es la tasa de libre inversión?")
     activo = escena.voluntario_activo()
     assert activo is not None and activo.destino == NUMERO
 
@@ -426,6 +431,7 @@ class BancoCanal:
     publicados: list[tuple[TurnoEscena, str]]
     llamadas: list[str]
     usuario_id: str
+    destinos: list[tuple[str, RespuestaCanal]] = field(default_factory=list)
 
 
 def _banco(
@@ -439,8 +445,8 @@ def _banco(
     ruta = tmp_path / "whatsapp.sqlite"
     usuario_id = calcular_usuario_id(NUMERO, SAL)
     enviadas: list[RespuestaCanal] = []
+    destinos: list[tuple[str, RespuestaCanal]] = []
     llamadas: list[str] = []
-    espia = EnviadorEspia(enviadas)
 
     def responder(_pregunta: str, _thread_id: str, _perfil: str) -> str:
         """Doble del grafo."""
@@ -457,7 +463,7 @@ def _banco(
         ruta_almacen=ruta,
         maquina=MaquinaConsentimiento(ruta),
         cola=ColaMensajes(),
-        crear_enviador=lambda _usuario, _destino: espia,
+        crear_enviador=lambda _usuario, destino: EnviadorEspia(enviadas, destino, destinos),
         responder=responder,
         motor=motor,
         entrevista=entrevista,
@@ -471,6 +477,7 @@ def _banco(
         else [],
         llamadas=llamadas,
         usuario_id=usuario_id,
+        destinos=destinos,
     )
 
 
@@ -502,7 +509,8 @@ def test_el_invitado_va_antes_que_pana(tmp_path: Path, monkeypatch: pytest.Monke
     assert [turno.personaje for turno, _ in espia.publicados] == ["invitado", "pana"]
     assert espia.publicados[0][0].texto == "¿cuál es la tasa de libre inversión?"
     assert espia.publicados[1][0].texto == "respuesta de Pana"
-    assert banco.llamadas == ["¿cuál es la tasa de libre inversión?"]
+    assert len(banco.llamadas) == 1
+    assert banco.llamadas[0].endswith("¿cuál es la tasa de libre inversión?")
 
 
 def test_el_comando_no_se_reenvia_al_motor(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -513,9 +521,10 @@ def test_el_comando_no_se_reenvia_al_motor(tmp_path: Path, monkeypatch: pytest.M
 
     _atender(banco, _mensaje(f"ESCENA {CODIGO}"))
 
-    assert banco.enviadas[-1].texto == TEXTO_ACTIVADA
+    assert banco.enviadas[-1].texto.startswith(TEXTO_ACTIVADA)
+    assert "¿Qué quieres hacer?" in banco.enviadas[-1].texto
     assert banco.llamadas == []
-    assert [turno.personaje for turno, _ in espia.publicados] == ["pana"]
+    assert [turno.personaje for turno, _ in espia.publicados] == ["pana", "pana"]
 
 
 def test_un_codigo_equivocado_no_publica_nada(
@@ -607,8 +616,11 @@ def test_la_primera_huella_que_acepta_es_la_voluntaria(
 
     assert escena.activo(banco.usuario_id) is True
     assert escena.convocatoria_abierta() is False
-    assert banco.enviadas[-1].texto == TEXTO_VOLUNTARIO
-    assert [turno.texto for turno, _ in espia.publicados] == [TEXTO_VOLUNTARIO]
+    assert banco.enviadas[-1].texto.startswith(TEXTO_VOLUNTARIO)
+    assert "¿Qué quieres hacer?" in banco.enviadas[-1].texto
+    textos = [turno.texto for turno, _ in espia.publicados]
+    assert textos[0] == TEXTO_VOLUNTARIO
+    assert textos[1].startswith("¿Qué quieres hacer?")
     assert banco.llamadas == []
     activo = escena.voluntario_activo()
     assert activo is not None and activo.destino == NUMERO
@@ -635,7 +647,7 @@ def test_quien_acepto_antes_no_activa_hasta_escribir_despues(
     banco.despachador.procesar(despues, AHORA)
 
     assert escena.activo(banco.usuario_id) is True
-    assert banco.enviadas[-1].texto == TEXTO_VOLUNTARIO
+    assert banco.enviadas[-1].texto.startswith(TEXTO_VOLUNTARIO)
 
 
 def test_la_segunda_persona_no_reemplaza_y_recibe_el_aviso_una_vez(
@@ -742,3 +754,214 @@ def test_la_convocatoria_no_pone_el_numero_en_logs_ni_en_la_lista(
     assert all(NUMERO not in turno.texto for turno, _ in espia.publicados)
     assert NUMERO not in repr(escena)
     assert NUMERO not in repr(escena.voluntario_activo())
+
+
+# --- La entrevista del voluntario la conduce el canal ---------------------------
+
+#: Letras que recorren la entrevista de libre inversión hasta el resumen A/B.
+RECORRIDO = ("D", "A", "D", "B", "A", "A")
+#: Monto exacto que cae en el rango de la opción A del bloque de monto.
+MONTO_EXACTO = "4.000.000"
+#: Plazo con el que se completa el diagnóstico.
+PLAZO = "C"
+
+
+@pytest.fixture
+def lista_temporal(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    """Manda la lista de la escena y la ficha a una carpeta temporal."""
+    ruta = tmp_path / "escena" / "en_vivo.jsonl"
+    monkeypatch.setattr(en_vivo, "RUTA_EN_VIVO", ruta)
+    monkeypatch.setattr(ficha_entrega, "RUTA_ENTREGA", tmp_path / "escena" / "ficha_entrega.json")
+    return ruta
+
+
+def _registros(ruta: Path) -> list[dict[str, object]]:
+    """Lee los turnos que publicaron las herramientas en la lista temporal."""
+    registros, _ = en_vivo.leer_turnos(0, limite=1000, ruta=ruta)
+    return [dict(registro) for registro in registros]
+
+
+def _personajes(ruta: Path) -> list[str]:
+    """Devuelve los personajes de la lista, en orden de ``seq``."""
+    return [str(dict(registro["turno"])["personaje"]) for registro in _registros(ruta)]
+
+
+def _voluntario(banco: BancoCanal, escena: EscenaVivo) -> None:
+    """Abre la convocatoria y activa al voluntario con «Acepto»."""
+    escena.abrir_convocatoria()
+    mensaje = _mensaje("Acepto", id_mensaje="wamid.acepto")
+    banco.despachador.recibir(mensaje)
+    banco.despachador.procesar(mensaje, AHORA)
+
+
+def _responder(
+    banco: BancoCanal,
+    texto: str,
+    turno: int,
+    *,
+    numero: str = NUMERO,
+) -> RespuestaCanal:
+    """Procesa un mensaje del voluntario y devuelve la respuesta que se envió."""
+    mensaje = _mensaje(texto, numero=numero, id_mensaje=f"wamid.turno{turno}")
+    banco.despachador.recibir(mensaje)
+    respuesta = banco.despachador.procesar(mensaje, AHORA)
+    assert respuesta is not None
+    return respuesta
+
+
+def _hasta_las_opciones(banco: BancoCanal, inicio: int = 0) -> RespuestaCanal:
+    """Recorre la entrevista completa y devuelve el resumen con A y B."""
+    posicion = inicio
+    for letra in RECORRIDO:
+        _responder(banco, letra, posicion)
+        posicion += 1
+    _responder(banco, MONTO_EXACTO, posicion)
+    return _responder(banco, PLAZO, posicion + 1)
+
+
+def test_la_entrevista_del_voluntario_avanza_sin_llamar_a_openclaw(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lista_temporal: Path
+) -> None:
+    """Al activarse, el canal llama a la herramienta y envía la primera pregunta."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    monkeypatch.setenv("SUCURSAL_DEMO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    banco = _banco(tmp_path, escena=escena)
+
+    _voluntario(banco, escena)
+
+    assert "¿Qué quieres hacer?" in banco.enviadas[-1].texto
+    primera = _responder(banco, "D", 1)
+    assert "¿Cómo generas tus ingresos?" in primera.texto
+    assert banco.llamadas == []
+
+
+def test_cada_letra_valida_produce_la_siguiente_pregunta(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lista_temporal: Path
+) -> None:
+    """El recorrido completo del voluntario avanza una pregunta por letra."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    monkeypatch.setenv("SUCURSAL_DEMO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    banco = _banco(tmp_path, escena=escena)
+    _voluntario(banco, escena)
+
+    esperadas = (
+        ("D", "¿Cómo generas tus ingresos?"),
+        ("A", "¿En qué rango están tus ingresos"),
+        ("D", "gastos fijos"),
+        ("B", "cuotas de créditos"),
+        ("A", "¿Cuánto dinero necesitas?"),
+        ("A", "monto exacto"),
+    )
+    for posicion, (letra, esperada) in enumerate(esperadas):
+        respuesta = _responder(banco, letra, posicion)
+        assert esperada in respuesta.texto
+
+    assert "¿En cuánto tiempo quieres pagarlo?" in _responder(banco, MONTO_EXACTO, 6).texto
+    resumen = _responder(banco, PLAZO, 7)
+
+    assert "Opción A:" in resumen.texto
+    assert "Opción B:" in resumen.texto
+    assert "Responde A o B." in resumen.texto
+    assert banco.llamadas == []
+
+
+def test_el_diagnostico_completo_publica_la_escena(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lista_temporal: Path
+) -> None:
+    """Al completar, la herramienta publica diagnóstico, Don Gota y la negociación."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    monkeypatch.setenv("SUCURSAL_DEMO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    banco = _banco(tmp_path, escena=escena)
+    _voluntario(banco, escena)
+
+    _hasta_las_opciones(banco)
+
+    registros = _registros(lista_temporal)
+    identificadores = [str(dict(registro["turno"])["id"]) for registro in registros]
+    personajes = _personajes(lista_temporal)
+    assert "pana.diagnostico.v1" in identificadores
+    assert personajes.count("don_gota") == 4
+    assert {"agente_joven", "agente_banco"} <= set(personajes)
+    assert banco.llamadas == []
+
+
+def test_a_envia_el_cierre_y_la_ficha_al_voluntario(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lista_temporal: Path
+) -> None:
+    """A cierra con el texto corto y la ficha como imagen, sin archivo intermedio."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    monkeypatch.setenv("SUCURSAL_DEMO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    banco = _banco(tmp_path, escena=escena)
+    _voluntario(banco, escena)
+    _hasta_las_opciones(banco)
+    antes = len(banco.enviadas)
+    publicados_antes = len(_personajes(lista_temporal))
+
+    respuesta = _responder(banco, "A", 20)
+
+    nuevos = banco.enviadas[antes:]
+    assert len(nuevos) == 2
+    assert "Elegiste la opción A" in nuevos[0].texto
+    assert nuevos[1].tipo == "imagen"
+    assert nuevos[1].imagen
+    assert respuesta.metadatos.get("ficha") == "1"
+    assert not ficha_entrega.RUTA_ENTREGA.exists()
+    assert "auditor" in _personajes(lista_temporal)[publicados_antes:]
+
+
+def test_un_texto_libre_va_a_openclaw_con_contexto_y_la_entrevista_sigue(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lista_temporal: Path
+) -> None:
+    """Una pregunta libre lleva el avance del voluntario y no rompe la entrevista."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    monkeypatch.setenv("SUCURSAL_DEMO", "1")
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    banco = _banco(tmp_path, escena=escena)
+    _voluntario(banco, escena)
+    _responder(banco, "D", 1)
+
+    libre = _responder(banco, "¿y si pido más plata?", 2)
+
+    assert libre.texto == "respuesta de Pana"
+    assert len(banco.llamadas) == 1
+    assert banco.llamadas[0].startswith("Contexto de la entrevista en vivo")
+    assert "objetivo.libre_inversion" in banco.llamadas[0]
+    assert banco.llamadas[0].endswith("¿y si pido más plata?")
+    siguiente = _responder(banco, "A", 3)
+    assert "¿En qué rango están tus ingresos" in siguiente.texto
+
+
+def test_otro_invitado_no_publica_ni_recibe_la_ficha_del_voluntario(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, lista_temporal: Path
+) -> None:
+    """La conversación del otro invitado no toca la pantalla ni la ficha del voluntario."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    monkeypatch.setenv("SUCURSAL_DEMO", "1")
+    segundo = calcular_usuario_id(OTRO_NUMERO, SAL)
+    espia, reloj = PublicadorEspia(), Reloj()
+    escena = _escena(espia, reloj)
+    banco = _banco(tmp_path, escena=escena, huellas_extra=(segundo,))
+    _voluntario(banco, escena)
+    _hasta_las_opciones(banco)
+
+    banco.despachador.maquina.aceptar(segundo, AHORA)
+    publicados_antes = _personajes(lista_temporal)
+    enviadas_antes = len(banco.enviadas)
+    for posicion, letra in enumerate(("D", "A")):
+        _responder(banco, letra, 40 + posicion, numero=OTRO_NUMERO)
+
+    assert _personajes(lista_temporal) == publicados_antes
+    assert all(envio.tipo != "imagen" for envio in banco.enviadas[enviadas_antes:])
+
+    _responder(banco, "A", 50)
+    imagenes = [destino for destino, envio in banco.destinos if envio.tipo == "imagen"]
+    assert imagenes == [NUMERO]

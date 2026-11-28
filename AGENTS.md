@@ -185,7 +185,7 @@ rol declarados, con consentimiento.
 | `.../canal/hitl.py` | `interrupt()`, botones Contactar/Descartar y caso de asesor |
 | `.../canal/envio.py` | Cliente de Meta: `timeout`, User-Agent y `From` |
 | `.../canal/openclaw.py` | Cliente del gateway OpenClaw: 90 s de techo, sin reintentos, UA, `From` y respaldo al grafo |
-| `.../canal/escena_vivo.py` | `ESCENA` activa al voluntario, TTL en memoria y publicación de invitado y Pana |
+| `.../canal/escena_vivo.py` | `ESCENA` activa al voluntario, TTL en memoria, publicación de invitado y Pana y la entrevista del diagnóstico que conduce el canal |
 | `.../escena/api_en_vivo.py` | `GET /api/escena/en-vivo`: solo lectura, 200 turnos y `no-store` |
 | `.../escena/recursos.py` | QR del repositorio y de WhatsApp (`PANA_WHATSAPP_NUMERO`) y los diagramas de `docs/` |
 | `.../canal/almacen.py` | Mensajes, consentimientos y casos en SQLite |
