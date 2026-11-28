@@ -261,7 +261,7 @@ def _turnos(registros: list[dict[str, object]]) -> list[dict[str, object]]:
 
 def test_calcular_prestamo_gota_publica_cuatro_turnos_de_don_gota(escena_viva: Path) -> None:
     """Don Gota deja sus cuatro turnos con origen de herramienta."""
-    salida = lectura.calcular_prestamo_gota(1_000_000)
+    salida = lectura.calcular_prestamo_gota(1_000_000, publicar=True)
     assert salida.ok
 
     registros = _publicados(escena_viva)
@@ -277,7 +277,7 @@ def test_calcular_prestamo_gota_publica_cuatro_turnos_de_don_gota(escena_viva: P
 
 def test_comparar_gota_banco_publica_tres_turnos_de_pana(escena_viva: Path) -> None:
     """La comparación deja golpe, tasa y ley como turnos de Pana."""
-    salida = lectura.comparar_gota_banco(1_000_000, RESPUESTAS)
+    salida = lectura.comparar_gota_banco(1_000_000, RESPUESTAS, publicar=True)
     assert salida.ok
 
     turnos = _turnos(_publicados(escena_viva))
@@ -293,7 +293,7 @@ def test_negociar_opcion_publica_solo_los_dos_agentes(
     """La negociación publica de uno a cuatro turnos de los dos agentes."""
     monkeypatch.setenv("SUCURSAL_DEMO", "1")
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
-    salida = lectura.negociar_opcion(RESPUESTAS)
+    salida = lectura.negociar_opcion(RESPUESTAS, publicar=True)
     assert salida.ok
 
     turnos = _turnos(_publicados(escena_viva))
@@ -303,7 +303,7 @@ def test_negociar_opcion_publica_solo_los_dos_agentes(
 
 def test_auditar_respuesta_publica_el_turno_del_auditor(escena_viva: Path) -> None:
     """Aun cuando objeta, el veredicto es parte de la escena."""
-    salida = lectura.auditar_respuesta("Tu crédito está aprobado y te lo garantizo.")
+    salida = lectura.auditar_respuesta("Tu crédito está aprobado y te lo garantizo.", publicar=True)
     assert salida.ok
     assert salida.datos["veredicto"] == "objeta"
 
@@ -316,7 +316,7 @@ def test_auditar_respuesta_publica_el_turno_del_auditor(escena_viva: Path) -> No
 
 def test_el_turno_publicado_del_auditor_trae_los_hallazgos(escena_viva: Path) -> None:
     """Con una promesa de aprobación el turno publicado no dice «conforme»."""
-    salida = lectura.auditar_respuesta("Tu crédito está aprobado y te lo garantizo.")
+    salida = lectura.auditar_respuesta("Tu crédito está aprobado y te lo garantizo.", publicar=True)
     assert salida.ok
     assert salida.datos["veredicto"] == "objeta"
 
@@ -328,7 +328,9 @@ def test_el_turno_publicado_del_auditor_trae_los_hallazgos(escena_viva: Path) ->
 
 def test_el_turno_publicado_del_auditor_limpio_sigue_conforme(escena_viva: Path) -> None:
     """Un texto limpio publica el veredicto conforme y sin hallazgos."""
-    salida = lectura.auditar_respuesta("Todo tiene su fuente y cada frase está sustentada.")
+    salida = lectura.auditar_respuesta(
+        "Todo tiene su fuente y cada frase está sustentada.", publicar=True
+    )
     assert salida.ok
     assert salida.datos["veredicto"] == "conforme"
 
@@ -340,8 +342,10 @@ def test_el_turno_publicado_del_auditor_limpio_sigue_conforme(escena_viva: Path)
 
 def test_el_cambio_de_veredicto_no_se_oculta_como_turno_repetido(escena_viva: Path) -> None:
     """Pasar de conforme a objeta publica un turno nuevo, no lo descarta."""
-    conforme = lectura.auditar_respuesta("Todo tiene su fuente y cada frase está sustentada.")
-    objeta = lectura.auditar_respuesta("Tu crédito está aprobado y te lo garantizo.")
+    conforme = lectura.auditar_respuesta(
+        "Todo tiene su fuente y cada frase está sustentada.", publicar=True
+    )
+    objeta = lectura.auditar_respuesta("Tu crédito está aprobado y te lo garantizo.", publicar=True)
     assert conforme.datos["veredicto"] == "conforme"
     assert objeta.datos["veredicto"] == "objeta"
 
@@ -355,7 +359,7 @@ def test_el_cambio_de_veredicto_no_se_oculta_como_turno_repetido(escena_viva: Pa
 
 def test_generar_ficha_opcion_publica_un_turno_de_pana(escena_viva: Path) -> None:
     """La ficha viaja como texto equivalente, nunca como PNG en la lista."""
-    salida = lectura.generar_ficha_opcion(RESPUESTAS)
+    salida = lectura.generar_ficha_opcion(RESPUESTAS, publicar=True)
     assert salida.ok
 
     turnos = _turnos(_publicados(escena_viva))
@@ -370,7 +374,9 @@ def test_generar_ficha_opcion_cierra_con_la_opcion_elegida_y_sus_cifras(
     escena_viva: Path,
 ) -> None:
     """El cierre corto no repite la otra opción y el auditor queda conforme."""
-    salida = lectura.generar_ficha_opcion(RESPUESTAS_VEHICULO, monto=30_000_000, opcion="A")
+    salida = lectura.generar_ficha_opcion(
+        RESPUESTAS_VEHICULO, monto=30_000_000, opcion="A", publicar=True
+    )
     assert salida.ok
     mensaje = salida.datos["mensaje_listo"]
     assert "Elegiste la opción A" in mensaje
@@ -389,7 +395,9 @@ def test_el_turno_de_la_ficha_trae_el_escenario_de_la_opcion_elegida(
     escena_viva: Path,
 ) -> None:
     """El panel de cifras recibe el plazo, la cuota y el total de la opción A."""
-    salida = lectura.generar_ficha_opcion(RESPUESTAS_VEHICULO, monto=30_000_000, opcion="A")
+    salida = lectura.generar_ficha_opcion(
+        RESPUESTAS_VEHICULO, monto=30_000_000, opcion="A", publicar=True
+    )
     assert salida.ok
 
     turnos = _turnos(_publicados(escena_viva))
@@ -474,17 +482,46 @@ def test_apagado_las_herramientas_no_publican(
     ruta = tmp_path / "escena" / "en_vivo.jsonl"
     monkeypatch.setattr(en_vivo, "RUTA_EN_VIVO", ruta)
 
-    assert lectura.calcular_prestamo_gota(1_000_000).ok
-    assert lectura.comparar_gota_banco(1_000_000, RESPUESTAS).ok
-    assert lectura.auditar_respuesta("Don Gota cobra 20 % mensual.").ok
-    assert lectura.generar_ficha_opcion(RESPUESTAS).ok
+    assert lectura.calcular_prestamo_gota(1_000_000, publicar=True).ok
+    assert lectura.comparar_gota_banco(1_000_000, RESPUESTAS, publicar=True).ok
+    assert lectura.auditar_respuesta("Don Gota cobra 20 % mensual.", publicar=True).ok
+    assert lectura.generar_ficha_opcion(RESPUESTAS, publicar=True).ok
 
     assert not ruta.parent.exists()
 
 
+def test_sin_publicar_las_herramientas_no_escriben_en_la_escena(escena_viva: Path) -> None:
+    """La llamada de Pana por el MCP no publica: solo lo hace el canal directo."""
+    assert escena_viva.parent.exists() is False
+
+    assert lectura.calcular_prestamo_gota(1_000_000).ok
+    assert lectura.diagnosticar_capacidad(RESPUESTAS, monto=7_500_000).ok
+    assert lectura.generar_ficha_opcion(RESPUESTAS).ok
+    assert lectura.auditar_respuesta("Todo tiene su fuente.").ok
+
+    assert _publicados(escena_viva) == []
+
+
+def test_generar_ficha_opcion_con_imagen_no_deja_la_ficha_pendiente(
+    escena_viva: Path,
+) -> None:
+    """Con `devolver_imagen` el canal recibe el PNG y no queda archivo intermedio."""
+    salida = lectura.generar_ficha_opcion(
+        RESPUESTAS_VEHICULO,
+        monto=30_000_000,
+        opcion="A",
+        publicar=True,
+        devolver_imagen=True,
+    )
+    assert salida.ok
+    assert salida.datos["png_base64"]
+    assert not ficha_entrega.RUTA_ENTREGA.exists()
+    assert len(_turnos(_publicados(escena_viva))) == 1
+
+
 def test_un_error_de_la_herramienta_no_publica(escena_viva: Path) -> None:
     """Si la herramienta devuelve error, la lista queda vacía."""
-    salida = lectura.comparar_gota_banco(1_000_000, ["respuesta.invalida"])
+    salida = lectura.comparar_gota_banco(1_000_000, ["respuesta.invalida"], publicar=True)
     assert not salida.ok
     assert _publicados(escena_viva) == []
 
@@ -499,7 +536,7 @@ def test_si_la_publicacion_falla_la_herramienta_responde_igual(
         raise OSError("disco lleno")
 
     monkeypatch.setattr(lectura, "publicar_turnos", fallar)
-    salida = lectura.calcular_prestamo_gota(1_000_000)
+    salida = lectura.calcular_prestamo_gota(1_000_000, publicar=True)
 
     assert salida.ok
     assert salida.datos["cuota_diaria_legible"] == "$40.000"
@@ -516,7 +553,7 @@ def test_diagnostico_completo_publica_la_escena_en_orden_y_devuelve_el_resumen(
     monkeypatch.setenv("SUCURSAL_DEMO", "1")
     monkeypatch.delenv("DEEPSEEK_API_KEY", raising=False)
 
-    salida = lectura.diagnosticar_capacidad(RESPUESTAS, monto=7_500_000)
+    salida = lectura.diagnosticar_capacidad(RESPUESTAS, monto=7_500_000, publicar=True)
     assert salida.ok
     assert "resultado" in salida.datos
 
@@ -549,13 +586,13 @@ def test_diagnostico_completo_publica_la_escena_en_orden_y_devuelve_el_resumen(
 
 def test_diagnostico_incompleto_no_publica_la_escena_continua(escena_viva: Path) -> None:
     """Sin monto exacto o con respuestas parciales no se publica nada de la escena."""
-    sin_monto = lectura.diagnosticar_capacidad(RESPUESTAS)
+    sin_monto = lectura.diagnosticar_capacidad(RESPUESTAS, publicar=True)
     assert sin_monto.ok
     assert sin_monto.datos["estado"] == "faltan_datos"
     assert "resumen_escena" not in sin_monto.datos
     assert _publicados(escena_viva) == []
 
-    parcial = lectura.diagnosticar_capacidad(["objetivo.libre_inversion"])
+    parcial = lectura.diagnosticar_capacidad(["objetivo.libre_inversion"], publicar=True)
     assert parcial.ok
     assert parcial.datos["estado"] == "faltan_datos"
     assert "resumen_escena" not in parcial.datos
@@ -576,7 +613,7 @@ def test_si_la_negociacion_falla_el_diagnostico_se_devuelve_igual(
 
     monkeypatch.setattr(lectura, "negociar_opcion", fallar)
     with caplog.at_level("WARNING"):
-        salida = lectura.diagnosticar_capacidad(RESPUESTAS, monto=7_500_000)
+        salida = lectura.diagnosticar_capacidad(RESPUESTAS, monto=7_500_000, publicar=True)
 
     assert salida.ok
     assert "resultado" in salida.datos

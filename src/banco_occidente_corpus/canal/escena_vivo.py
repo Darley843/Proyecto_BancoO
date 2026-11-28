@@ -24,6 +24,11 @@ Reglas que implementa este módulo:
   ``DELETE /api/escena/convocatoria`` libera la ranura para la tecla L.
 - El interruptor ``ESCENA_EN_VIVO=1`` se consulta en cada publicación: apagarlo
   detiene la escritura sin reiniciar la app.
+- El canal **conduce la entrevista del voluntario** llamando a las herramientas
+  del diagnóstico directo (`diagnosticar_capacidad`, `generar_ficha_opcion` y
+  `auditar_respuesta`) con `publicar=True`, sin pasar por OpenClaw: así la
+  pantalla avanza rápida y no se mezcla con lo que escriben los demás invitados.
+  El estado de la entrevista vive en memoria con el mismo TTL de la escena.
 - Los demás invitados no se publican nunca; su conversación privada sigue igual.
 - Un mensaje con datos personales no se publica: se publica la respuesta fija
   que el canal envía, porque esa no lleva el dato.
@@ -35,19 +40,22 @@ Las pruebas viven en ``test/test_canal_escena_vivo.py``.
 
 from __future__ import annotations
 
+import base64
 import importlib
 import logging
 import os
 import re
 import secrets
 import threading
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from typing import Protocol, cast
+from types import ModuleType
+from typing import Any, Protocol, cast
 
 from ..asistente.validacion import detectar_pii
 from ..escena.contratos import OrigenTurno, PersonajeEscena, TurnoEscena
+from ..escena.entrada import monto_de, normalizar
 from .contratos import MensajeEntrante, RespuestaCanal
 
 logger = logging.getLogger(__name__)
@@ -80,6 +88,26 @@ ID_INVITADO = "canal.invitado.v1"
 ID_PANA = "canal.pana.v1"
 ID_ACTIVACION = "canal.pana.escena.v1"
 ID_CONVOCATORIA = "canal.pana.convocatoria.v1"
+
+#: Estados de la entrevista que el canal conduce para el voluntario activo.
+ESTADO_ENTREVISTA = "entrevista"
+ESTADO_OPCIONES = "opciones"
+ESTADO_CERRADA = "cerrada"
+
+#: Frase fija si la herramienta del diagnóstico no devuelve una pregunta.
+TEXTO_SIN_DIAGNOSTICO = (
+    "No pude continuar el diagnóstico en este momento. Escríbeme tu pregunta y sigo contigo."
+)
+#: Cierre de respaldo si el auditor no deja enviar el texto de la ficha.
+CIERRE_SEGURO = "Ya te envié la ficha por WhatsApp. Es orientativo: la decisión es del banco."
+#: Frase fija si la ficha de la opción no se pudo generar.
+TEXTO_SIN_FICHA = (
+    "No pude generar la ficha en este momento. Escribe de nuevo A o B e intento otra vez."
+)
+#: Largo máximo de la línea de contexto que acompaña a una pregunta libre.
+LARGO_CONTEXTO = 600
+#: Letra de una pregunta o de las opciones A/B, sola o con «letra» u «opción».
+_RE_LETRA = re.compile(r"^(?:(?:letra|opcion)\s+)?([a-h])(?:[.)])?$")
 
 #: Comando ``ESCENA`` con un código de cuatro dígitos opcional; se aplica al
 #: texto normalizado (sin mayúsculas de diferencia y con un solo espacio).
@@ -216,6 +244,42 @@ class ResultadoConvocatoria:
     texto: str | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class FichaVoluntario:
+    """La ficha de la opción lista para enviar como imagen al voluntario.
+
+    Vive solo en memoria: el canal tiene el número del voluntario y no necesita
+    pasar por ``data/escena/ficha_entrega.json``. ``texto`` es el equivalente
+    legible de la tarjeta y ``imagen`` el PNG.
+    """
+
+    texto: str = field(repr=False)
+    imagen: bytes = field(repr=False)
+
+
+@dataclass(frozen=True, slots=True)
+class TurnoVoluntario:
+    """Lo que el canal debe enviar tras un turno de la entrevista del voluntario.
+
+    ``texto`` es la siguiente pregunta, el resumen con A y B o el cierre corto.
+    ``ficha`` solo viene en el cierre: se envía como mensaje aparte.
+    """
+
+    texto: str
+    ficha: FichaVoluntario | None = None
+
+
+@dataclass
+class _EntrevistaVoluntario:
+    """Avance de la entrevista del voluntario, en memoria y con el TTL de la escena."""
+
+    respuestas: list[str] = field(default_factory=list)
+    monto: int | None = None
+    pendiente: dict[str, Any] = field(default_factory=dict)
+    opciones: tuple[Mapping[str, Any], ...] = ()
+    estado: str = ESTADO_ENTREVISTA
+
+
 @dataclass
 class EscenaVivo:
     """Ranura del voluntario activo y publicación de sus turnos.
@@ -238,6 +302,7 @@ class EscenaVivo:
     _apertura: datetime | None = field(default=None, init=False, repr=False)
     _abierta: bool = field(default=False, init=False, repr=False)
     _avisados: set[str] = field(default_factory=set, init=False, repr=False)
+    _entrevista: _EntrevistaVoluntario | None = field(default=None, init=False, repr=False)
     _candado: threading.Lock = field(default_factory=threading.Lock, init=False, repr=False)
 
     def decidir(self, mensaje: MensajeEntrante, usuario_id: str) -> RespuestaCanal | None:
@@ -294,6 +359,7 @@ class EscenaVivo:
             if destino is not None:
                 self._destino = destino
             self._vence = self._instante() + timedelta(minutes=self.ttl_minutos)
+            self._entrevista = None
             return True
 
     def abrir_convocatoria(self) -> None:
@@ -326,6 +392,7 @@ class EscenaVivo:
             self._apertura = None
             self._abierta = False
             self._avisados.clear()
+            self._entrevista = None
 
     def convocatoria_abierta(self) -> bool:
         """Indica si la convocatoria todavía acepta voluntarios.
@@ -375,6 +442,7 @@ class EscenaVivo:
                     self._destino = destino
                 self._vence = self._instante() + timedelta(minutes=self.ttl_minutos)
                 self._abierta = False
+                self._entrevista = None
                 activado = True
             else:
                 if usuario_id in self._avisados:
@@ -437,6 +505,7 @@ class EscenaVivo:
             self._huella = None
             self._destino = None
             self._vence = None
+            self._entrevista = None
 
     def publicar_invitado(self, mensaje: MensajeEntrante, usuario_id: str) -> bool:
         """Publica el mensaje del voluntario como turno ``invitado``.
@@ -477,6 +546,209 @@ class EscenaVivo:
             return False
         return self._publicar_pana(ID_PANA, texto)
 
+    def iniciar_entrevista(self, usuario_id: str) -> str | None:
+        """Arranca la entrevista del voluntario y devuelve su primera pregunta.
+
+        Llama a ``diagnosticar_capacidad`` con la lista de respuestas vacía y
+        ``publicar=True``. Con respuestas vacías la herramienta solo devuelve el
+        paso ``faltan_datos``, así que la escena todavía no publica turnos: la
+        pantalla los recibe cuando el diagnóstico avanza.
+
+        Args:
+            usuario_id: huella HMAC del voluntario activo.
+
+        Returns:
+            El ``mensaje_listo`` con la primera pregunta y sus opciones, o
+            ``None`` si esa huella no es la voluntaria o la herramienta falló.
+        """
+        if not self.activo(usuario_id):
+            return None
+        estado = _EntrevistaVoluntario()
+        texto = self._pedir(estado)
+        with self._candado:
+            if self._huella != usuario_id:
+                return None
+            self._entrevista = estado
+        return texto
+
+    def atender_entrevista(
+        self, mensaje: MensajeEntrante, usuario_id: str
+    ) -> TurnoVoluntario | None:
+        """Avanza la entrevista con la letra, el monto o la opción del voluntario.
+
+        Solo la huella activa avanza. Una letra válida de la pregunta pendiente
+        (o el monto exacto, cuando esa es la pregunta) se guarda en memoria y
+        se pide el paso siguiente; con el diagnóstico completo se envían las
+        opciones A y B, y con A o B se genera la ficha. Cualquier otro texto no
+        es una opción: se devuelve ``None`` para que el canal lo pase a OpenClaw.
+
+        Args:
+            mensaje: mensaje entrante del voluntario.
+            usuario_id: huella HMAC del remitente.
+
+        Returns:
+            El texto que el canal debe enviar y, al cerrar, la ficha; o ``None``
+            si el turno no es una respuesta válida de la entrevista.
+        """
+        if not self.activo(usuario_id):
+            return None
+        estado = self._entrevista
+        if estado is None or estado.estado == ESTADO_CERRADA:
+            return None
+        if estado.estado == ESTADO_OPCIONES:
+            letra = _letra_de(mensaje.texto, estado.opciones)
+            if letra is None:
+                return None
+            return self._cerrar(estado, letra)
+        if estado.pendiente.get("bloque") == "monto_exacto":
+            if not self._anotar_monto(estado, mensaje.texto):
+                return None
+        else:
+            ident = _ident_de_la_opcion(mensaje.texto, estado.opciones)
+            if ident is None:
+                return None
+            clave = ident.split(".", 1)[0]
+            estado.respuestas = [
+                respuesta
+                for respuesta in estado.respuestas
+                if not respuesta.startswith(f"{clave}.")
+            ]
+            estado.respuestas.append(ident)
+            if clave == "monto":
+                # Si cambia el rango de monto, el monto exacto se vuelve a pedir.
+                estado.monto = None
+        texto = self._pedir(estado)
+        return TurnoVoluntario(texto) if texto else TurnoVoluntario(TEXTO_SIN_DIAGNOSTICO)
+
+    def contexto_entrevista(self, usuario_id: str) -> str | None:
+        """Resume en una línea lo que el voluntario ya respondió.
+
+        Se agrega delante de una pregunta libre que el canal manda a OpenClaw,
+        para que Pana sepa en qué punto va la entrevista y luego el canal pueda
+        retomarla. Solo incluye ids y etiquetas de la entrevista: ni el número
+        ni textos libres del voluntario.
+
+        Args:
+            usuario_id: huella HMAC del remitente.
+
+        Returns:
+            La línea de contexto, o ``None`` si no hay entrevista en curso.
+        """
+        if not self.activo(usuario_id):
+            return None
+        estado = self._entrevista
+        if estado is None or estado.estado == ESTADO_CERRADA or not estado.respuestas:
+            return None
+        etiquetas = _etiquetas()
+        partes = [
+            f"{etiquetas.get(respuesta, respuesta)} ({respuesta})"
+            for respuesta in estado.respuestas
+        ]
+        linea = (
+            "Contexto de la entrevista en vivo: el voluntario ya respondió "
+            + ", ".join(partes)
+            + ". Responde su pregunta sin repetir la entrevista: la entrevista sigue donde quedó."
+        )
+        return linea[:LARGO_CONTEXTO]
+
+    def _pedir(self, estado: _EntrevistaVoluntario) -> str | None:
+        """Pide a la herramienta el paso siguiente y guarda el avance.
+
+        Args:
+            estado: entrevista del voluntario que se está conduciendo.
+
+        Returns:
+            El ``mensaje_listo`` del paso, o ``None`` si la herramienta falló.
+        """
+        salida = _herramientas().diagnosticar_capacidad(
+            list(estado.respuestas),
+            monto=estado.monto,
+            publicar=True,
+        )
+        if not salida.ok:
+            logger.warning("la entrevista del voluntario no pudo continuar")
+            return None
+        datos = salida.datos
+        if datos.get("estado") == "faltan_datos":
+            estado.pendiente = dict(datos)
+            estado.opciones = _opciones(datos.get("opciones"))
+            estado.estado = ESTADO_ENTREVISTA
+            mensaje = datos.get("mensaje_listo") or datos.get("pregunta")
+            return str(mensaje).strip() if mensaje else None
+        resumen = datos.get("resumen_escena")
+        if isinstance(resumen, Mapping):
+            estado.opciones = _opciones(resumen.get("opciones"))
+            mensaje = datos.get("mensaje_listo") or resumen.get("mensaje_listo")
+        else:
+            estado.opciones = ()
+            mensaje = datos.get("mensaje_listo")
+        estado.pendiente = {}
+        estado.estado = ESTADO_OPCIONES if estado.opciones else ESTADO_CERRADA
+        return str(mensaje).strip() if mensaje else None
+
+    def _cerrar(self, estado: _EntrevistaVoluntario, letra: str) -> TurnoVoluntario:
+        """Genera la ficha de A o B y el cierre corto del voluntario.
+
+        La herramienta publica el turno de la ficha en la pantalla y devuelve el
+        PNG en memoria, sin dejar ``data/escena/ficha_entrega.json``: el canal
+        ya tiene el número del voluntario. El cierre se audita con las cifras de
+        la ficha antes de enviarlo.
+
+        Args:
+            estado: entrevista del voluntario con el diagnóstico completo.
+            letra: opción elegida, ``A`` o ``B``.
+
+        Returns:
+            El cierre corto y, si se pudo, la ficha para el envío aparte.
+        """
+        modulo = _herramientas()
+        salida = modulo.generar_ficha_opcion(
+            list(estado.respuestas),
+            monto=estado.monto,
+            opcion=letra,
+            publicar=True,
+            devolver_imagen=True,
+        )
+        if not salida.ok:
+            logger.warning("no se pudo generar la ficha del voluntario")
+            return TurnoVoluntario(TEXTO_SIN_FICHA)
+        datos = salida.datos
+        cierre = str(datos.get("mensaje_listo") or "").strip() or CIERRE_SEGURO
+        cifras = [str(valor) for valor in datos.get("cifras_permitidas") or ()]
+        revision = modulo.auditar_respuesta(cierre, cifras_permitidas=cifras, publicar=True)
+        if revision.ok and revision.datos.get("permite_enviar") is False:
+            cierre = CIERRE_SEGURO
+        estado.estado = ESTADO_CERRADA
+        estado.pendiente = {}
+        imagen = _imagen(datos.get("png_base64"))
+        texto_ficha = str(datos.get("texto") or "").strip()
+        if imagen is None or not texto_ficha:
+            return TurnoVoluntario(cierre)
+        return TurnoVoluntario(cierre, FichaVoluntario(texto_ficha, imagen))
+
+    def _anotar_monto(self, estado: _EntrevistaVoluntario, texto: str) -> bool:
+        """Guarda el monto exacto si cae dentro de los límites del rango pendiente.
+
+        Args:
+            estado: entrevista del voluntario con la pregunta del monto pendiente.
+            texto: lo que escribió el voluntario.
+
+        Returns:
+            ``True`` si el monto se reconoció y cabe en el rango; ``False`` si
+            el turno debe seguir a OpenClaw como pregunta libre.
+        """
+        valor = monto_de(texto)
+        limites = estado.pendiente.get("limites")
+        if valor is None or not isinstance(limites, Mapping):
+            return False
+        desde = int(limites.get("desde", 0))
+        hasta = int(limites.get("hasta", 0))
+        entero = int(valor)
+        if not desde <= entero <= hasta:
+            return False
+        estado.monto = entero
+        return True
+
     def _publicar_pana(self, identificador: str, texto: str) -> bool:
         """Publica un turno de Pana con el saneado y el filtro de PII."""
         limpio = sin_nombres(texto.strip())[:LARGO_MAXIMO]
@@ -511,6 +783,7 @@ class EscenaVivo:
             self._huella = None
             self._destino = None
             self._vence = None
+            self._entrevista = None
             return False
         return True
 
@@ -520,6 +793,98 @@ class EscenaVivo:
         if valor.tzinfo is None:
             return valor.replace(tzinfo=UTC)
         return valor.astimezone(UTC)
+
+
+def _herramientas() -> ModuleType:
+    """Importa las herramientas del diagnóstico solo cuando se necesitan.
+
+    Returns:
+        El módulo ``herramientas.lectura`` ya importado.
+    """
+    return importlib.import_module("..herramientas.lectura", package=__package__)
+
+
+def _etiquetas() -> dict[str, str]:
+    """Devuelve la etiqueta legible de cada id canónico de la entrevista.
+
+    Returns:
+        El mapa ``id → etiqueta`` de ``herramientas.esquemas``.
+    """
+    modulo = importlib.import_module("..herramientas.esquemas", package=__package__)
+    return cast("dict[str, str]", modulo.ETIQUETAS_ENTREVISTA)
+
+
+def _opciones(valor: object) -> tuple[Mapping[str, Any], ...]:
+    """Normaliza la lista de opciones que devuelve la herramienta.
+
+    Args:
+        valor: lista de opciones de un paso ``faltan_datos`` o del resumen.
+
+    Returns:
+        Las opciones que son diccionarios, en su orden; vacío si no hay.
+    """
+    if not isinstance(valor, (list, tuple)):
+        return ()
+    return tuple(opcion for opcion in valor if isinstance(opcion, Mapping))
+
+
+def _letra_de(texto: str, opciones: Sequence[Mapping[str, Any]]) -> str | None:
+    """Reconoce la letra de una opción válida de la pregunta pendiente.
+
+    Acepta ``"A"``, ``"b."``, ``"letra C"`` y ``"opción G"``, sin inventar
+    letras que la pregunta no tenga.
+
+    Args:
+        texto: lo que escribió el voluntario.
+        opciones: opciones de la pregunta pendiente.
+
+    Returns:
+        La letra en mayúscula, o ``None`` si no es una opción de esa pregunta.
+    """
+    coincidencia = _RE_LETRA.match(normalizar(texto))
+    if coincidencia is None:
+        return None
+    letra = coincidencia.group(1).upper()
+    validas = {str(opcion.get("letra")) for opcion in opciones}
+    return letra if letra in validas else None
+
+
+def _ident_de_la_opcion(texto: str, opciones: Sequence[Mapping[str, Any]]) -> str | None:
+    """Devuelve el id canónico de la opción que eligió el voluntario.
+
+    Args:
+        texto: lo que escribió el voluntario.
+        opciones: opciones de la pregunta pendiente.
+
+    Returns:
+        El id ``bloque.valor`` de la opción, o ``None`` si no es válida.
+    """
+    letra = _letra_de(texto, opciones)
+    if letra is None:
+        return None
+    for opcion in opciones:
+        if str(opcion.get("letra")) == letra:
+            ident = str(opcion.get("id") or "").strip()
+            return ident or None
+    return None
+
+
+def _imagen(png_base64: object) -> bytes | None:
+    """Decodifica el PNG que la ficha devolvió en base64.
+
+    Args:
+        png_base64: contenido del campo ``png_base64`` de la herramienta.
+
+    Returns:
+        Los bytes del PNG, o ``None`` si no vino o no se pudo decodificar.
+    """
+    if not isinstance(png_base64, str) or not png_base64:
+        return None
+    try:
+        return base64.b64decode(png_base64, validate=True)
+    except (ValueError, TypeError):
+        logger.warning("la ficha del voluntario no trajo un PNG válido")
+        return None
 
 
 def _respuesta(mensaje: MensajeEntrante, usuario_id: str, texto: str) -> RespuestaCanal:

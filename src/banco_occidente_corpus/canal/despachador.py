@@ -8,7 +8,12 @@ Es la pieza que convierte un mensaje de WhatsApp en una respuesta:
 4. Escena en vivo: ``ESCENA`` con el código de cuatro dígitos de la sesión
    activa al voluntario de la demo; desde ahí sus mensajes y las respuestas de
    Pana se publican en la lista que lee la pantalla. El comando no se reenvía
-   al motor ni se publica como mensaje.
+   al motor ni se publica como mensaje. Con el voluntario activo, el canal
+   conduce la entrevista del diagnóstico llamando a las herramientas directo
+   (``publicar=True``), sin pasar por OpenClaw: cada letra válida produce la
+   siguiente pregunta, el diagnóstico completo publica la escena y A o B
+   envía el cierre y la ficha. Una pregunta libre sí va a OpenClaw, con una
+   línea de contexto, y la entrevista sigue donde quedó.
 5. Si la entrevista del diagnóstico está activa, el botón o la fila avanza la
    entrevista; un texto libre repite la pregunta. Al completar, calcula el
    diagnóstico y envía la tarjeta.
@@ -56,7 +61,13 @@ from .consentimiento import ESTADO_ACEPTADO, MaquinaConsentimiento
 from .contratos import MensajeEntrante, RespuestaCanal
 from .entrevista import EntrevistaCanal
 from .envio import Enviador, ErrorEnvio
-from .escena_vivo import TEXTO_VOLUNTARIO, EscenaVivo, activa_entorno, es_comando
+from .escena_vivo import (
+    TEXTO_VOLUNTARIO,
+    EscenaVivo,
+    FichaVoluntario,
+    activa_entorno,
+    es_comando,
+)
 from .identidad import calcular_usuario_id
 
 logger = logging.getLogger(__name__)
@@ -244,7 +255,11 @@ class Despachador:
                 # acaba de aceptar) queda como voluntaria sin código.
                 convocatoria = self.escena.convocar(usuario_id, destino=mensaje.remitente)
                 if convocatoria is not None and convocatoria.voluntario:
-                    respuesta_voluntario = self._enviar_texto(
+                    if self.entrevista is not None:
+                        # La entrevista privada del invitado se deja: desde
+                        # aquí la conduce la escena, no el motor.
+                        self.entrevista.descartar(usuario_id)
+                    respuesta_voluntario = self._arrancar_voluntario(
                         mensaje, usuario_id, convocatoria.texto or TEXTO_VOLUNTARIO
                     )
                     actualizar_mensaje(
@@ -257,6 +272,7 @@ class Despachador:
                     return respuesta_voluntario
                 if convocatoria is not None:
                     aviso_convocatoria = convocatoria.texto
+            pregunta_inicial: str | None = None
             if respuesta is None and self.escena is not None:
                 intento_escena = es_comando(mensaje.texto)
                 respuesta = self.escena.decidir(mensaje, usuario_id)
@@ -266,35 +282,57 @@ class Despachador:
                         # ESCENA cancela la entrevista a medias: el siguiente
                         # mensaje ya es de la escena y no una respuesta suelta.
                         self.entrevista.descartar(usuario_id)
+                    if self.escena.activo(usuario_id):
+                        # La primera pregunta sale junto con la confirmación y
+                        # se publica para que la pantalla abra la conversación.
+                        pregunta_inicial = self.escena.iniciar_entrevista(usuario_id)
+                        if pregunta_inicial is not None:
+                            respuesta = respuesta.model_copy(
+                                update={
+                                    "texto": f"{respuesta.texto}\n\n{pregunta_inicial}"[:4096],
+                                }
+                            )
                 elif not intento_escena:
                     # El mensaje del voluntario se publica antes del motor: la
                     # pantalla lo muestra primero y después los turnos de las
                     # herramientas. Los demás invitados no publican. Un
                     # ``ESCENA`` sin el código de la sesión tampoco publica.
                     self.escena.publicar_invitado(mensaje, usuario_id)
-            if respuesta is None and self.entrevista is not None:
+            ficha_voluntario: FichaVoluntario | None = None
+            if respuesta is None and self.escena is not None:
+                avance = self.escena.atender_entrevista(mensaje, usuario_id)
+                if avance is not None:
+                    ficha_voluntario = avance.ficha
+                    respuesta = RespuestaCanal(
+                        usuario_id=usuario_id,
+                        id_mensaje_origen=mensaje.id_mensaje,
+                        texto=avance.texto[:4096],
+                    )
+            es_voluntario = self.escena is not None and self.escena.activo(usuario_id)
+            if respuesta is None and not es_voluntario and self.entrevista is not None:
                 respuesta = self.entrevista.reanudar(mensaje, usuario_id)
-            if respuesta is None:
+            if respuesta is None and not es_voluntario:
                 respuesta = self._turno_entrevista(mensaje, usuario_id)
-            if respuesta is None and self.entrevista is not None:
+            if respuesta is None and not es_voluntario and self.entrevista is not None:
                 respuesta = self.entrevista.escenario(mensaje, usuario_id)
             motor_usado: str | None = None
             inicio_motor = datetime.now(UTC)
             if respuesta is None:
-                texto_motor = self._texto_del_motor(mensaje.texto, usuario_id)
+                texto = self._con_contexto(mensaje.texto, usuario_id)
+                texto_motor = self._texto_del_motor(texto, usuario_id)
                 if texto_motor is not None:
                     resultado = RespuestaGrafo(texto=texto_motor)
                     motor_usado = MOTOR_OPENCLAW
                 else:
                     resultado = _respuesta_del_grafo(
                         self.responder(
-                            mensaje.texto,
+                            texto,
                             f"wa:{usuario_id}",
                             huella_perfil(usuario_id),
                         )
                     )
                     motor_usado = MOTOR_GRAFO
-                if resultado.es_diagnostico and self.entrevista is not None:
+                if resultado.es_diagnostico and not es_voluntario and self.entrevista is not None:
                     respuesta = self.entrevista.iniciar(usuario_id, mensaje.id_mensaje)
                 else:
                     respuesta = RespuestaCanal(
@@ -318,6 +356,12 @@ class Despachador:
                 # ESCENA ya se publicó con su propio identificador, y un
                 # comando con código equivocado no publica nada.
                 self.escena.publicar_pana(usuario_id, respuesta.texto)
+            if pregunta_inicial is not None and self.escena is not None:
+                self.escena.publicar_pana(usuario_id, pregunta_inicial)
+            if ficha_voluntario is not None:
+                respuesta = self._enviar_ficha_voluntario(
+                    mensaje, usuario_id, ficha_voluntario, respuesta
+                )
             respuesta = self._enviar_ficha_pendiente(
                 mensaje, usuario_id, respuesta, motor_usado, inicio_motor
             )
@@ -382,6 +426,88 @@ class Despachador:
                     texto=texto[:4096],
                     tipo="imagen",
                     imagen=imagen,
+                )
+            )
+        except ErrorEnvio:
+            logger.warning("no se pudo enviar la ficha del voluntario")
+            return respuesta
+        return respuesta.model_copy(update={"metadatos": {**respuesta.metadatos, "ficha": "1"}})
+
+    def _arrancar_voluntario(
+        self, mensaje: MensajeEntrante, usuario_id: str, bienvenida: str
+    ) -> RespuestaCanal:
+        """Envía la bienvenida del voluntario con la primera pregunta.
+
+        El canal conduce la entrevista directo: la herramienta devuelve el
+        ``mensaje_listo`` de la primera pregunta y su publicación queda para la
+        pantalla, después de la confirmación de la convocatoria o del comando.
+
+        Args:
+            mensaje: mensaje que activó al voluntario.
+            usuario_id: huella HMAC del voluntario.
+            bienvenida: frase fija de activación que ya se publicó en la escena.
+
+        Returns:
+            La respuesta enviada, con la primera pregunta si se pudo armar.
+        """
+        pregunta = self.escena.iniciar_entrevista(usuario_id) if self.escena is not None else None
+        texto = f"{bienvenida}\n\n{pregunta}" if pregunta else bienvenida
+        respuesta = self._enviar_texto(mensaje, usuario_id, texto[:4096])
+        if pregunta and self.escena is not None:
+            self.escena.publicar_pana(usuario_id, pregunta)
+        return respuesta
+
+    def _con_contexto(self, texto: str, usuario_id: str) -> str:
+        """Agrega la línea de contexto de la entrevista del voluntario.
+
+        Solo aplica a la huella del voluntario activo con una entrevista en
+        curso: una pregunta libre va a OpenClaw con sus respuestas hasta ese
+        momento, y la entrevista sigue después.
+
+        Args:
+            texto: mensaje original del voluntario.
+            usuario_id: huella HMAC del remitente.
+
+        Returns:
+            El mensaje con la línea de contexto delante, o el mismo texto.
+        """
+        if self.escena is None:
+            return texto
+        contexto = self.escena.contexto_entrevista(usuario_id)
+        if not contexto:
+            return texto
+        return f"{contexto}\n\n{texto}"
+
+    def _enviar_ficha_voluntario(
+        self,
+        mensaje: MensajeEntrante,
+        usuario_id: str,
+        ficha: FichaVoluntario,
+        respuesta: RespuestaCanal,
+    ) -> RespuestaCanal:
+        """Envía la ficha de la opción como mensaje aparte al voluntario.
+
+        La ficha llega en memoria desde la herramienta, sin pasar por
+        ``data/escena/ficha_entrega.json``. Si el envío falla, el cierre corto
+        ya salió y el turno no se rompe.
+
+        Args:
+            mensaje: mensaje que originó el turno.
+            usuario_id: huella HMAC del voluntario.
+            ficha: texto y PNG de la ficha.
+            respuesta: cierre corto que ya se envió.
+
+        Returns:
+            La respuesta con ``metadatos["ficha"]="1"`` si la ficha salió.
+        """
+        try:
+            self.crear_enviador(usuario_id, mensaje.remitente).enviar(
+                RespuestaCanal(
+                    usuario_id=usuario_id,
+                    id_mensaje_origen=mensaje.id_mensaje,
+                    texto=ficha.texto[:4096],
+                    tipo="imagen",
+                    imagen=ficha.imagen,
                 )
             )
         except ErrorEnvio:
