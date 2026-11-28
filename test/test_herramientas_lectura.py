@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 from decimal import Decimal
 from pathlib import Path
@@ -10,6 +11,7 @@ import pytest
 
 from banco_occidente_corpus.escena import en_vivo, ficha_entrega
 from banco_occidente_corpus.herramientas import lectura
+from banco_occidente_corpus.herramientas.servidor import crear_servidor
 
 RESPUESTAS = [
     "objetivo.libre_inversion",
@@ -239,8 +241,13 @@ def test_auditar_respuesta_acepta_las_cifras_legibles_de_la_herramienta() -> Non
 
 @pytest.fixture
 def escena_viva(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
-    """Enciende el interruptor y manda la lista a una carpeta temporal."""
+    """Enciende el interruptor y manda la lista a una carpeta temporal.
+
+    El puente ``ESCENA_PUBLICAR_MCP`` queda apagado: cada prueba que lo
+    necesita lo enciende con ``monkeypatch``.
+    """
     monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    monkeypatch.delenv("ESCENA_PUBLICAR_MCP", raising=False)
     ruta = tmp_path / "escena" / "en_vivo.jsonl"
     monkeypatch.setattr(en_vivo, "RUTA_EN_VIVO", ruta)
     monkeypatch.setattr(ficha_entrega, "RUTA_ENTREGA", tmp_path / "escena" / "ficha_entrega.json")
@@ -540,6 +547,92 @@ def test_si_la_publicacion_falla_la_herramienta_responde_igual(
 
     assert salida.ok
     assert salida.datos["cuota_diaria_legible"] == "$40.000"
+
+
+# --- El puente ESCENA_PUBLICAR_MCP y la llamada del canal ----------------------
+
+
+def test_con_publicar_mcp_una_llamada_del_mcp_publica_en_orden(
+    escena_viva: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Con `ESCENA_PUBLICAR_MCP=1`, el MCP publica como antes del #253."""
+    monkeypatch.setenv("ESCENA_PUBLICAR_MCP", "1")
+    salida = lectura.calcular_prestamo_gota(1_000_000)
+    assert salida.ok
+
+    turnos = _turnos(_publicados(escena_viva))
+    assert [turno["orden"] for turno in turnos] == [1, 2, 3, 4]
+    assert [turno["personaje"] for turno in turnos] == ["don_gota"] * 4
+
+
+def test_sin_publicar_mcp_una_llamada_del_mcp_no_publica(
+    escena_viva: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sin la variable, una llamada sin `publicar=True` no toca la lista."""
+    monkeypatch.delenv("ESCENA_PUBLICAR_MCP", raising=False)
+
+    assert lectura.calcular_prestamo_gota(1_000_000).ok
+    assert lectura.auditar_respuesta("Don Gota cobra 20 % mensual.").ok
+
+    assert _publicados(escena_viva) == []
+    assert not escena_viva.parent.exists()
+
+
+@pytest.mark.parametrize("variable_mcp", [None, "1"])
+def test_publicar_true_publica_una_sola_vez(
+    escena_viva: Path,
+    monkeypatch: pytest.MonkeyPatch,
+    variable_mcp: str | None,
+) -> None:
+    """La llamada del canal publica un solo lote, con o sin la variable."""
+    if variable_mcp is None:
+        monkeypatch.delenv("ESCENA_PUBLICAR_MCP", raising=False)
+    else:
+        monkeypatch.setenv("ESCENA_PUBLICAR_MCP", variable_mcp)
+
+    assert lectura.calcular_prestamo_gota(1_000_000, publicar=True).ok
+
+    turnos = _turnos(_publicados(escena_viva))
+    assert [turno["orden"] for turno in turnos] == [1, 2, 3, 4]
+
+
+def test_publicar_true_no_duplica_la_ficha_con_la_variable(
+    escena_viva: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """La misma ficha no se publica dos veces aunque la variable esté activa."""
+    monkeypatch.setenv("ESCENA_PUBLICAR_MCP", "1")
+
+    assert lectura.generar_ficha_opcion(RESPUESTAS, publicar=True).ok
+    assert lectura.generar_ficha_opcion(RESPUESTAS, publicar=True).ok
+
+    turnos = _turnos(_publicados(escena_viva))
+    assert len(turnos) == 1
+    assert turnos[0]["id"] == "vivo.ficha.v1"
+
+
+def test_el_mcp_no_expone_el_interruptor_del_canal() -> None:
+    """`publicar` no viaja en el esquema que ve Pana: solo lo usa el canal."""
+
+    async def caso() -> None:
+        servidor = crear_servidor()
+        herramientas = {
+            herramienta.name: herramienta for herramienta in await servidor.list_tools()
+        }
+        for nombre in (
+            "diagnosticar_capacidad",
+            "calcular_prestamo_gota",
+            "comparar_gota_banco",
+            "negociar_opcion",
+            "auditar_respuesta",
+            "generar_ficha_opcion",
+        ):
+            propiedades = herramientas[nombre].input_schema["properties"]
+            assert "publicar" not in propiedades
+
+    asyncio.run(caso())
 
 
 # --- El diagnóstico completo sigue solo con la escena ---------------------------

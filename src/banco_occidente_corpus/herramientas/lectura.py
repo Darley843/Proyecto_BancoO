@@ -107,11 +107,33 @@ ORDEN_TURNO_DIAGNOSTICO: int = 0
 AVISO_GOTA: str = "no se pudo calcular la oferta de Don Gota"
 AVISO_COMPARACION: str = "no se pudo comparar con el banco"
 AVISO_NEGOCIACION: str = "no se pudo negociar la opción"
+#: Variable temporal que reactiva la publicación desde el MCP; solo el valor `1`.
+VARIABLE_PUBLICAR_MCP: str = "ESCENA_PUBLICAR_MCP"
 
 logger = logging.getLogger(__name__)
 
 #: Última ficha publicada por este proceso; evita repetir el mismo turno.
 _ULTIMA_FICHA_PUBLICADA: str | None = None
+
+
+def _publicacion_permitida(publicar: bool) -> bool:
+    """Indica si esta llamada puede dejar turnos en la escena en vivo.
+
+    El canal que conduce la entrevista pasa ``publicar=True``; las llamadas del
+    MCP no lo pasan y quedan sujetas a ``ESCENA_PUBLICAR_MCP``. En los dos
+    casos ``ESCENA_EN_VIVO=1`` sigue siendo obligatorio. La variable se lee en
+    cada publicación, no al arrancar el proceso, para poder apagarla sin
+    reiniciar el MCP.
+
+    Args:
+        publicar: ``True`` solo cuando el canal pide publicar este turno.
+
+    Returns:
+        ``True`` si la llamada publica; ``False`` si se queda en silencio.
+    """
+    if os.environ.get("ESCENA_EN_VIVO", "").strip() != "1":
+        return False
+    return publicar or os.environ.get(VARIABLE_PUBLICAR_MCP, "").strip() == "1"
 
 
 def _publicar_escena(
@@ -127,28 +149,30 @@ def _publicar_escena(
 
     Args:
         construir: fábrica que arma los turnos ya calculados.
-        publicar: ``True`` solo cuando el canal conduce la escena y llama a la
-            herramienta directo. Pana, por el MCP, nunca publica.
+        publicar: ``True`` cuando el canal conduce la escena y llama a la
+            herramienta directo. Sin él, la publicación desde el MCP la decide
+            ``ESCENA_PUBLICAR_MCP`` (§8.3).
     """
-    if not publicar:
+    if not _publicacion_permitida(publicar):
         return
     with suppress(Exception):
         publicar_turnos(construir(), origen="herramienta")
 
 
-def _publicar_ficha(turno: TurnoEscena, *, publicar: bool) -> None:
+def _publicar_ficha(turno: TurnoEscena, *, publicar: bool = False) -> None:
     """Publica la ficha una sola vez, aunque la herramienta se repita.
 
     Args:
         turno: turno `vivo.ficha.v1` ya armado.
-        publicar: ``True`` solo en la llamada directa del canal.
+        publicar: ``True`` cuando el canal pide publicar sin depender del
+            interruptor temporal del MCP.
     """
     global _ULTIMA_FICHA_PUBLICADA
-    if not publicar or os.environ.get("ESCENA_EN_VIVO", "").strip() != "1":
+    if not _publicacion_permitida(publicar):
         return
     if turno.texto == _ULTIMA_FICHA_PUBLICADA:
         return
-    _publicar_escena(lambda: (turno,), publicar=True)
+    _publicar_escena(lambda: (turno,), publicar=publicar)
     _ULTIMA_FICHA_PUBLICADA = turno.texto
 
 
@@ -822,7 +846,7 @@ def _continuar_escena(
     resultado: ResultadoDiagnostico,
     respuestas: list[str],
     *,
-    publicar: bool,
+    publicar: bool = False,
 ) -> dict[str, Any]:
     """Prolonga la escena con Don Gota, la comparación y la negociación.
 
@@ -834,7 +858,7 @@ def _continuar_escena(
     Args:
         resultado: diagnóstico completo del motor.
         respuestas: ids canónicos de la entrevista.
-        publicar: ``True`` solo en la llamada directa del canal.
+        publicar: ``True`` cuando el canal pide publicar la escena completa.
 
     Returns:
         El resumen corto para Pana: oferta de Don Gota, comparación con el banco
@@ -971,9 +995,9 @@ def diagnosticar_capacidad(
     Cuando el diagnóstico queda completo —producto, monto y plazo—, la misma
     llamada calcula la oferta de Don Gota, la comparación con el banco y la
     negociación con las funciones del recorrido, publica sus turnos en la
-    escena en vivo (si está encendida y `publicar`) y devuelve además el
-    `resumen_escena` con las opciones A y B y las `cifras_permitidas` para
-    `auditar_respuesta`.
+    escena en vivo (si está encendida y el canal pasó ``publicar=True`` o quedó
+    activo `ESCENA_PUBLICAR_MCP`) y devuelve además el `resumen_escena`
+    con las opciones A y B y las `cifras_permitidas` para `auditar_respuesta`.
 
     Args:
         respuestas: ids canónicos de la entrevista en la forma bloque.valor:
@@ -982,8 +1006,9 @@ def diagnosticar_capacidad(
             cuota_trasladar.* (solo en compra de cartera). Puede venir vacía o
             incompleta: la herramienta indica qué preguntar.
         monto: monto exacto que dijo el invitado, en pesos.
-        publicar: ``True`` solo cuando el canal conduce la entrevista directo.
-            Pana, por el MCP, no publica nada en la pantalla.
+        publicar: ``True`` solo si lo pide el canal que conduce la entrevista;
+            por defecto la publicación desde el MCP la decide
+            `ESCENA_PUBLICAR_MCP`.
 
     Returns:
         El paso `faltan_datos` con la pregunta y sus opciones, o el resultado
@@ -1117,7 +1142,9 @@ def calcular_prestamo_gota(monto: int, *, publicar: bool = False) -> SalidaHerra
 
     Args:
         monto: capital en pesos.
-        publicar: ``True`` solo en la llamada directa del canal; Pana no publica.
+        publicar: ``True`` solo si lo pide el canal que conduce la entrevista;
+            por defecto la publicación desde el MCP la decide
+            `ESCENA_PUBLICAR_MCP`.
 
     Returns:
         Interés, cuota diaria, totales y tasa E.A. equivalente, con su fuente,
@@ -1240,7 +1267,9 @@ def comparar_gota_banco(
             monto y plazo, como en ``diagnosticar_capacidad``. El producto de
             estas respuestas no cambia el lado del banco: siempre es libre
             inversión a la tasa máxima.
-        publicar: ``True`` solo en la llamada directa del canal; Pana no publica.
+        publicar: ``True`` solo si lo pide el canal que conduce la entrevista;
+            por defecto la publicación desde el MCP la decide
+            `ESCENA_PUBLICAR_MCP`.
 
     Returns:
         La comparación con los totales, la usura y los supuestos, con sus cifras
@@ -1339,7 +1368,8 @@ def comparar_gota_banco(
         )
     anotar(detalle, cifras)
     _publicar_escena(
-        lambda: turnos_pana_comparacion(comparacion, orden_inicial=8), publicar=publicar
+        lambda: turnos_pana_comparacion(comparacion, orden_inicial=8),
+        publicar=publicar,
     )
     return ok(
         "comparar_gota_banco",
@@ -1372,7 +1402,9 @@ def negociar_opcion(
             cálculo del rango solo si cae dentro de sus límites y, si no, la
             herramienta devuelve `entrada_invalida` con los límites. Sin este
             campo se usa el valor del rango.
-        publicar: ``True`` solo en la llamada directa del canal; Pana no publica.
+        publicar: ``True`` solo si lo pide el canal que conduce la entrevista;
+            por defecto la publicación desde el MCP la decide
+            `ESCENA_PUBLICAR_MCP`.
 
     Returns:
         Los turnos, el acuerdo o `None`, el veredicto y el registro de validaciones.
@@ -1446,7 +1478,9 @@ def generar_ficha_opcion(
             campo se usa el valor del rango.
         opcion: letra de la opción que eligió el invitado (`A` o `B`); sin ella
             se usa el plazo de la entrevista.
-        publicar: ``True`` solo cuando el canal conduce la escena directo.
+        publicar: ``True`` solo si lo pide el canal que conduce la entrevista;
+            por defecto la publicación desde el MCP la decide
+            `ESCENA_PUBLICAR_MCP`.
         devolver_imagen: ``True`` cuando el canal, que ya tiene el número del
             voluntario, envía la ficha en el mismo turno: devuelve el PNG en
             `png_base64` y no deja `data/escena/ficha_entrega.json`.
@@ -1726,8 +1760,9 @@ def auditar_respuesta(
             el `cifras_permitidas` que devuelve la herramienta. Acepta el texto
             legible («791,61 % E.A.») y también los dígitos de máquina.
         personaje: quién envía el texto.
-        publicar: ``True`` solo cuando el canal conduce la escena directo; el
-            turno del auditor no se publica desde el MCP.
+        publicar: ``True`` solo si lo pide el canal que conduce la entrevista;
+            por defecto la publicación desde el MCP la decide
+            `ESCENA_PUBLICAR_MCP`.
 
     Returns:
         `conforme`, el veredicto, si se puede enviar y los hallazgos en español.

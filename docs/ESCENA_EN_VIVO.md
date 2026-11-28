@@ -338,12 +338,12 @@ leer_turnos(
 ## 8. Herramientas (Nayla)
 
 Las cinco herramientas publican **después** de calcular, **solo** si su
-resultado es correcto y **solo** cuando el canal las llama directo con
-`publicar=True`. Una llamada de Pana por el MCP usa el valor por defecto
-(`publicar=False`) y no escribe nada en la lista: el modelo no puede publicar
-turnos de otro invitado. El sobre de la herramienta no cambia: la publicación
-es un efecto lateral local, no un campo de la respuesta, y `publicar` no viaja
-en el esquema del MCP.
+resultado es correcto y **solo** si la llamada tiene permiso de publicar (§8.3).
+El canal que conduce la entrevista pasa `publicar=True`; una llamada de Pana por
+el MCP no lo pasa y queda sujeta a `ESCENA_PUBLICAR_MCP`. `publicar` no viaja en
+el esquema del MCP, así que el modelo no puede activarlo. El sobre de la
+herramienta no cambia: la publicación es un efecto lateral local, no un campo de
+la respuesta.
 
 | Herramienta | Fuente de los turnos | Cuántos | `personaje` | `turno.origen` | `orden` sugerido |
 |---|---|---|---|---|---|
@@ -391,17 +391,44 @@ en el esquema del MCP.
   herramienta responde como hoy y no se publica el lote.
 - Si el turno supera 4.000 caracteres o 16 KiB, se descarta solo ese turno; los
   demás del lote siguen.
-- Si el interruptor está apagado, no se publica y la herramienta responde
-  exactamente igual que hoy.
-- Si el canal no pasa `publicar=True`, no se publica aunque el interruptor esté
-  encendido: es el caso de todas las llamadas del MCP.
+- Si la herramienta no tiene permiso de publicar (§8.3), no escribe aunque el
+  interruptor esté encendido y responde exactamente igual que hoy.
 - Las demás herramientas del catálogo **no** publican: `consultar_tasa`,
-  `simular_cuota`, `verificar_usura`, `diagnosticar_capacidad`,
-  `comparar_escenario`, `convocar_comite`, `responder_sobre_proyecto`,
-  `buscar_en_documentos`, `consultar_tarifas`, `clasificar_pregunta` y las de
-  estado. La escena en vivo no cambia su contrato. `diagnosticar_capacidad`
-  publica solo cuando el diagnóstico queda completo y el canal la llama con
-  `publicar=True`.
+  `simular_cuota`, `verificar_usura`, `comparar_escenario`, `convocar_comite`,
+  `responder_sobre_proyecto`, `buscar_en_documentos`, `consultar_tarifas`,
+  `clasificar_pregunta` y las de estado. La escena en vivo no cambia su
+  contrato. `diagnosticar_capacidad` publica solo cuando el diagnóstico queda
+  completo y la llamada tiene permiso de publicar.
+
+### 8.3 Publicación desde el canal y desde el MCP
+
+La escena en vivo sigue necesitando `ESCENA_EN_VIVO=1` en el proceso. Además,
+cada herramienta decide si publica según **quién la llama**:
+
+- El **canal** que conduce la entrevista del voluntario llama a la herramienta
+  con `publicar=True`; esa llamada publica una sola vez, aunque también esté
+  activo el puente del MCP.
+- Una llamada del **MCP** (Pana) no pasa `publicar`; solo publica si
+  `ESCENA_PUBLICAR_MCP=1`. Sin la variable o con `0`, la herramienta responde
+  igual y no deja turnos.
+- `publicar` no viaja en el esquema de las herramientas que ve Pana: el
+  servidor MCP lo oculta, para que el modelo no pueda activarlo por su cuenta.
+- La variable se lee **en cada publicación**, no al arrancar el proceso: se
+  puede apagar sin reiniciar el MCP.
+
+`ESCENA_PUBLICAR_MCP=1` es un puente **temporal** para los ensayos y para el
+caso en que el canal no esté conduciendo la escena: sin el puente, Pana responde
+igual pero sus herramientas no dejan turnos. Con el canal conduciendo la
+entrevista (§9.3.2) no hace falta y conviene dejarlo apagado: mientras esté en
+`1`, una herramienta que dispare otro invitado por Pana también publica y la
+pantalla puede saltar.
+
+```powershell
+# Ventana del MCP, solo mientras el canal no conduzca la escena
+$env:ESCENA_EN_VIVO = "1"
+$env:ESCENA_PUBLICAR_MCP = "1"
+make agente-mcp
+```
 
 ## 9. Canal (Darley)
 
@@ -893,7 +920,8 @@ las 18:00 se aplica el congelamiento de la tarea 5.3.
 - No cambia el contrato de las veinte herramientas ni sus esquemas de entrada.
   `publicar` y `devolver_imagen` son ajustes internos que solo pasa el canal:
   la firma que ve el MCP se recorta a los campos de la entrada Pydantic, así
-  que el modelo no puede publicar en la pantalla.
+  que el modelo no puede activar `publicar`; con `ESCENA_PUBLICAR_MCP=1` es el
+  operador, no el modelo, quien permite que el MCP publique (§8.3).
 - No cambia `TurnoEscena` en sus campos: solo añade dos valores a dos `Literal`.
 - No añade dependencias, `pip`, `requirements.txt` ni toca `uv.lock`.
 - No toca Bronze, Silver ni Gold.
