@@ -150,6 +150,11 @@ es [`DESPLIEGUE_WHATSAPP.md`](./DESPLIEGUE_WHATSAPP.md), sección 8.
 - [ ] ⏳ MCP `sucursal-agente` en `127.0.0.1:8765` con **exactamente 20
       herramientas** permitidas (`openclaw mcp tools`). `olvidar_mis_datos` y
       `solicitar_asesor` piden confirmación.
+- [ ] Puente opcional `ESCENA_PUBLICAR_MCP`: si el canal **no** está conduciendo
+      la entrevista del voluntario (ensayo del MCP solo), la ventana 1 arranca
+      con `$env:ESCENA_PUBLICAR_MCP = "1"` y `$env:ESCENA_EN_VIVO = "1"`. Con el
+      canal conduciendo la escena, se deja apagado: Pana responde igual pero sus
+      herramientas no dejan turnos en la pantalla.
 - [ ] ⏳ Memoria: reiniciar el gateway y hacer una pregunta de seguimiento; el
       contexto se conserva sin datos personales.
 - [ ] Respaldo: con el gateway apagado, el canal responde con el grafo en
@@ -295,6 +300,19 @@ gateway, app y túnel.
 | 4 | Túnel | `cloudflared tunnel --url http://127.0.0.1:8000` |
 | 5 | Comprobaciones | El bloque de abajo |
 | Edge | Pantalla | `http://127.0.0.1:8000/escena.html` en pantalla completa (F11) |
+
+**Ventana 1: el MCP.** Con el canal conduciendo la entrevista del voluntario, el
+MCP **no** necesita el puente: las herramientas publican solo cuando el canal
+las llama con `publicar=True`. Si se ensaya el MCP solo, sin el canal, se
+enciende el puente temporal `ESCENA_PUBLICAR_MCP` y se apaga al terminar; con
+el puente activo, una herramienta que dispare otro invitado también publica.
+
+```powershell
+$env:ESCENA_EN_VIVO = "1"
+# Solo para ensayar el MCP sin el canal que conduce la entrevista:
+# $env:ESCENA_PUBLICAR_MCP = "1"
+make agente-mcp
+```
 
 **Ventana 3: la app.**
 

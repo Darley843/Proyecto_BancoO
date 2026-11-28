@@ -42,6 +42,10 @@ for _variable in VARIABLES_DE_TRAZAS:
 #: cada prueba que la necesita la enciende con `monkeypatch`.
 os.environ.pop("ESCENA_EN_VIVO", None)
 
+#: El puente temporal que permite publicar desde el MCP también queda apagado;
+#: cada prueba que lo necesita lo enciende con `monkeypatch`.
+os.environ.pop("ESCENA_PUBLICAR_MCP", None)
+
 
 def _es_loopback(direccion: object) -> bool:
     """Indica si una dirección de socket es un literal de loopback IPv4 o IPv6."""
