@@ -160,13 +160,17 @@ CATALOGO: tuple[Herramienta, ...] = (
         _doc(
             "Conduce la entrevista por rangos y calcula el diagnóstico "
             "determinista: cuota, semáforo y alertas. Con respuestas parciales "
-            "devuelve la siguiente pregunta y sus opciones exactas.",
+            "devuelve la siguiente pregunta y sus opciones exactas; cuando el "
+            "diagnóstico queda completo, sigue sola con Don Gota, la comparación "
+            "y la negociación.",
             "No la uses para una tasa suelta ni para una cuota aislada, y nunca "
             "como aprobación. No inventes rangos ni ids: si faltan datos, copia "
             "la pregunta que devuelve la herramienta.",
             "`faltan_datos` con la pregunta, sus letras y opciones, o "
             "`resultado` con la entrada, la cuota, el semáforo, las alertas y la "
-            "trazabilidad.",
+            "trazabilidad. Con el diagnóstico completo añade `resumen_escena` "
+            "con Don Gota, la comparación, las opciones A y B y las "
+            "`cifras_permitidas`.",
             "`config/diagnostico.toml` y `diagnostico/motor.py`, con la tasa del Tablero.",
             "diagnostico.motor.calcular + diagnostico.calculo",
         ),
