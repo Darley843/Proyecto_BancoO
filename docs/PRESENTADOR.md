@@ -10,8 +10,9 @@ Cada pregunta tiene dos textos:
 
 - **Voz:** la respuesta fija que dice Pana. Si la pregunta del público coincide
   con una de estas, Pana la dice tal cual (`origen: "guion_fijo"`), con la línea
-  `Fuente:` que apunta al ancla de esta ficha (`docs/PRESENTADOR.md#p1` a `#p22`).
-  Máximo tres frases y 40 palabras contando esa línea, como exige la 6.14.
+  `Fuente:` que apunta al ancla de esta ficha (`docs/PRESENTADOR.md#p1` a `#p32`).
+  Entre dos y cuatro frases y máximo 100 palabras contando esa línea, como exige
+  la 6.14.
 - **Detalle:** la versión larga, para el panel de la pantalla y para quien
   presenta. No se dice en voz alta.
 
@@ -20,7 +21,7 @@ Si la pregunta no coincide, la responde el recuperador del proyecto con el model
 
 Reglas de redacción, iguales a las del documento de Pana anfitrión:
 
-- Español, tuteo y, en la voz, como mucho tres frases y 40 palabras.
+- Español, tuteo y, en la voz, entre dos y cuatro frases y máximo 100 palabras.
 - Sin códigos internos ni nombres de archivo. Las cifras se escriben como se
   dicen.
 - Cada respuesta tiene su fuente en el repositorio, para revisarla antes de
@@ -521,6 +522,179 @@ los hooks de `.pre-commit-config.yaml` lo revisan antes del commit.
 
 ---
 
+## F. Preguntas técnicas del jurado
+
+<a id="p23"></a>
+
+### P23. ¿Qué modelo usa el agente en producción?
+
+**Variantes:** qué modelo usa el agente en producción, qué modelo usa Pana en producción, cuál es el modelo principal y el alternativo, qué modelo de lenguaje usa el agente.
+
+**Voz** (lo que dice Pana):
+
+> El agente usa DeepSeek Flash como modelo principal y DeepSeek Pro como respaldo, con el razonamiento extendido apagado para bajar la latencia. Lo elegimos por costo: medimos entre 0,1 y 0,2 centavos de dólar por mensaje, y se integra directo con LangChain. Ollama no redacta: solo calcula los embeddings locales de la Bóveda.
+
+**Detalle (para el panel, no para la voz):**
+`openclaw/openclaw.json` declara `deepseek/deepseek-flash` como principal y
+`deepseek/deepseek-v4-pro` como respaldo, con `thinkingDefault: "off"`. La
+medición de costo por mensaje está en `docs/PRESENTADOR.md` (P5) y los
+embeddings locales de Ollama, en `README.md`.
+
+**Fuente:** `openclaw/openclaw.json`, `docs/PRESENTADOR.md#p5` y `README.md`.
+
+<a id="p24"></a>
+
+### P24. ¿Cómo es la arquitectura del proyecto?
+
+**Variantes:** cómo es la arquitectura del proyecto, cómo es la arquitectura del sistema, explícame la arquitectura y qué recorrido hace un mensaje de WhatsApp hasta la respuesta.
+
+**Voz** (lo que dice Pana):
+
+> El mensaje entra por WhatsApp a Meta, pasa al canal FastAPI que verifica la firma, el consentimiento, la huella del número, los comandos y los cupos, y de ahí al gateway local de OpenClaw con el agente Pana y su workspace. Pana usa el servidor MCP propio, con sus veinte herramientas tipadas, que llaman a los módulos de diagnóstico, Tablero de tasas, RAG y escena. El auditor revisa la respuesta antes de enviarla y, si el gateway falla, el canal responde con el grafo de los módulos anteriores.
+
+**Detalle (para el panel, no para la voz):**
+El recorrido completo está en `docs/AGENTE_OPENCLAW.md` §2 y §4.1: Meta,
+webhook con firma, cola, despachador, gateway en loopback, MCP en loopback y
+respaldo con el grafo de LangGraph.
+
+**Fuente:** `docs/AGENTE_OPENCLAW.md`.
+
+<a id="p25"></a>
+
+### P25. ¿Qué es OpenClaw y qué es el MCP?
+
+**Variantes:** qué es OpenClaw y qué es el MCP, por qué separaron OpenClaw del MCP, diferencia entre OpenClaw y el servidor MCP.
+
+**Voz** (lo que dice Pana):
+
+> OpenClaw es el gateway y el runtime del agente Pana: recibe el turno, conversa y decide qué herramienta usar. El MCP es el protocolo con el que ese agente llama a nuestro servidor local de veinte herramientas tipadas, que son las que calculan y consultan los datos. Los separamos para que el agente no pueda ejecutar comandos ni tocar archivos: el gateway solo conversa y el MCP solo expone herramientas cerradas, en loopback y con token.
+
+**Detalle (para el panel, no para la voz):**
+El gateway y el servidor MCP son procesos distintos, ambos en loopback y con
+token. El gateway no ejecuta ni sale del workspace; el MCP solo publica las
+veinte herramientas del catálogo. Ver `docs/AGENTE_OPENCLAW.md` §2 y §6.
+
+**Fuente:** `docs/AGENTE_OPENCLAW.md`.
+
+<a id="p26"></a>
+
+### P26. ¿Cuántas herramientas tiene y cómo evitan que alucine?
+
+**Variantes:** cuántas herramientas tiene, cómo decide qué herramienta usar, cómo controlan la alucinación, cómo evitan que invente cifras.
+
+**Voz** (lo que dice Pana):
+
+> Pana tiene veinte herramientas y elige entre ellas por el nombre y la descripción del esquema; no ve ninguna otra. La lista es cerrada por el filtro del gateway y cada entrada es un esquema Pydantic que rechaza campos extra. La entrevista la conduce la herramienta de diagnóstico, que devuelve la pregunta y las opciones, y las cifras salen del código o del Tablero, nunca del modelo. El auditor revisa el texto antes de enviarlo.
+
+**Detalle (para el panel, no para la voz):**
+Las veinte herramientas y las seis defensas están en `docs/HERRAMIENTAS.md`
+(«Control de la alucinación»). El catálogo cerrado y los esquemas Pydantic, en
+`docs/AGENTE_OPENCLAW.md` §3 y §6.
+
+**Fuente:** `docs/HERRAMIENTAS.md`.
+
+<a id="p27"></a>
+
+### P27. ¿De dónde sale la información del RAG y cómo lo evaluaron?
+
+**Variantes:** de dónde sale la información del RAG, cómo funciona el RAG, qué evalúan del RAG, cuánto da recall@10 y nDCG@10, qué muestra la proyección t-SNE, de donde sale la informacion del RAG.
+
+**Voz** (lo que dice Pana):
+
+> La Bóveda sale del sitio público del banco: guardamos el texto en Gold y lo indexamos en Qdrant local, con embeddings que calcula Ollama. Cada búsqueda es híbrida, vectores para el sentido y BM25 para los nombres exactos, y cada respuesta cita el documento del fragmento. Con 36 preguntas de fuente conocida medimos recall@10 de 0,82 y nDCG@10 de 0,64; la proyección t-SNE salió confiable en 0,95 y con pureza de vecindario de 0,66.
+
+**Detalle (para el panel, no para la voz):**
+`docs/ARQUEO.md` publica recall@10 0,82 y nDCG@10 0,64 con los pesos por
+defecto; `docs/PROYECCION.md` publica confiabilidad 0,95 y pureza de vecindario
+0,66 (al azar, 0,22).
+
+**Fuente:** `docs/ARQUEO.md` y `docs/PROYECCION.md`.
+
+<a id="p28"></a>
+
+### P28. ¿Cómo funciona la memoria del agente?
+
+**Variantes:** cómo funciona la memoria del agente, qué guardan en la memoria, qué no guardan de los invitados, dónde está la memoria de largo plazo.
+
+**Voz** (lo que dice Pana):
+
+> Cada persona tiene su hilo de corto plazo en OpenClaw, identificado por la huella HMAC de su número, y ese hilo no guarda el número. El largo plazo vive en MEMORY.md y en la bitácora diaria del workspace, que son locales y no se versionan. No guardamos nombres, teléfonos, montos, deudas ni textos de invitados; al cerrar el evento se borran las sesiones, la memoria y la bitácora.
+
+**Detalle (para el panel, no para la voz):**
+El workspace, `MEMORY.md` y la bitácora están en `openclaw/README.md`; el
+borrado del evento, en `docs/AGENTE_OPENCLAW.md` §9.
+
+**Fuente:** `openclaw/README.md` y `docs/AGENTE_OPENCLAW.md`.
+
+<a id="p29"></a>
+
+### P29. ¿Cómo protegen el agente?
+
+**Variantes:** cómo protegen el agente, qué herramientas tiene bloqueadas, cómo va la evaluación de inyección, qué publica el túnel, cómo prueban la seguridad, como protegen el agente.
+
+**Voz** (lo que dice Pana):
+
+> Pana tiene bloqueadas la ejecución de comandos, el sistema de archivos, el navegador y el envío de mensajes, y el espacio de trabajo está limitado con workspaceOnly. La auditoría de OpenClaw dio cero hallazgos críticos y dos advertencias justificadas. En la evaluación de inyección, quince ataques se repitieron en nueve corridas: la mejor llegó a quince de quince y las demás quedaron entre once y quince, porque el modelo varía. El túnel solo publica el webhook y la salud, y al cerrar el evento se borran las sesiones y la memoria.
+
+**Detalle (para el panel, no para la voz):**
+La lista de herramientas bloqueadas y `workspaceOnly` están en
+`docs/HERRAMIENTAS.md`; el resultado de inyección y su variabilidad, en
+`docs/INYECCION.md`; la superficie del túnel y el borrado, en
+`docs/SEGURIDAD.md` y `docs/AGENTE_OPENCLAW.md` §9.
+
+**Fuente:** `docs/HERRAMIENTAS.md`, `docs/INYECCION.md` y `docs/SEGURIDAD.md`.
+
+<a id="p30"></a>
+
+### P30. ¿Cuánto cuesta un mensaje y cuánto tarda?
+
+**Variantes:** cuánto cuesta un mensaje con OpenClaw, cuánto tarda una respuesta, por qué tarda, cuánto cuesta la jornada del evento.
+
+**Voz** (lo que dice Pana):
+
+> Cada mensaje con OpenClaw cuesta entre 0,1 y 0,2 centavos de dólar, y el tope de 300 mensajes del modo evento deja la jornada en menos de un dólar. Una respuesta con herramientas tarda unos 9 segundos. Tarda porque el modelo decide, llama una o varias herramientas locales, espera la auditoría y solo entonces el canal envía por WhatsApp; el razonamiento extendido está apagado para no sumar más espera.
+
+**Detalle (para el panel, no para la voz):**
+El costo por mensaje y el tope de 300 están en `docs/PRESENTADOR.md` (P5) y
+`docs/DESPLIEGUE_WHATSAPP.md` §8.2; los «unos 9 s» de una respuesta con
+herramientas, en `docs/INYECCION.md`.
+
+**Fuente:** `docs/PRESENTADOR.md`, `docs/DESPLIEGUE_WHATSAPP.md` y `docs/INYECCION.md`.
+
+<a id="p31"></a>
+
+### P31. ¿Cómo se conecta con WhatsApp?
+
+**Variantes:** cómo se conecta con WhatsApp, cómo verifican el número del bot, cómo funciona el modo evento, cómo piden el consentimiento por WhatsApp.
+
+**Voz** (lo que dice Pana):
+
+> El número del bot se registra y se verifica en Meta, y el webhook recibe los mensajes con la firma verificada. En el modo evento, cualquier número dentro de la ventana recibe primero el aviso de la Ley 1581 y no se procesa nada sin un Acepto explícito. La ventana es de 08:00 a 20:00, con 30 mensajes por hora y 40 en total por persona, y un tope global de 300.
+
+**Detalle (para el panel, no para la voz):**
+La verificación del número está en `docs/DESPLIEGUE_WHATSAPP.md` §4.2; el
+modo evento y sus cuotas, en §8.
+
+**Fuente:** `docs/DESPLIEGUE_WHATSAPP.md`.
+
+<a id="p32"></a>
+
+### P32. ¿Cómo funciona la escena en vivo?
+
+**Variantes:** cómo funciona la escena en vivo, cómo hablan los personajes, de dónde salen las cifras de la escena, quién habla en la escena.
+
+**Voz** (lo que dice Pana):
+
+> En la escena en vivo hablan Pana, Don Gota, el joven, los dos agentes de la negociación y el auditor. Cada uno tiene su voz y su turno, y la pantalla pinta lo que recibe; el invitado escribe por WhatsApp y aparece solo en subtítulos. Las cifras de la escena salen de las herramientas, no del modelo: el motor del diagnóstico, la fórmula del gota a gota y el Tablero.
+
+**Detalle (para el panel, no para la voz):**
+Los personajes, los turnos y la publicación desde las herramientas están en
+`docs/ESCENA_EN_VIVO.md` §3 y §8.
+
+**Fuente:** `docs/ESCENA_EN_VIVO.md`.
+
+---
+
 ## Respuestas especiales (ya definidas en el documento de Pana anfitrión)
 
 - **Karol G o Shakira:** respuesta fija con el guiño al profesor Jan.
@@ -532,7 +706,7 @@ los hooks de `.pre-commit-config.yaml` lo revisan antes del commit.
 ## Pendiente antes de congelar (jueves 26)
 
 1. Las voces de esta ficha pasan a `config/escena.toml [preguntas]` (tarea 6.14),
-   con una prueba que revisa las 40 palabras, las tres frases, la fuente y las
+   con una prueba que revisa las 100 palabras, las cuatro frases, la fuente y las
    cifras declaradas.
 2. Leer en voz alta cada voz con la voz de Pana (Gonzalo); todas duran menos de
    unos 15 segundos.

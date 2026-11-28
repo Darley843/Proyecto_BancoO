@@ -166,11 +166,12 @@ CATALOGO: tuple[Herramienta, ...] = (
             "No la uses para una tasa suelta ni para una cuota aislada, y nunca "
             "como aprobación. No inventes rangos ni ids: si faltan datos, copia "
             "la pregunta que devuelve la herramienta.",
-            "`faltan_datos` con la pregunta, sus letras y opciones, o "
-            "`resultado` con la entrada, la cuota, el semáforo, las alertas y la "
-            "trazabilidad. Con el diagnóstico completo añade `resumen_escena` "
-            "con Don Gota, la comparación, las opciones A y B y las "
-            "`cifras_permitidas`.",
+            "`faltan_datos` con la pregunta, sus letras, sus opciones y el "
+            "`mensaje_listo` que se copia, o `resultado` con la entrada, la "
+            "cuota, el semáforo, las alertas y la trazabilidad. Con el "
+            "diagnóstico completo añade `resumen_escena` con Don Gota, la "
+            "comparación, las opciones A y B, `mensaje_listo` y las "
+            "`cifras_permitidas`, y los copia también en la salida.",
             "`config/diagnostico.toml` y `diagnostico/motor.py`, con la tasa del Tablero.",
             "diagnostico.motor.calcular + diagnostico.calculo",
         ),
@@ -267,12 +268,14 @@ CATALOGO: tuple[Herramienta, ...] = (
         lectura.generar_ficha_opcion,
         GenerarFichaOpcionEntrada,
         _doc(
-            "Genera el texto equivalente de la ficha de la opción recomendada, "
-            "sin datos personales.",
+            "Genera la ficha de la opción elegida (A o B) y el cierre corto que "
+            "Pana responde, sin datos personales.",
             "No para prometer aprobación ni para sustituir la tarjeta con imagen "
             "(`generar_tarjeta_pana`). Si el invitado dio un monto exacto, "
-            "pásalo en `monto`.",
-            "El `texto` de la ficha, el tamaño del PNG, el semáforo, la cuota, la tasa y el aviso.",
+            "pásalo en `monto`; si ya eligió, pasa la letra en `opcion`.",
+            "El `texto` de la ficha, el `mensaje_listo` del cierre, las "
+            "`cifras_permitidas`, el `escenario` de la opción, el tamaño del PNG, "
+            "el semáforo, la cuota, la tasa y el aviso.",
             "El motor del diagnóstico y `pana/desde_diagnostico.py`.",
             "pana.desde_diagnostico.tarjeta_y_texto",
         ),

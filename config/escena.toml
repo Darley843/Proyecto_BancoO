@@ -135,7 +135,7 @@ aviso_microfono = "El reconocimiento de voz del navegador puede usar un servicio
 # mide con las cuatro rutas y se ajusta aquí sin cambiar el contrato.
 umbral_fijo = 0.6
 puntaje_minimo = 0.9
-max_palabras = 40
+max_palabras = 100
 tiempo_total_segundos = 8
 tiempo_llamada_segundos = 4
 max_fragmentos = 3
@@ -151,7 +151,7 @@ rutas = ["README.md", "AGENTS.md", "CONSTITUTION.md", "docs"]
 
 # Respuestas fijas de la tarea 6.14: la «Voz» de cada pregunta de
 # docs/PRESENTADOR.md (#180), con su ancla como fuente. Cada respuesta tiene como
-# máximo tres frases y 40 palabras, y toda cifra dura que dice está declarada en
+# máximo cuatro frases y 100 palabras, y toda cifra dura que dice está declarada en
 # `cifras`. Las comprueba test/test_escena_ficha.py.
 
 [[preguntas.fijas]]
@@ -442,3 +442,138 @@ variantes = [
 ]
 respuesta = "Con pruebas automáticas que corren sin red: lint, tipos y pytest. make check corre las tres y debe quedar en verde antes de cada cambio; el pipeline de GitHub las repite en cada pull request."
 fuente = "docs/PRESENTADOR.md#p22"
+
+[[preguntas.fijas]]
+id = "modelo"
+variantes = [
+  "¿Qué modelo usa el agente en producción?",
+  "¿Qué modelo usa Pana en producción?",
+  "¿Cuál es el modelo principal y el alternativo?",
+  "¿Que modelo usa el agente en produccion?",
+  "¿Qué modelo de lenguaje usa el agente?",
+]
+respuesta = "El agente usa DeepSeek Flash como modelo principal y DeepSeek Pro como respaldo, con el razonamiento extendido apagado para bajar la latencia. Lo elegimos por costo: medimos entre 0,1 y 0,2 centavos de dólar por mensaje, y se integra directo con LangChain. Ollama no redacta: solo calcula los embeddings locales de la Bóveda."
+fuente = "docs/PRESENTADOR.md#p23"
+
+[[preguntas.fijas]]
+id = "arquitectura"
+variantes = [
+  "¿Cómo es la arquitectura del proyecto?",
+  "¿Cómo es la arquitectura del sistema?",
+  "Explícame la arquitectura y qué recorrido hace un mensaje de WhatsApp hasta la respuesta.",
+  "¿Como es la arquitectura del proyecto?",
+  "¿Qué recorrido hace un mensaje de WhatsApp hasta la respuesta?",
+]
+respuesta = "El mensaje entra por WhatsApp a Meta, pasa al canal FastAPI que verifica la firma, el consentimiento, la huella del número, los comandos y los cupos, y de ahí al gateway local de OpenClaw con el agente Pana y su workspace. Pana usa el servidor MCP propio, con sus veinte herramientas tipadas, que llaman a los módulos de diagnóstico, Tablero de tasas, RAG y escena. El auditor revisa la respuesta antes de enviarla y, si el gateway falla, el canal responde con el grafo de los módulos anteriores."
+fuente = "docs/PRESENTADOR.md#p24"
+
+[[preguntas.fijas]]
+id = "openclaw_mcp"
+variantes = [
+  "¿Qué es OpenClaw y qué es el MCP?",
+  "¿Por qué separaron OpenClaw del MCP?",
+  "¿Cuál es la diferencia entre OpenClaw y el servidor MCP?",
+  "¿Que es OpenClaw y que es el MCP?",
+  "¿Qué papel tiene el MCP?",
+]
+respuesta = "OpenClaw es el gateway y el runtime del agente Pana: recibe el turno, conversa y decide qué herramienta usar. El MCP es el protocolo con el que ese agente llama a nuestro servidor local de veinte herramientas tipadas, que son las que calculan y consultan los datos. Los separamos para que el agente no pueda ejecutar comandos ni tocar archivos: el gateway solo conversa y el MCP solo expone herramientas cerradas, en loopback y con token."
+fuente = "docs/PRESENTADOR.md#p25"
+
+[[preguntas.fijas]]
+id = "herramientas_alucinacion"
+variantes = [
+  "¿Cuántas herramientas tiene el agente?",
+  "¿Cómo decide qué herramienta usar?",
+  "¿Cómo controlan la alucinación?",
+  "¿Cómo evitan que el agente invente cifras?",
+  "¿Cuantas herramientas tiene el agente?",
+]
+respuesta = "Pana tiene veinte herramientas y elige entre ellas por el nombre y la descripción del esquema; no ve ninguna otra. La lista es cerrada por el filtro del gateway y cada entrada es un esquema Pydantic que rechaza campos extra. La entrevista la conduce la herramienta de diagnóstico, que devuelve la pregunta y las opciones, y las cifras salen del código o del Tablero, nunca del modelo. El auditor revisa el texto antes de enviarlo."
+fuente = "docs/PRESENTADOR.md#p26"
+
+[[preguntas.fijas]]
+id = "rag"
+variantes = [
+  "¿De dónde sale la información del RAG?",
+  "¿Cómo funciona el RAG?",
+  "¿Cómo evaluaron la recuperación del RAG?",
+  "¿Cuánto da recall@10 y nDCG@10?",
+  "¿Qué muestra la proyección t-SNE?",
+  "¿De donde sale la informacion del RAG?",
+]
+respuesta = "La Bóveda sale del sitio público del banco: guardamos el texto en Gold y lo indexamos en Qdrant local, con embeddings que calcula Ollama. Cada búsqueda es híbrida, vectores para el sentido y BM25 para los nombres exactos, y cada respuesta cita el documento del fragmento. Con 36 preguntas de fuente conocida medimos recall@10 de 0,82 y nDCG@10 de 0,64; la proyección t-SNE salió confiable en 0,95 y con pureza de vecindario de 0,66."
+fuente = "docs/PRESENTADOR.md#p27"
+cifras = [
+  { valor = "0.82", valor_legible = "0,82", unidad = "veces", etiqueta = "recall@10" },
+  { valor = "0.64", valor_legible = "0,64", unidad = "veces", etiqueta = "nDCG@10" },
+  { valor = "0.95", valor_legible = "0,95", unidad = "veces", etiqueta = "confiabilidad del t-SNE" },
+  { valor = "0.66", valor_legible = "0,66", unidad = "veces", etiqueta = "pureza de vecindario" },
+]
+
+[[preguntas.fijas]]
+id = "memoria"
+variantes = [
+  "¿Cómo funciona la memoria del agente?",
+  "¿Qué guardan en la memoria?",
+  "¿Qué no guardan de los invitados?",
+  "¿Dónde está la memoria de largo plazo?",
+  "¿Como funciona la memoria del agente?",
+]
+respuesta = "Cada persona tiene su hilo de corto plazo en OpenClaw, identificado por la huella HMAC de su número, y ese hilo no guarda el número. El largo plazo vive en MEMORY.md y en la bitácora diaria del workspace, que son locales y no se versionan. No guardamos nombres, teléfonos, montos, deudas ni textos de invitados; al cerrar el evento se borran las sesiones, la memoria y la bitácora."
+fuente = "docs/PRESENTADOR.md#p28"
+
+[[preguntas.fijas]]
+id = "seguridad"
+variantes = [
+  "¿Cómo protegen el agente?",
+  "¿Qué herramientas tiene bloqueadas?",
+  "¿Cómo va la evaluación de inyección?",
+  "¿Qué publica el túnel?",
+  "¿Cómo prueban la seguridad del agente?",
+  "¿Como protegen el agente?",
+]
+respuesta = "Pana tiene bloqueadas la ejecución de comandos, el sistema de archivos, el navegador y el envío de mensajes, y el espacio de trabajo está limitado con workspaceOnly. La auditoría de OpenClaw dio cero hallazgos críticos y dos advertencias justificadas. En la evaluación de inyección, quince ataques se repitieron en nueve corridas: la mejor llegó a quince de quince y las demás quedaron entre once y quince, porque el modelo varía. El túnel solo publica el webhook y la salud, y al cerrar el evento se borran las sesiones y la memoria."
+fuente = "docs/PRESENTADOR.md#p29"
+
+[[preguntas.fijas]]
+id = "costo_latencia"
+variantes = [
+  "¿Cuánto cuesta un mensaje con OpenClaw?",
+  "¿Cuánto tarda una respuesta?",
+  "¿Por qué tarda el agente?",
+  "¿Cuánto cuesta la jornada del evento?",
+  "¿Cuanto cuesta un mensaje con OpenClaw?",
+]
+respuesta = "Cada mensaje con OpenClaw cuesta entre 0,1 y 0,2 centavos de dólar, y el tope de 300 mensajes del modo evento deja la jornada en menos de un dólar. Una respuesta con herramientas tarda unos 9 segundos. Tarda porque el modelo decide, llama una o varias herramientas locales, espera la auditoría y solo entonces el canal envía por WhatsApp; el razonamiento extendido está apagado para no sumar más espera."
+fuente = "docs/PRESENTADOR.md#p30"
+cifras = [{ valor = "300", valor_legible = "300", unidad = "veces", etiqueta = "tope global del modo evento" }]
+
+[[preguntas.fijas]]
+id = "whatsapp"
+variantes = [
+  "¿Cómo se conecta con WhatsApp?",
+  "¿Cómo verifican el número del bot?",
+  "¿Cómo funciona el modo evento?",
+  "¿Cómo piden el consentimiento por WhatsApp?",
+  "¿Como se conecta con WhatsApp?",
+]
+respuesta = "El número del bot se registra y se verifica en Meta, y el webhook recibe los mensajes con la firma verificada. En el modo evento, cualquier número dentro de la ventana recibe primero el aviso de la Ley 1581 y no se procesa nada sin un Acepto explícito. La ventana es de 08:00 a 20:00, con 30 mensajes por hora y 40 en total por persona, y un tope global de 300."
+fuente = "docs/PRESENTADOR.md#p31"
+cifras = [
+  { valor = "1581", valor_legible = "1581", unidad = "veces", etiqueta = "Ley de protección de datos" },
+  { valor = "30", valor_legible = "30", unidad = "veces", etiqueta = "mensajes por hora" },
+  { valor = "40", valor_legible = "40", unidad = "veces", etiqueta = "mensajes por persona" },
+  { valor = "300", valor_legible = "300", unidad = "veces", etiqueta = "tope global" },
+]
+
+[[preguntas.fijas]]
+id = "escena_vivo"
+variantes = [
+  "¿Cómo funciona la escena en vivo?",
+  "¿Cómo hablan los personajes?",
+  "¿De dónde salen las cifras de la escena?",
+  "¿Quién habla en la escena?",
+  "¿Como funciona la escena en vivo?",
+]
+respuesta = "En la escena en vivo hablan Pana, Don Gota, el joven, los dos agentes de la negociación y el auditor. Cada uno tiene su voz y su turno, y la pantalla pinta lo que recibe; el invitado escribe por WhatsApp y aparece solo en subtítulos. Las cifras de la escena salen de las herramientas, no del modelo: el motor del diagnóstico, la fórmula del gota a gota y el Tablero."
+fuente = "docs/PRESENTADOR.md#p32"

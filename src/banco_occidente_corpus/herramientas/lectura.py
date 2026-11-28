@@ -13,12 +13,12 @@ import os
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import suppress
 from decimal import Decimal
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ValidationError
 
 from ..asistente.validacion import cifras_duras
-from ..canal.contratos import ResultadoDiagnostico
+from ..canal.contratos import EntradaDiagnostico, ResultadoDiagnostico
 from ..cifras_legibles import (
     anotar,
     cifra,
@@ -40,11 +40,19 @@ from ..escena.auditor import (
 )
 from ..escena.comparacion import alertas_comparacion, turnos_pana_comparacion
 from ..escena.comparacion import comparar_gota_banco as _comparar_gota_banco
-from ..escena.contratos import HallazgoEscena, TurnoEscena, VeredictoAuditor
+from ..escena.contratos import (
+    CifraEscena,
+    EscenarioEscena,
+    FuenteCifra,
+    HallazgoEscena,
+    TurnoEscena,
+    VeredictoAuditor,
+)
 from ..escena.en_vivo import publicar_turnos
+from ..escena.ficha_entrega import dejar_ficha
 from ..escena.gota import calcular_prestamo_gota as _calcular_gota
 from ..escena.gota import turnos_don_gota
-from ..escena.negociacion import negociar
+from ..escena.negociacion import construir_mesa, negociar
 from ..escena.proyecto import crear_recuperador_proyecto, es_pregunta_del_proyecto
 from ..mcp_servidor import conocimiento, control
 from ..mcp_servidor.control import Personaje
@@ -52,6 +60,7 @@ from ..mcp_servidor.servidor import buscar_en_boveda
 from ..mcp_servidor.servidor import consultar_tasa as _consultar_tasa
 from ..mcp_servidor.servidor import simular_cuota as _simular_cuota
 from ..pana.desde_diagnostico import tarjeta_y_texto
+from ..pana.tarjetas import monto_corto
 from ..sucursal.ajustes import leer_modo_demo
 from ..tablero.tasas import cargar_config_tasas, clave_producto
 from .comun import aplicar_monto_exacto, como_json, error, mensaje_de_validacion, ok
@@ -100,6 +109,9 @@ AVISO_NEGOCIACION: str = "no se pudo negociar la opción"
 
 logger = logging.getLogger(__name__)
 
+#: Última ficha publicada por este proceso; evita repetir el mismo turno.
+_ULTIMA_FICHA_PUBLICADA: str | None = None
+
 
 def _publicar_escena(construir: Callable[[], Iterable[TurnoEscena]]) -> None:
     """Publica un lote en la escena en vivo sin cambiar la respuesta.
@@ -113,6 +125,21 @@ def _publicar_escena(construir: Callable[[], Iterable[TurnoEscena]]) -> None:
     """
     with suppress(Exception):
         publicar_turnos(construir(), origen="herramienta")
+
+
+def _publicar_ficha(turno: TurnoEscena) -> None:
+    """Publica la ficha una sola vez, aunque la herramienta se repita.
+
+    Args:
+        turno: turno `vivo.ficha.v1` ya armado.
+    """
+    global _ULTIMA_FICHA_PUBLICADA
+    if os.environ.get("ESCENA_EN_VIVO", "").strip() != "1":
+        return
+    if turno.texto == _ULTIMA_FICHA_PUBLICADA:
+        return
+    _publicar_escena(lambda: (turno,))
+    _ULTIMA_FICHA_PUBLICADA = turno.texto
 
 
 def _diagnostico(
@@ -444,6 +471,343 @@ def _opcion(letra: str, escenario: Mapping[str, Any]) -> dict[str, Any]:
     }
 
 
+def _cifras_de_la_ficha(
+    resultado: ResultadoDiagnostico,
+    *,
+    monto: int | None = None,
+    plazo_meses: int | None = None,
+    cuota: Decimal | None = None,
+    total: Decimal | None = None,
+) -> list[str]:
+    """Reúne las cifras legibles de la ficha y del cierre para el auditor.
+
+    Incluye el monto completo y el corto de la tarjeta, el plazo, el rango de
+    la cuota, el total, las tasas E.A. y M.V. y el porcentaje del ingreso. Así
+    el cierre se audita contra todo lo que la ficha dice, sin falsos hallazgos.
+
+    Args:
+        resultado: diagnóstico de la opción.
+        monto: monto exacto de la opción, si cambió respecto de la entrevista.
+        plazo_meses: plazo de la opción, si cambió respecto de la entrevista.
+        cuota: cuota exacta de la opción elegida.
+        total: total pagado de la opción elegida.
+
+    Returns:
+        Las cifras permitidas, sin repetir y con el tope del auditor.
+    """
+    cifras: list[str] = []
+    entrada = resultado.entrada
+    monto_final = (
+        monto
+        if monto is not None
+        else (int(entrada.monto_credito) if entrada.monto_credito is not None else None)
+    )
+    if monto_final is not None:
+        _agregar_cifras(
+            cifras,
+            [formatear_pesos(monto_final), monto_corto(Decimal(monto_final))],
+        )
+    plazo = plazo_meses if plazo_meses is not None else entrada.plazo_meses
+    if plazo:
+        _agregar_cifras(cifras, [formatear_meses(plazo)])
+    if resultado.cuota_mensual is not None:
+        _agregar_cifras(
+            cifras,
+            [
+                formatear_pesos(resultado.cuota_mensual.desde),
+                formatear_pesos(resultado.cuota_mensual.hasta),
+            ],
+        )
+    if cuota is not None:
+        _agregar_cifras(cifras, [formatear_pesos(cuota)])
+    if total is not None:
+        _agregar_cifras(cifras, [formatear_pesos(total)])
+    if resultado.total_pagado is not None:
+        _agregar_cifras(
+            cifras,
+            [
+                formatear_pesos(resultado.total_pagado.desde),
+                formatear_pesos(resultado.total_pagado.hasta),
+            ],
+        )
+    if resultado.tasa_ea is not None:
+        _agregar_cifras(
+            cifras,
+            [
+                formatear_tasa_ea(resultado.tasa_ea.desde),
+                formatear_tasa_ea(resultado.tasa_ea.hasta),
+            ],
+        )
+    if resultado.tasa_mensual is not None:
+        _agregar_cifras(
+            cifras,
+            [
+                f"{formatear_porcentaje(resultado.tasa_mensual.desde)} M.V.",
+                f"{formatear_porcentaje(resultado.tasa_mensual.hasta)} M.V.",
+            ],
+        )
+    if resultado.razon_endeudamiento is not None:
+        _agregar_cifras(cifras, [formatear_porcentaje(resultado.razon_endeudamiento)])
+    if resultado.ahorro_mensual_estimado is not None:
+        _agregar_cifras(cifras, [formatear_pesos(resultado.ahorro_mensual_estimado)])
+    return cifras[:MAXIMO_CIFRAS_AUDITOR]
+
+
+def _mensaje_resumen(resumen: Mapping[str, Any]) -> str:
+    """Escribe el resumen corto con las opciones A y B para copiar tal cual.
+
+    Args:
+        resumen: `resumen_escena` ya armado con el diagnóstico y las opciones.
+
+    Returns:
+        La cuota del plan, la advertencia del gota a gota, las dos opciones y
+        la instrucción «Responde A o B».
+    """
+    lineas: list[str] = []
+    diagnostico = resumen.get("diagnostico")
+    if isinstance(diagnostico, Mapping):
+        monto = diagnostico.get("monto_legible")
+        plazo = diagnostico.get("plazo_legible")
+        cuota = diagnostico.get("cuota_desde_legible")
+        if monto and plazo and cuota:
+            frase = f"Con {monto} a {plazo} tu cuota sería {cuota} al mes"
+            total = diagnostico.get("total_legible")
+            if total:
+                frase += f" y el total {total}"
+            lineas.append(f"{frase}.")
+    lineas.append(
+        "Antes de firmar, ten en cuenta que el gota a gota cobra tasas mucho "
+        "más altas y sin control: mejor un banco vigilado."
+    )
+    opciones = resumen.get("opciones")
+    if isinstance(opciones, (list, tuple)):
+        for opcion in opciones:
+            if not isinstance(opcion, Mapping):
+                continue
+            letra = opcion.get("letra")
+            plazo = opcion.get("plazo_legible")
+            cuota = opcion.get("cuota_mensual_legible")
+            total = opcion.get("total_pagado_legible")
+            if letra and plazo and cuota and total:
+                lineas.append(f"Opción {letra}: {plazo}, cuota {cuota}, total {total}.")
+    lineas.append("Responde A o B.")
+    return "\n\n".join(lineas)
+
+
+def _escenarios_sin_publicar(
+    respuestas: list[str],
+    monto: int | None,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """Calcula la mesa de negociación sin publicar turnos en la escena.
+
+    `generar_ficha_opcion` necesita el escenario de la opción elegida, pero no
+    debe repetir la negociación en la pantalla.
+
+    Args:
+        respuestas: ids canónicos de la entrevista.
+        monto: monto exacto del invitado, si lo dio.
+
+    Returns:
+        Los escenarios serializados y las dos opciones A/B; listas vacías si la
+        mesa no se puede armar.
+    """
+    try:
+        entrada = entrada_desde_respuestas(respuestas)
+        if monto is not None:
+            ajustada = aplicar_monto_exacto("generar_ficha_opcion", entrada, monto)
+            if isinstance(ajustada, SalidaHerramienta):
+                return [], []
+            entrada = ajustada
+        if entrada.monto_credito is None:
+            return [], []
+        escenarios = [
+            dict(escenario)
+            for escenario in como_json(construir_mesa(entrada))
+            if isinstance(escenario, dict)
+        ]
+        opciones = _opciones_negociacion(escenarios, int(entrada.monto_credito), entrada.producto)
+        return escenarios, opciones
+    except Exception:  # noqa: BLE001 - la ficha cae al diagnóstico de la entrevista
+        logger.warning("generar_ficha_opcion no pudo armar la mesa de la opción")
+        return [], []
+
+
+def _entrada_de_la_opcion(
+    respuestas: list[str],
+    monto: int,
+    plazo_meses: int | None,
+) -> EntradaDiagnostico:
+    """Ajusta la entrada del diagnóstico al monto y al plazo de la opción.
+
+    Args:
+        respuestas: ids canónicos de la entrevista.
+        monto: monto de la opción elegida.
+        plazo_meses: plazo de la opción elegida.
+
+    Returns:
+        La entrada del motor con el monto y el plazo de la opción.
+    """
+    entrada = entrada_desde_respuestas(respuestas)
+    cambios: dict[str, Any] = {"monto_credito": Decimal(monto)}
+    if plazo_meses is not None:
+        cambios["plazo_meses"] = int(plazo_meses)
+    return entrada.model_copy(update=cambios)
+
+
+def _cifras_del_turno_ficha(
+    resultado: ResultadoDiagnostico,
+    *,
+    monto: int,
+    plazo_meses: int,
+    cuota: Decimal,
+    total: Decimal | None,
+) -> tuple[CifraEscena, ...]:
+    """Arma las cifras del turno de la ficha para el panel de la pantalla.
+
+    Args:
+        resultado: diagnóstico de la opción.
+        monto: monto de la opción elegida.
+        plazo_meses: plazo de la opción elegida.
+        cuota: cuota exacta de la opción elegida.
+        total: total pagado de la opción elegida.
+
+    Returns:
+        Las cifras con su fuente `motor`, sin repetir el mismo valor.
+    """
+    fuente = FuenteCifra(tipo="motor", referencia="diagnostico.motor#ficha_opcion")
+    candidatas: list[CifraEscena] = [
+        CifraEscena(
+            etiqueta="monto",
+            valor=Decimal(monto),
+            valor_legible=formatear_pesos(monto),
+            unidad="pesos",
+            fuente=fuente,
+        ),
+        CifraEscena(
+            etiqueta="plazo",
+            valor=Decimal(plazo_meses),
+            valor_legible=str(plazo_meses),
+            unidad="meses",
+            fuente=fuente,
+        ),
+        CifraEscena(
+            etiqueta="cuota mensual",
+            valor=cuota,
+            valor_legible=formatear_pesos(cuota),
+            unidad="pesos",
+            fuente=fuente,
+        ),
+    ]
+    if total is not None:
+        candidatas.append(
+            CifraEscena(
+                etiqueta="total pagado",
+                valor=total,
+                valor_legible=formatear_pesos(total),
+                unidad="pesos",
+                fuente=fuente,
+            )
+        )
+    if resultado.cuota_mensual is not None:
+        candidatas.extend(
+            (
+                CifraEscena(
+                    etiqueta="cuota desde",
+                    valor=resultado.cuota_mensual.desde,
+                    valor_legible=formatear_pesos(resultado.cuota_mensual.desde),
+                    unidad="pesos",
+                    fuente=fuente,
+                ),
+                CifraEscena(
+                    etiqueta="cuota hasta",
+                    valor=resultado.cuota_mensual.hasta,
+                    valor_legible=formatear_pesos(resultado.cuota_mensual.hasta),
+                    unidad="pesos",
+                    fuente=fuente,
+                ),
+            )
+        )
+    if resultado.tasa_ea is not None:
+        candidatas.append(
+            CifraEscena(
+                etiqueta="tasa E.A.",
+                valor=resultado.tasa_ea.hasta,
+                valor_legible=formatear_tasa_ea(resultado.tasa_ea.hasta),
+                unidad="porcentaje_ea",
+                fuente=fuente,
+            )
+        )
+    if resultado.tasa_mensual is not None:
+        candidatas.append(
+            CifraEscena(
+                etiqueta="tasa M.V.",
+                valor=resultado.tasa_mensual.hasta,
+                valor_legible=formatear_porcentaje(resultado.tasa_mensual.hasta),
+                unidad="porcentaje",
+                fuente=fuente,
+            )
+        )
+    if resultado.razon_endeudamiento is not None:
+        candidatas.append(
+            CifraEscena(
+                etiqueta="porcentaje del ingreso",
+                valor=resultado.razon_endeudamiento,
+                valor_legible=formatear_porcentaje(resultado.razon_endeudamiento),
+                unidad="porcentaje",
+                fuente=fuente,
+            )
+        )
+    vistas: set[tuple[Decimal, str]] = set()
+    unicas: list[CifraEscena] = []
+    for item in candidatas:
+        clave = (item.valor, item.unidad)
+        if clave in vistas:
+            continue
+        vistas.add(clave)
+        unicas.append(item)
+    return tuple(unicas)
+
+
+def _escenario_de_la_opcion(
+    resultado: ResultadoDiagnostico,
+    *,
+    monto: int,
+    plazo_meses: int,
+    cuota: Decimal,
+    total: Decimal | None,
+) -> EscenarioEscena:
+    """Arma el escenario del diagnóstico cuando no hay una opción A/B elegida.
+
+    Args:
+        resultado: diagnóstico de la entrevista.
+        monto: monto del diagnóstico.
+        plazo_meses: plazo del diagnóstico.
+        cuota: cuota exacta.
+        total: total pagado.
+
+    Returns:
+        El escenario que pinta el panel de cifras con la opción elegida.
+    """
+    entrada = resultado.entrada
+    return EscenarioEscena(
+        codigo="entrevista",
+        descripcion=f"{entrada.producto} a {plazo_meses} meses",
+        producto=entrada.producto,
+        monto=Decimal(monto),
+        plazo_meses=plazo_meses,
+        cuota_mensual=cuota,
+        total_pagado=total,
+        total_intereses=(
+            resultado.total_intereses.hasta if resultado.total_intereses is not None else None
+        ),
+        semaforo=resultado.semaforo,
+        razon_endeudamiento=resultado.razon_endeudamiento,
+        margen_despues_cuota=resultado.margen_despues_cuota,
+        aceptable=resultado.semaforo != "rojo",
+        ofertable=True,
+    )
+
+
 def _continuar_escena(
     resultado: ResultadoDiagnostico,
     respuestas: list[str],
@@ -490,6 +854,15 @@ def _continuar_escena(
         _agregar_cifras(
             cifras,
             [diagnostico["cuota_desde_legible"], diagnostico["cuota_hasta_legible"]],
+        )
+    if resultado.total_pagado is not None:
+        diagnostico["total_legible"] = formatear_pesos(resultado.total_pagado.desde)
+        _agregar_cifras(
+            cifras,
+            [
+                formatear_pesos(resultado.total_pagado.desde),
+                formatear_pesos(resultado.total_pagado.hasta),
+            ],
         )
     resumen["diagnostico"] = diagnostico
 
@@ -561,7 +934,9 @@ def _continuar_escena(
             )
 
     resumen["avisos"] = avisos
+    _agregar_cifras(cifras, _cifras_de_la_ficha(resultado))
     resumen["cifras_permitidas"] = cifras[:MAXIMO_CIFRAS_AUDITOR]
+    resumen["mensaje_listo"] = _mensaje_resumen(resumen)
     return resumen
 
 
@@ -611,7 +986,10 @@ def diagnosticar_capacidad(
     datos: dict[str, Any] = {"resultado": como_json(resultado)}
     if _diagnostico_completo(resultado):
         try:
-            datos["resumen_escena"] = _continuar_escena(resultado, entrada.respuestas)
+            resumen = _continuar_escena(resultado, entrada.respuestas)
+            datos["resumen_escena"] = resumen
+            datos["mensaje_listo"] = resumen.get("mensaje_listo")
+            datos["cifras_permitidas"] = resumen.get("cifras_permitidas", [])
         except Exception:  # noqa: BLE001 - el diagnóstico nunca se pierde
             logger.warning("diagnosticar_capacidad escena_continua aviso resumen")
     return ok("diagnosticar_capacidad", datos)
@@ -1015,8 +1393,14 @@ def _entorno_negociacion() -> Mapping[str, str]:
 def generar_ficha_opcion(
     respuestas: RespuestasEntrevista,
     monto: MontoExactoEntrada = None,
+    opcion: Literal["A", "B"] | None = None,
 ) -> SalidaHerramienta:
-    """Genera la ficha textual de la opción recomendada, sin datos personales.
+    """Genera la ficha de la opción elegida y su cierre corto para WhatsApp.
+
+    Con la letra elegida (`A` o `B`) la ficha usa el monto y el plazo de esa
+    opción, y el turno de la escena lleva su escenario y sus cifras para que el
+    panel se actualice. La ficha se deja para que el canal la envíe como
+    mensaje aparte; Pana solo responde el `mensaje_listo`.
 
     Args:
         respuestas: ids canónicos de la entrevista, como en
@@ -1026,36 +1410,147 @@ def generar_ficha_opcion(
             cálculo del rango solo si cae dentro de sus límites y, si no, la
             herramienta devuelve `entrada_invalida` con los límites. Sin este
             campo se usa el valor del rango.
+        opcion: letra de la opción que eligió el invitado (`A` o `B`); sin ella
+            se usa el plazo de la entrevista.
 
     Returns:
-        El texto equivalente de la tarjeta de Pana y las cifras de la opción.
+        El texto de la ficha, su cierre corto (`mensaje_listo`), las cifras que
+        puede citar (`cifras_permitidas`) y el escenario de la opción.
     """
     fallo = respuestas_o_error("generar_ficha_opcion", respuestas)
     if fallo is not None:
         return fallo
-    entrada = GenerarFichaOpcionEntrada(respuestas=respuestas, monto=monto)
+    entrada = GenerarFichaOpcionEntrada(
+        respuestas=respuestas,
+        monto=monto,
+        opcion=opcion,
+    )
     resultado = _diagnostico("generar_ficha_opcion", entrada.respuestas, monto=entrada.monto)
     if isinstance(resultado, SalidaHerramienta):
         return resultado
+
+    escenario: EscenarioEscena | None = None
+    if entrada.opcion is not None:
+        escenarios, opciones = _escenarios_sin_publicar(entrada.respuestas, entrada.monto)
+        elegida = next(
+            (opcion_ab for opcion_ab in opciones if opcion_ab.get("letra") == entrada.opcion),
+            None,
+        )
+        if elegida is not None:
+            datos = next(
+                (
+                    escenario_ab
+                    for escenario_ab in escenarios
+                    if escenario_ab.get("codigo") == elegida.get("codigo")
+                ),
+                None,
+            )
+            if datos is not None:
+                try:
+                    escenario = EscenarioEscena.model_validate(datos)
+                    ajustada = _entrada_de_la_opcion(
+                        entrada.respuestas,
+                        int(escenario.monto),
+                        escenario.plazo_meses,
+                    )
+                    resultado = calcular(ajustada)
+                except Exception:  # noqa: BLE001 - la ficha no se pierde por la opción
+                    escenario = None
+                    logger.warning("generar_ficha_opcion no pudo recalcular la opción")
+
     imagen, texto = tarjeta_y_texto(resultado)
     ficha = texto.strip()
+    monto_final = (
+        int(escenario.monto)
+        if escenario is not None
+        else (
+            int(resultado.entrada.monto_credito)
+            if resultado.entrada.monto_credito is not None
+            else None
+        )
+    )
+    plazo_final = (
+        escenario.plazo_meses
+        if escenario is not None and escenario.plazo_meses is not None
+        else resultado.entrada.plazo_meses
+    )
+    cuota_final = (
+        escenario.cuota_mensual
+        if escenario is not None
+        else (resultado.cuota_mensual.desde if resultado.cuota_mensual is not None else None)
+    )
+    total_final = (
+        escenario.total_pagado
+        if escenario is not None
+        else (resultado.total_pagado.desde if resultado.total_pagado is not None else None)
+    )
+    if escenario is None and monto_final is not None and plazo_final and cuota_final is not None:
+        escenario = _escenario_de_la_opcion(
+            resultado,
+            monto=monto_final,
+            plazo_meses=int(plazo_final),
+            cuota=cuota_final,
+            total=total_final,
+        )
+
+    letra = f"la opción {entrada.opcion}" if entrada.opcion else "esta opción"
+    if monto_final is not None and plazo_final and cuota_final is not None:
+        cierre = (
+            f"Elegiste {letra}: {formatear_pesos(monto_final)} a "
+            f"{formatear_meses(plazo_final)}, cuota de {formatear_pesos(cuota_final)} al mes"
+        )
+        if total_final is not None:
+            cierre += f" y total de {formatear_pesos(total_final)}"
+        mensaje_listo = (
+            f"{cierre}. Ya te envié la ficha por WhatsApp. "
+            "Es orientativo: la decisión es del banco."
+        )
+    else:
+        mensaje_listo = (
+            "Ya te envié la ficha por WhatsApp. Es orientativo: la decisión es del banco."
+        )
+
+    cifras_permitidas = _cifras_de_la_ficha(
+        resultado,
+        monto=monto_final,
+        plazo_meses=int(plazo_final) if plazo_final else None,
+        cuota=cuota_final,
+        total=total_final,
+    )
+    cifras_turno = (
+        _cifras_del_turno_ficha(
+            resultado,
+            monto=monto_final,
+            plazo_meses=int(plazo_final),
+            cuota=cuota_final,
+            total=total_final,
+        )
+        if monto_final is not None and plazo_final and cuota_final is not None
+        else ()
+    )
+
     if ficha:
-        _publicar_escena(
-            lambda: (
-                TurnoEscena(
-                    id="vivo.ficha.v1",
-                    orden=91,
-                    personaje="pana",
-                    texto=texto,
-                    subtitulo="Ficha de la opción",
-                    origen="reglas",
-                ),
+        _publicar_ficha(
+            TurnoEscena(
+                id="vivo.ficha.v1",
+                orden=91,
+                personaje="pana",
+                texto=texto,
+                subtitulo="Ficha de la opción",
+                cifras=cifras_turno,
+                escenario=escenario,
+                origen="reglas",
             )
         )
+        dejar_ficha(texto, imagen)
     return ok(
         "generar_ficha_opcion",
         {
             "texto": texto,
+            "mensaje_listo": mensaje_listo,
+            "cifras_permitidas": cifras_permitidas,
+            "opcion": entrada.opcion,
+            "escenario": como_json(escenario),
             "png_bytes": len(imagen),
             "semaforo": resultado.semaforo,
             "cuota_mensual": como_json(resultado.cuota_mensual),

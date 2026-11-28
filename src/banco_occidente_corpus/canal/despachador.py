@@ -42,6 +42,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 from ..asistente.validacion import detectar_pii
+from ..escena.ficha_entrega import tomar_ficha
 from ..sucursal.perfil import huella_perfil
 from .almacen import (
     actualizar_mensaje,
@@ -278,6 +279,7 @@ class Despachador:
             if respuesta is None and self.entrevista is not None:
                 respuesta = self.entrevista.escenario(mensaje, usuario_id)
             motor_usado: str | None = None
+            inicio_motor = datetime.now(UTC)
             if respuesta is None:
                 texto_motor = self._texto_del_motor(mensaje.texto, usuario_id)
                 if texto_motor is not None:
@@ -316,6 +318,9 @@ class Despachador:
                 # ESCENA ya se publicó con su propio identificador, y un
                 # comando con código equivocado no publica nada.
                 self.escena.publicar_pana(usuario_id, respuesta.texto)
+            respuesta = self._enviar_ficha_pendiente(
+                mensaje, usuario_id, respuesta, motor_usado, inicio_motor
+            )
             actualizar_mensaje(
                 self.ruta_almacen,
                 mensaje.id_mensaje,
@@ -332,6 +337,57 @@ class Despachador:
             except Exception:
                 logger.warning("tampoco se pudo enviar el aviso de error")
             return None
+
+    def _enviar_ficha_pendiente(
+        self,
+        mensaje: MensajeEntrante,
+        usuario_id: str,
+        respuesta: RespuestaCanal,
+        motor_usado: str | None,
+        inicio: datetime,
+    ) -> RespuestaCanal:
+        """Envía la ficha que dejó el agente como un mensaje aparte.
+
+        Solo aplica al voluntario activo de la escena, cuando respondió el
+        gateway y la herramienta dejó una ficha de este turno. La ficha viaja
+        después del cierre corto de Pana; si el envío falla, el cierre ya salió
+        y el turno no se rompe.
+
+        Args:
+            mensaje: mensaje que originó el turno.
+            usuario_id: huella del número.
+            respuesta: respuesta que ya se envió.
+            motor_usado: motor que respondió (`openclaw` o `grafo`).
+            inicio: instante en que empezó el turno del motor.
+
+        Returns:
+            La respuesta, con `metadatos["ficha"]="1"` si la ficha salió.
+        """
+        if (
+            motor_usado != MOTOR_OPENCLAW
+            or self.escena is None
+            or not activa_entorno()
+            or not self.escena.activo(usuario_id)
+        ):
+            return respuesta
+        ficha = tomar_ficha(inicio)
+        if ficha is None:
+            return respuesta
+        texto, imagen = ficha
+        try:
+            self.crear_enviador(usuario_id, mensaje.remitente).enviar(
+                RespuestaCanal(
+                    usuario_id=usuario_id,
+                    id_mensaje_origen=mensaje.id_mensaje,
+                    texto=texto[:4096],
+                    tipo="imagen",
+                    imagen=imagen,
+                )
+            )
+        except ErrorEnvio:
+            logger.warning("no se pudo enviar la ficha del voluntario")
+            return respuesta
+        return respuesta.model_copy(update={"metadatos": {**respuesta.metadatos, "ficha": "1"}})
 
     def _avisar_no_autorizado(self, mensaje: MensajeEntrante, usuario_id: str) -> None:
         """Intenta avisar al número no autorizado sin romper el turno.

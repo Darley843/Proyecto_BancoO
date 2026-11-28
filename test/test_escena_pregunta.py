@@ -542,6 +542,22 @@ def test_equipo_descarta_el_hallazgo_dato_personal() -> None:
     assert turno.hallazgos == ()
 
 
+def test_la_respuesta_del_modelo_se_dice_sin_enlaces_ni_listas() -> None:
+    """El paso del proyecto deja el subtítulo hablado sin URL ni viñetas."""
+    modelo = ModeloFalso(["Usamos Qdrant por los filtros.\n- Es local\nhttps://ejemplo.com/boveda"])
+    turno = responder_pregunta(
+        "¿por qué usaron Qdrant?",
+        ficha=_ficha(),
+        recuperador=RecuperadorFalso([_fragmento()]),
+        ventanilla=VentanillaFalsa(),
+        modelo=modelo,
+    )
+
+    assert turno.origen == "llm"
+    assert "https://" not in turno.texto
+    assert "- " not in turno.texto
+
+
 def test_texto_del_modelo_se_recorta_a_40_palabras_sin_fuente() -> None:
     """El tope de palabras se aplica al texto hablado y no a la línea Fuente."""
     modelo = ModeloFalso(["palabra " * 80])
@@ -581,10 +597,10 @@ def test_registro_mide_el_tiempo_sin_guardar_pregunta_ni_respuesta(
 
 
 def test_cargar_limites_pregunta_del_toml() -> None:
-    """Los límites salen de `[preguntas]` y respetan el tope de 40 palabras."""
+    """Los límites salen de `[preguntas]` y respetan el tope de 100 palabras."""
     limites = cargar_limites_pregunta()
 
-    assert limites.max_palabras == 40
+    assert limites.max_palabras == 100
     assert limites.tiempo_total_segundos == 8.0
     assert limites.tiempo_llamada_segundos == 4.0
     assert limites.puntaje_minimo == 0.9

@@ -308,6 +308,20 @@ def bloque_aplicable(prefijo: str, producto: str) -> str | None:
     return None
 
 
+def _mensaje_de_bloque(bloque: dict[str, Any]) -> str:
+    """Arma el texto exacto de una pregunta con sus opciones para copiar.
+
+    Args:
+        bloque: bloque de `BLOQUES_ENTREVISTA` con `pregunta` y `opciones`.
+
+    Returns:
+        La pregunta y una opción por línea, con su letra.
+    """
+    opciones = [f"{opcion['letra']}. {opcion['etiqueta']}" for opcion in bloque.get("opciones", [])]
+    pregunta = " ".join(str(bloque.get("pregunta", "")).split())
+    return "\n\n".join(parte for parte in (pregunta, "\n".join(opciones)) if parte)
+
+
 def _pregunta_de_bloque(clave: str) -> dict[str, Any]:
     """Arma el paso `faltan_datos` de un bloque con sus letras y etiquetas.
 
@@ -315,7 +329,8 @@ def _pregunta_de_bloque(clave: str) -> dict[str, Any]:
         clave: bloque de `BLOQUES_ENTREVISTA`.
 
     Returns:
-        El estado, la pregunta y las opciones exactas que Pana debe copiar.
+        El estado, la pregunta, las opciones exactas que Pana debe copiar y el
+        `mensaje_listo` que responde sin reescribir nada.
     """
     bloque = BLOQUES_ENTREVISTA[clave]
     return {
@@ -323,6 +338,7 @@ def _pregunta_de_bloque(clave: str) -> dict[str, Any]:
         "bloque": clave,
         "pregunta": bloque["pregunta"],
         "opciones": bloque["opciones"],
+        "mensaje_listo": _mensaje_de_bloque(bloque),
         "mensaje": (
             "Copia esta pregunta y sus opciones tal cual, una sola pregunta por "
             "mensaje; no cambies textos ni rangos."
@@ -351,6 +367,7 @@ def _pregunta_de_monto_exacto(ident: str) -> dict[str, Any]:
         "etiqueta": ETIQUETAS_ENTREVISTA.get(ident, ident),
         "limites": {"desde": desde, "hasta": hasta},
         "valor_del_rango": VALORES_ENTREVISTA.get(ident),
+        "mensaje_listo": PREGUNTA_MONTO_EXACTO,
         "mensaje": (
             "Pregunta el monto exacto en un mensaje aparte y pásalo en `monto`, "
             "con la misma validación de límites del rango. Si no lo da, usa "
@@ -765,12 +782,20 @@ class NegociarOpcionEntrada(BaseModel):
 
 
 class GenerarFichaOpcionEntrada(BaseModel):
-    """Entrada de `generar_ficha_opcion`."""
+    """Entrada de `generar_ficha_opcion`.
+
+    La letra es la opción que el invitado eligió en el resumen A/B; con ella la
+    ficha lleva el monto, el plazo, la cuota y el total de esa opción.
+    """
 
     model_config = ConfigDict(extra="forbid")
 
     respuestas: RespuestasEntrevista
     monto: MontoExactoEntrada = None
+    opcion: Literal["A", "B"] | None = Field(
+        default=None,
+        description="Letra de la opción elegida (A o B); sin ella se usa el plazo de la entrevista.",
+    )
 
 
 class ResponderSobreProyectoEntrada(BaseModel):

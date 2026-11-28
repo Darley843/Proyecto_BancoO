@@ -2,9 +2,10 @@
 
 Cada entrada sale de la «Voz» de una pregunta de `docs/PRESENTADOR.md` y se
 revisa aquí con las mismas reglas que aplica `escena/pregunta.py` antes de
-usarla: fuente que existe, máximo tres frases y 40 palabras, toda cifra dura
-declarada y sin datos personales. Además, cada variante elige su propia entrada
-y una pregunta parecida que no llega al umbral no se responde como fija.
+usarla: fuente que existe, entre dos y cuatro frases, máximo 100 palabras, toda
+cifra dura declarada y sin datos personales. Además, cada variante elige su
+propia entrada y una pregunta parecida que no llega al umbral no se responde
+como fija.
 """
 
 from __future__ import annotations
@@ -39,11 +40,11 @@ def _ids(entradas: tuple[EntradaFija, ...]) -> list[str]:
     return [entrada.id for entrada in entradas]
 
 
-def test_se_cargan_las_22_y_ninguna_se_descarta() -> None:
-    """Las 22 preguntas de la ficha cargan: ninguna pierde su fuente al leerse."""
-    assert len(_crudas()) == 22
+def test_se_cargan_las_32_y_ninguna_se_descarta() -> None:
+    """Las 32 preguntas de la ficha cargan: ninguna pierde su fuente al leerse."""
+    assert len(_crudas()) == 32
     assert _ids(FICHA.entradas) == [str(dato["id"]) for dato in _crudas()]
-    assert len(set(_ids(FICHA.entradas))) == 22
+    assert len(set(_ids(FICHA.entradas))) == 32
 
 
 @pytest.mark.parametrize("entrada", FICHA.entradas, ids=_ids(FICHA.entradas))
@@ -56,14 +57,23 @@ def test_cada_fuente_es_un_ancla_de_la_ficha_que_existe(entrada: EntradaFija) ->
 
 @pytest.mark.parametrize("entrada", FICHA.entradas, ids=_ids(FICHA.entradas))
 def test_cada_respuesta_cumple_el_contrato_de_la_voz(entrada: EntradaFija) -> None:
-    """Máximo tres frases y 40 palabras, cifras declaradas y sin datos personales."""
+    """Entre dos y cuatro frases, 70 palabras, cifras declaradas y sin PII."""
     assert pregunta._entrada_valida(entrada, LIMITES)
     assert contar_palabras(entrada.respuesta) <= LIMITES.max_palabras
-    assert pregunta._contar_frases(entrada.respuesta) <= 3
+    assert 2 <= pregunta._contar_frases(entrada.respuesta) <= 4
     declaradas = {pregunta._canonica(cifra.valor) for cifra in entrada.cifras}
     assert cifras_duras(entrada.respuesta) <= declaradas
     for texto in (entrada.respuesta, *entrada.variantes):
         assert not detectar_pii(texto)
+
+
+@pytest.mark.parametrize("entrada", FICHA.entradas, ids=_ids(FICHA.entradas))
+def test_cada_respuesta_es_hablada_sin_enlaces_ni_asteriscos(entrada: EntradaFija) -> None:
+    """Lo que se dice en voz alta no lleva enlaces, ni marcas de negrita."""
+    assert "http://" not in entrada.respuesta
+    assert "https://" not in entrada.respuesta
+    assert "*" not in entrada.respuesta
+    assert len(entrada.variantes) >= 2
 
 
 @pytest.mark.parametrize("entrada", FICHA.entradas, ids=_ids(FICHA.entradas))
@@ -117,3 +127,21 @@ def test_la_ficha_no_tiene_telefonos_correos_ni_documentos() -> None:
 def test_un_toml_con_otra_raiz_sin_la_ficha_no_carga_entradas(tmp_path: Path) -> None:
     """Si `docs/PRESENTADOR.md` no existe en la raíz, ninguna entrada se usa."""
     assert cargar_ficha(RUTA_TOML, raiz=tmp_path).entradas == ()
+
+
+def test_las_cifras_de_las_respuestas_tecnicas_estan_en_la_documentacion() -> None:
+    """Las cifras nuevas no se inventan: están en los documentos que citan."""
+    por_id = {entrada.id: entrada for entrada in FICHA.entradas}
+    fuentes = {
+        "rag": [
+            PROJECT_ROOT / "docs" / "ARQUEO.md",
+            PROJECT_ROOT / "docs" / "EVIDENCIA.md",
+            PROJECT_ROOT / "docs" / "PROYECCION.md",
+        ],
+        "costo_latencia": [PROJECT_ROOT / "docs" / "DESPLIEGUE_WHATSAPP.md"],
+        "whatsapp": [PROJECT_ROOT / "docs" / "DESPLIEGUE_WHATSAPP.md"],
+    }
+    for identificador, rutas in fuentes.items():
+        texto = "\n".join(ruta.read_text(encoding="utf-8") for ruta in rutas)
+        for cifra in por_id[identificador].cifras:
+            assert cifra.valor_legible in texto, (identificador, cifra.valor_legible)

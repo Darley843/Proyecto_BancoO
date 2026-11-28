@@ -79,7 +79,9 @@ RUTA_CONFIG = PROJECT_ROOT / "config" / "escena.toml"
 #: Umbral de coincidencia de tokens con las variantes de la ficha.
 UMBRAL_FIJO = 0.6
 #: Máximo de palabras del texto que se dice en voz.
-MAX_PALABRAS = 40
+MAX_PALABRAS = 100
+#: Máximo de frases de una respuesta fija.
+MAX_FRASES = 4
 #: Presupuesto total de una pregunta, en segundos (punto abierto del diseño).
 TIEMPO_TOTAL_SEGUNDOS = 8.0
 #: Presupuesto de la llamada al modelo, en segundos.
@@ -190,7 +192,7 @@ def cargar_limites_pregunta(ruta: Path | None = None) -> LimitesPregunta:
         ruta: archivo TOML alternativo; por defecto `config/escena.toml`.
 
     Returns:
-        Los límites validados. Las palabras nunca pasan de 40, el máximo del
+        Los límites validados. Las palabras nunca pasan de 100, el máximo del
         contrato; los tiempos y el puntaje mínimo se toman del TOML porque el
         límite de tiempo es un punto abierto.
     """
@@ -581,6 +583,23 @@ def _llamar_modelo(
         ejecutor.shutdown(wait=False, cancel_futures=True)
 
 
+def _sin_enlaces_ni_listas(texto: str) -> str:
+    """Deja la respuesta del modelo como texto hablado, sin URL ni viñetas.
+
+    Args:
+        texto: respuesta cruda del modelo.
+
+    Returns:
+        El texto en un párrafo, sin enlaces ni marcas de lista y con máximo
+        cuatro frases.
+    """
+    sin_url = re.sub(r"https?://\S+", " ", texto)
+    lineas = [re.sub(r"^\s*(?:[-*•]|\d+[.)])\s+", "", linea) for linea in sin_url.splitlines()]
+    plano = " ".join(" ".join(lineas).split())
+    frases = [frase for frase in re.split(r"(?<=[.!?…])\s+", plano) if frase.strip()]
+    return " ".join(frases[:MAX_FRASES]).strip()
+
+
 def _turno_proyecto(
     fragmento: FragmentoProyecto,
     crudo: str,
@@ -598,6 +617,7 @@ def _turno_proyecto(
         return None
     if _aplica_pii(audiencia) and detectar_pii(cuerpo) is not None:
         return None
+    cuerpo = _sin_enlaces_ni_listas(cuerpo)
     cuerpo, _ = limitar_palabras(cuerpo, limites.max_palabras)
     if not cuerpo:
         return None
@@ -717,7 +737,7 @@ def _entrada_valida(entrada: EntradaFija, limites: LimitesPregunta) -> bool:
     """Comprueba el contrato de una entrada fija antes de usarla."""
     if not entrada.respuesta.strip() or not entrada.fuente.strip() or not entrada.variantes:
         return False
-    if _contar_frases(entrada.respuesta) > 3:
+    if _contar_frases(entrada.respuesta) > MAX_FRASES:
         return False
     if contar_palabras(entrada.respuesta) > limites.max_palabras:
         return False
