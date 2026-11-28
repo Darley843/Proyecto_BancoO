@@ -492,7 +492,7 @@ def crear_router_escena(
                 respuesta=None,
                 turno=_turno_canal(respuesta.texto),
                 enviado=True,
-                ficha=respuesta.imagen is not None,
+                ficha=respuesta.imagen is not None or respuesta.metadatos.get("ficha") == "1",
             )
 
         resultado = actual.interpretar(

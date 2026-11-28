@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 
-from banco_occidente_corpus.escena import en_vivo
+from banco_occidente_corpus.escena import en_vivo, ficha_entrega
 from banco_occidente_corpus.herramientas import lectura
 
 RESPUESTAS = [
@@ -19,6 +19,16 @@ RESPUESTAS = [
     "cuotas.NINGUNA",
     "monto.DE_5M_A_10M",
     "plazo.36",
+]
+
+RESPUESTAS_VEHICULO = [
+    "objetivo.vehiculo_nuevo",
+    "vinculacion.empleado",
+    "ingresos.DE_3M_A_5M",
+    "gastos.DE_1M_A_2M",
+    "cuotas.NINGUNA",
+    "monto.DE_30M_A_60M",
+    "plazo.48",
 ]
 
 
@@ -100,10 +110,13 @@ def test_responder_sobre_proyecto_cita_la_fuente() -> None:
     assert len(str(fragmento["texto"]).split()) <= 41
 
 
-def test_buscar_en_documentos_traduce_el_error_del_indice(monkeypatch) -> None:
+def test_buscar_en_documentos_traduce_el_error_del_indice(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     """Si la Bóveda no está, la herramienta devuelve un error explicable."""
 
     def falso(pregunta: str, k: int = 5) -> dict[str, object]:
+        """Devuelve el error fijo del índice ausente."""
         return {"error": {"codigo": "indice_ausente", "mensaje": "falta el índice"}}
 
     monkeypatch.setattr(lectura, "buscar_en_boveda", falso)
@@ -230,6 +243,8 @@ def escena_viva(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     monkeypatch.setenv("ESCENA_EN_VIVO", "1")
     ruta = tmp_path / "escena" / "en_vivo.jsonl"
     monkeypatch.setattr(en_vivo, "RUTA_EN_VIVO", ruta)
+    monkeypatch.setattr(ficha_entrega, "RUTA_ENTREGA", tmp_path / "escena" / "ficha_entrega.json")
+    monkeypatch.setattr(lectura, "_ULTIMA_FICHA_PUBLICADA", None)
     return ruta
 
 
@@ -349,6 +364,105 @@ def test_generar_ficha_opcion_publica_un_turno_de_pana(escena_viva: Path) -> Non
     assert turnos[0]["id"] == "vivo.ficha.v1"
     assert turnos[0]["subtitulo"] == "Ficha de la opción"
     assert turnos[0]["texto"] == salida.datos["texto"]
+
+
+def test_generar_ficha_opcion_cierra_con_la_opcion_elegida_y_sus_cifras(
+    escena_viva: Path,
+) -> None:
+    """El cierre corto no repite la otra opción y el auditor queda conforme."""
+    salida = lectura.generar_ficha_opcion(RESPUESTAS_VEHICULO, monto=30_000_000, opcion="A")
+    assert salida.ok
+    mensaje = salida.datos["mensaje_listo"]
+    assert "Elegiste la opción A" in mensaje
+    assert "Ya te envié la ficha por WhatsApp" in mensaje
+    assert "es orientativo" in mensaje.lower()
+    assert "Opción B" not in mensaje
+    assert salida.datos["texto"] not in mensaje
+    auditoria = lectura.auditar_respuesta(
+        mensaje,
+        cifras_permitidas=salida.datos["cifras_permitidas"],
+    )
+    assert auditoria.datos["veredicto"] == "conforme"
+
+
+def test_el_turno_de_la_ficha_trae_el_escenario_de_la_opcion_elegida(
+    escena_viva: Path,
+) -> None:
+    """El panel de cifras recibe el plazo, la cuota y el total de la opción A."""
+    salida = lectura.generar_ficha_opcion(RESPUESTAS_VEHICULO, monto=30_000_000, opcion="A")
+    assert salida.ok
+
+    turnos = _turnos(_publicados(escena_viva))
+    assert len(turnos) == 1
+    escenario = turnos[0]["escenario"]
+    assert isinstance(escenario, dict)
+    assert escenario["plazo_meses"] == 60
+    assert escenario["cuota_mensual"] == salida.datos["escenario"]["cuota_mensual"]
+    etiquetas = {cifra["etiqueta"] for cifra in turnos[0]["cifras"]}  # type: ignore[union-attr]
+    assert {"plazo", "cuota mensual", "total pagado"} <= etiquetas
+
+
+def test_los_pasos_de_la_entrevista_traen_el_mensaje_listo() -> None:
+    """Cada paso trae la pregunta con sus opciones para copiar sin reescribir."""
+    pasos = [
+        ["objetivo.libre_inversion"],
+        ["objetivo.libre_inversion", "vinculacion.empleado"],
+        [
+            "objetivo.libre_inversion",
+            "vinculacion.empleado",
+            "ingresos.DE_3M_A_5M",
+        ],
+        [
+            "objetivo.libre_inversion",
+            "vinculacion.empleado",
+            "ingresos.DE_3M_A_5M",
+            "gastos.DE_1M_A_2M",
+        ],
+        [
+            "objetivo.libre_inversion",
+            "vinculacion.empleado",
+            "ingresos.DE_3M_A_5M",
+            "gastos.DE_1M_A_2M",
+            "cuotas.NINGUNA",
+        ],
+        [
+            "objetivo.libre_inversion",
+            "vinculacion.empleado",
+            "ingresos.DE_3M_A_5M",
+            "gastos.DE_1M_A_2M",
+            "cuotas.NINGUNA",
+            "monto.DE_5M_A_10M",
+        ],
+    ]
+    for respuestas in pasos:
+        salida = lectura.diagnosticar_capacidad(respuestas)
+        assert salida.ok
+        assert salida.datos["estado"] == "faltan_datos"
+        mensaje = salida.datos["mensaje_listo"]
+        assert salida.datos["pregunta"] in mensaje
+        if salida.datos["opciones"]:
+            primera = salida.datos["opciones"][0]
+            assert f"{primera['letra']}. {primera['etiqueta']}" in mensaje
+
+
+def test_el_diagnostico_completo_trae_resumen_y_cifras_permitidas() -> None:
+    """El resumen copia A y B y sus cifras cubren el cierre y la ficha."""
+    salida = lectura.diagnosticar_capacidad(RESPUESTAS_VEHICULO, monto=30_000_000)
+    assert salida.ok
+    resumen = salida.datos["resumen_escena"]
+    mensaje = resumen["mensaje_listo"]
+    assert "Opción A:" in mensaje
+    assert "Opción B:" in mensaje
+    assert "Responde A o B." in mensaje
+    permitidas = resumen["cifras_permitidas"]
+    assert "$880.294" in permitidas
+    assert "$760.808" in permitidas
+    assert "19,49 % E.A." in permitidas
+    assert "1,49 % M.V." in permitidas
+    assert salida.datos["mensaje_listo"] == mensaje
+    assert salida.datos["cifras_permitidas"] == permitidas
+    auditoria = lectura.auditar_respuesta(mensaje, cifras_permitidas=permitidas)
+    assert auditoria.datos["veredicto"] == "conforme"
 
 
 def test_apagado_las_herramientas_no_publican(

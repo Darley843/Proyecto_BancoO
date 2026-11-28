@@ -70,7 +70,7 @@ editarla. Si hay que cambiarla, se avisa a los tres y se actualiza el contrato.
 | Ruta | `GET /api/escena/en-vivo?desde=<seq>`; solo en la app que escucha en `127.0.0.1` |
 | Tecla de la pantalla | **E** (libre; ya están P, S, Q, V, N, T, H, R, Espacio y →) |
 | Frecuencia | cada 1 s, solo con el modo en vivo abierto y la pestaña visible |
-| Borrado | `scripts/limpiar_evento.ps1` borra `en_vivo.jsonl` (y `en_vivo.lock`) |
+| Borrado | `scripts/limpiar_evento.ps1` borra `en_vivo.jsonl`, `en_vivo.lock` y la ficha pendiente `ficha_entrega.json` |
 | Punto de control | jueves 26 a las **12:00**; si no está verde, la escena en vivo queda apagada (§15) |
 
 ## 3. El turno que se publica
@@ -366,9 +366,12 @@ un efecto lateral local, no un campo de la respuesta.
   guion debe evitarlo.
 - **`generar_ficha_opcion`.** Publica un turno de Pana con
   `id="vivo.ficha.v1"`, `texto=resultado["texto"]`,
-  `subtitulo="Ficha de la opción"`, `origen="reglas"` y `cifras=()`. El PNG no
-  viaja en la lista: solo su texto equivalente. Si `texto` viene vacío, no se
-  publica.
+  `subtitulo="Ficha de la opción"`, `origen="reglas"`, el `escenario` de la
+  opción elegida y sus `cifras` (plazo, cuota y total), para que el panel de la
+  pantalla se actualice. El PNG no viaja en la lista: solo su texto equivalente.
+  La herramienta devuelve además el `mensaje_listo` del cierre corto y deja la
+  ficha para que el canal la envíe como mensaje aparte por WhatsApp. Si `texto`
+  viene vacío, no se publica.
 
 ### 8.2 Fallos y bordes
 

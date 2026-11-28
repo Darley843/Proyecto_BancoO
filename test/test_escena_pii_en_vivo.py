@@ -178,9 +178,10 @@ def test_la_ruta_no_devuelve_pii_ni_rutas_internas(lista: Path) -> None:
 
 
 def test_el_script_de_limpieza_nombra_la_lista_y_el_bloqueo() -> None:
-    """``limpiar_evento.ps1`` borra los dos archivos de la escena en vivo (§12)."""
+    """``limpiar_evento.ps1`` borra la escena en vivo y la ficha pendiente (§12)."""
     script = (PROJECT_ROOT / "scripts" / "limpiar_evento.ps1").read_text(
         encoding="utf-8-sig", errors="replace"
     )
     assert "en_vivo.jsonl" in script
     assert "en_vivo.lock" in script
+    assert "ficha_entrega.json" in script

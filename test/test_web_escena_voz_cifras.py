@@ -313,6 +313,12 @@ def test_la_voz_y_la_pantalla_conservan_el_punto_final_de_la_frase() -> None:
         ("$28.000.000", "$28.000.000"),
         ("$59.636 – $66.400", "$59.636 – $66.400"),
         ("36 meses y 4 turnos", "36 meses y 4 turnos"),
+        ("*Verde: va bien* y _cursiva_", "Verde: va bien y cursiva"),
+        ("mira https://ejemplo.com/pagina ahora", "mira ahora"),
+        (
+            "*$30 millones* a 60 meses\nhttps://ejemplo.com/tasas\n_Orientativo._",
+            "$30.000.000 a 60 meses\nOrientativo.",
+        ),
     ],
 )
 @requiere_node

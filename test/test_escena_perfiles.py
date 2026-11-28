@@ -256,8 +256,9 @@ def test_la_escena_necesita_entre_tres_y_cinco_perfiles(
 def test_los_textos_de_los_perfiles_del_demo_no_llevan_datos_personales() -> None:
     """El archivo real no trae teléfonos, correos ni documentos en los perfiles."""
     texto = RUTA_CONFIG.read_text(encoding="utf-8")
+    perfiles = texto.split("[[perfiles]]", 1)[1].split("[voluntario]", 1)[0]
 
-    assert "@" not in texto.split("[[perfiles]]", 1)[1]
+    assert "@" not in perfiles
 
 
 # --- El modo seguro ejecuta el auditor ------------------------------------------

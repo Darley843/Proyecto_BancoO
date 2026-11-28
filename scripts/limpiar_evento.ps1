@@ -59,9 +59,10 @@
        scripts\sembrar_memoria.ps1.
 
     5. Borra en Windows data\asistente\trazas\herramientas.jsonl si existe y, con
-       el modo En vivo de la escena, data\escena\en_vivo.jsonl y su bloqueo
-       data\escena\en_vivo.lock. Sale del modo en vivo y, si es posible, detiene
-       la app y el MCP antes de borrar la lista; despues apaga
+       el modo En vivo de la escena, data\escena\en_vivo.jsonl, su bloqueo
+       data\escena\en_vivo.lock y la ficha pendiente
+       data\escena\ficha_entrega.json. Sale del modo en vivo y, si es posible,
+       detiene la app y el MCP antes de borrar la lista; despues apaga
        ESCENA_EN_VIVO y reinicia la app.
 
     No borra data\evaluacion\inyeccion.json: es la evidencia de la tarea 3.5
@@ -172,6 +173,7 @@ $ArchivosWindows = @(
     (Join-Path $RaizRepo 'data\asistente\trazas\herramientas.jsonl')
     (Join-Path $RaizRepo 'data\escena\en_vivo.jsonl')
     (Join-Path $RaizRepo 'data\escena\en_vivo.lock')
+    (Join-Path $RaizRepo 'data\escena\ficha_entrega.json')
 )
 $ArchivosVersionados = @('SOUL.md', 'AGENTS.md', 'USER.md', 'IDENTITY.md')
 $ArchivosSemilla = @('MEMORY.semilla.md', 'semilla.md')

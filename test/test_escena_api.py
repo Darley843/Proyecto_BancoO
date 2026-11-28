@@ -235,6 +235,28 @@ def test_hablar_libre_marca_la_ficha(tmp_path: Path) -> None:
     assert datos["ficha"] is True
 
 
+def test_hablar_libre_marca_la_ficha_enviada_aparte(tmp_path: Path) -> None:
+    """La ficha que el canal envió aparte también queda marcada."""
+    canal = CanalFalso(
+        RespuestaCanal(
+            usuario_id="huella",
+            id_mensaje_origen="escena-voz",
+            texto="cierre corto",
+            metadatos={"ficha": "1"},
+        )
+    )
+    datos = (
+        _cliente_canal(tmp_path, canal)
+        .post(
+            "/api/escena/hablar",
+            json={"texto": "termina la escena"},
+        )
+        .json()
+    )
+
+    assert datos["ficha"] is True
+
+
 def test_hablar_libre_sin_voluntario_responde_409(tmp_path: Path) -> None:
     """Sin una ranura activa no se inventa un destinatario."""
     respuesta = _cliente_canal(tmp_path, CanalFalso(None)).post(

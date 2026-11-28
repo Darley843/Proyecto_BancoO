@@ -26,7 +26,9 @@ from banco_occidente_corpus.canal.despachador import (
     Despachador,
 )
 from banco_occidente_corpus.canal.envio import Enviador, ErrorEnvio
+from banco_occidente_corpus.canal.escena_vivo import EscenaVivo
 from banco_occidente_corpus.canal.identidad import calcular_usuario_id
+from banco_occidente_corpus.escena import ficha_entrega
 from banco_occidente_corpus.sucursal.perfil import huella_perfil
 
 SAL = "sal-de-prueba"
@@ -304,6 +306,37 @@ def test_openclaw_responde_una_sola_vez_y_no_llama_al_grafo(tmp_path: Path) -> N
     assert banco.llamadas == []
     assert [respuesta.texto for respuesta in banco.enviadas] == ["respuesta de openclaw"]
     assert _motor_de(banco.ruta, mensaje.id_mensaje) == "openclaw"
+
+
+def test_la_ficha_del_agente_llega_como_mensaje_aparte(
+    tmp_path: Path,
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """El cierre de Pana y la ficha van en dos envíos distintos, sin duplicarse."""
+    monkeypatch.setenv("ESCENA_EN_VIVO", "1")
+    monkeypatch.setattr(ficha_entrega, "RUTA_ENTREGA", tmp_path / "ficha_entrega.json")
+    escena = EscenaVivo(publicador=lambda *_args, **_kwargs: ())
+    imagen = b"\x89PNG\r\n\x1a\nficha"
+
+    def motor(_texto: str, _usuario_id: str) -> str:
+        """Simula al agente que deja la ficha durante el turno."""
+        ficha_entrega.dejar_ficha("ficha aparte", imagen)
+        return "cierre corto"
+
+    banco = _banco(tmp_path, motor=motor)
+    banco.despachador.escena = escena
+    assert escena.activar(banco.usuario_id, destino=NUMERO)
+    banco.maquina.aceptar(banco.usuario_id, AHORA)
+    mensaje = _mensaje("elijo la opción A")
+
+    banco.despachador.recibir(mensaje)
+    respuesta = banco.despachador.procesar(mensaje)
+
+    assert [envio.texto for envio in banco.enviadas] == ["cierre corto", "ficha aparte"]
+    assert banco.enviadas[1].tipo == "imagen"
+    assert banco.enviadas[1].imagen == imagen
+    assert respuesta is not None and respuesta.metadatos.get("ficha") == "1"
+    assert not (tmp_path / "ficha_entrega.json").exists()
 
 
 def test_si_openclaw_no_responde_responde_el_grafo(tmp_path: Path) -> None:

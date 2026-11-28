@@ -44,6 +44,26 @@ function montoCompleto(crudo, factor) {
 }
 
 /**
+ * Quita el formato de WhatsApp y las URL de un texto para la pantalla.
+ *
+ * La voz ya limpia las marcas en `voz.js`; los subtítulos y el panel deben
+ * mostrar el mismo contenido sin los asteriscos de negrita, los guiones bajos
+ * de cursiva ni el enlace de la fuente.
+ *
+ * @param {string} texto Texto con el formato de WhatsApp.
+ * @returns {string} El texto limpio, sin enlaces ni marcas.
+ */
+function sinFormato(texto) {
+  return String(texto ?? "")
+    .replace(/https?:\/\/\S+/gi, " ")
+    .replace(/[*_~`]/g, "")
+    .replace(/[ \t]{2,}/g, " ")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{2,}/g, "\n")
+    .trim();
+}
+
+/**
  * Expande las cifras abreviadas de un texto para mostrarlo en la escena.
  *
  * Los rangos con la escala al final («$20 a $50 millones») aplican la escala a
@@ -56,7 +76,7 @@ function montoCompleto(crudo, factor) {
  * @returns {string} El mismo texto con las cifras completas.
  */
 export function paraPantalla(texto) {
-  let limpio = String(texto ?? "");
+  let limpio = sinFormato(texto);
   limpio = limpio.replace(
     /\$\s*(\d+(?:\.\d{3})*)\s+a\s+\$\s*(\d+(?:\.\d{3})*)\s*(millones|millón)\b/gi,
     (coincidencia, desde, hasta) =>

@@ -345,7 +345,9 @@ Qué hace, en orden:
    archivos versionados `SOUL.md`, `AGENTS.md`, `USER.md` e `IDENTITY.md`. Los
    archivos reales se regeneran desde las semillas con
    `scripts\sembrar_memoria.ps1`.
-6. Borra en Windows `data/asistente/trazas/herramientas.jsonl` si existe.
+6. Borra en Windows `data/asistente/trazas/herramientas.jsonl` si existe y, con
+   el modo En vivo, la lista `data/escena/en_vivo.jsonl`, su bloqueo y la ficha
+   pendiente `data/escena/ficha_entrega.json`.
    **No** borra `data/evaluacion/inyeccion.json`: es la evidencia de la tarea
    3.5 que cita [`INYECCION.md`](./INYECCION.md) y no guarda el texto de las
    respuestas ni datos de invitados.
